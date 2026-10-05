@@ -21,3 +21,4 @@
 - [Human evaluation (planned)](ch12-human-evaluation.md)
 - [Evaluation design (planned)](ch13-evaluation-design.md)
 - [Reports (planned)](ch14-reports.md)
+- [Workspace agent (planned, paused)](ch15-workspace-agent.md)

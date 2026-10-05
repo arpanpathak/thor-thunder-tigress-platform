@@ -4,8 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Thor Chat</title>
+<script>try { const t = JSON.parse(localStorage.getItem("theme")); if (t && t !== "system") document.documentElement.dataset.theme = t; } catch {}</script>
 <style>
-  :root {
+  /* Themes. "system" follows the device: paper when light, night when dark. */
+  :root, :root[data-theme="paper"] {
     --bg: #fbfaf8; --panel: #ffffff; --text: #1c1917; --muted: #78716c; --border: #e7e5e4;
     --accent: #2f6f4f; --accent-text: #ffffff; --user: #f1efeb; --code-bg: #f6f5f2; --bar: #efede9;
     --danger: #b42318;
@@ -13,7 +15,7 @@
     --tok-number: #0e7490; --tok-macro: #2563eb; --tok-attr: #78716c; --tok-lifetime: #be185d; --tok-call: #1d4ed8;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme]) {
       --bg: #141312; --panel: #1c1b19; --text: #ecebe8; --muted: #9c978f; --border: #2e2c29;
       --accent: #7fc8a0; --accent-text: #0f1a14; --user: #24221f; --code-bg: #181715; --bar: #201f1c;
       --danger: #f97066;
@@ -21,6 +23,83 @@
       --tok-number: #79dcf2; --tok-macro: #82aaff; --tok-attr: #a8a29e; --tok-lifetime: #f78fb3; --tok-call: #9cc4ff;
     }
   }
+  :root[data-theme="night"] {
+    --bg: #141312; --panel: #1c1b19; --text: #ecebe8; --muted: #9c978f; --border: #2e2c29;
+    --accent: #7fc8a0; --accent-text: #0f1a14; --user: #24221f; --code-bg: #181715; --bar: #201f1c;
+    --danger: #f97066;
+    --tok-comment: #8b949e; --tok-string: #a5d6a7; --tok-keyword: #d2a8ff; --tok-type: #ffcb6b;
+    --tok-number: #79dcf2; --tok-macro: #82aaff; --tok-attr: #a8a29e; --tok-lifetime: #f78fb3; --tok-call: #9cc4ff;
+  }
+  :root[data-theme="github-light"] {
+    --bg: #ffffff; --panel: #ffffff; --text: #1f2328; --muted: #59636e; --border: #d1d9e0;
+    --accent: #0969da; --accent-text: #ffffff; --user: #f6f8fa; --code-bg: #f6f8fa; --bar: #eff2f5;
+    --danger: #cf222e;
+    --tok-comment: #59636e; --tok-string: #0a3069; --tok-keyword: #cf222e; --tok-type: #953800;
+    --tok-number: #0550ae; --tok-macro: #8250df; --tok-attr: #6e7781; --tok-lifetime: #116329; --tok-call: #8250df;
+  }
+  :root[data-theme="solarized-light"] {
+    --bg: #fdf6e3; --panel: #fffbef; --text: #073642; --muted: #7b8b8f; --border: #e6dfc8;
+    --accent: #268bd2; --accent-text: #fdf6e3; --user: #eee8d5; --code-bg: #f6efdc; --bar: #eee8d5;
+    --danger: #dc322f;
+    --tok-comment: #93a1a1; --tok-string: #2aa198; --tok-keyword: #859900; --tok-type: #b58900;
+    --tok-number: #d33682; --tok-macro: #268bd2; --tok-attr: #cb4b16; --tok-lifetime: #6c71c4; --tok-call: #268bd2;
+  }
+  :root[data-theme="solarized-dark"] {
+    --bg: #002b36; --panel: #073642; --text: #eee8d5; --muted: #93a1a1; --border: #0f4a57;
+    --accent: #2aa198; --accent-text: #002b36; --user: #073642; --code-bg: #01313d; --bar: #073642;
+    --danger: #dc322f;
+    --tok-comment: #839496; --tok-string: #2aa198; --tok-keyword: #859900; --tok-type: #b58900;
+    --tok-number: #d33682; --tok-macro: #268bd2; --tok-attr: #cb4b16; --tok-lifetime: #6c71c4; --tok-call: #268bd2;
+  }
+  :root[data-theme="nord"] {
+    --bg: #2e3440; --panel: #3b4252; --text: #eceff4; --muted: #a3acb9; --border: #434c5e;
+    --accent: #88c0d0; --accent-text: #2e3440; --user: #3b4252; --code-bg: #2a2f3a; --bar: #353b48;
+    --danger: #bf616a;
+    --tok-comment: #7b88a1; --tok-string: #a3be8c; --tok-keyword: #81a1c1; --tok-type: #8fbcbb;
+    --tok-number: #b48ead; --tok-macro: #88c0d0; --tok-attr: #d08770; --tok-lifetime: #ebcb8b; --tok-call: #88c0d0;
+  }
+  :root[data-theme="dracula"] {
+    --bg: #282a36; --panel: #2f3241; --text: #f8f8f2; --muted: #a2a6c2; --border: #3c3f52;
+    --accent: #bd93f9; --accent-text: #282a36; --user: #343746; --code-bg: #21222c; --bar: #2b2d3a;
+    --danger: #ff5555;
+    --tok-comment: #6272a4; --tok-string: #f1fa8c; --tok-keyword: #ff79c6; --tok-type: #8be9fd;
+    --tok-number: #bd93f9; --tok-macro: #50fa7b; --tok-attr: #ffb86c; --tok-lifetime: #ffb86c; --tok-call: #50fa7b;
+  }
+  :root[data-theme="one-dark"] {
+    --bg: #282c34; --panel: #2c313a; --text: #abb2bf; --muted: #7f848e; --border: #3a3f4b;
+    --accent: #61afef; --accent-text: #282c34; --user: #323842; --code-bg: #21252b; --bar: #2c313a;
+    --danger: #e06c75;
+    --tok-comment: #7f848e; --tok-string: #98c379; --tok-keyword: #c678dd; --tok-type: #e5c07b;
+    --tok-number: #d19a66; --tok-macro: #61afef; --tok-attr: #d19a66; --tok-lifetime: #e06c75; --tok-call: #61afef;
+  }
+  :root[data-theme="gruvbox-dark"] {
+    --bg: #282828; --panel: #32302f; --text: #ebdbb2; --muted: #a89984; --border: #3c3836;
+    --accent: #b8bb26; --accent-text: #282828; --user: #3c3836; --code-bg: #1d2021; --bar: #32302f;
+    --danger: #fb4934;
+    --tok-comment: #928374; --tok-string: #b8bb26; --tok-keyword: #fb4934; --tok-type: #fabd2f;
+    --tok-number: #d3869b; --tok-macro: #8ec07c; --tok-attr: #fe8019; --tok-lifetime: #83a598; --tok-call: #8ec07c;
+  }
+  :root[data-theme="monokai"] {
+    --bg: #272822; --panel: #2d2e27; --text: #f8f8f2; --muted: #a59f85; --border: #3e3d32;
+    --accent: #a6e22e; --accent-text: #272822; --user: #3e3d32; --code-bg: #1e1f1c; --bar: #2d2e27;
+    --danger: #f92672;
+    --tok-comment: #75715e; --tok-string: #e6db74; --tok-keyword: #f92672; --tok-type: #66d9ef;
+    --tok-number: #ae81ff; --tok-macro: #a6e22e; --tok-attr: #fd971f; --tok-lifetime: #fd971f; --tok-call: #a6e22e;
+  }
+  /* Material Deep Ocean, as configured in dogeleena-neo-agentic-ide (stock purple
+     remapped to ocean blue); the same palette as the book's deep-ocean.css. */
+  :root[data-theme="deep-ocean"] {
+    --bg: #0F111A; --panel: #1A1C25; --text: #EEFFFF; --muted: #8F93A2; --border: #3B3F51;
+    --accent: #84FFFF; --accent-text: #0F111A; --user: #1F2233; --code-bg: #090B10; --bar: #1A1C25;
+    --danger: #F07178;
+    --tok-comment: #464B5D; --tok-string: #C3E88D; --tok-keyword: #82AAFF; --tok-type: #82AAFF;
+    --tok-number: #F78C6C; --tok-macro: #89DDFF; --tok-attr: #FFCB6B; --tok-lifetime: #FFCB6B; --tok-call: #82AAFF;
+  }
+  :root[data-theme="deep-ocean"] .tok-keyword,
+  :root[data-theme="deep-ocean"] .tok-type { font-style: italic; }
+  :root { color-scheme: light; }
+  :root[data-theme="night"], :root[data-theme="deep-ocean"], :root[data-theme="solarized-dark"], :root[data-theme="nord"], :root[data-theme="dracula"], :root[data-theme="one-dark"], :root[data-theme="gruvbox-dark"], :root[data-theme="monokai"] { color-scheme: dark; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme]) { color-scheme: dark; } }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body { margin: 0; background: var(--bg); color: var(--text);
@@ -40,6 +119,9 @@
   .dot.bad { background: var(--danger); }
   #model { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   header .spacer { flex: 1; }
+  #theme { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px;
+           font-size: 14px; max-width: 150px; }
+  @media (max-width: 520px) { #theme { max-width: 96px; } .toggle { font-size: 0; gap: 0; } .toggle input { margin: 0; } }
   .toggle { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer;
             user-select: none; }
   .toggle input { accent-color: var(--accent); }
@@ -78,6 +160,11 @@
   .tok-number { color: var(--tok-number); } .tok-macro { color: var(--tok-macro); font-weight: 600; }
   .tok-attr { color: var(--tok-attr); } .tok-lifetime { color: var(--tok-lifetime); } .tok-call { color: var(--tok-call); }
 
+  details.sources { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+  details.sources summary { cursor: pointer; user-select: none; }
+  details.sources ol { margin: 6px 0 0; padding-left: 22px; }
+  details.sources li { margin: 2px 0; overflow-wrap: anywhere; }
+  details.sources a { color: var(--accent); }
   details.thinking { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
   details.thinking summary { cursor: pointer; user-select: none; }
   details.thinking .text { white-space: pre-wrap; border-left: 2px solid var(--border); padding: 4px 0 4px 12px;
@@ -114,7 +201,22 @@
   <span id="status" class="dot" title="server status"></span>
   <span id="model">connecting…</span>
   <span class="spacer"></span>
+  <label class="toggle" title="Let the model search the web before answering"><input id="web" type="checkbox"> web</label>
   <label class="toggle" title="Let the model reason before answering"><input id="think" type="checkbox"> think</label>
+  <select id="theme" title="Theme" aria-label="Theme">
+    <option value="system">System</option>
+    <option value="paper">Paper</option>
+    <option value="night">Night</option>
+    <option value="deep-ocean">Material Deep Ocean</option>
+    <option value="github-light">GitHub Light</option>
+    <option value="solarized-light">Solarized Light</option>
+    <option value="solarized-dark">Solarized Dark</option>
+    <option value="nord">Nord</option>
+    <option value="dracula">Dracula</option>
+    <option value="one-dark">One Dark</option>
+    <option value="gruvbox-dark">Gruvbox Dark</option>
+    <option value="monokai">Monokai</option>
+  </select>
   <button id="new" title="Start a new conversation">New</button>
   <button id="open-settings" title="Settings" aria-label="Settings">⚙</button>
 </header>
@@ -336,6 +438,22 @@ function renderMessage(message) {
   if (message.role === "user") {
     body.textContent = message.content;
   } else {
+    if (message.searches && message.searches.length) {
+      const details = element("details", "sources");
+      const count = message.searches.reduce((sum, search) => sum + search.results.length, 0);
+      details.append(element("summary", "", `searched: ${message.searches.map((search) => `“${search.query}”`).join(", ")} · ${count} sources`));
+      const list = element("ol");
+      message.searches.flatMap((search) => search.results).forEach((result) => {
+        const item = element("li");
+        const anchor = element("a", "", result.title || result.url);
+        anchor.href = /^https?:\/\//.test(result.url) ? result.url : "#";
+        anchor.target = "_blank"; anchor.rel = "noreferrer";
+        item.append(anchor);
+        list.append(item);
+      });
+      details.append(list);
+      body.append(details);
+    }
     if (message.reasoning) {
       const details = element("details", "thinking");
       details.append(element("summary", "", message.thinkingDone ? "thought" : "thinking…"), element("div", "text", message.reasoning));
@@ -407,9 +525,10 @@ async function send(text) {
   $("scroller").scrollTop = $("scroller").scrollHeight;
   setBusy(true);
 
-  const history = messages.slice(0, -1).filter((m) => !m.error).map(({ role, content }) => ({ role, content }));
+  const history = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content)).map(({ role, content }) => ({ role, content }));
   if (settings.system.trim()) history.unshift({ role: "system", content: settings.system.trim() });
-  const body = { messages: history, stream: true, chat_template_kwargs: { enable_thinking: $("think").checked } };
+  const body = { messages: history, stream: true, chat_template_kwargs: { enable_thinking: $("think").checked },
+    thor_web_search: $("web").checked };
   if (settings.temperature !== "" && !Number.isNaN(Number(settings.temperature))) body.temperature = Number(settings.temperature);
 
   controller = new AbortController();
@@ -436,6 +555,11 @@ async function send(text) {
         const payload = line.slice(5).trim();
         if (payload === "[DONE]") continue;
         const chunk = JSON.parse(payload);
+        if (chunk.thor) {
+          if (chunk.thor.search) (reply.searches = reply.searches || []).push(chunk.thor.search);
+          if (chunk.thor.error) reply.error = chunk.thor.error;
+          continue;
+        }
         const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta || {};
         if ((delta.content || delta.reasoning_content) && !firstToken) firstToken = performance.now();
         if (delta.reasoning_content) reply.reasoning += delta.reasoning_content;
@@ -485,7 +609,17 @@ $("composer").addEventListener("submit", (event) => {
 $("send").addEventListener("click", () => { if (controller) controller.abort(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && controller) controller.abort(); });
 $("new").addEventListener("click", () => { if (controller) controller.abort(); messages = []; save(); render(); input.focus(); });
+function applyTheme(name) {
+  if (name === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = name;
+}
+$("theme").value = store.get("theme", "system");
+applyTheme($("theme").value);
+$("theme").addEventListener("change", () => { applyTheme($("theme").value); store.set("theme", $("theme").value); });
+
 $("think").checked = store.get("think", false);
+$("web").checked = store.get("web", false);
+$("web").addEventListener("change", () => store.set("web", $("web").checked));
 $("think").addEventListener("change", () => store.set("think", $("think").checked));
 
 $("open-settings").addEventListener("click", () => {

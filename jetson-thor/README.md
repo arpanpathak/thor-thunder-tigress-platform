@@ -2,7 +2,7 @@
 
 The book has the full guide: https://arpanpathak.github.io/thor-thunder-tigress-platform/ (chapters 4 to 7).
 
-The Thor is `192.168.0.83`, user `arpanpathak`. On yahboom it is just `thor`.
+The Thor is `192.168.0.189`, user `arpanpathak`. On yahboom it is just `thor`.
 
 ## Log in
 
@@ -15,11 +15,11 @@ No IP and no password. This comes from a block in `~/.ssh/config` and the key
 
 ```bash
 ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519      # skip if the key exists
-ssh-copy-id arpanpathak@192.168.0.83                  # asks for the password once
+ssh-copy-id arpanpathak@192.168.0.189                  # asks for the password once
 cat >> ~/.ssh/config <<'EOF'
 
 Host thor
-    HostName 192.168.0.83
+    HostName 192.168.0.189
     User arpanpathak
     IdentityFile ~/.ssh/id_ed25519
     ServerAliveInterval 30
@@ -106,7 +106,7 @@ installed as the `thor-chat` user service and starts at boot.
 | Measured | 53 tok/s, first token 0.2 s |
 
 Change settings in `~/.config/thor-chat/env` (e.g. `USERS=8`), then
-`systemctl --user restart thor-chat`. The page has a think toggle, a stop
+`./serve.sh install`. The page has a think toggle, a stop
 button, copyable highlighted code and an optional system prompt in settings
 (none by default).
 
@@ -123,9 +123,9 @@ without the key. It is on now, because the chat is public through Funnel.
 
 ```bash
 cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/web
-./serve.sh key && systemctl --user restart thor-chat   # new key; the old one stops working
+./serve.sh key && systemctl --user restart thor-chat thor-tigress-agent   # new key; the old one stops working
 cat ~/.config/thor-chat/api-key                        # show the current key
-rm ~/.config/thor-chat/api-key && systemctl --user restart thor-chat   # no key: open to anyone
+rm ~/.config/thor-chat/api-key && systemctl --user restart thor-chat thor-tigress-agent   # no key: open to anyone
 ```
 
 The key is 24 random bytes from `/dev/urandom`, kept in

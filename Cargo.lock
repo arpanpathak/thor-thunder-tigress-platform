@@ -165,6 +165,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "thor-tigress-agent"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "thor-tigress-reinforcer-frontend"
 version = "0.1.0"
 dependencies = [

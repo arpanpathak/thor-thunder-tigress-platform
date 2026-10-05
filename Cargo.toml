@@ -4,5 +4,6 @@ members = [
     "crates/thor-hammer-trainer",
     "crates/thor-lasso-distiller",
     "crates/thor-spark-safety-eval",
+    "crates/thor-tigress-agent",
     "crates/thor-tigress-reinforcer-frontend",
 ]

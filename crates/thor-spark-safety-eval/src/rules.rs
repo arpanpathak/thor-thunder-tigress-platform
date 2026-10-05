@@ -303,6 +303,7 @@ impl ErrorFacts {
 #[derive(Default)]
 struct Scan {
     offset: usize,
+    in_trait_impl: bool,
     violations: Vec<Violation>,
     bodies: Vec<(LineColumn, LineColumn)>,
     pub_items: usize,
@@ -429,7 +430,9 @@ impl<'ast> Visit<'ast> for Scan {
 
     fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
         self.check_docs(&item.vis, &item.attrs, format!("fn {}", item.sig.ident), item.span());
-        self.signature(&item.sig);
+        if !self.in_trait_impl {
+            self.signature(&item.sig);
+        }
         self.body(&item.block);
         visit::visit_impl_item_fn(self, item);
     }
@@ -452,7 +455,10 @@ impl<'ast> Visit<'ast> for Scan {
             let line = self.line(item.span());
             self.errors.impls.push((line, trait_name, self_name));
         }
+        let outer = self.in_trait_impl;
+        self.in_trait_impl = item.trait_.is_some();
         visit::visit_item_impl(self, item);
+        self.in_trait_impl = outer;
     }
 
     fn visit_item_type(&mut self, item: &'ast ItemType) {
@@ -746,6 +752,12 @@ mod tests {
             fn a() -> Result<(), E> { Err(E::Bad) }
         ";
         assert_eq!(verdict(source, Rule::ErrorEnum), Verdict::Pass);
+    }
+
+    #[test]
+    fn rule_two_does_not_judge_a_signature_a_trait_imposes() {
+        let source = "struct R; impl std::io::Read for R { fn read(&mut self, b: &mut [u8]) -> std::io::Result<usize> { Ok(0) } }";
+        assert_eq!(verdict(source, Rule::ErrorEnum), Verdict::NotApplicable);
     }
 
     #[test]
