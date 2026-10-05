@@ -30,6 +30,7 @@ Thor.
 
 ```text
 your machine: opencode ─► 127.0.0.1:8079 ─► SSH tunnel ─► thor: llama-server :8079 (Nemotron)
+                     └──► 127.0.0.1:8888 ─► SSH tunnel ─► thor: SearXNG :8888 (search)
 ```
 
 The tunnel uses your existing SSH access, so nothing new is opened on the
@@ -61,12 +62,28 @@ mkdir -p ~/.config/thor-chat
         "nemotron": {
           "name": "Nemotron 3 Nano (Thor)",
           "options": { "chat_template_kwargs": { "enable_thinking": false } }
-        }
+        },
+        "nemotron-think": { "name": "Nemotron 3 Nano (Thor, thinking)" }
       }
+    }
+  },
+  "agent": { "plan": { "model": "thor/nemotron-think" } },
+  "mcp": {
+    "searxng": {
+      "type": "local",
+      "command": ["npx", "-y", "mcp-searxng@2.5.0"],
+      "environment": { "SEARXNG_URL": "http://127.0.0.1:8888" },
+      "enabled": true
     }
   }
 }
 ```
+
+- **Build mode** uses `nemotron` with thinking off, so it acts.
+- **Plan mode** (Tab) uses `nemotron-think`, so it reasons before proposing.
+- **Web search** comes from the SearXNG instance on the Thor through the
+  `mcp-searxng` plugin (an npm package, run locally by `npx`): tools
+  `searxng_web_search` and `web_url_read`, which reads a page as text.
 
 `enable_thinking: false` matters: Nemotron thinks by default, and on a large
 task it spent a whole turn reasoning (11,504 characters) and stopped without
@@ -82,7 +99,7 @@ Description=SSH tunnel to Nemotron on the Thor
 After=network-online.target
 
 [Service]
-ExecStart=/usr/bin/ssh -o ControlMaster=no -o ControlPath=none -o BatchMode=yes -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:8079:127.0.0.1:8079 thor
+ExecStart=/usr/bin/ssh -o ControlMaster=no -o ControlPath=none -o BatchMode=yes -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:8079:127.0.0.1:8079 -L 127.0.0.1:8888:127.0.0.1:8888 thor
 Restart=always
 RestartSec=5
 
@@ -101,7 +118,7 @@ curl -fsSL https://opencode.ai/install | bash
 mkdir -p ~/.config/opencode ~/.config/thor-chat
 scp <yahboom>:.config/opencode/opencode.json ~/.config/opencode/
 (umask 077; ssh thor cat .config/thor-chat/api-key > ~/.config/thor-chat/api-key)
-echo 'alias opencode="(nc -z 127.0.0.1 8079 || ssh -fN -L 8079:127.0.0.1:8079 thor) && command opencode"' >> ~/.zshrc
+echo 'alias opencode="(nc -z 127.0.0.1 8079 || ssh -fN -L 8079:127.0.0.1:8079 -L 8888:127.0.0.1:8888 thor) && command opencode"' >> ~/.zshrc
 ```
 
 The alias opens the tunnel when it is not already up.
