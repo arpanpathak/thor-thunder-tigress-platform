@@ -177,6 +177,23 @@ and open http://localhost:8787.
 `~/Projects/edgechat/convo_datastore`, `~/Projects/nvidia-cloud-software-engineer-interview`
 and `corpus/` (`bash train/fetch_corpus.sh`).
 
+## Coding agent: OpenCode with Nemotron
+
+On yahboom, `opencode` in any project folder starts a terminal coding agent
+that uses Nemotron on the Thor. Set up: OpenCode in `~/.opencode/bin`, the
+config `~/.config/opencode/opencode.json` (provider `thor`, default model
+`thor/nemotron`, base URL `http://127.0.0.1:8079/v1`, key read from
+`~/.config/thor-chat/api-key`), and the `thor-model-tunnel` user service that
+keeps `127.0.0.1:8079` tunnelled to the Thor's llama-server.
+
+```bash
+cd ~/Projects/some-project && opencode
+systemctl --user status thor-model-tunnel      # tunnel up?
+curl -s 127.0.0.1:8079/health                  # model reachable?
+```
+
+Full setup, including macOS: the book, chapter "Local models".
+
 ## Ollama
 
 ```bash
