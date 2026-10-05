@@ -6,8 +6,9 @@
 //!                     [--server 127.0.0.1:8000] [--model NAME] [--dry-run]
 //! ```
 //!
-//! A run that stops can be started again with the same `--out`: conversations
-//! already in that file are skipped.
+//! Runs are incremental: conversations already in `--out` are skipped, and
+//! `--limit N` generates N new ones, so the work can be done in small batches
+//! at times that suit the people sharing the model server.
 //!
 //! An access key for the server is read from the `LASSO_KEY` environment
 //! variable, so it never appears in the command line or the shell history.
@@ -114,7 +115,18 @@ fn run(options: &Options) -> Result<(), DistillError> {
     counts
         .iter()
         .for_each(|(book, (talks, turns))| println!("  {book:<44} {talks:>5} conversations {turns:>6} turns"));
-    let chosen: Vec<&Vec<Passage>> = planned.iter().take(options.limit.unwrap_or(planned.len())).collect();
+    let finished = finished_keys(&options.out)?;
+    let remaining: Vec<&Vec<Passage>> = planned
+        .iter()
+        .filter(|sections| !finished.contains(&conversations::conversation_key(sections)))
+        .collect();
+    println!(
+        "{} already in {}, {} left",
+        planned.len() - remaining.len(),
+        options.out.display(),
+        remaining.len()
+    );
+    let chosen: Vec<&Vec<Passage>> = remaining.into_iter().take(options.limit.unwrap_or(usize::MAX)).collect();
     match options.dry_run {
         true => write_prompts(options, &chosen),
         false => generate(options, &chosen),
@@ -160,13 +172,9 @@ fn generate(options: &Options, chosen: &[&Vec<Passage>]) -> Result<(), DistillEr
         .append(true)
         .open(&options.out)
         .map_err(DistillError::io(&options.out))?;
-    let finished = finished_keys(&options.out)?;
     let started = Instant::now();
     let (mut kept, mut rejected) = (0usize, 0usize);
     for (done, sections) in chosen.iter().enumerate() {
-        if finished.contains(&conversations::conversation_key(sections)) {
-            continue;
-        }
         let conversation = conversations::converse(&options.client, sections)?;
         kept += conversation.turns.len();
         rejected += conversation.rejected.len();
