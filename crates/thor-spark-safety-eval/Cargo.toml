@@ -1,0 +1,16 @@
+[package]
+name = "thor-spark-safety-eval"
+version = "0.1.0"
+edition = "2024"
+description = "Scores answers for AI slop in prose and for the five Rust rules in code."
+
+[dependencies]
+proc-macro2 = { version = "1", features = ["span-locations"] }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+syn = { version = "2", features = ["full", "visit", "extra-traits"] }
+
+[[bin]]
+name = "spark"
+path = "src/main.rs"

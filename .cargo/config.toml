@@ -1,0 +1,7 @@
+# Candle's aarch64 CPU kernels use FP16 SIMD (`fadd v0.8h` and friends).
+# Without native FP16 support, `gemm-f16` fails to assemble on Jetson, even
+# when the model runs on the GPU, because Candle always builds its CPU backend.
+# `target-cpu=native` turns on the board's `fullfp16` (Cortex-A78AE) without
+# naming an unstable rustc feature.
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "target-cpu=native"]

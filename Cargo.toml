@@ -1,0 +1,8 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/thor-hammer-trainer",
+    "crates/thor-lasso-distiller",
+    "crates/thor-spark-safety-eval",
+    "crates/thor-tigress-reinforcer-frontend",
+]

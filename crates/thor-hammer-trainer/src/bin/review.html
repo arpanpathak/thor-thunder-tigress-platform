@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training Set Review</title>
+<style>
+  :root {
+    --bg: #fafaf9; --panel: #ffffff; --text: #1c1917; --muted: #78716c;
+    --border: #e7e5e4; --code-bg: #f5f5f4; --accent: #2563eb;
+    --mark: #fde047; --mark-text: #1c1917;
+    --slop: #dc2626; --slop-mark: #fecaca; --slop-mark-text: #7f1d1d;
+    --readability: #15803d; --chat: #2563eb; --book: #9333ea; --code: #c2410c;
+    --clever_vs_readable: #0e7490; --corpus: #0f766e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1917; --panel: #292524; --text: #f5f5f4; --muted: #a8a29e;
+      --border: #44403c; --code-bg: #1c1917; --accent: #60a5fa;
+      --mark: #ca8a04; --mark-text: #fefce8;
+      --slop: #f87171; --slop-mark: #7f1d1d; --slop-mark-text: #fee2e2;
+      --readability: #4ade80; --chat: #60a5fa; --book: #c084fc; --code: #fb923c;
+      --clever_vs_readable: #22d3ee; --corpus: #2dd4bf;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { position: sticky; top: 0; z-index: 1; background: var(--bg);
+           border-bottom: 1px solid var(--border); padding: 12px 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  #summary { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  input[type=search], input[type=text], select, button {
+    font: inherit; color: var(--text); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; }
+  input[type=search] { flex: 1 1 260px; min-width: 0; }
+  button { cursor: pointer; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  label { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+  #page-info { color: var(--muted); font-size: 13px; }
+  main { max-width: 1000px; margin: 0 auto; padding: 16px; }
+  article { background: var(--panel); border: 1px solid var(--border);
+            border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  article.flagged { border-left: 4px solid var(--slop); }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center;
+          padding: 8px 14px; border-bottom: 1px solid var(--border);
+          font-size: 13px; color: var(--muted); }
+  .badge { font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
+  .badge.readability { color: var(--readability); }
+  .badge.chat { color: var(--chat); }
+  .badge.book { color: var(--book); }
+  .badge.code { color: var(--code); }
+  .badge.clever_vs_readable { color: var(--clever_vs_readable); }
+  .origin { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+  .hits { width: 100%; color: var(--text); }
+  .part { padding: 10px 14px; }
+  .part + .part { border-top: 1px dashed var(--border); }
+  .label { font-size: 12px; font-weight: 600; color: var(--muted);
+           text-transform: uppercase; margin-bottom: 4px; user-select: none; }
+  .prose { white-space: pre-wrap; overflow-wrap: anywhere; }
+  pre { background: var(--code-bg); border: 1px solid var(--border);
+        border-radius: 6px; padding: 10px; overflow-x: auto; margin: 6px 0;
+        font: 13px/1.45 ui-monospace, "SF Mono", Menlo, monospace; }
+  mark { background: var(--mark); color: var(--mark-text); border-radius: 2px; }
+  mark.slop { background: var(--slop-mark); color: var(--slop-mark-text);
+              text-decoration: underline wavy var(--slop); }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  .curation { display: flex; flex-direction: column; gap: 8px;
+              padding: 10px 14px; border-top: 1px solid var(--border); }
+  .curation .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .curation input[type=text] { flex: 1 1 260px; min-width: 0; background: var(--bg); }
+  .curation .state { font-size: 13px; font-weight: 600; color: var(--slop); }
+  .curation .selection { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .curation button.flag { border-color: var(--slop); color: var(--slop); }
+  .spans { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .spans li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+  .spans .category { font-weight: 600; color: var(--slop); white-space: nowrap; }
+  .spans .quote { overflow-wrap: anywhere; }
+  .spans button { padding: 0 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Training set review</h1>
+  <div id="summary">Loading train.jsonl…</div>
+  <div class="controls">
+    <input id="search" type="search" placeholder="Search instruction, response or origin">
+    <select id="source">
+      <option value="">All sources</option>
+      <option value="corpus">corpus</option>
+      <option value="readability">readability</option>
+      <option value="clever_vs_readable">clever_vs_readable</option>
+      <option value="chat">chat</option>
+      <option value="book">book</option>
+      <option value="code">code</option>
+    </select>
+    <label><input id="sensitive" type="checkbox"> Possible personal data or secrets only</label>
+    <label><input id="slop-only" type="checkbox"> Flagged as AI slop only</label>
+    <button id="prev">Previous</button>
+    <span id="page-info"></span>
+    <button id="next">Next</button>
+  </div>
+</header>
+<main id="list"></main>
+
+<script>
+const PAGE_SIZE = 20;
+
+const SENSITIVE = [
+  ["email", /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g],
+  ["API key", /\b(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|hf_[A-Za-z0-9]{30,})\b/g],
+  ["private key", /-----BEGIN [A-Z ]*PRIVATE KEY-----/g],
+  ["password", /\b(?:password|passwd|pwd)\s*[:=]\s*\S+/gi],
+  ["bearer token", /\bBearer\s+[A-Za-z0-9._~+\/-]{20,}/g],
+  ["phone number", /(?<![\w.])\+?\d{1,3}[\s.-]?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}(?![\w.])/g],
+];
+
+// The categories of anti_ai_slop.md; the values match slop_flags::SlopCategory.
+const SLOP_CATEGORIES = [
+  ["flattery_filler_opener", "Flattery or filler opener"],
+  ["wrap_up_repeat", "Wrap-up that repeats the answer"],
+  ["fake_importance", "Fake importance"],
+  ["dramatic_setup", "Dramatic setup before something ordinary"],
+  ["empty_depth_words", "Empty depth words"],
+  ["fake_balance_hedging", "Fake balance or hedging"],
+  ["rhythm_trick", "Rhythm trick (triplet, fragments, em-dash reveal)"],
+  ["other", "Other"],
+];
+const CATEGORY_LABELS = new Map(SLOP_CATEGORIES);
+
+let examples = [];
+let slopFlags = new Map();
+let pendingSelection = null;
+let visible = [];
+let page = 0;
+
+const $ = (id) => document.getElementById(id);
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+// Ranges to highlight in one block of text: personal-data matches and the slop
+// spans marked on this field. Overlapping ranges are merged; slop wins the style.
+function highlightRanges(text, slopSpans) {
+  const ranges = [];
+  for (const [label, pattern] of SENSITIVE) {
+    for (const match of text.matchAll(pattern)) {
+      ranges.push({ start: match.index, end: match.index + match[0].length, label, isSlop: false });
+    }
+  }
+  for (const span of slopSpans) {
+    const start = text.indexOf(span.text);
+    if (start >= 0) {
+      ranges.push({ start, end: start + span.text.length, label: CATEGORY_LABELS.get(span.category), isSlop: true });
+    }
+  }
+  ranges.sort((first, second) => first.start - second.start);
+  const merged = [];
+  for (const range of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && range.start < last.end) {
+      last.end = Math.max(last.end, range.end);
+      last.isSlop = last.isSlop || range.isSlop;
+      continue;
+    }
+    merged.push({ ...range });
+  }
+  return merged;
+}
+
+function appendWithMarks(parent, text, slopSpans) {
+  let position = 0;
+  for (const range of highlightRanges(text, slopSpans)) {
+    parent.append(document.createTextNode(text.slice(position, range.start)));
+    const mark = element("mark", range.isSlop ? "slop" : "", text.slice(range.start, range.end));
+    mark.title = range.label;
+    parent.append(mark);
+    position = range.end;
+  }
+  parent.append(document.createTextNode(text.slice(position)));
+}
+
+function splitFences(text) {
+  const segments = [];
+  let current = { code: false, lines: [] };
+  for (const line of text.split("\n")) {
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+      segments.push(current);
+      current = { code: !current.code, lines: [] };
+      continue;
+    }
+    current.lines.push(line);
+  }
+  segments.push(current);
+  return segments.filter((segment) => segment.lines.join("").trim() !== "");
+}
+
+function renderText(parent, text, slopSpans) {
+  for (const segment of splitFences(text)) {
+    const body = segment.lines.join("\n");
+    if (segment.code) {
+      const pre = element("pre");
+      const code = element("code");
+      appendWithMarks(code, body, slopSpans);
+      pre.append(code);
+      parent.append(pre);
+      continue;
+    }
+    const prose = element("div", "prose");
+    appendWithMarks(prose, body.trim(), slopSpans);
+    parent.append(prose);
+  }
+}
+
+function spansOf(example, field) {
+  const flag = slopFlags.get(example.id);
+  if (!flag) return [];
+  return flag.spans.filter((span) => span.field === field);
+}
+
+function part(example, field, label) {
+  const section = element("section", "part");
+  section.dataset.field = field;
+  section.append(element("div", "label", label));
+  renderText(section, example[field], spansOf(example, field));
+  return section;
+}
+
+function metaLine(example) {
+  const meta = element("div", "meta");
+  const size = `${(example.instruction.length + example.response.length).toLocaleString()} chars`;
+  meta.append(
+    element("span", "", `#${example.number}`),
+    element("span", `badge ${example.source}`, example.source),
+    element("span", "origin", example.origin),
+    element("span", "", size),
+  );
+  if (example.hits.length > 0) {
+    const labels = [...new Set(example.hits.map((hit) => hit.label))].join(", ");
+    meta.append(element("div", "hits", `Possible ${labels}`));
+  }
+  return meta;
+}
+
+function card(example) {
+  const article = element("article");
+  article.dataset.id = example.id;
+  article.classList.toggle("flagged", slopFlags.has(example.id));
+  article.append(
+    metaLine(example),
+    part(example, "instruction", "Instruction"),
+    part(example, "response", "Response"),
+    curationPanel(example),
+  );
+  return article;
+}
+
+// The panel under each example: mark a selected sentence with a slop category,
+// list the marked sentences, and flag, annotate or unflag the whole example.
+function curationPanel(example) {
+  const panel = element("div", "curation");
+  const flag = slopFlags.get(example.id) || { note: "", spans: [] };
+  const isFlagged = slopFlags.has(example.id);
+
+  const selectionRow = element("div", "row");
+  const category = element("select");
+  for (const [value, label] of SLOP_CATEGORIES) {
+    const option = element("option", "", label);
+    option.value = value;
+    category.append(option);
+  }
+  const flagSelection = element("button", "flag", "Flag selection");
+  const selectionText = element("span", "selection", "Select a sentence in the instruction or response above.");
+  flagSelection.addEventListener("click", () => {
+    const selection = pendingSelection;
+    if (!selection || selection.id !== example.id) {
+      selectionText.textContent = "Nothing selected in this example.";
+      return;
+    }
+    const span = { field: selection.field, text: selection.text, category: category.value };
+    saveFlag(example, { note: note.value, spans: [...flag.spans, span] }, panel);
+  });
+  selectionRow.append(category, flagSelection, selectionText);
+
+  const spanList = element("ul", "spans");
+  flag.spans.forEach((span, position) => {
+    const item = element("li");
+    const remove = element("button", "", "remove");
+    remove.addEventListener("click", () => {
+      const remaining = flag.spans.filter((kept, index) => index !== position);
+      saveFlag(example, { note: note.value, spans: remaining }, panel);
+    });
+    item.append(
+      element("span", "category", CATEGORY_LABELS.get(span.category)),
+      element("span", "quote", `${span.field}: “${span.text}”`),
+      remove,
+    );
+    spanList.append(item);
+  });
+
+  const noteRow = element("div", "row");
+  const state = element("span", "state", isFlagged ? "Flagged as AI slop" : "");
+  const note = element("input");
+  note.type = "text";
+  note.placeholder = "Note: what makes this example slop";
+  note.value = flag.note;
+  const flagWhole = element("button", "flag", isFlagged ? "Save note" : "Flag whole example");
+  flagWhole.addEventListener("click", () => saveFlag(example, { note: note.value, spans: flag.spans }, panel));
+  noteRow.append(state, note, flagWhole);
+  if (isFlagged) {
+    const unflag = element("button", "", "Unflag");
+    unflag.addEventListener("click", () => saveFlag(example, null, panel));
+    noteRow.append(unflag);
+  }
+
+  panel.append(selectionRow, spanList, noteRow);
+  return panel;
+}
+
+// Sends the complete new flag for one example; `null` removes the flag.
+async function saveFlag(example, flag, panel) {
+  const body = flag === null
+    ? { id: example.id, flagged: false }
+    : { id: example.id, note: flag.note.trim(), spans: flag.spans, flagged: true };
+  const response = await fetch("/flags", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    panel.querySelector(".state").textContent = `Not saved: ${await response.text()}`;
+    return;
+  }
+  if (flag === null) {
+    slopFlags.delete(example.id);
+  } else {
+    slopFlags.set(example.id, { note: flag.note.trim(), spans: flag.spans });
+  }
+  pendingSelection = null;
+  panel.closest("article").replaceWith(card(example));
+  summarize();
+}
+
+// Remembers the last text selection made inside an instruction or response,
+// so the "Flag selection" click can use it after the selection is gone.
+document.addEventListener("mouseup", () => {
+  const selection = window.getSelection();
+  const text = selection.toString().trim();
+  if (!text || selection.rangeCount === 0) return;
+  const container = selection.getRangeAt(0).commonAncestorContainer;
+  const startElement = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+  const section = startElement.closest("section.part");
+  if (!section) return;
+  const article = section.closest("article");
+  pendingSelection = { id: article.dataset.id, field: section.dataset.field, text };
+  article.querySelector(".curation .selection").textContent = `Selected: “${text}”`;
+});
+
+function applyFilters() {
+  const query = $("search").value.trim().toLowerCase();
+  const source = $("source").value;
+  const sensitiveOnly = $("sensitive").checked;
+  const slopOnly = $("slop-only").checked;
+  visible = examples.filter((example) => {
+    if (source && example.source !== source) return false;
+    if (sensitiveOnly && example.hits.length === 0) return false;
+    if (slopOnly && !slopFlags.has(example.id)) return false;
+    if (!query) return true;
+    return example.searchText.includes(query);
+  });
+  page = 0;
+  render();
+}
+
+function render() {
+  const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  page = Math.min(page, pages - 1);
+  $("page-info").textContent = `${visible.length.toLocaleString()} examples · page ${page + 1} of ${pages}`;
+  $("prev").disabled = page === 0;
+  $("next").disabled = page >= pages - 1;
+
+  const list = $("list");
+  list.replaceChildren();
+  const shown = visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  if (shown.length === 0) list.append(element("p", "empty", "No examples match."));
+  for (const example of shown) list.append(card(example));
+  window.scrollTo(0, 0);
+}
+
+function summarize() {
+  const counts = {};
+  for (const example of examples) counts[example.source] = (counts[example.source] || 0) + 1;
+  const withPersonalData = examples.filter((example) => example.hits.length > 0).length;
+  const spanCount = [...slopFlags.values()].reduce((total, flag) => total + flag.spans.length, 0);
+  const perSource = Object.entries(counts).map(([source, count]) => `${source} ${count.toLocaleString()}`).join(" · ");
+  $("summary").textContent = `${examples.length.toLocaleString()} examples (${perSource}) · ` +
+    `${withPersonalData.toLocaleString()} with possible personal data or secrets · ` +
+    `${slopFlags.size.toLocaleString()} flagged as AI slop, ${spanCount.toLocaleString()} marked sentences`;
+}
+
+async function fetchJsonLines(path) {
+  const response = await fetch(path);
+  const text = await response.text();
+  return text.split("\n").filter((line) => line.trim() !== "").map((line) => JSON.parse(line));
+}
+
+async function load() {
+  const [training, removedAsSlop, flags] = await Promise.all([
+    fetchJsonLines("/train.jsonl"),
+    fetchJsonLines("/slop.jsonl"),
+    fetchJsonLines("/flags"),
+  ]);
+  slopFlags = new Map(flags.map((flag) => [flag.id, { note: flag.note, spans: flag.spans || [] }]));
+  examples = [...training, ...removedAsSlop].map((example, index) => {
+    example.number = index + 1;
+    example.hits = highlightRanges(`${example.instruction}\n${example.response}`, []);
+    example.searchText = `${example.instruction}\n${example.response}\n${example.origin}`.toLowerCase();
+    return example;
+  });
+  summarize();
+  applyFilters();
+}
+
+let searchTimer;
+$("search").addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applyFilters, 200);
+});
+$("source").addEventListener("change", applyFilters);
+$("sensitive").addEventListener("change", applyFilters);
+$("slop-only").addEventListener("change", applyFilters);
+$("prev").addEventListener("click", () => { page -= 1; render(); });
+$("next").addEventListener("click", () => { page += 1; render(); });
+
+load().catch((error) => { $("summary").textContent = `Could not load the data: ${error}`; });
+</script>
+</body>
+</html>

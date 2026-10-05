@@ -1,0 +1,9 @@
+target/
+data/
+attic/book/build/
+corpus/
+
+# Kept local, not published
+CLAUDE.md
+attic/
+labels/

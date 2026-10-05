@@ -1,0 +1,1426 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training Set Review</title>
+<style>
+  :root {
+    --bg: #fafaf9; --panel: #ffffff; --text: #1c1917; --muted: #78716c;
+    --border: #e7e5e4; --code-bg: #f5f5f4; --accent: #2563eb;
+    --mark: #fde047; --mark-text: #1c1917;
+    --slop: #dc2626; --slop-mark: #fecaca; --slop-mark-text: #7f1d1d;
+    --readability: #15803d; --chat: #2563eb; --book: #9333ea; --code: #c2410c;
+    --clever_vs_readable: #0e7490; --corpus: #0f766e;
+    --shadow: 0 1px 2px rgba(28,25,23,.05), 0 8px 24px -18px rgba(28,25,23,.35);
+    --header-h: 118px;
+    --code-block-bg: #fbfaf8; --code-bar-bg: #f1efec; --gutter: #a8a29e;
+    --tok-comment: #6b7280; --tok-string: #0a7d32; --tok-keyword: #a626a4;
+    --tok-type: #b45309; --tok-number: #0e7490; --tok-macro: #2563eb;
+    --tok-attr: #78716c; --tok-lifetime: #be185d; --tok-call: #1d4ed8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1917; --panel: #292524; --text: #f5f5f4; --muted: #a8a29e;
+      --border: #44403c; --code-bg: #262322; --accent: #60a5fa;
+      --mark: #ca8a04; --mark-text: #fefce8;
+      --slop: #f87171; --slop-mark: #7f1d1d; --slop-mark-text: #fee2e2;
+      --readability: #4ade80; --chat: #60a5fa; --book: #c084fc; --code: #fb923c;
+      --clever_vs_readable: #22d3ee; --corpus: #2dd4bf;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -20px rgba(0,0,0,.9);
+      --code-block-bg: #161412; --code-bar-bg: #211e1c; --gutter: #57534e;
+      --tok-comment: #8b949e; --tok-string: #a5d6a7; --tok-keyword: #d2a8ff;
+      --tok-type: #ffcb6b; --tok-number: #79dcf2; --tok-macro: #82aaff;
+      --tok-attr: #a8a29e; --tok-lifetime: #f78fb3; --tok-call: #9cc4ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+         -webkit-font-smoothing: antialiased; }
+  header { position: sticky; top: 0; z-index: 3; background: var(--bg);
+           border-bottom: 1px solid var(--border); padding: 11px 16px; }
+  h1 { font-size: 17px; margin: 0 0 3px; letter-spacing: -0.01em; }
+  #summary { color: var(--muted); font-size: 12.5px; margin-bottom: 9px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  input[type=search], input[type=text], select, button {
+    font: inherit; color: var(--text); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px;
+    transition: border-color .12s ease, background .12s ease; }
+  input:focus-visible, select:focus-visible, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px; }
+  input[type=search] { flex: 1 1 260px; min-width: 0; }
+  .controls select { flex: 0 1 240px; min-width: 0; }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: default; }
+  label { display: flex; gap: 6px; align-items: center; font-size: 14px; white-space: nowrap; }
+  .pager { display: flex; gap: 6px; align-items: center; margin-left: auto; }
+  #page-info { color: var(--muted); font-size: 12.5px; white-space: nowrap;
+               font-variant-numeric: tabular-nums; }
+  main { max-width: 1000px; margin: 0 auto; padding: 16px 16px 64px; }
+
+  article { background: var(--panel); border: 1px solid var(--border);
+            border-radius: 10px; margin-bottom: 16px; overflow: clip;
+            box-shadow: var(--shadow);
+            scroll-margin-top: calc(var(--header-h) + 8px); }
+  article.flagged { border-left: 4px solid var(--slop); }
+  article.focused { border-color: var(--accent); }
+  article.focused > .meta { background: var(--bg); }
+
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+          position: sticky; top: var(--header-h); z-index: 2;
+          padding: 8px 14px; border-bottom: 1px solid var(--border);
+          background: var(--panel); font-size: 12.5px; color: var(--muted); }
+  .badge { font-weight: 700; text-transform: uppercase; font-size: 10.5px;
+           letter-spacing: .05em; padding: 2px 7px; border-radius: 999px;
+           background: var(--bg); border: 1px solid var(--border); }
+  .badge.readability { color: var(--readability); }
+  .badge.chat { color: var(--chat); }
+  .badge.book { color: var(--book); }
+  .badge.code { color: var(--code); }
+  .badge.clever_vs_readable { color: var(--clever_vs_readable); }
+  .badge.corpus { color: var(--corpus); }
+  .origin { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+  .book-title { color: var(--text); font-size: 13px; }
+  .question { font-weight: 600; font-size: 15.5px; }
+  .part.rejected { opacity: .75; }
+  .badge.conversation { color: var(--accent); }
+  .spacer { margin-left: auto; }
+  .hits { width: 100%; color: var(--text); }
+  .seen { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+          background: var(--border); flex: none; }
+  .seen.on { background: var(--accent); }
+
+  .part { padding: 12px 16px; }
+  .part + .part { border-top: 1px dashed var(--border); }
+  .label { display: flex; align-items: center; gap: 8px;
+           font-size: 11.5px; font-weight: 700; color: var(--muted);
+           text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px;
+           user-select: none; }
+  .label .size { margin-left: auto; font-weight: 500; letter-spacing: 0;
+                 text-transform: none; font-variant-numeric: tabular-nums; }
+
+  .prose { overflow-wrap: anywhere; }
+  .prose p { margin: 0 0 10px; white-space: pre-wrap; }
+  .prose p:last-child { margin-bottom: 0; }
+  .prose h3 { font-size: 14.5px; margin: 14px 0 7px; letter-spacing: -0.01em; }
+  .prose ul, .prose ol { margin: 0 0 10px; padding-left: 22px; }
+  .prose li { margin: 3px 0; }
+  .prose a { color: var(--accent); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px;
+         background: var(--code-bg); border: 1px solid var(--border);
+         border-radius: 4px; padding: 1px 5px; }
+  .code-block { margin: 12px 0; border: 1px solid var(--border); border-radius: 8px;
+                overflow: hidden; background: var(--code-block-bg); }
+  .code-bar { display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 12px;
+              background: var(--code-bar-bg); border-bottom: 1px solid var(--border);
+              font-size: 11.5px; color: var(--muted); user-select: none; }
+  .code-lang { font-weight: 700; text-transform: lowercase; letter-spacing: .03em;
+               color: var(--text); font-family: ui-monospace, monospace; }
+  .code-lines { font-variant-numeric: tabular-nums; }
+  .code-copy { margin-left: auto; padding: 1px 9px; font-size: 11.5px; }
+  pre { margin: 0; padding: 10px 0; overflow-x: auto; max-width: 100%;
+        font: 13px/1.55 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
+        tab-size: 4; counter-reset: line; }
+  pre code { display: block; min-width: max-content; background: none; border: none;
+             padding: 0; font-size: inherit; }
+  pre .line { display: block; padding-right: 16px; counter-increment: line; min-height: 1.55em; }
+  pre .line::before { content: counter(line); display: inline-block; width: 3.2em;
+                      padding-right: 1em; margin-right: .6em; text-align: right;
+                      color: var(--gutter); border-right: 1px solid var(--border);
+                      user-select: none; font-variant-numeric: tabular-nums; }
+  .short pre .line::before { display: none; }
+  .short pre .line { padding-left: 14px; }
+  pre .line:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .tok-comment { color: var(--tok-comment); font-style: italic; }
+  .tok-string { color: var(--tok-string); }
+  .tok-keyword { color: var(--tok-keyword); font-weight: 600; }
+  .tok-type { color: var(--tok-type); }
+  .tok-number { color: var(--tok-number); }
+  .tok-macro { color: var(--tok-macro); font-weight: 600; }
+  .tok-attr { color: var(--tok-attr); }
+  .tok-lifetime { color: var(--tok-lifetime); }
+  .tok-call { color: var(--tok-call); }
+  table { border-collapse: collapse; margin: 10px 0; font-size: 13.5px;
+          display: block; overflow-x: auto; max-width: 100%; }
+  th, td { border: 1px solid var(--border); padding: 5px 10px; text-align: left;
+           vertical-align: top; }
+  th { background: var(--code-bg); font-weight: 600; }
+  tbody tr:nth-child(even) { background: color-mix(in srgb, var(--code-bg) 45%, transparent); }
+  mark { background: var(--mark); color: var(--mark-text); border-radius: 2px; }
+  mark.slop { background: var(--slop-mark); color: var(--slop-mark-text);
+              text-decoration: underline wavy var(--slop); }
+
+  mark.suggest { background: transparent; color: inherit; cursor: pointer;
+                 text-decoration: underline dashed var(--slop) 1.5px; text-underline-offset: 3px;
+                 border-radius: 2px; }
+  mark.suggest:hover { background: var(--slop-mark); color: var(--slop-mark-text); }
+  pre .line.violation { background: color-mix(in srgb, var(--slop) 10%, transparent); }
+  .rule-tag { float: right; margin-left: 12px; padding: 0 6px; border-radius: 4px;
+              font: 600 10.5px/1.7 system-ui, sans-serif; color: var(--slop);
+              border: 1px solid color-mix(in srgb, var(--slop) 45%, transparent);
+              user-select: none; position: sticky; right: 8px; }
+  .phrase-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 9px;
+                padding: 7px 11px; border: 1px solid var(--accent); border-radius: 8px;
+                font-size: 13px; background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .phrase-bar[hidden], .orphans[hidden] { display: none; }
+  .phrase-bar button.flag { border-color: var(--slop); color: var(--slop); }
+  .shortened { position: relative; }
+  .shortened::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+                      height: 48px; pointer-events: none;
+                      background: linear-gradient(transparent, var(--panel)); }
+  .more { display: block; margin-top: 6px; border-color: var(--accent); color: var(--accent); }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+
+  .curation { display: flex; flex-direction: column; gap: 8px;
+              padding: 11px 16px; border-top: 1px solid var(--border);
+              background: var(--bg); }
+  .curation .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .curation input[type=text] { flex: 1 1 260px; min-width: 0; background: var(--panel); }
+  .curation .state { font-size: 13px; font-weight: 600; color: var(--slop); }
+  .curation .selection { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+  .curation button.flag { border-color: var(--slop); color: var(--slop); }
+  .spans { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
+  .spans li { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
+  .spans .category { font-weight: 700; color: var(--slop); white-space: nowrap; }
+  .spans .quote { overflow-wrap: anywhere; }
+  .spans button { padding: 0 8px; font-size: 12px; }
+
+  .orphans { display: flex; flex-direction: column; gap: 6px; margin-top: 9px;
+             padding: 8px 11px; border: 1px solid var(--slop); border-radius: 8px;
+             background: color-mix(in srgb, var(--slop) 8%, transparent); }
+  .orphans .title { font-size: 13px; font-weight: 700; color: var(--slop); }
+  .orphans .item { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
+                   font-size: 13px; }
+  .orphans .item .note { font-weight: 600; overflow-wrap: anywhere; }
+  .orphans .item .id { font-family: ui-monospace, monospace; color: var(--muted);
+                       font-size: 12px; }
+
+  #keys { color: var(--muted); font-size: 12.5px; display: flex; gap: 12px;
+          flex-wrap: wrap; margin-top: 8px; }
+  kbd { background: var(--panel); border: 1px solid var(--border);
+        border-bottom-width: 2px; border-radius: 5px; padding: 0 5px;
+        font: 11.5px/1.6 ui-monospace, monospace; }
+  #toast { position: fixed; left: 50%; bottom: 22px; z-index: 5;
+           transform: translateX(-50%) translateY(8px);
+           background: var(--accent); color: #fff; padding: 7px 16px;
+           border-radius: 999px; font-size: 13px; font-weight: 600;
+           opacity: 0; pointer-events: none;
+           transition: opacity .16s ease, transform .16s ease; }
+  #toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<header id="header">
+  <h1>Training set review</h1>
+  <div id="summary">Loading…</div>
+  <div class="controls">
+    <input id="search" type="search" placeholder="Search instruction, response or origin  ( / )">
+    <select id="source">
+      <option value="">All sources</option>
+    </select>
+    <select id="collection">
+      <option value="">All books and docs</option>
+    </select>
+    <label><input id="sensitive" type="checkbox"> Personal data only</label>
+    <label><input id="slop-only" type="checkbox"> Flagged only</label>
+    <div class="pager">
+      <button id="prev">←</button>
+      <span id="page-info"></span>
+      <button id="next">→</button>
+    </div>
+  </div>
+  <div id="keys">
+    <span><kbd>j</kbd><kbd>k</kbd> next / previous example</span>
+    <span><kbd>f</kbd> flag the focused one</span>
+    <span><kbd>e</kbd> full answer</span>
+    <span><kbd>g</kbd><kbd>G</kbd> first / last page</span>
+  </div>
+  <div id="phrase-bar" class="phrase-bar" hidden></div>
+  <div id="orphans" class="orphans" hidden></div>
+</header>
+<main id="list"></main>
+<div id="toast"></div>
+
+<script>
+const PAGE_SIZE = 20;
+
+const SENSITIVE = [
+  ["email", /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g],
+  ["API key", /\b(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|hf_[A-Za-z0-9]{30,})\b/g],
+  ["private key", /-----BEGIN [A-Z ]*PRIVATE KEY-----/g],
+  ["password", /\b(?:password|passwd|pwd)\s*[:=]\s*\S+/gi],
+  ["bearer token", /\bBearer\s+[A-Za-z0-9._~+\/-]{20,}/g],
+  ["phone number", /(?<![\w.])\+?\d{1,3}[\s.-]?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}(?![\w.])/g],
+];
+
+// The categories of anti_ai_slop.md; the values match slop_flags::SlopCategory.
+const SLOP_CATEGORIES = [
+  ["flattery_filler_opener", "Flattery or filler opener"],
+  ["wrap_up_repeat", "Wrap-up that repeats the answer"],
+  ["fake_importance", "Fake importance"],
+  ["dramatic_setup", "Dramatic setup before something ordinary"],
+  ["empty_depth_words", "Empty depth words"],
+  ["fake_balance_hedging", "Fake balance or hedging"],
+  ["rhythm_trick", "Rhythm trick (triplet, fragments, em-dash reveal)"],
+  ["other", "Other"],
+];
+const CATEGORY_LABELS = new Map(SLOP_CATEGORIES);
+
+const slopFlags = new Map();
+const pageCache = new Map();
+const reviewed = new Set(JSON.parse(localStorage.getItem("reviewed") || "[]"));
+let pendingSelection = null;
+let visible = [];
+let shown = [];
+let page = 0;
+let total = 0;
+let filteredTotal = 0;
+let slopOnly = false;
+let metaSources = [];
+let flaggedCount = 0;
+let learnedPhrases = [];
+let phraseSearch = null;
+let focusIndex = -1;
+let orphans = [];
+let pendingOrphan = null;
+
+const $ = (id) => document.getElementById(id);
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function toast(message) {
+  const node = $("toast");
+  node.textContent = message;
+  node.classList.add("on");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => node.classList.remove("on"), 1300);
+}
+
+function rememberReviewed() {
+  localStorage.setItem("reviewed", JSON.stringify([...reviewed].slice(-5000)));
+}
+
+// Ranges to highlight in one piece of text: personal-data matches and the slop
+// spans marked on this field. Overlapping ranges are merged; slop wins the style.
+// Ranges to highlight in one piece of text: personal-data matches, phrases
+// suggested as slop (by Stage 0 or because a reviewer marked the same phrase
+// elsewhere), and the slop spans marked on this field. Overlapping ranges are
+// merged; a marked span wins over a suggestion, a suggestion over personal data.
+const RANK = { sensitive: 0, suggest: 1, slop: 2 };
+
+function occurrences(text, phrase) {
+  const found = [];
+  const haystack = text.toLowerCase();
+  const needle = phrase.toLowerCase();
+  if (!needle) return found;
+  let start = haystack.indexOf(needle);
+  while (start >= 0) {
+    found.push(start);
+    start = haystack.indexOf(needle, start + needle.length);
+  }
+  return found;
+}
+
+function highlightRanges(text, slopSpans, suggestions = []) {
+  const ranges = [];
+  for (const [label, pattern] of SENSITIVE) {
+    for (const match of text.matchAll(pattern)) {
+      ranges.push({ start: match.index, end: match.index + match[0].length, label, kind: "sensitive" });
+    }
+  }
+  for (const suggestion of suggestions) {
+    for (const start of occurrences(text, suggestion.text)) {
+      ranges.push({
+        start, end: start + suggestion.text.length, kind: "suggest",
+        category: suggestion.category,
+        label: `Suggested: ${CATEGORY_LABELS.get(suggestion.category) || suggestion.category} (${suggestion.from}). Click to mark.`,
+      });
+    }
+  }
+  for (const span of slopSpans) {
+    const start = text.indexOf(span.text);
+    if (start >= 0) {
+      ranges.push({ start, end: start + span.text.length, label: CATEGORY_LABELS.get(span.category), kind: "slop" });
+    }
+  }
+  ranges.sort((first, second) => first.start - second.start);
+  const merged = [];
+  for (const range of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && range.start < last.end) {
+      last.end = Math.max(last.end, range.end);
+      if (RANK[range.kind] > RANK[last.kind]) Object.assign(last, { kind: range.kind, label: range.label, category: range.category });
+      continue;
+    }
+    merged.push({ ...range });
+  }
+  return merged;
+}
+
+function markFor(range, text) {
+  const mark = element("mark", range.kind === "sensitive" ? "" : range.kind, text);
+  mark.title = range.label;
+  if (range.kind === "suggest") mark.dataset.category = range.category;
+  return mark;
+}
+
+// `marks` is { spans, suggestions }: the slop spans marked on this field and
+// the phrases to suggest in it.
+function appendWithMarks(parent, text, marks) {
+  let position = 0;
+  for (const range of highlightRanges(text, marks.spans, marks.suggestions)) {
+    parent.append(document.createTextNode(text.slice(position, range.start)));
+    parent.append(markFor(range, text.slice(range.start, range.end)));
+    position = range.end;
+  }
+  parent.append(document.createTextNode(text.slice(position)));
+}
+
+// The answer text is markdown, so it is rendered rather than shown raw: a
+// reader should not have to read around backticks and pipe characters. Every
+// node is built with createElement and textContent, so markup in the data is
+// displayed, never executed.
+const INLINE = /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*|(?<!\w)_[^_\n]+_(?!\w))|(\[[^\]\n]+\]\([^)\n]+\))/g;
+
+function inlineRuns(text) {
+  const runs = [];
+  let position = 0;
+  for (const match of text.matchAll(INLINE)) {
+    if (match.index > position) runs.push({ kind: "text", text: text.slice(position, match.index) });
+    const token = match[0];
+    if (token.startsWith("`")) {
+      runs.push({ kind: "code", text: token.slice(1, -1) });
+    } else if (token.startsWith("**")) {
+      runs.push({ kind: "bold", text: token.slice(2, -2) });
+    } else if (token.startsWith("*") || token.startsWith("_")) {
+      runs.push({ kind: "italic", text: token.slice(1, -1) });
+    } else {
+      const link = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(token);
+      runs.push({ kind: "link", text: link[1], href: link[2] });
+    }
+    position = match.index + token.length;
+  }
+  if (position < text.length) runs.push({ kind: "text", text: text.slice(position) });
+  return runs;
+}
+
+function appendInline(parent, text, marks) {
+  for (const run of inlineRuns(text)) {
+    switch (run.kind) {
+      case "code":
+        parent.append(element("code", "", run.text));
+        break;
+      case "bold": {
+        const strong = element("strong");
+        appendInline(strong, run.text, marks);
+        parent.append(strong);
+        break;
+      }
+      case "italic": {
+        const emphasis = element("em");
+        appendInline(emphasis, run.text, marks);
+        parent.append(emphasis);
+        break;
+      }
+      case "link": {
+        const anchor = element("a", "", run.text);
+        anchor.href = run.href;
+        anchor.target = "_blank";
+        anchor.rel = "noreferrer";
+        parent.append(anchor);
+        break;
+      }
+      default:
+        appendWithMarks(parent, run.text, marks);
+    }
+  }
+}
+
+function tableCells(row) {
+  return row.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+}
+
+function isDivider(row) {
+  const cells = tableCells(row);
+  return cells.length > 0 && cells.every((cell) => /^:?-{2,}:?$/.test(cell));
+}
+
+function renderTable(parent, rows, marks) {
+  const table = element("table");
+  const body = element("tbody");
+  let headerDone = false;
+  for (const row of rows) {
+    if (isDivider(row)) continue;
+    const cells = tableCells(row);
+    const line = element("tr");
+    for (const cell of cells) {
+      const node = element(headerDone ? "td" : "th");
+      appendInline(node, cell, marks);
+      line.append(node);
+    }
+    if (headerDone) {
+      body.append(line);
+    } else {
+      const head = element("thead");
+      head.append(line);
+      table.append(head);
+      table.append(body);
+      headerDone = true;
+    }
+  }
+  parent.append(table);
+}
+
+// Cuts prose into paragraphs, headings, lists and tables.
+function splitBlocks(text) {
+  const lines = text.split("\n");
+  const blocks = [];
+  let paragraph = [];
+  let index = 0;
+  const flush = () => {
+    if (paragraph.length > 0) {
+      blocks.push({ type: "paragraph", lines: paragraph });
+      paragraph = [];
+    }
+  };
+  while (index < lines.length) {
+    const line = lines[index];
+    if (line.trim() === "") {
+      flush();
+      index += 1;
+      continue;
+    }
+    if (line.trim().startsWith("|")) {
+      flush();
+      const rows = [];
+      while (index < lines.length && lines[index].trim().startsWith("|")) {
+        rows.push(lines[index]);
+        index += 1;
+      }
+      blocks.push({ type: "table", rows });
+      continue;
+    }
+    const heading = /^#{1,6}\s+(.*)$/.exec(line);
+    if (heading) {
+      flush();
+      blocks.push({ type: "heading", text: heading[1] });
+      index += 1;
+      continue;
+    }
+    const marker = /^\s*(?:[-*+]|\d+[.)])\s+(.*)$/.exec(line);
+    if (marker) {
+      flush();
+      const ordered = /^\s*\d+[.)]\s+/.test(line);
+      const items = [];
+      while (index < lines.length) {
+        const next = /^\s*(?:[-*+]|\d+[.)])\s+(.*)$/.exec(lines[index]);
+        if (!next) break;
+        items.push(next[1]);
+        index += 1;
+      }
+      blocks.push({ type: "list", ordered, items });
+      continue;
+    }
+    paragraph.push(line);
+    index += 1;
+  }
+  flush();
+  return blocks;
+}
+
+function renderBlocks(parent, text, marks) {
+  for (const block of splitBlocks(text)) {
+    if (block.type === "table") {
+      renderTable(parent, block.rows, marks);
+      continue;
+    }
+    if (block.type === "list") {
+      const list = element(block.ordered ? "ol" : "ul");
+      for (const item of block.items) {
+        const entry = element("li");
+        appendInline(entry, item, marks);
+        list.append(entry);
+      }
+      parent.append(list);
+      continue;
+    }
+    if (block.type === "heading") {
+      const heading = element("h3");
+      appendInline(heading, block.text, marks);
+      parent.append(heading);
+      continue;
+    }
+    const paragraph = element("p");
+    appendInline(paragraph, block.lines.join("\n"), marks);
+    parent.append(paragraph);
+  }
+}
+
+// Cuts text into prose and fenced code. A fence's info string ("```rust")
+// becomes the segment's language. An unclosed fence, which a shortened answer
+// can leave, runs to the end of the text. The Claude export also wraps code in
+// <antArtifact language="..."> tags instead of fences; those count as fences.
+function fenceOf(line, inCode) {
+  const fence = /^\s*(```+|~~~+)\s*([\w+#.-]*)/.exec(line);
+  if (fence) return { lang: fence[2] };
+  const artifact = /<antArtifact\b[^>]*>/.exec(line);
+  if (!inCode && artifact) {
+    const type = /type="([^"]*)"/.exec(artifact[0]);
+    const language = /language="([^"]*)"/.exec(artifact[0]);
+    const isCode = language || (type && type[1] === "application/vnd.ant.code");
+    if (isCode) return { lang: language ? language[1] : "", rest: line.slice(artifact.index + artifact[0].length) };
+  }
+  if (inCode && /<\/antArtifact>/.test(line)) return { lang: "", rest: line.replace(/<\/antArtifact>.*/, "") };
+  return null;
+}
+
+function splitFences(text) {
+  const segments = [];
+  let current = { code: false, lang: "", lines: [] };
+  for (const line of text.split("\n")) {
+    const fence = fenceOf(line, current.code);
+    if (fence) {
+      if (current.code && fence.rest && fence.rest.trim()) current.lines.push(fence.rest);
+      segments.push(current);
+      current = current.code
+        ? { code: false, lang: "", lines: [] }
+        : { code: true, lang: fence.lang.toLowerCase(), lines: fence.rest && fence.rest.trim() ? [fence.rest] : [] };
+      continue;
+    }
+    current.lines.push(line);
+  }
+  segments.push(current);
+  return segments.filter((segment) => segment.lines.join("").trim() !== "");
+}
+
+// A small highlighter for the languages in the training set. It is a lexer,
+// not a parser: it colours comments, strings, numbers, keywords, types,
+// macros, attributes and lifetimes, which is what a reviewer scans for.
+const KEYWORDS = {
+  rust: "as async await break const continue crate dyn else enum extern false fn for if impl in let loop match mod move mut pub ref return self Self static struct super trait true type unsafe use where while",
+  python: "and as assert async await break class continue def del elif else except False finally for from global if import in is lambda None nonlocal not or pass raise return self True try while with yield",
+  go: "break case chan const continue default defer else fallthrough for func go goto if import interface map nil package range return select struct switch type var true false",
+  c: "auto bool break case char class const constexpr continue default delete do double else enum explicit extern false float for if inline int long namespace new nullptr private protected public return short signed sizeof static struct switch template this true typedef typename union unsigned using virtual void volatile while __global__ __device__ __host__ __shared__",
+  shell: "if then else elif fi for in do done while case esac function return export local set echo cd",
+  data: "true false null",
+};
+const LANG_ALIASES = {
+  rs: "rust", rust: "rust", py: "python", python: "python", go: "go", golang: "go",
+  c: "c", h: "c", cpp: "c", "c++": "c", cc: "c", hpp: "c", cu: "c", cuda: "c",
+  sh: "shell", bash: "shell", shell: "shell", console: "shell", zsh: "shell",
+  toml: "data", json: "data", yaml: "data", yml: "data", ini: "data",
+};
+const KEYWORD_SETS = Object.fromEntries(
+  Object.entries(KEYWORDS).map(([name, words]) => [name, new Set(words.split(" "))]));
+const NEVER = String.raw`(?!)`;
+
+// The language to colour a block as. An unlabelled fence takes the origin's
+// file extension, and failing that is treated as Rust, the common case here.
+function languageOf(lang, origin) {
+  if (LANG_ALIASES[lang]) return LANG_ALIASES[lang];
+  if (lang) return "";
+  const extension = /\.(\w+)$/.exec(origin || "");
+  if (extension && LANG_ALIASES[extension[1]]) return LANG_ALIASES[extension[1]];
+  return "rust";
+}
+
+const TOKEN_KINDS = ["comment", "string", "attr", "lifetime", "number", "macro", "word"];
+
+// One regex per language, with a named group per token kind; the first group
+// that matched names the token.
+function lexer(language) {
+  const hashComments = ["python", "shell", "data"].includes(language);
+  const strings = {
+    python: String.raw`"""[\s\S]*?"""|'''[\s\S]*?'''|[rbf]?"(?:\\.|[^"\\\n])*"|[rbf]?'(?:\\.|[^'\\\n])*'`,
+    rust: String.raw`b?r(?<hashes>#*)"[\s\S]*?"\k<hashes>|b?"(?:\\.|[^"\\])*"|b?'(?:\\.|[^'\\\n])'`,
+  };
+  const patterns = {
+    comment: hashComments ? String.raw`#.*` : String.raw`\/\/.*|\/\*[\s\S]*?\*\/`,
+    string: strings[language] || String.raw`"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|` + "`[^`]*`",
+    attr: language === "rust" ? String.raw`#!?\[[^\]\n]*\]` : language === "python" ? String.raw`@\w+` : NEVER,
+    lifetime: language === "rust" ? String.raw`'[a-z_]\w*\b(?!')` : NEVER,
+    number: String.raw`\b(?:0x[\da-fA-F_]+|\d[\d_]*(?:\.\d[\d_]*)?(?:e[+-]?\d+)?)(?:[iu](?:8|16|32|64|128|size)|f32|f64)?\b`,
+    macro: language === "rust" ? String.raw`\b[a-z_]\w*!` : NEVER,
+    word: String.raw`\b[A-Za-z_]\w*\b`,
+  };
+  return new RegExp(TOKEN_KINDS.map((kind) => `(?<${kind}>${patterns[kind]})`).join("|"), "g");
+}
+
+// Coloured ranges over `text`: [{start, end, kind}], gaps left uncoloured.
+function tokenize(text, language) {
+  if (!language) return [];
+  const keywords = KEYWORD_SETS[language];
+  const tokens = [];
+  for (const match of text.matchAll(lexer(language))) {
+    const word = match[0];
+    const kind = TOKEN_KINDS.find((name) => match.groups[name] !== undefined);
+    const next = text[match.index + word.length];
+    const style = kind !== "word" ? kind
+      : keywords.has(word) ? "keyword"
+      : /^[A-Z]/.test(word) ? "type"
+      : next === "(" ? "call"
+      : "";
+    if (style) tokens.push({ start: match.index, end: match.index + word.length, kind: style });
+  }
+  return tokens;
+}
+
+// Splits `text` at every token and mark boundary, so a slop mark can cross
+// highlighted tokens without breaking either.
+function styledRuns(text, tokens, marks) {
+  const cuts = new Set([0, text.length]);
+  for (const range of [...tokens, ...marks]) { cuts.add(range.start); cuts.add(range.end); }
+  const points = [...cuts].sort((first, second) => first - second);
+  return points.slice(0, -1).map((start, position) => {
+    const end = points[position + 1];
+    const token = tokens.find((candidate) => candidate.start <= start && end <= candidate.end);
+    const mark = marks.find((candidate) => candidate.start <= start && end <= candidate.end);
+    return { text: text.slice(start, end), kind: token ? token.kind : "", mark };
+  }).filter((run) => run.text !== "");
+}
+
+function codeBar(body, lang, language) {
+  const bar = element("figcaption", "code-bar");
+  const lineCount = body.split("\n").length;
+  const copy = element("button", "code-copy", "Copy");
+  copy.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(body).catch(() => {});
+    toast("Code copied");
+  });
+  bar.append(
+    element("span", "code-lang", lang || (language ? `${language}?` : "text")),
+    element("span", "code-lines", `${lineCount} line${lineCount === 1 ? "" : "s"}`),
+    copy,
+  );
+  return bar;
+}
+
+// One fenced block: a bar with the language, line count and a copy button,
+// then the code with line numbers. Line numbers are CSS counters, so they are
+// not part of a text selection and a flagged span stays clean.
+function renderCode(parent, body, lang, origin, slopSpans, suggestions, violations) {
+  const language = languageOf(lang, origin);
+  const block = element("figure", body.split("\n").length < 3 ? "code-block short" : "code-block");
+  const pre = element("pre");
+  const code = element("code");
+  const runs = styledRuns(body, tokenize(body, language), highlightRanges(body, slopSpans, suggestions));
+  const sourceLines = body.split("\n");
+  const tagLine = (node, number) => {
+    const text = (sourceLines[number] || "").trim();
+    const broken = violations.filter((violation) => text !== "" && violation.line === text);
+    if (broken.length === 0) return;
+    node.classList.add("violation");
+    const tag = element("span", "rule-tag", broken.map((violation) => violation.rule).join(" · "));
+    tag.title = broken.map((violation) => `${violation.rule}: ${violation.detail}`).join("\n");
+    node.prepend(tag);
+  };
+  let lineNumber = 0;
+  let line = element("span", "line");
+  for (const run of runs) {
+    run.text.split("\n").forEach((piece, position) => {
+      if (position > 0) {
+        line.append("\n");
+        tagLine(line, lineNumber);
+        code.append(line);
+        lineNumber += 1;
+        line = element("span", "line");
+      }
+      if (piece === "") return;
+      let node = run.kind ? element("span", `tok-${run.kind}`, piece) : document.createTextNode(piece);
+      if (run.mark) {
+        const mark = markFor(run.mark);
+        mark.append(node);
+        node = mark;
+      }
+      line.append(node);
+    });
+  }
+  tagLine(line, lineNumber);
+  code.append(line);
+  pre.append(code);
+  block.append(codeBar(body, lang, language), pre);
+  parent.append(block);
+}
+
+function renderText(parent, text, slopSpans, origin, suggestions = [], violations = []) {
+  for (const segment of splitFences(text)) {
+    const body = segment.lines.join("\n").replace(/\n+$/, "");
+    if (segment.code) {
+      renderCode(parent, body, segment.lang, origin, slopSpans, suggestions, violations);
+      continue;
+    }
+    const prose = element("div", "prose");
+    renderBlocks(prose, body, { spans: slopSpans, suggestions });
+    parent.append(prose);
+  }
+}
+
+// The phrases to suggest in one field: what Stage 0 found in the answer, and
+// every phrase a reviewer has marked anywhere. Phrases already marked on this
+// example are left to the slop marks.
+const OWN_SOURCES = new Set(["readability", "clever_vs_readable"]);
+
+function suggestionsFor(example, field) {
+  if (field !== "response" || OWN_SOURCES.has(example.source)) return [];
+  const marked = new Set(spansOf(example, field).map((span) => span.text.toLowerCase()));
+  const fromStage0 = ((example.suggestions || {}).slop || [])
+    .map((hit) => ({ text: hit.text, category: hit.category, from: "Stage 0 phrase list" }));
+  const learned = learnedPhrases
+    .map((phrase) => ({ text: phrase.text, category: phrase.category, from: `you marked it in ${phrase.examples}` }));
+  return [...fromStage0, ...learned].filter((suggestion) => !marked.has(suggestion.text.toLowerCase()));
+}
+
+function violationsOf(example) {
+  return (example.suggestions || {}).violations || [];
+}
+
+async function loadPhrases() {
+  const data = await fetchJson("/api/phrases").catch(() => ({ phrases: [] }));
+  learnedPhrases = data.phrases || [];
+}
+
+// Clicking a suggested phrase marks it on that example with the suggested
+// category: one click instead of select, pick, flag.
+document.addEventListener("click", (event) => {
+  const mark = event.target.closest("mark.suggest");
+  if (!mark) return;
+  const article = mark.closest("article");
+  const section = mark.closest("section.part");
+  const example = article && shown.find((candidate) => candidate.id === article.dataset.id);
+  if (!example || !section) return;
+  const flag = slopFlags.get(example.id) || { note: "", spans: [] };
+  const span = { field: section.dataset.field, text: mark.textContent, category: mark.dataset.category };
+  saveFlag(example, { note: flag.note, spans: [...flag.spans, span] }, article.querySelector(".curation"));
+});
+
+// Lists every example whose answer contains `span.text`, with a bar that
+// marks the phrase in all of them at once.
+async function findEverywhere(span) {
+  phraseSearch = { text: span.text, category: span.category };
+  $("search").value = span.text;
+  $("source").value = "";
+  $("collection").value = "";
+  $("slop-only").checked = false;
+  await applyFilters();
+  renderPhraseBar();
+  window.scrollTo({ top: 0 });
+}
+
+function renderPhraseBar() {
+  const bar = $("phrase-bar");
+  bar.replaceChildren();
+  bar.hidden = !phraseSearch || $("search").value !== phraseSearch.text;
+  if (bar.hidden) return;
+  const label = CATEGORY_LABELS.get(phraseSearch.category) || phraseSearch.category;
+  bar.append(element("span", "", `“${phraseSearch.text}” is in ${filteredTotal.toLocaleString()} examples.`));
+  const all = element("button", "flag", `Mark it in all ${filteredTotal.toLocaleString()} as ${label}`);
+  all.addEventListener("click", () => flagAllMatches(all));
+  const done = element("button", "", "Done");
+  done.addEventListener("click", async () => {
+    phraseSearch = null;
+    $("search").value = "";
+    await applyFilters();
+    renderPhraseBar();
+  });
+  bar.append(all, done);
+  measureHeader();
+}
+
+async function flagAllMatches(button) {
+  button.disabled = true;
+  const response = await fetch("/api/flag-matches", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(phraseSearch),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    toast(`Not saved: ${result.error || response.statusText}`);
+    button.disabled = false;
+    return;
+  }
+  toast(`Marked in ${result.added} more examples (${result.matched} contain it)`);
+  const meta = await fetchJson("/api/meta");
+  flaggedCount = meta.flagged;
+  await loadPhrases();
+  await applyFilters();
+  renderPhraseBar();
+}
+
+function spansOf(example, field) {
+  const flag = slopFlags.get(example.id);
+  if (!flag) return [];
+  return flag.spans.filter((span) => span.field === field);
+}
+
+// One labelled part of an example. A long answer arrives shortened and is
+// fetched whole only when the reader asks, so one enormous record cannot make a
+// whole page heavy.
+function part(example, field, label) {
+  const section = element("section", "part");
+  section.dataset.field = field;
+  const head = element("div", "label");
+  head.append(element("span", "", label));
+  if (field === "response") {
+    head.append(element("span", "size", `${example.response_chars.toLocaleString()} chars`));
+  }
+  section.append(head);
+
+  const trimmed = field === "response" && example.shortened;
+  const body = element("div", trimmed ? "shortened" : "");
+  renderText(body, example[field], spansOf(example, field), example.origin,
+    suggestionsFor(example, field), field === "response" ? violationsOf(example) : []);
+  section.append(body);
+
+  if (trimmed) {
+    const more = element("button", "more",
+      `Show the full answer (${example.response_chars.toLocaleString()} chars)`);
+    more.addEventListener("click", () => expand(example, section));
+    section.append(more);
+  }
+  return section;
+}
+
+async function expand(example, section) {
+  const data = await fetchJson(`/api/record?position=${example.position}`);
+  Object.assign(example, data);
+  example.hits = highlightRanges(`${example.instruction}\n${example.response}`, []);
+  section.replaceWith(part(example, "response", example.instruction.trim() === "" ? "Passage (training text, no question)" : "Response"));
+  toast("Full answer loaded");
+}
+
+function metaLine(example) {
+  const meta = element("div", "meta");
+  const size = `${(example.instruction.length + example.response_chars).toLocaleString()} chars`;
+  const seen = element("span", "seen" + (reviewed.has(example.id) ? " on" : ""));
+  seen.title = reviewed.has(example.id) ? "You have looked at this one" : "Not looked at yet";
+  meta.append(
+    seen,
+    element("span", "", `#${example.position + 1}`),
+    element("span", `badge ${example.source}`, example.source_title || example.source),
+    ...(example.collection_title ? [element("strong", "book-title", example.collection_title)] : []),
+    element("span", "origin", example.origin),
+    element("span", "spacer", ""),
+    element("span", "", size),
+  );
+  if (example.hits.length > 0) {
+    const labels = [...new Set(example.hits.map((hit) => hit.label))].join(", ");
+    meta.append(element("div", "hits", `Possible ${labels}`));
+  }
+  return meta;
+}
+
+function card(example) {
+  const article = element("article");
+  article.dataset.id = example.id;
+  article.classList.toggle("flagged", slopFlags.has(example.id));
+  if (Array.isArray(example.messages)) {
+    article.append(metaLine(example), ...conversationParts(example), curationPanel(example));
+    return article;
+  }
+  const isPassage = example.instruction.trim() === "";
+  article.append(
+    metaLine(example),
+    ...(isPassage ? [] : [part(example, "instruction", "Instruction")]),
+    part(example, "response", isPassage ? "Passage (training text, no question)" : "Response"),
+    curationPanel(example),
+  );
+  return article;
+}
+
+// A generated conversation: each question the teacher wrote, then the book
+// text that answers it, then the questions that were thrown away and why.
+function conversationParts(example) {
+  const parts = [];
+  const turns = example.messages.filter((message) => message.role === "user" || message.role === "assistant");
+  turns.forEach((message, position) => {
+    const number = Math.floor(position / 2) + 1;
+    const section = element("section", "part");
+    section.dataset.field = "messages";
+    const head = element("div", "label");
+    head.append(element("span", "", message.role === "user" ? `Question ${number} (written by the model)` : `Answer ${number} (book text)`));
+    section.append(head);
+    const body = element("div", message.role === "user" ? "question" : "");
+    renderText(body, message.content, [], example.origin);
+    section.append(body);
+    parts.push(section);
+  });
+  if (Array.isArray(example.rejected) && example.rejected.length > 0) {
+    const section = element("section", "part rejected");
+    const head = element("div", "label");
+    head.append(element("span", "", `Questions thrown away (${example.rejected.length})`));
+    const list = element("ul", "spans");
+    for (const entry of example.rejected) {
+      const item = element("li");
+      item.append(element("span", "category", entry.reason), element("span", "quote", `“${entry.question}”`));
+      list.append(item);
+    }
+    section.append(head, list);
+    parts.push(section);
+  }
+  return parts;
+}
+
+// The panel under each example: mark a selected sentence with a slop category,
+// list the marked sentences, and flag, annotate or unflag the whole example.
+function curationPanel(example) {
+  const panel = element("div", "curation");
+  const flag = slopFlags.get(example.id) || { note: "", spans: [] };
+  const isFlagged = slopFlags.has(example.id);
+
+  const selectionRow = element("div", "row");
+  const category = element("select");
+  const prompt = element("option", "", "Slop category…");
+  prompt.value = "";
+  prompt.disabled = true;
+  prompt.selected = true;
+  category.append(prompt);
+  for (const [value, label] of SLOP_CATEGORIES) {
+    const option = element("option", "", label);
+    option.value = value;
+    category.append(option);
+  }
+  const flagSelection = element("button", "flag", "Flag selection");
+  const selectionText = element("span", "selection", "Select a sentence in the instruction or response above.");
+  flagSelection.addEventListener("click", () => {
+    const selection = pendingSelection;
+    if (!selection || selection.id !== example.id) {
+      selectionText.textContent = "Nothing selected in this example.";
+      return;
+    }
+    if (!category.value) {
+      selectionText.textContent = "Pick a slop category first.";
+      category.focus();
+      return;
+    }
+    const span = { field: selection.field, text: selection.text, category: category.value };
+    saveFlag(example, { note: note.value, spans: [...flag.spans, span] }, panel);
+  });
+  selectionRow.append(category, flagSelection, selectionText);
+
+  const spanList = element("ul", "spans");
+  flag.spans.forEach((span, position) => {
+    const item = element("li");
+    const remove = element("button", "", "remove");
+    remove.addEventListener("click", () => {
+      const remaining = flag.spans.filter((kept, index) => index !== position);
+      saveFlag(example, { note: note.value, spans: remaining }, panel);
+    });
+    const everywhere = element("button", "", "Find everywhere");
+    everywhere.title = "List every example whose answer contains this phrase, and mark it in all of them";
+    everywhere.addEventListener("click", () => findEverywhere(span));
+    item.append(
+      element("span", "category", CATEGORY_LABELS.get(span.category)),
+      element("span", "quote", `${span.field}: “${span.text}”`),
+      everywhere,
+      remove,
+    );
+    spanList.append(item);
+  });
+
+  const noteRow = element("div", "row");
+  const state = element("span", "state", isFlagged ? "Flagged as AI slop" : "");
+  const note = element("input");
+  note.type = "text";
+  note.placeholder = "Note: what makes this example slop";
+  note.value = flag.note;
+  const flagWhole = element("button", "flag", isFlagged ? "Save note" : "Flag whole example");
+  flagWhole.addEventListener("click", () => saveFlag(example, { note: note.value, spans: flag.spans }, panel));
+  noteRow.append(state, note, flagWhole);
+  if (isFlagged) {
+    const unflag = element("button", "", "Unflag");
+    unflag.addEventListener("click", () => saveFlag(example, null, panel));
+    noteRow.append(unflag);
+  }
+
+  panel.append(selectionRow, spanList, noteRow);
+  return panel;
+}
+
+// Sends the complete new flag for one example; `null` removes the flag.
+async function saveFlag(example, flag, panel) {
+  let note = "";
+  if (flag !== null) {
+    note = flag.note.trim();
+    if (pendingOrphan) note = note ? `${pendingOrphan.note} | ${note}` : pendingOrphan.note;
+  }
+  const body = flag === null
+    ? { id: example.id, flagged: false }
+    : { id: example.id, note, spans: flag.spans, flagged: true };
+  const response = await fetch("/api/flag", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}));
+    panel.querySelector(".state").textContent = `Not saved: ${detail.error || response.statusText}`;
+    return;
+  }
+  if (flag === null) {
+    slopFlags.delete(example.id);
+    flaggedCount = Math.max(0, flaggedCount - 1);
+    toast("Unflagged");
+  } else {
+    slopFlags.set(example.id, { note, spans: flag.spans });
+    flaggedCount += 1;
+    reviewed.add(example.id);
+    rememberReviewed();
+    toast(pendingOrphan ? "Flagged and re-pointed" : "Flagged");
+  }
+  if (flag !== null && pendingOrphan) {
+    const orphan = pendingOrphan;
+    pendingOrphan = null;
+    await fetch("/api/flag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: orphan.id, flagged: false }),
+    });
+    orphans = orphans.filter((entry) => entry.id !== orphan.id);
+    flaggedCount = Math.max(0, flaggedCount - 1);
+    renderOrphans();
+  }
+  pendingSelection = null;
+  pageCache.clear();
+  await loadPhrases();
+  panel.closest("article").replaceWith(card(example));
+  summarize();
+}
+
+// Remembers the last text selection made inside an instruction or response,
+// so the "Flag selection" click can use it after the selection is gone.
+document.addEventListener("mouseup", () => {
+  const selection = window.getSelection();
+  const text = selection.toString().trim();
+  if (!text || selection.rangeCount === 0) return;
+  const container = selection.getRangeAt(0).commonAncestorContainer;
+  const startElement = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+  const section = startElement.closest("section.part");
+  if (!section) return;
+  const article = section.closest("article");
+  pendingSelection = { id: article.dataset.id, field: section.dataset.field, text };
+  article.querySelector(".curation .selection").textContent = `Selected: “${text}”`;
+});
+
+// Adds the fields the renderer needs. The server sends only the record.
+function normalize(example) {
+  example.hits = highlightRanges(`${example.instruction}\n${example.response}`, []);
+  return example;
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${url}: ${response.statusText}`);
+  return response.json();
+}
+
+async function fetchJsonLines(path) {
+  const response = await fetch(path);
+  if (!response.ok) return [];
+  const text = await response.text();
+  return text.split("\n").filter((line) => line.trim() !== "").map((line) => JSON.parse(line));
+}
+
+function rememberFlags(items) {
+  for (const item of items) {
+    if (item.flag) slopFlags.set(item.id, { note: item.flag.note || "", spans: item.flag.spans || [] });
+  }
+}
+
+// Every example the flag file knows about but which the generator has already
+// moved out of the training set, plus the ones still in it that are flagged.
+// The flagged side is fetched in pages: there can be more than one page of them.
+async function flaggedExamples() {
+  const pending = [];
+  let start = 0;
+  let total = Infinity;
+  while (start < total) {
+    const page = await fetchJson(`/api/page?flagged=1&start=${start}&limit=100`);
+    total = page.total;
+    if (page.items.length === 0) break;
+    pending.push(...page.items);
+    start += page.items.length;
+  }
+  const removed = await fetchJsonLines("/slop.jsonl");
+  const merged = new Map();
+  for (const item of removed) {
+    merged.set(item.id, {
+      ...item,
+      response_chars: (item.response || "").length,
+      shortened: false,
+      flag: { note: item.note || "", spans: item.spans || [] },
+    });
+  }
+  for (const item of pending) merged.set(item.id, item);
+  return [...merged.values()].map((example, index) => {
+    example.position = index;
+    return example;
+  });
+}
+
+function filterParams() {
+  const params = new URLSearchParams();
+  const query = $("search").value.trim();
+  const source = $("source").value;
+  const collection = $("collection").value;
+  if (query) params.set("q", query);
+  if (source) params.set("source", source);
+  if (collection) params.set("collection", collection);
+  return params;
+}
+
+function pageUrl(index) {
+  const params = filterParams();
+  params.set("start", String(index * PAGE_SIZE));
+  params.set("limit", String(PAGE_SIZE));
+  return `/api/page?${params}`;
+}
+
+// Fetches one page and keeps it, so paging back and forth costs nothing.
+async function fetchPage(index) {
+  const url = pageUrl(index);
+  const cached = pageCache.get(url);
+  if (cached) return cached;
+  const started = performance.now();
+  const data = await fetchJson(url);
+  data.millis = Math.round(performance.now() - started);
+  data.bytes = new Blob([JSON.stringify(data)]).size;
+  if (pageCache.size > 40) pageCache.delete(pageCache.keys().next().value);
+  pageCache.set(url, data);
+  return data;
+}
+
+function prefetch(index) {
+  if (index < 0) return;
+  fetchPage(index).catch(() => {});
+}
+
+async function showPage(index) {
+  page = Math.max(0, index);
+  const data = await fetchPage(page);
+  filteredTotal = data.total;
+  visible = data.items.map(normalize);
+  rememberFlags(visible);
+  if ($("sensitive").checked) visible = visible.filter((example) => example.hits.length > 0);
+  render();
+  prefetch(page + 1);
+}
+
+async function applyFilters() {
+  pageCache.clear();
+  focusIndex = -1;
+  if ($("slop-only").checked) {
+    slopOnly = true;
+    visible = (await flaggedExamples()).map(normalize);
+    rememberFlags(visible);
+    render();
+    return;
+  }
+  slopOnly = false;
+  await showPage(0);
+}
+
+function render() {
+  const pages = Math.max(1, Math.ceil((slopOnly ? visible.length : filteredTotal) / PAGE_SIZE));
+  page = Math.min(page, pages - 1);
+  $("page-info").textContent = slopOnly
+    ? `${visible.length.toLocaleString()} flagged · ${page + 1} / ${pages}`
+    : `${filteredTotal.toLocaleString()} · ${page + 1} / ${pages}`;
+  $("prev").disabled = page === 0;
+  $("next").disabled = page >= pages - 1;
+
+  const list = $("list");
+  list.replaceChildren();
+  shown = slopOnly ? visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : visible;
+  if (shown.length === 0) list.append(element("p", "empty", "No examples match."));
+  for (const example of shown) list.append(card(example));
+  summarize();
+}
+
+function summarize() {
+  const perSource = metaSources.map((entry) => `${entry.title} ${entry.count.toLocaleString()}`).join(" · ");
+  const cached = pageCache.get(pageUrl(page));
+  const weight = cached && cached.bytes ? `${(cached.bytes / 1024).toFixed(0)} KB` : "–";
+  const timing = cached && cached.millis !== undefined ? ` in ${cached.millis} ms` : "";
+  const spanCount = [...slopFlags.values()].reduce((sum, flag) => sum + flag.spans.length, 0);
+  $("summary").textContent =
+    `${total.toLocaleString()} examples (${perSource}) · ` +
+    `${flaggedCount.toLocaleString()} flagged, ${spanCount.toLocaleString()} marked sentences, ` +
+    `${learnedPhrases.length.toLocaleString()} learned phrases · ` +
+    `${shown.length} records, ${weight}${timing}`;
+}
+
+function setFocus(index) {
+  const articles = [...document.querySelectorAll("#list article")];
+  if (articles.length === 0) return;
+  focusIndex = Math.max(0, Math.min(articles.length - 1, index));
+  articles.forEach((article, position) => article.classList.toggle("focused", position === focusIndex));
+  const article = articles[focusIndex];
+  article.scrollIntoView({ block: "start", behavior: "smooth" });
+  const example = shown[focusIndex];
+  if (example && !reviewed.has(example.id)) {
+    reviewed.add(example.id);
+    rememberReviewed();
+  }
+}
+
+function focusedExample() {
+  return shown[focusIndex];
+}
+
+function articleFor(example) {
+  return document.querySelector(`#list article[data-id="${example.id}"]`);
+}
+
+async function go(delta) {
+  await showPage(page + delta);
+  focusIndex = -1;
+  window.scrollTo({ top: 0 });
+}
+
+let searchTimer;
+$("search").addEventListener("input", () => {
+  renderPhraseBar();
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applyFilters, 250);
+});
+$("search").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") $("search").blur();
+});
+$("source").addEventListener("change", () => {
+  $("collection").value = "";
+  applyFilters();
+});
+$("collection").addEventListener("change", () => {
+  $("source").value = "";
+  applyFilters();
+});
+$("sensitive").addEventListener("change", () => {
+  if (slopOnly) { applyFilters(); return; }
+  visible = visible.filter((example) => example.hits.length > 0);
+  render();
+});
+$("slop-only").addEventListener("change", applyFilters);
+$("prev").addEventListener("click", () => go(-1));
+$("next").addEventListener("click", () => go(1));
+
+document.addEventListener("keydown", (event) => {
+  if (event.target.tagName === "INPUT" || event.target.tagName === "SELECT") return;
+  const actions = {
+    j: () => setFocus(focusIndex + 1),
+    k: () => setFocus(focusIndex - 1),
+    ArrowDown: () => setFocus(focusIndex + 1),
+    ArrowUp: () => setFocus(focusIndex - 1),
+    f: () => {
+      const example = focusedExample();
+      if (!example) return;
+      const article = articleFor(example);
+      const spans = (slopFlags.get(example.id) || { spans: [] }).spans;
+      saveFlag(example, { note: "flagged in review", spans }, article.querySelector(".curation"));
+    },
+    e: () => {
+      const example = focusedExample();
+      if (!example || !example.shortened) return;
+      expand(example, articleFor(example).querySelector('section[data-field="response"]'));
+    },
+    g: () => go(-page),
+    G: () => go(1e6),
+    "/": () => $("search").focus(),
+  };
+  const action = actions[event.key];
+  if (action) { event.preventDefault(); action(); }
+});
+
+function measureHeader() {
+  document.documentElement.style.setProperty("--header-h", `${$("header").offsetHeight}px`);
+}
+window.addEventListener("resize", measureHeader);
+
+// The banner for flags whose example this build no longer has. Their ids are
+// content hashes, so a rebuild that changed the text orphans them; they have to
+// be shown and re-pointed, never dropped.
+function renderOrphans() {
+  const banner = $("orphans");
+  banner.replaceChildren();
+  banner.hidden = orphans.length === 0;
+  if (orphans.length === 0) return;
+  banner.append(element("div", "title",
+    `${orphans.length} flag(s) matched no example — re-point or clear them`));
+  for (const orphan of orphans) {
+    const item = element("div", "item");
+    item.append(
+      element("span", "note", orphan.note || "(no note)"),
+      element("span", "id", orphan.id),
+    );
+    const use = element("button", "", "Use for next flag");
+    use.addEventListener("click", () => {
+      pendingOrphan = orphan;
+      toast("The next example you flag gets this note");
+    });
+    const clear = element("button", "", "Clear");
+    clear.addEventListener("click", () => clearOrphan(orphan));
+    item.append(use, clear);
+    banner.append(item);
+  }
+}
+
+async function clearOrphan(orphan) {
+  const response = await fetch("/api/flag", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: orphan.id, flagged: false }),
+  });
+  if (!response.ok) return;
+  orphans = orphans.filter((entry) => entry.id !== orphan.id);
+  if (pendingOrphan && pendingOrphan.id === orphan.id) pendingOrphan = null;
+  flaggedCount = Math.max(0, flaggedCount - 1);
+  renderOrphans();
+  summarize();
+}
+
+async function load() {
+  const meta = await fetchJson("/api/meta");
+  total = meta.total;
+  metaSources = meta.sources;
+  flaggedCount = meta.flagged;
+  const source = $("source");
+  if (source.options.length <= 1) {
+    for (const entry of meta.sources) {
+      const option = element("option", "", `${entry.title} (${entry.count.toLocaleString()})`);
+      option.value = entry.name;
+      source.append(option);
+    }
+  }
+  const collection = $("collection");
+  if (collection.options.length <= 1) {
+    const titles = new Map(meta.sources.map((entry) => [entry.name, entry.title]));
+    for (const sourceName of [...new Set(meta.collections.map((entry) => entry.source))]) {
+      const group = element("optgroup");
+      group.label = titles.get(sourceName) || sourceName;
+      for (const entry of meta.collections.filter((candidate) => candidate.source === sourceName)) {
+        const option = element("option", "", `${entry.title} (${entry.count.toLocaleString()})`);
+        option.value = entry.name;
+        group.append(option);
+      }
+      collection.append(group);
+    }
+  }
+  await loadPhrases();
+  const orphanData = await fetchJson("/api/orphans");
+  orphans = orphanData.orphans || [];
+  renderOrphans();
+  measureHeader();
+  await applyFilters();
+}
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+[package]
+name = "thor-lasso-distiller"
+version = "0.1.0"
+edition = "2024"
+description = "Asks a teacher model, served by trtllm-serve, for the questions book passages answer, and builds conversations from them."
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thor-spark-safety-eval = { path = "../thor-spark-safety-eval" }
+
+[[bin]]
+name = "lasso"
+path = "src/main.rs"

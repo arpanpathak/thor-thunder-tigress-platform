@@ -1,0 +1,12 @@
+# The book prints this code, so it is formatted for reading.
+#
+# The import options are unstable, so format with nightly:
+#   cargo +nightly fmt
+#
+# One `use` per crate, grouped std / external / this crate, and nested
+# paths broken onto their own lines when they do not fit on one.
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+imports_layout = "HorizontalVertical"
+# Break method chains longer than this onto one call per line.
+chain_width = 40

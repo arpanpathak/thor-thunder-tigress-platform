@@ -1,0 +1,9 @@
+[submodule "projects/openbatrangs"]
+	path = projects/openbatrangs
+	url = https://github.com/arpanpathak/openbatrangs.git
+[submodule "projects/local-copilot-codebuddy"]
+	path = projects/local-copilot-codebuddy
+	url = https://github.com/arpanpathak/local-copilot-codebuddy.git
+[submodule "tools/thor-sync"]
+	path = tools/thor-sync
+	url = https://github.com/arpanpathak/thor-sync.git
