@@ -1,0 +1,159 @@
+/* Material Deep Ocean, as configured in dogeleena-neo-agentic-ide:
+   the stock purple (#C792EA) is remapped to ocean blue (#82AAFF).
+   It replaces mdBook's "navy" theme, which book.toml makes the default. */
+
+html.navy {
+    --ocean-bg: #0F111A;
+    --ocean-bg-deep: #090B10;
+    --ocean-panel: #1A1C25;
+    --ocean-selection: #1F2233;
+    --ocean-border: #3B3F51;
+    --ocean-disabled: #464B5D;
+    --ocean-fg: #A6ACCD;
+    --ocean-text: #EEFFFF;
+    --ocean-muted: #8F93A2;
+    --ocean-accent: #84FFFF;
+    --ocean-blue: #82AAFF;
+    --ocean-cyan: #89DDFF;
+    --ocean-green: #C3E88D;
+    --ocean-yellow: #FFCB6B;
+    --ocean-orange: #F78C6C;
+    --ocean-red: #F07178;
+
+    --bg: var(--ocean-bg);
+    --fg: var(--ocean-fg);
+
+    --sidebar-bg: var(--ocean-bg-deep);
+    --sidebar-fg: var(--ocean-muted);
+    --sidebar-non-existant: var(--ocean-disabled);
+    --sidebar-active: var(--ocean-accent);
+    --sidebar-spacer: var(--ocean-selection);
+    --sidebar-header-border-color: var(--ocean-blue);
+
+    --scrollbar: var(--ocean-border);
+    --icons: var(--ocean-muted);
+    --icons-hover: var(--ocean-accent);
+    --links: var(--ocean-cyan);
+    --inline-code-color: var(--ocean-yellow);
+
+    --theme-popup-bg: var(--ocean-panel);
+    --theme-popup-border: var(--ocean-border);
+    --theme-hover: var(--ocean-selection);
+
+    --quote-bg: var(--ocean-panel);
+    --quote-border: var(--ocean-blue);
+    --warning-border: var(--ocean-orange);
+
+    --table-border-color: var(--ocean-border);
+    --table-header-bg: var(--ocean-selection);
+    --table-alternate-bg: #13151F;
+
+    --searchbar-border-color: var(--ocean-border);
+    --searchbar-bg: var(--ocean-panel);
+    --searchbar-fg: var(--ocean-text);
+    --searchbar-shadow-color: transparent;
+    --searchresults-header-fg: var(--ocean-muted);
+    --searchresults-border-color: var(--ocean-border);
+    --searchresults-li-bg: var(--ocean-panel);
+    --search-mark-bg: var(--ocean-yellow);
+
+    --footnote-highlight: var(--ocean-blue);
+    --blockquote-note-color: var(--ocean-blue);
+    --blockquote-tip-color: var(--ocean-green);
+    --blockquote-important-color: var(--ocean-cyan);
+    --blockquote-warning-color: var(--ocean-yellow);
+    --blockquote-caution-color: var(--ocean-red);
+}
+
+html.navy .content h1,
+html.navy .content h2,
+html.navy .content h3 {
+    color: var(--ocean-text);
+}
+
+html.navy .content h2 {
+    border-bottom: 1px solid var(--ocean-selection);
+    padding-bottom: 0.2em;
+}
+
+html.navy .content strong {
+    color: var(--ocean-text);
+}
+
+/* Code blocks and the highlight.js token colours of Material Deep Ocean. */
+html.navy pre,
+html.navy pre > .hljs {
+    background: var(--ocean-bg-deep);
+    border: 1px solid var(--ocean-selection);
+    border-radius: 6px;
+}
+html.navy .hljs { color: var(--ocean-fg); }
+html.navy .hljs-comment,
+html.navy .hljs-quote { color: var(--ocean-disabled); font-style: italic; }
+html.navy .hljs-keyword,
+html.navy .hljs-selector-tag,
+html.navy .hljs-type,
+html.navy .hljs-built_in { color: var(--ocean-blue); font-style: italic; }
+html.navy .hljs-string,
+html.navy .hljs-regexp,
+html.navy .hljs-addition { color: var(--ocean-green); }
+html.navy .hljs-number,
+html.navy .hljs-literal,
+html.navy .hljs-symbol { color: var(--ocean-orange); }
+html.navy .hljs-title,
+html.navy .hljs-title.function_,
+html.navy .hljs-section { color: var(--ocean-blue); }
+html.navy .hljs-attr,
+html.navy .hljs-attribute,
+html.navy .hljs-variable,
+html.navy .hljs-template-variable { color: var(--ocean-yellow); }
+html.navy .hljs-meta,
+html.navy .hljs-punctuation,
+html.navy .hljs-operator { color: var(--ocean-cyan); }
+html.navy .hljs-deletion { color: var(--ocean-red); }
+
+/* The "This chapter covers" box, as in the systems programming book. */
+.covers {
+    background: var(--ocean-panel, var(--quote-bg));
+    border-left: 3px solid var(--ocean-accent, var(--links));
+    border-radius: 6px;
+    padding: 0.4em 1.2em 0.6em;
+    margin: 1.4em 0;
+}
+.covers > p:first-child {
+    font-weight: bold;
+    color: var(--ocean-accent, inherit);
+    margin-bottom: 0.3em;
+}
+
+/* Figures: the SVGs carry their own dark background. */
+figure { margin: 1.8em 0; text-align: center; }
+figure img {
+    max-width: 100%;
+    border: 1px solid var(--ocean-selection, var(--table-border-color));
+    border-radius: 8px;
+}
+figcaption {
+    margin-top: 0.6em;
+    font-size: 0.9em;
+    color: var(--ocean-muted, var(--fg));
+}
+figcaption b { color: var(--ocean-accent, inherit); margin-right: 0.4em; }
+
+/* Build status labels used in tables. */
+.built { color: var(--ocean-green, green); font-weight: bold; }
+.planned { color: var(--ocean-yellow, orange); font-weight: bold; }
+
+/* Chapter plates and the cover. The art is transparent, so no frame is added. */
+img.plate {
+    display: block;
+    width: 100%;
+    margin: 0.5em 0 1em 0;
+}
+
+img.cover {
+    display: block;
+    max-width: 440px;
+    width: 100%;
+    margin: 1em auto 2em;
+}

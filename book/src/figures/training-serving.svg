@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; font-size: 12px; }
+    .step { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .artifact { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 1.5; }
+    .flow { stroke: #B7791F; stroke-width: 1.8; fill: none; stroke-dasharray: 7 5; }
+    .check { stroke: #D9542B; stroke-width: 1.5; fill: none; stroke-dasharray: 3 4; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#B7791F"/>
+    </marker>
+    <marker id="arrow-orange" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="430" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Stage 2 steps and artifacts (planned)</text>
+
+  <!-- Step boxes -->
+  <rect x="30" y="80" width="160" height="96" rx="10" class="step"/>
+  <text x="110" y="108" class="name" text-anchor="middle">1. QLoRA</text>
+  <text x="110" y="130" class="note" text-anchor="middle">base frozen in 4 bit,</text>
+  <text x="110" y="146" class="note" text-anchor="middle">small adapters train</text>
+  <text x="110" y="162" class="note" text-anchor="middle">in 16 bit</text>
+
+  <rect x="215" y="80" width="160" height="96" rx="10" class="step"/>
+  <text x="295" y="108" class="name" text-anchor="middle">2. Merge</text>
+  <text x="295" y="130" class="note" text-anchor="middle">adapters folded into</text>
+  <text x="295" y="146" class="note" text-anchor="middle">full-precision base</text>
+
+  <rect x="400" y="80" width="160" height="96" rx="10" class="step"/>
+  <text x="480" y="108" class="name" text-anchor="middle">3. Quantize</text>
+  <text x="480" y="130" class="note" text-anchor="middle">same mode for base</text>
+  <text x="480" y="146" class="note" text-anchor="middle">and fine-tuned</text>
+
+  <rect x="585" y="80" width="160" height="96" rx="10" class="step"/>
+  <text x="665" y="108" class="name" text-anchor="middle">4. Build engine</text>
+  <text x="665" y="130" class="note" text-anchor="middle">TensorRT-LLM</text>
+  <text x="665" y="146" class="note" text-anchor="middle">for sm_110</text>
+
+  <rect x="770" y="80" width="160" height="96" rx="10" class="step"/>
+  <text x="850" y="108" class="name" text-anchor="middle">5. Serve</text>
+  <text x="850" y="130" class="note mono" text-anchor="middle">trtllm-serve</text>
+  <text x="850" y="146" class="note" text-anchor="middle">HTTP, localhost</text>
+
+  <path class="flow" d="M192,128 L211,128" marker-end="url(#arrow)"/>
+  <path class="flow" d="M377,128 L396,128" marker-end="url(#arrow)"/>
+  <path class="flow" d="M562,128 L581,128" marker-end="url(#arrow)"/>
+  <path class="flow" d="M747,128 L766,128" marker-end="url(#arrow)"/>
+
+  <!-- Artifacts -->
+  <rect x="30" y="210" width="160" height="50" rx="6" class="artifact"/>
+  <text x="110" y="232" class="mono" text-anchor="middle" style="fill:#1D2733">adapter weights</text>
+  <text x="110" y="249" class="note" text-anchor="middle">tens of MB</text>
+  <rect x="215" y="210" width="160" height="50" rx="6" class="artifact"/>
+  <text x="295" y="232" class="mono" text-anchor="middle" style="fill:#1D2733">merged model</text>
+  <text x="295" y="249" class="note" text-anchor="middle">16 bit, 9B ≈ 18 GB</text>
+  <rect x="400" y="210" width="160" height="50" rx="6" class="artifact"/>
+  <text x="480" y="232" class="mono" text-anchor="middle" style="fill:#1D2733">quantized model</text>
+  <text x="480" y="249" class="note" text-anchor="middle">smaller, faster</text>
+  <rect x="585" y="210" width="160" height="50" rx="6" class="artifact"/>
+  <text x="665" y="232" class="mono" text-anchor="middle" style="fill:#1D2733">engine files</text>
+  <text x="665" y="249" class="note" text-anchor="middle">tied to this GPU</text>
+  <rect x="770" y="210" width="160" height="50" rx="6" class="artifact"/>
+  <text x="850" y="232" class="mono" text-anchor="middle" style="fill:#1D2733">endpoint</text>
+  <text x="850" y="249" class="note" text-anchor="middle">/v1/chat/completions</text>
+
+  <!-- The diagnosis path -->
+  <path class="check" d="M295,262 C295,330 480,330 480,262" marker-end="url(#arrow-orange)"/>
+  <text x="300" y="350" class="note" style="fill:#D9542B">Diagnosis: compare the merged model with the quantized model</text>
+  <text x="300" y="366" class="note" style="fill:#D9542B">before changing data or training settings.</text>
+
+  <text x="30" y="404" class="note">Every reported result records the build command, quantization mode, maximum sequence length,</text>
+  <text x="30" y="420" class="note">batch size, tokens per second and peak memory. An unsupported mode on sm_110 stops the run.</text>
+</svg>

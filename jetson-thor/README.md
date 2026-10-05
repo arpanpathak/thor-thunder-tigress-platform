@@ -1,5 +1,7 @@
 # Jetson Thor
 
+The book has the full guide: https://arpanpathak.github.io/thor-thunder-tigress-platform/ (chapters 4 to 7).
+
 The Thor is `192.168.0.83`, user `arpanpathak`. On yahboom it is just `thor`.
 
 ## Log in

@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .planned { stroke: #B7791F; stroke-dasharray: 7 5; }
+    .file { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 1.8; }
+    .human { fill: #E8EEF6; stroke: #00838F; stroke-width: 2.5; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    </marker>
+  </defs>
+  <rect width="960" height="520" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Evaluation: frozen inputs, two endpoints, per-item scores, intervals (planned)</text>
+
+  <!-- Frozen inputs -->
+  <rect x="30" y="70" width="190" height="56" rx="6" class="file"/>
+  <text x="125" y="94" class="name mono" text-anchor="middle">eval/held_out.jsonl</text>
+  <text x="125" y="112" class="note" text-anchor="middle">frozen before Stage 2</text>
+  <rect x="30" y="140" width="190" height="56" rx="6" class="file"/>
+  <text x="125" y="164" class="name mono" text-anchor="middle">eval/public/</text>
+  <text x="125" y="182" class="note" text-anchor="middle">MultiPL-E, GSM8K, XSTest...</text>
+  <rect x="30" y="210" width="190" height="56" rx="6" class="file"/>
+  <text x="125" y="234" class="name mono" text-anchor="middle">eval/probes.jsonl</text>
+  <text x="125" y="252" class="note" text-anchor="middle">privacy leakage prompts</text>
+
+  <rect x="30" y="300" width="190" height="56" rx="6" class="file"/>
+  <text x="125" y="324" class="name mono" text-anchor="middle">overlap_report.md</text>
+  <text x="125" y="342" class="note" text-anchor="middle">13-gram check vs train.jsonl</text>
+  <path class="flow" d="M125,268 L125,296" marker-end="url(#arrow)"/>
+
+  <!-- Runner -->
+  <path class="flow" d="M222,98 C250,98 250,160 272,160" marker-end="url(#arrow)"/>
+  <path class="flow" d="M222,168 L272,168" marker-end="url(#arrow)"/>
+  <path class="flow" d="M222,238 C250,238 250,176 272,176" marker-end="url(#arrow)"/>
+  <rect x="274" y="126" width="170" height="90" rx="10" class="box planned"/>
+  <text x="359" y="156" class="name" text-anchor="middle">runner</text>
+  <text x="359" y="176" class="note" text-anchor="middle">same prompts, decoding,</text>
+  <text x="359" y="192" class="note" text-anchor="middle">seeds for both models</text>
+
+  <!-- Endpoints -->
+  <rect x="500" y="70" width="170" height="56" rx="10" class="box planned"/>
+  <text x="585" y="94" class="name" text-anchor="middle">base endpoint</text>
+  <text x="585" y="112" class="note mono" text-anchor="middle">trtllm-serve</text>
+  <rect x="500" y="216" width="170" height="56" rx="10" class="box planned"/>
+  <text x="585" y="240" class="name" text-anchor="middle">fine-tuned endpoint</text>
+  <text x="585" y="258" class="note mono" text-anchor="middle">trtllm-serve</text>
+  <path class="flow" d="M446,150 C470,150 470,98 496,98" marker-end="url(#arrow)"/>
+  <path class="flow" d="M446,192 C470,192 470,244 496,244" marker-end="url(#arrow)"/>
+
+  <!-- Answers -->
+  <rect x="730" y="142" width="200" height="56" rx="6" class="file"/>
+  <text x="830" y="166" class="name mono" text-anchor="middle">answers.jsonl</text>
+  <text x="830" y="184" class="note" text-anchor="middle">runs/&lt;run_id&gt;/</text>
+  <path class="flow" d="M672,98 C700,98 700,160 726,160" marker-end="url(#arrow)"/>
+  <path class="flow" d="M672,244 C700,244 700,180 726,180" marker-end="url(#arrow)"/>
+
+  <!-- Scorers -->
+  <rect x="300" y="330" width="290" height="110" rx="10" class="box planned"/>
+  <text x="445" y="356" class="name" text-anchor="middle">automatic scorers</text>
+  <text x="318" y="380" class="note">compile and tests · five rules · false claims</text>
+  <text x="318" y="400" class="note">slop density · knowledge judge (κ-validated)</text>
+  <text x="318" y="420" class="note">refusal · over-refusal · leakage</text>
+
+  <rect x="620" y="330" width="150" height="110" rx="10" class="human"/>
+  <text x="695" y="370" class="name" text-anchor="middle">reviewer</text>
+  <text x="695" y="390" class="note" text-anchor="middle">blind A/B,</text>
+  <text x="695" y="406" class="note" text-anchor="middle">slop spans</text>
+
+  <path class="flow" d="M800,200 C800,280 540,280 520,326" marker-end="url(#arrow)"/>
+  <path class="flow" d="M830,200 C830,290 720,290 705,326" marker-end="url(#arrow)"/>
+
+  <!-- Outputs -->
+  <rect x="800" y="370" width="140" height="70" rx="6" class="file"/>
+  <text x="870" y="396" class="name mono" text-anchor="middle">scores.jsonl</text>
+  <text x="870" y="414" class="note mono" text-anchor="middle">summary.md</text>
+  <text x="870" y="430" class="note" text-anchor="middle">rates with 95% CI</text>
+  <path class="flow" d="M592,452 C700,470 800,470 860,444" marker-end="url(#arrow)"/>
+  <path class="flow" d="M772,392 L796,400" marker-end="url(#arrow)"/>
+
+  <text x="30" y="490" class="note">Every run writes runs/&lt;run_id&gt;/manifest.json: model, quantization, build command, max sequence length,</text>
+  <text x="30" y="506" class="note">batch size, decoding settings, seed, git commit, tokens per second, peak memory.</text>
+</svg>

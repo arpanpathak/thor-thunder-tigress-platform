@@ -1,0 +1,23 @@
+[book]
+title = "Thor Thunder Tigress Platform"
+description = "Fine-tuning a local model on an NVIDIA Jetson to stop writing AI slop"
+authors = ["Arpan Pathak"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "build"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/arpanpathak/thor-thunder-tigress-platform"
+site-url = "/thor-thunder-tigress-platform/"
+default-theme = "light"
+preferred-dark-theme = "navy"
+additional-css = ["theme/deep-ocean.css"]
+smart-punctuation = true
+mathjax-support = true
+
+[output.html.fold]
+enable = true
+level = 1

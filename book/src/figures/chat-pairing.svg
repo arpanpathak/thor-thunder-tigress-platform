@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .head { fill: #5B6B7C; font-size: 12px; letter-spacing: 1px; }
+    .msg { fill: #1D2733; font-size: 13px; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; font-size: 12px; }
+    .human { fill: #F4F7FA; stroke: #3B6FD4; stroke-width: 2; }
+    .assistant { fill: #F4F7FA; stroke: #1E88A8; stroke-width: 2; }
+    .hidden { fill: #CFD8DC; }
+    .kept { fill: #F7F9FB; stroke: #4E8A16; stroke-width: 2; }
+    .skipped { fill: #F7F9FB; stroke: #C62828; stroke-width: 2; stroke-dasharray: 6 4; }
+    .flow { stroke: #1E88A8; stroke-width: 1.8; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    </marker>
+  </defs>
+  <rect width="960" height="470" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Chat pairing: four messages, two pairs, one example</text>
+
+  <text x="40" y="70" class="head">MESSAGES, IN ORDER</text>
+  <text x="560" y="70" class="head">PAIRS, THEN EXAMPLES</text>
+
+  <!-- Message 1 -->
+  <rect x="40" y="84" width="380" height="44" rx="8" class="human"/>
+  <text x="56" y="111" class="mono" fill="#3B6FD4" style="fill:#3B6FD4">human</text>
+  <text x="120" y="111" class="msg">What is a futex?</text>
+
+  <!-- Message 2 with hidden blocks -->
+  <rect x="40" y="140" width="380" height="132" rx="8" class="assistant"/>
+  <text x="56" y="164" class="mono" style="fill:#1E88A8">assistant</text>
+  <rect x="56" y="174" width="348" height="20" rx="4" class="hidden" fill-opacity="0.35"/>
+  <text x="66" y="188" class="mono" style="fill:#5B6B7C">thinking: dropped</text>
+  <text x="66" y="212" class="msg">text: "A fast userspace mutex."</text>
+  <rect x="56" y="222" width="348" height="20" rx="4" class="hidden" fill-opacity="0.35"/>
+  <text x="66" y="236" class="mono" style="fill:#5B6B7C">tool_use: dropped</text>
+  <text x="66" y="260" class="msg">text: "The kernel only steps in on contention."</text>
+
+  <!-- Message 3 -->
+  <rect x="40" y="284" width="380" height="54" rx="8" class="human"/>
+  <text x="56" y="306" class="mono" style="fill:#3B6FD4">human</text>
+  <text x="120" y="306" class="msg">Look at this</text>
+  <text x="120" y="326" class="mono" style="fill:#B7791F">files: screen.PNG (not in the export)</text>
+
+  <!-- Message 4 -->
+  <rect x="40" y="350" width="380" height="44" rx="8" class="assistant"/>
+  <text x="56" y="377" class="mono" style="fill:#1E88A8">assistant</text>
+  <text x="140" y="377" class="msg">The picture shows a graph.</text>
+
+  <!-- Pair 1 -->
+  <path class="flow" d="M422,106 C490,106 492,156 558,156" marker-end="url(#arrow)"/>
+  <path class="flow" d="M422,206 C490,206 492,196 558,196" marker-end="url(#arrow)"/>
+  <rect x="560" y="110" width="370" height="132" rx="10" class="kept"/>
+  <text x="578" y="136" class="msg" style="font-weight:600">Pair 1, turn 1</text>
+  <text x="578" y="160" class="note">question: What is a futex?</text>
+  <text x="578" y="180" class="note">answer: the two text blocks, joined</text>
+  <text x="578" y="200" class="note">asks_about_image: false</text>
+  <text x="578" y="226" class="mono" style="fill:#4E8A16">Ok(Example)  origin: c1/1</text>
+
+  <!-- Pair 2 -->
+  <path class="flow" d="M422,311 C490,311 492,306 558,306" marker-end="url(#arrow)"/>
+  <path class="flow" d="M422,372 C490,372 492,350 558,350" marker-end="url(#arrow)"/>
+  <rect x="560" y="270" width="370" height="122" rx="10" class="skipped"/>
+  <text x="578" y="296" class="msg" style="font-weight:600">Pair 2, turn 2</text>
+  <text x="578" y="320" class="note">question: Look at this</text>
+  <text x="578" y="340" class="note">asks_about_image: true</text>
+  <text x="578" y="376" class="mono" style="fill:#C62828">Err(SkipReason::AboutImage)</text>
+
+  <text x="40" y="430" class="note">Human message: extends an unanswered pair, otherwise starts a new pair.</text>
+  <text x="40" y="450" class="note">Assistant message: text blocks appended to the current answer; hidden blocks dropped.</text>
+</svg>

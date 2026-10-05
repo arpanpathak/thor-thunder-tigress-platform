@@ -7,6 +7,8 @@ inside function bodies, index loops, errors that are strings).
 This repository is the training and evaluation platform, and the umbrella for
 the other projects that run on the same device.
 
+**Book:** https://arpanpathak.github.io/thor-thunder-tigress-platform/ (or `mdbook serve book` locally).
+
 ## The projects
 
 | Repository | What it is | Here |

@@ -1,6 +1,6 @@
 target/
 data/
-attic/book/build/
+book/build/
 corpus/
 
 # Kept local, not published

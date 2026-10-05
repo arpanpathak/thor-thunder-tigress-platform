@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; font-size: 12px; }
+    .step { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .model { fill: #F4F7FA; stroke: #3B6FD4; stroke-width: 2; stroke-dasharray: 7 5; }
+    .you { fill: #E8EEF6; stroke: #00838F; stroke-width: 2.5; }
+    .flow { stroke: #B7791F; stroke-width: 1.8; fill: none; stroke-dasharray: 7 5; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#B7791F"/>
+    </marker>
+  </defs>
+  <rect width="960" height="400" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Blind pairwise comparison (planned)</text>
+
+  <rect x="30" y="140" width="160" height="80" rx="10" class="step"/>
+  <text x="110" y="172" class="name" text-anchor="middle">Prompt list</text>
+  <text x="110" y="194" class="note" text-anchor="middle">written by hand</text>
+
+  <rect x="260" y="70" width="200" height="74" rx="10" class="model"/>
+  <text x="360" y="100" class="name" text-anchor="middle">Base model</text>
+  <text x="360" y="122" class="note" text-anchor="middle">same quantization</text>
+
+  <rect x="260" y="216" width="200" height="74" rx="10" class="model"/>
+  <text x="360" y="246" class="name" text-anchor="middle">Fine-tuned model</text>
+  <text x="360" y="268" class="note" text-anchor="middle">same quantization</text>
+
+  <path class="flow" d="M192,170 C225,170 225,107 256,107" marker-end="url(#arrow)"/>
+  <path class="flow" d="M192,190 C225,190 225,253 256,253" marker-end="url(#arrow)"/>
+
+  <rect x="530" y="110" width="200" height="140" rx="10" class="step"/>
+  <text x="630" y="140" class="name" text-anchor="middle">Side by side</text>
+  <rect x="546" y="156" width="80" height="70" rx="5" fill="#F7F9FB" stroke="#B0BEC5"/>
+  <rect x="634" y="156" width="80" height="70" rx="5" fill="#F7F9FB" stroke="#B0BEC5"/>
+  <text x="586" y="196" class="mono" text-anchor="middle" style="fill:#37474F">A</text>
+  <text x="674" y="196" class="mono" text-anchor="middle" style="fill:#37474F">B</text>
+  <text x="630" y="242" class="note" text-anchor="middle">order shuffled, names hidden</text>
+
+  <path class="flow" d="M462,107 C500,107 500,160 526,160" marker-end="url(#arrow)"/>
+  <path class="flow" d="M462,253 C500,253 500,200 526,200" marker-end="url(#arrow)"/>
+
+  <circle cx="830" cy="180" r="58" class="you"/>
+  <text x="830" y="176" class="name" text-anchor="middle">Reviewer</text>
+  <text x="830" y="196" class="note" text-anchor="middle">A, B or tie</text>
+  <path class="flow" d="M732,180 L768,180" marker-end="url(#arrow)"/>
+
+  <rect x="560" y="300" width="240" height="56" rx="8" fill="#F7F9FB" stroke="#4E8A16" stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="680" y="324" class="mono" text-anchor="middle" style="fill:#1D2733">verdicts.jsonl</text>
+  <text x="680" y="342" class="note" text-anchor="middle">prompt, both answers, verdict</text>
+  <path class="flow" d="M830,240 C830,300 820,328 804,328" marker-end="url(#arrow)"/>
+
+  <path class="flow" d="M558,328 C300,328 120,320 110,224" marker-end="url(#arrow)"/>
+  <text x="200" y="380" class="note">losses by topic select sources for the next data round</text>
+</svg>
