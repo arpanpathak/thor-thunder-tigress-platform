@@ -39,11 +39,12 @@ use crate::{
     slop_flags,
 };
 
-/// The folder holding the chat export and the readability set.
-const DATASTORE: &str = "/home/jetson/Projects/edgechat/convo_datastore";
+/// The folder holding the chat export and the readability set, under the
+/// home folder.
+const DATASTORE: &str = "Projects/edgechat/convo_datastore";
 
-/// The book repository named in `other_project_in_this_machine.md`.
-const BOOK_REPOSITORY: &str = "/home/jetson/Projects/nvidia-cloud-software-engineer-interview";
+/// The book repository, under the home folder.
+const BOOK_REPOSITORY: &str = "Projects/nvidia-cloud-software-engineer-interview";
 
 /// The verified clever-vs-readable set, extracted from `files.zip` into the datastore.
 const CLEVER_VS_READABLE_SFT: &str = "clever_vs_readable/clever_vs_readable_sft.jsonl";
@@ -132,7 +133,7 @@ pub fn build_training_set(output_dir: &Path) -> Result<(), DataError> {
             unmatched.id, unmatched.note
         );
     }
-    let preference_file = Path::new(DATASTORE).join(CLEVER_VS_READABLE_DPO);
+    let preference_file = home_path(DATASTORE).join(CLEVER_VS_READABLE_DPO);
     let preference_pairs = clever_vs_readable::preference_pairs(&read_file(&preference_file)?)?;
     let slop_span_counts = slop_flags::span_counts(&flagged_examples);
     let report = report::render(&ReportInput {
@@ -158,7 +159,8 @@ pub fn build_training_set(output_dir: &Path) -> Result<(), DataError> {
 
 /// Reads every source, curated sets first, so the curated copy of a duplicate is the one kept.
 fn read_all_examples(skip_reasons: &mut Vec<SkipReason>) -> Result<Vec<Example>, DataError> {
-    let datastore = Path::new(DATASTORE);
+    let datastore = home_path(DATASTORE);
+    let datastore = datastore.as_path();
     let readability_set = read_file(&datastore.join("readability_training.md"))?;
     let clever_vs_readable_set = read_file(&datastore.join(CLEVER_VS_READABLE_SFT))?;
     let chat_export = read_file(&datastore.join("work/extracted/conversations.json"))?;
@@ -172,7 +174,7 @@ fn read_all_examples(skip_reasons: &mut Vec<SkipReason>) -> Result<Vec<Example>,
     examples.extend(chat::examples(&chat_export, skip_reasons)?);
     examples.extend(chat::example_from_question_file(&single_chat, "chat_0.md"));
     examples.extend(book_repository_examples(
-        Path::new(BOOK_REPOSITORY),
+        &home_path(BOOK_REPOSITORY),
         skip_reasons,
     )?);
     examples.extend(open_corpus_examples()?);
@@ -219,6 +221,15 @@ fn open_corpus_examples() -> Result<Vec<Example>, DataError> {
 }
 
 /// Reads a whole UTF-8 file.
+/// `relative` under the home folder of whoever runs the build, so the same
+/// binary works on every machine the repositories are synced to.
+fn home_path(relative: &str) -> PathBuf {
+    std::env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_default()
+        .join(relative)
+}
+
 fn read_file(path: &Path) -> Result<String, DataError> {
     fs::read_to_string(path).map_err(DataError::io(path))
 }
