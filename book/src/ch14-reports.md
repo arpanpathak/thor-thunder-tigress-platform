@@ -108,3 +108,43 @@ Contributions:
 - measured peak memory and step time for QLoRA at several model sizes and sequence lengths
 - serving throughput for each supported quantization mode on sm_110
 - the software versions and workarounds needed, including the CUDA 12 library requirement in `CLAUDE.md`
+- serving capacity for many users at once: the model and benchmark below
+
+#### Serving capacity: model to test
+
+Decoding is limited by memory bandwidth (273 GB/s on the Thor), not compute:
+each step reads the weights it uses once, and that read serves every reply in
+the batch. Like hardware threads sharing a core, more slots add throughput
+until the shared resource, bandwidth, is used up.
+
+| Replies at once | Read per step (estimate) | Per reply (estimate) | Total (estimate) |
+|---|---|---|---|
+| 1 | ~3.7 GB, the ~3.5B active parameters at Q8 | ≤ 74 tok/s; **53 measured** | 53 tok/s measured |
+| 16 | ~20 GB, as the batch touches more experts | ~14 tok/s | ~220 tok/s |
+| 64 or more | ≤ 33.6 GB, the whole model | ~8 tok/s | ~500 tok/s |
+
+Compute is not the limit: a token costs about 2 × 3.5B ≈ 7 GFLOP. Memory
+limits the batch: context costs about 6 GB per million tokens (measured: 4 ×
+1M tokens took about 24 GB beside 34 GB of weights), so about 70 GB holds
+about 11M tokens, e.g. 44 slots of 256K.
+
+From throughput to users, assuming a comfortable 15 tok/s per reply and that a
+chatting person is generating about 15% of the time: about 16 replies at once,
+so about 100 people online at once, about 800K tokens or 1,600 replies of 500
+tokens per hour.
+
+Unknowns the benchmark settles: how many experts a batch touches in practice,
+and how efficiency falls at large batches.
+
+#### Serving capacity: benchmark
+
+| Setting | Values |
+|---|---|
+| Model | Nemotron 3 Nano 30B-A3B Q8_0, llama-server |
+| Slots × context | 16 × 256K, 32 × 128K |
+| Concurrent requests | 1, 2, 4, 8, 16, 32 |
+| Prompt | the same 500-token prompt, 500-token reply, thinking off |
+| Record per run | per-reply tok/s (median and slowest), total tok/s, first-token time, GPU memory, power |
+
+Result: a curve of per-reply and total tok/s against concurrent replies, and
+the concurrency where per-reply speed falls below 15 tok/s.
