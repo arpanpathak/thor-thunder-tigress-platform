@@ -31,10 +31,15 @@ pub struct Client {
     pub address: String,
     /// The model name the server expects in requests.
     pub model: String,
+    /// The access key, sent as `Authorization: Bearer <key>` when set.
+    pub key: Option<String>,
 }
 
 impl Client {
     /// Sends `messages` and returns the reply text of the first choice.
+    /// Thinking is switched off (`enable_thinking: false`, which servers that
+    /// do not know it ignore): a hybrid reasoning model would otherwise spend
+    /// the whole token budget reasoning and return no question at all.
     pub fn complete(&self, messages: &[Message], max_tokens: u32, temperature: f32) -> Result<String, DistillError> {
         let body = json!({
             "model": self.model,
@@ -44,6 +49,7 @@ impl Client {
                 .collect::<Vec<Value>>(),
             "max_tokens": max_tokens,
             "temperature": temperature,
+            "chat_template_kwargs": { "enable_thinking": false },
         })
         .to_string();
         let response = self.post("/v1/chat/completions", &body)?;
@@ -61,8 +67,9 @@ impl Client {
         let mut stream = TcpStream::connect(&self.address).map_err(server)?;
         stream.set_read_timeout(Some(TIMEOUT)).map_err(server)?;
         let request = format!(
-            "POST {path} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+            "POST {path} HTTP/1.1\r\nHost: {}\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             self.address,
+            self.key.as_ref().map_or(String::new(), |key| format!("Authorization: Bearer {key}\r\n")),
             body.len()
         );
         stream.write_all(request.as_bytes()).map_err(server)?;
@@ -137,6 +144,7 @@ mod tests {
         let client = Client {
             address: serve_once(reply)?,
             model: "teacher".to_string(),
+            key: None,
         };
         let message = Message {
             role: "user",
@@ -151,6 +159,7 @@ mod tests {
         let client = Client {
             address: serve_once("HTTP/1.1 500 Internal Server Error\r\n\r\nengine not loaded".to_string())?,
             model: "teacher".to_string(),
+            key: None,
         };
         let outcome = client.complete(&[], 32, 0.7);
         assert!(matches!(outcome, Err(DistillError::Server(message)) if message.contains("engine not loaded")));

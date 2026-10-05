@@ -27,7 +27,13 @@ use crate::{
 
 /// How many times the model is asked for one question before the
 /// conversation ends at the turn before it.
-const ATTEMPTS: usize = 2;
+const ATTEMPTS: usize = 3;
+
+/// Word overlap (Jaccard) from which a question repeats an earlier one.
+const REPEAT_OVERLAP: f64 = 0.6;
+
+/// The instructions for checking that a section answers a question.
+const ANSWER_CHECK_PROMPT: &str = "You check whether a text answers a question. Reply with yes or no only.";
 
 /// The longest part of a passage shown to the model, in characters. Enough
 /// for the model to see what the section is about without filling its context.
@@ -185,6 +191,10 @@ pub enum Rejection {
     MentionsSource(&'static str),
     /// It contains a slop phrase.
     Slop(String),
+    /// It repeats a question asked earlier in the conversation.
+    Repeats,
+    /// The section does not answer it.
+    NotAnswered,
 }
 
 impl fmt::Display for Rejection {
@@ -196,6 +206,8 @@ impl fmt::Display for Rejection {
             Rejection::TooLong => write!(formatter, "longer than {MAX_QUESTION} characters"),
             Rejection::MentionsSource(word) => write!(formatter, "mentions \"{word}\""),
             Rejection::Slop(phrase) => write!(formatter, "slop phrase \"{phrase}\""),
+            Rejection::Repeats => formatter.write_str("repeats an earlier question"),
+            Rejection::NotAnswered => formatter.write_str("the section does not answer it"),
         }
     }
 }
@@ -232,6 +244,9 @@ pub fn check_question(reply: &str) -> Result<String, Rejection> {
 pub struct Conversation {
     /// The chapter file the sections came from.
     pub origin: String,
+    /// Identifies the planned conversation, so a stopped run can skip the
+    /// ones it already wrote: see [`conversation_key`].
+    pub key: String,
     /// Each kept question and the passage that answers it.
     pub turns: Vec<(String, String)>,
     /// Each rejected question with the reason, for review.
@@ -261,6 +276,7 @@ impl Conversation {
             "id": fnv_hex(&serde_json::to_string(&messages).unwrap_or_default()),
             "source": "conversation",
             "origin": self.origin,
+            "key": self.key,
             "model": model,
             "messages": messages,
             "rejected": rejected,
@@ -275,6 +291,7 @@ impl Conversation {
 pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, DistillError> {
     let mut conversation = Conversation {
         origin: sections.first().map(|passage| passage.origin.clone()).unwrap_or_default(),
+        key: conversation_key(sections),
         ..Conversation::default()
     };
     for passage in sections {
@@ -283,7 +300,14 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
         let mut question = None;
         for _ in 0..ATTEMPTS {
             let reply = client.complete(&prompt, 80, 0.7)?;
-            match check_question(&reply) {
+            let verdict = match check_question(&reply) {
+                Ok(checked) if asked.iter().any(|earlier| overlap(earlier, &checked) >= REPEAT_OVERLAP) => {
+                    Err(Rejection::Repeats)
+                }
+                Ok(checked) if !answers(client, &checked, passage)? => Err(Rejection::NotAnswered),
+                other => other,
+            };
+            match verdict {
                 Ok(checked) => {
                     question = Some(checked);
                     break;
@@ -297,6 +321,50 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
         }
     }
     Ok(conversation)
+}
+
+/// Asks the model whether `passage` answers `question`; only a reply that
+/// starts with "yes" counts.
+pub fn answers(client: &Client, question: &str, passage: &Passage) -> Result<bool, DistillError> {
+    let shown: String = passage.text.chars().take(MAX_PROMPT_PASSAGE).collect();
+    let prompt = [
+        Message {
+            role: "system",
+            content: ANSWER_CHECK_PROMPT.to_string(),
+        },
+        Message {
+            role: "user",
+            content: format!("Question: {question}\n\nText:\n<<<\n{shown}\n>>>\n\nDoes the text answer the question?"),
+        },
+    ];
+    let reply = client.complete(&prompt, 4, 0.0)?;
+    Ok(reply.trim().to_lowercase().starts_with("yes"))
+}
+
+/// Word overlap of two questions: shared words over all words, counting
+/// lowercase words of three letters or more.
+fn overlap(first: &str, second: &str) -> f64 {
+    let words = |text: &str| -> std::collections::BTreeSet<String> {
+        text.split(|character: char| !character.is_alphanumeric())
+            .filter(|word| word.len() >= 3)
+            .map(str::to_lowercase)
+            .collect()
+    };
+    let (first, second) = (words(first), words(second));
+    let union = first.union(&second).count();
+    match union {
+        0 => 0.0,
+        total => first.intersection(&second).count() as f64 / total as f64,
+    }
+}
+
+/// A stable key for one planned conversation: its chapter and the start of
+/// its first section.
+pub fn conversation_key(sections: &[Passage]) -> String {
+    let first = sections.first().map_or(String::new(), |passage| {
+        format!("{}\n{}", passage.origin, passage.text.chars().take(200).collect::<String>())
+    });
+    fnv_hex(&first)
 }
 
 /// How many planned conversations and turns each collection has.
@@ -387,7 +455,7 @@ mod tests {
             .local_addr()
             .map_err(DistillError::io("listener"))?
             .to_string();
-        let replies = ["What does this section explain?", "Why does push sometimes reallocate a Vec?"];
+        let replies = ["What does this section explain?", "Why does push sometimes reallocate a Vec?", "yes"];
         thread::spawn(move || {
             replies.iter().for_each(|reply| {
                 if let Ok((mut stream, _)) = listener.accept() {
@@ -401,6 +469,7 @@ mod tests {
         let client = Client {
             address,
             model: "teacher".to_string(),
+            key: None,
         };
         let conversation = converse(&client, &[passage("trpl/v.md", "# Vectors\n\nPush may reallocate.")])?;
         assert_eq!(
@@ -409,6 +478,12 @@ mod tests {
         );
         assert_eq!(conversation.rejected.len(), 1);
         Ok(())
+    }
+
+    #[test]
+    fn measures_how_much_two_questions_overlap() {
+        assert!(overlap("Why does Vec push reallocate?", "Why does push on a Vec reallocate?") >= REPEAT_OVERLAP);
+        assert!(overlap("Why does Vec push reallocate?", "How do I share an Arc between threads?") < REPEAT_OVERLAP);
     }
 
     #[test]

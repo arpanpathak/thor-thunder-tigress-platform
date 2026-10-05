@@ -6,6 +6,12 @@
 //!                     [--server 127.0.0.1:8000] [--model NAME] [--dry-run]
 //! ```
 //!
+//! A run that stops can be started again with the same `--out`: conversations
+//! already in that file are skipped.
+//!
+//! An access key for the server is read from the `LASSO_KEY` environment
+//! variable, so it never appears in the command line or the shell history.
+//!
 //! `--dry-run` calls no model: it prints how many conversations and turns the
 //! books give, and writes the first prompts to `OUT.prompts.jsonl` so they can
 //! be read before any generation is paid for. Without it, every conversation
@@ -69,6 +75,7 @@ fn options(arguments: &[String]) -> Result<Options, DistillError> {
         client: Client {
             address: "127.0.0.1:8000".to_string(),
             model: "teacher".to_string(),
+            key: std::env::var("LASSO_KEY").ok().filter(|key| !key.is_empty()),
         },
         dry_run: false,
     };
@@ -133,15 +140,33 @@ fn write_prompts(options: &Options, chosen: &[&Vec<Passage>]) -> Result<(), Dist
     Ok(())
 }
 
+/// The keys of the conversations an earlier run already wrote to `path`.
+fn finished_keys(path: &std::path::Path) -> Result<std::collections::HashSet<String>, DistillError> {
+    let text = match fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(std::collections::HashSet::new()),
+        Err(error) => return Err(DistillError::io(path)(error)),
+    };
+    Ok(text
+        .lines()
+        .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+        .filter_map(|record| record.get("key").and_then(|key| key.as_str()).map(str::to_string))
+        .collect())
+}
+
 fn generate(options: &Options, chosen: &[&Vec<Passage>]) -> Result<(), DistillError> {
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&options.out)
         .map_err(DistillError::io(&options.out))?;
+    let finished = finished_keys(&options.out)?;
     let started = Instant::now();
     let (mut kept, mut rejected) = (0usize, 0usize);
     for (done, sections) in chosen.iter().enumerate() {
+        if finished.contains(&conversations::conversation_key(sections)) {
+            continue;
+        }
         let conversation = conversations::converse(&options.client, sections)?;
         kept += conversation.turns.len();
         rejected += conversation.rejected.len();
