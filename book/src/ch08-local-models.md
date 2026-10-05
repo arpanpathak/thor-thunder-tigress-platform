@@ -57,11 +57,21 @@ mkdir -p ~/.config/thor-chat
         "baseURL": "http://127.0.0.1:8079/v1",
         "apiKey": "{file:~/.config/thor-chat/api-key}"
       },
-      "models": { "nemotron": { "name": "Nemotron 3 Nano (Thor)" } }
+      "models": {
+        "nemotron": {
+          "name": "Nemotron 3 Nano (Thor)",
+          "options": { "chat_template_kwargs": { "enable_thinking": false } }
+        }
+      }
     }
   }
 }
 ```
+
+`enable_thinking: false` matters: Nemotron thinks by default, and on a large
+task it spent a whole turn reasoning (11,504 characters) and stopped without
+calling a single tool. With thinking off it goes straight to reading, writing
+and running. The web chat's think toggle is not affected.
 
 The tunnel as a user service that starts at boot and reconnects,
 `~/.config/systemd/user/thor-model-tunnel.service`:

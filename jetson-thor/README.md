@@ -182,7 +182,7 @@ and `corpus/` (`bash train/fetch_corpus.sh`).
 On yahboom, `opencode` in any project folder starts a terminal coding agent
 that uses Nemotron on the Thor. Set up: OpenCode in `~/.opencode/bin`, the
 config `~/.config/opencode/opencode.json` (provider `thor`, default model
-`thor/nemotron`, base URL `http://127.0.0.1:8079/v1`, key read from
+`thor/nemotron`, thinking off for agent work, base URL `http://127.0.0.1:8079/v1`, key read from
 `~/.config/thor-chat/api-key`), and the `thor-model-tunnel` user service that
 keeps `127.0.0.1:8079` tunnelled to the Thor's llama-server.
 
