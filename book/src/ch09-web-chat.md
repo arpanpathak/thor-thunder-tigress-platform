@@ -274,5 +274,6 @@ ssh thor 'cd ~/Projects/thor-thunder-tigress-platform &&
 ## Not done yet
 
 - One shared key; no per-person limits or sign-in.
-- Search reads snippets, not pages.
+- Search reads snippets, not pages; reading pages is designed in chapter
+  "Tool calling (planned)".
 - Conversations stay in one browser; there is no account to sync them.

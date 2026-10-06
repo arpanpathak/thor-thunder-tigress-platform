@@ -32,7 +32,8 @@ what was decided so it can resume without starting over.
   starts containers. Adding the user to the `docker` group is ruled out: it
   gives root to anything running as that user.
 - `fetch_page` comes first, on its own: it improves search answers (the model
-  currently sees snippets only) and has no sandbox to build.
+  currently sees snippets only) and has no sandbox to build. Its design and
+  safety rules are in chapter "Tool calling (planned)".
 
 ## Not decided
 

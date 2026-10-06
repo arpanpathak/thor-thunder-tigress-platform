@@ -26,6 +26,7 @@
 - [Human evaluation (planned)](ch12-human-evaluation.md)
 - [Evaluation design (planned)](ch13-evaluation-design.md)
 - [Reports (planned)](ch14-reports.md)
+- [Tool calling (planned)](ch19-tool-calling.md)
 - [Workspace agent (planned, paused)](ch15-workspace-agent.md)
 
 [Appendix: commands and files](appendix-commands.md)
