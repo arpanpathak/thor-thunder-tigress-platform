@@ -12,12 +12,14 @@
 //! | [`request`], [`response`] | reading requests, writing answers |
 //! | [`routes`] | which request goes where |
 //! | [`chat`], [`messages`], [`search`] | the model and search work |
+//! | [`defaults`] | the rules and temperature a bare chat request gets |
 //! | [`upstream`] | calling llama-server and SearXNG |
 
 #![forbid(unsafe_code)]
 
 mod chat;
 mod config;
+mod defaults;
 mod error;
 mod messages;
 mod paths;

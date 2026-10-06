@@ -8,6 +8,9 @@
 //!      │                SearXNG ── results ──► back to the model, next round
 //!      └──── every token, plus a {"thor":{"search":…}} event per search
 //! ```
+//!
+//! A request without a system prompt or a temperature gets the ones in
+//! [`crate::defaults`] first.
 
 use std::io::{BufRead, Write};
 
@@ -16,6 +19,7 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     config::Upstreams,
+    defaults,
     error::{AgentError, Outcome},
     paths,
     response::{self, DONE, EVENT_PREFIX},
@@ -206,6 +210,7 @@ pub fn answer(client: &mut impl Write, body: &[u8], upstreams: &Upstreams) -> Ou
         return Err(AgentError::bad_request("the body must be a JSON object"));
     };
     let web_search = fields.remove(WEB_SEARCH_SWITCH).and_then(|value| value.as_bool()).unwrap_or(false);
+    defaults::apply(&mut fields);
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
     match Mode::of(web_search, streamed) {
         Mode::Relay => upstreams.model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?.relay(client),
@@ -470,7 +475,8 @@ mod tests {
         let mut client = Vec::new();
         answer(&mut client, br#"{"messages":[]}"#, &upstreams(&model, &search))?;
         assert!(String::from_utf8_lossy(&client).ends_with(r#"{"choices":[]}"#));
-        assert!(model.requests()?[0].ends_with(r#"{"messages":[]}"#));
+        let sent = model.requests()?;
+        assert!(sent[0].contains(r#""role":"system""#) && sent[0].contains(r#""temperature":0.3"#), "{}", sent[0]);
         Ok(())
     }
 
