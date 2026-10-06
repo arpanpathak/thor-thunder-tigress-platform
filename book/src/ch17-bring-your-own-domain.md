@@ -119,7 +119,7 @@ holds five small files:
 |---|---|
 | `CNAME` | `voltforge.tech`; tells GitHub Pages which domain it serves |
 | `index.html` | forwards `voltforge.tech/` to the Thor |
-| `thor-tigress-cub/index.html` | forwards `voltforge.tech/thor-tigress-cub` |
+| `thor-tigress-cub.html` | forwards `voltforge.tech/thor-tigress-cub`; as a file, not a folder, so GitHub serves it without first redirecting to `/thor-tigress-cub/` |
 | `404.html` | forwards every other path too |
 | `.nojekyll` | serve the files as they are |
 
