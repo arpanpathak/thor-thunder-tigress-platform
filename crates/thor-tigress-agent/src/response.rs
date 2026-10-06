@@ -81,7 +81,7 @@ impl ContentType {
 /// # Errors
 ///
 /// `AgentError::Io` when the client is gone.
-pub fn respond(stream: &mut impl Write, status: Status, content_type: ContentType, body: &[u8]) -> Outcome {
+pub fn respond(stream: &mut dyn Write, status: Status, content_type: ContentType, body: &[u8]) -> Outcome {
     write!(
         stream,
         "HTTP/1.1 {}\r\n{CORS}Content-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
@@ -98,7 +98,7 @@ pub fn respond(stream: &mut impl Write, status: Status, content_type: ContentTyp
 /// # Errors
 ///
 /// `AgentError::Io` when the client is gone.
-pub fn unauthorized(stream: &mut impl Write) -> Outcome {
+pub fn unauthorized(stream: &mut dyn Write) -> Outcome {
     respond(stream, Status::Unauthorized, ContentType::Json, INVALID_KEY)
 }
 
@@ -109,7 +109,7 @@ pub fn unauthorized(stream: &mut impl Write) -> Outcome {
 /// # Errors
 ///
 /// `AgentError::Io` when the client is gone.
-pub fn failure(stream: &mut impl Write, error: &AgentError) -> Outcome {
+pub fn failure(stream: &mut dyn Write, error: &AgentError) -> Outcome {
     let status = match error {
         AgentError::BadRequest(_) | AgentError::Json(_) => Status::BadRequest,
         AgentError::Upstream(_) => Status::BadGateway,
@@ -125,7 +125,7 @@ pub fn failure(stream: &mut impl Write, error: &AgentError) -> Outcome {
 /// # Errors
 ///
 /// `AgentError::Io` when the client is gone.
-pub fn preflight(stream: &mut impl Write) -> Outcome {
+pub fn preflight(stream: &mut dyn Write) -> Outcome {
     write!(
         stream,
         "HTTP/1.1 204 No Content\r\n{CORS}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Authorization, Content-Type, x-api-key, anthropic-version\r\nAccess-Control-Max-Age: 86400\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -139,7 +139,7 @@ pub fn preflight(stream: &mut impl Write) -> Outcome {
 /// # Errors
 ///
 /// `AgentError::Io` when the client is gone.
-pub fn start_events(stream: &mut impl Write) -> Outcome {
+pub fn start_events(stream: &mut dyn Write) -> Outcome {
     write!(
         stream,
         "HTTP/1.1 200 OK\r\n{CORS}Content-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
@@ -152,7 +152,7 @@ pub fn start_events(stream: &mut impl Write) -> Outcome {
 /// # Errors
 ///
 /// `AgentError::Io` when the client is gone.
-pub fn send_event(stream: &mut impl Write, data: &str) -> Outcome {
+pub fn send_event(stream: &mut dyn Write, data: &str) -> Outcome {
     write!(stream, "{EVENT_PREFIX} {data}\n\n")?;
     Ok(stream.flush()?)
 }
@@ -171,7 +171,7 @@ mod tests {
         assert!(failure(&mut gone, &AgentError::bad_request("x")).is_err());
     }
 
-    fn written(write: impl FnOnce(&mut Vec<u8>) -> Outcome) -> Outcome<String> {
+    fn written(write: impl FnOnce(&mut dyn Write) -> Outcome) -> Outcome<String> {
         let mut out = Vec::new();
         write(&mut out)?;
         Ok(String::from_utf8_lossy(&out).into_owned())
@@ -225,10 +225,11 @@ mod tests {
 
     #[test]
     fn events_follow_the_event_stream_header() -> Outcome {
-        let text = written(|out| {
+        let streamed = written(|out| {
             start_events(out)?;
             send_event(out, DONE)
-        })?;
+        });
+        let text = streamed?;
         assert!(text.contains("Content-Type: text/event-stream"));
         assert!(text.ends_with("\r\n\r\ndata: [DONE]\n\n"));
         Ok(())

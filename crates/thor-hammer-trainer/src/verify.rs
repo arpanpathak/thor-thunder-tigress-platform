@@ -382,7 +382,7 @@ mod tests {
 
     fn conversation(answer: &str) -> Result<Conversation, DataError> {
         let entry = format!("<!-- source: test -->\n### User\nWrite it.\n### Assistant\n{answer}\n");
-        teacher::parse(&entry, "test").map_err(|error| DataError::Format { origin: "test".to_string(), error })
+        teacher::parse(&entry, "test").map_err(DataError::format("test"))
     }
 
     const GOOD: &str = "Sums the values.\n\n```rust\n/// The sum of `values`.\n#[must_use]\npub fn total(values: &[u32]) -> u32 {\n    values.iter().sum()\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn adds() {\n        assert_eq!(total(&[1, 2]), 3);\n    }\n}\n```";
@@ -457,7 +457,7 @@ mod tests {
         let folder = scratch("grounded");
         let answer = "```rust\n/// One.\n#[must_use]\npub fn one(text: &str) -> u8 {\n    text.parse().unwrap_or(1)\n}\n\nfn main() {\n    let n: u8 = \"1\".parse().unwrap();\n    println!(\"{}\", one(\"x\") + n);\n}\n```";
         let entry = format!("<!-- source: trpl; section: abc -->\n### User\nShow unwrap.\n### Assistant\n{answer}\n");
-        let grounded = teacher::parse(&entry, "x").map_err(|error| DataError::Format { origin: "x".to_string(), error })?;
+        let grounded = teacher::parse(&entry, "x").map_err(DataError::format("x"))?;
         let checked = check(&grounded, &folder)?;
         assert!(checked.problems.is_empty(), "{:?}", checked.problems);
         assert_eq!(checked.notes.len(), 1);
@@ -510,6 +510,16 @@ mod tests {
         ];
         let kinds: Vec<&str> = problems.iter().map(Problem::kind).collect();
         assert_eq!(kinds, ["build", "tests", "timed out", "rule", "slop", "false claim"]);
+    }
+
+    #[test]
+    fn a_block_that_does_not_parse_and_em_dashes_are_problems() -> Result<(), DataError> {
+        let folder = scratch("unparsed");
+        let answer = "One \u{2014} two \u{2014} three.\n\n```rust,ignore\nfn (\n```";
+        let kinds_found = kinds(&check(&conversation(answer)?, &folder)?);
+        assert_eq!(kinds_found, ["rule", "slop"]);
+        let _ = fs::remove_dir_all(&folder);
+        Ok(())
     }
 
     #[test]

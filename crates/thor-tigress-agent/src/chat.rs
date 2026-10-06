@@ -201,7 +201,7 @@ struct Source<'a> {
 /// `AgentError::BadRequest` when the body isn't a JSON object, and upstream
 /// or I/O errors before the answer starts. Errors after an event stream has
 /// started are sent to the client as a `{"thor":{"error":…}}` event instead.
-pub fn answer(client: &mut impl Write, body: &[u8], upstreams: &Upstreams) -> Outcome {
+pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Outcome {
     let Value::Object(mut fields) = serde_json::from_slice(body)? else {
         return Err(AgentError::bad_request("the body must be a JSON object"));
     };
@@ -209,17 +209,17 @@ pub fn answer(client: &mut impl Write, body: &[u8], upstreams: &Upstreams) -> Ou
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
     match Mode::of(web_search, streamed) {
         Mode::Relay => upstreams.model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?.relay(client),
-        Mode::Stream => as_events(client, |client| stream_round(client, &fields, &upstreams.model).map(drop)),
+        Mode::Stream => as_events(client, &mut |client| stream_round(client, &fields, &upstreams.model).map(drop)),
         Mode::Search => {
             fields.insert(STREAM.to_string(), Value::Bool(true));
-            as_events(client, |client| search_loop(client, fields, upstreams))
+            as_events(client, &mut |client| search_loop(client, fields.clone(), upstreams))
         }
     }
 }
 
 /// Runs `body` inside an event stream: an error becomes an error event, and
 /// the stream always ends with `[DONE]`.
-fn as_events<W: Write>(client: &mut W, body: impl FnOnce(&mut W) -> Outcome) -> Outcome {
+fn as_events(client: &mut dyn Write, body: &mut dyn FnMut(&mut dyn Write) -> Outcome) -> Outcome {
     response::start_events(client)?;
     if let Err(error) = body(client) {
         send_thor(client, &ThorEvent::Error(error.to_string()))?;
@@ -227,13 +227,13 @@ fn as_events<W: Write>(client: &mut W, body: impl FnOnce(&mut W) -> Outcome) -> 
     response::send_event(client, DONE)
 }
 
-fn send_thor(client: &mut impl Write, event: &ThorEvent) -> Outcome {
+fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
     response::send_event(client, &json!({ "thor": event }).to_string())
 }
 
 /// Asks the model, runs the tools it calls, and asks again, until it answers
 /// without a tool call or the rounds run out.
-fn search_loop(client: &mut impl Write, mut fields: Fields, upstreams: &Upstreams) -> Outcome {
+fn search_loop(client: &mut dyn Write, mut fields: Fields, upstreams: &Upstreams) -> Outcome {
     for round_number in 1..=MAX_ROUNDS {
         offer_tools(&mut fields, round_number < MAX_ROUNDS);
         let round = stream_round(client, &fields, &upstreams.model)?;
@@ -271,14 +271,14 @@ fn append_round(fields: &mut Fields, round: &Round, results: &[String]) -> Outco
 }
 
 /// Runs one tool call; its result is text for the model.
-fn run_tool(client: &mut impl Write, call: &ToolCall, searxng: &Endpoint) -> Outcome<String> {
+fn run_tool(client: &mut dyn Write, call: &ToolCall, searxng: &Endpoint) -> Outcome<String> {
     match Tool::named(&call.name) {
         Some(Tool::WebSearch) => web_search(client, call, searxng),
         None => Ok(format!("Unknown tool {}.", call.name)),
     }
 }
 
-fn web_search(client: &mut impl Write, call: &ToolCall, searxng: &Endpoint) -> Outcome<String> {
+fn web_search(client: &mut dyn Write, call: &ToolCall, searxng: &Endpoint) -> Outcome<String> {
     let Some(query) = call.query() else {
         return Ok("The search needs a non-empty query.".to_string());
     };
@@ -292,7 +292,7 @@ fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
 }
 
 /// Streams one model reply to the client, collecting any tool calls.
-fn stream_round(client: &mut impl Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
+fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
     let response = model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(fields)?)?;
     if !response.is_ok() {
         let status = response.status;

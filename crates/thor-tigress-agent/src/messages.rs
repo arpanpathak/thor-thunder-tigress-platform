@@ -34,7 +34,7 @@ impl Thinking {
 ///
 /// `AgentError::Json` when `body` isn't JSON; upstream and I/O errors as in
 /// [`Endpoint::post`].
-pub fn forward(client: &mut impl Write, body: &[u8], model: &Endpoint) -> Outcome {
+pub fn forward(client: &mut dyn Write, body: &[u8], model: &Endpoint) -> Outcome {
     model.post(paths::MESSAGES, &prepare(body)?)?.relay(client)
 }
 

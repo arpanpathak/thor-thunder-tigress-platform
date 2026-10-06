@@ -40,8 +40,6 @@ impl TempDir {
 
 impl Drop for TempDir {
     fn drop(&mut self) {
-        if let Err(error) = fs::remove_dir_all(&self.path) {
-            eprintln!("could not remove {}: {error}", self.path.display());
-        }
+        let _ = fs::remove_dir_all(&self.path);
     }
 }

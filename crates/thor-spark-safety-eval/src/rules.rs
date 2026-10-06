@@ -671,10 +671,10 @@ fn error_name(ty: &Type) -> Option<String> {
         .iter()
         .map(|segment| segment.ident.to_string())
         .collect();
-    match names.as_slice() {
-        [.., module, last] if last == "Error" => Some(format!("{module}::{last}")),
-        [.., last] => Some(last.clone()),
-        [] => None,
+    let (last, before) = names.split_last()?;
+    match before.last() {
+        Some(module) if last == "Error" => Some(format!("{module}::{last}")),
+        Some(_) | None => Some(last.clone()),
     }
 }
 
@@ -794,12 +794,28 @@ pub fn three() -> Result<u8, u8, u8> { todo!() }
 pub fn boxed() -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
 pub fn owned() -> Result<(), String> { Ok(()) }
 
+pub fn lifetimes<'a>() -> Result<'a, u8, Failure> { todo!() }
+
+use anyhow;
+use anyhow as ah;
+use {anyhow::Context};
+
 pub fn macros() -> anyhow::Result<()> {
     println!("{}", Some(1).unwrap());
     let items = vec![Some(2).unwrap()];
     anyhow::bail!("stop {}", items.len());
 }
 "##;
+
+    #[test]
+    fn finds_an_index_inside_a_macro_and_shortens_a_long_comment() {
+        let source = "/// Prints.\npub fn show(values: &[u8]) {\n    for i in 0..values.len() {\n        println!(\"{}\", values[i]);\n    }\n    // This comment inside the body is much longer than sixty characters in total.\n}\n";
+        let details: Vec<String> = check(source).violations.into_iter().map(|violation| violation.detail).collect();
+        assert!(details.iter().any(|detail| detail == "for i in a range, used as an index"), "{details:?}");
+        let unnamed = check("/// Counts.\npub fn count(values: &[u8]) {\n    for _ in 0..values.len() {}\n    for value in values {\n        drop(value);\n    }\n}\n");
+        assert!(unnamed.violations.iter().any(|violation| violation.detail == "for _ in a range, used as an index"));
+        assert!(details.iter().any(|detail| detail.ends_with('…') && detail.chars().count() == DETAIL_CHARS + 1), "{details:?}");
+    }
 
     #[test]
     fn reports_every_uncommon_form() {
@@ -816,14 +832,16 @@ pub fn macros() -> anyhow::Result<()> {
             (35, "returns the library error io::Error, not a custom enum"),
             (39, "returns Result<_, Box<dyn Error>>"),
             (40, "returns Result<_, String>"),
-            (43, ".unwrap()"),
-            (44, ".unwrap()"),
-            (45, "uses the anyhow (bail!) crate"),
+            (44, "uses the anyhow crate"),
+            (45, "uses the anyhow crate"),
+            (49, ".unwrap()"),
+            (50, ".unwrap()"),
+            (51, "uses the anyhow (bail!) crate"),
         ];
         assert!(expected.iter().all(|wanted| found.contains(wanted)), "{found:?}");
         let undocumented = found.iter().filter(|(_, detail)| detail.ends_with("has no doc comment")).count();
-        assert_eq!(undocumented, 19);
-        assert_eq!(report.violations.len(), 30);
+        assert_eq!(undocumented, 20);
+        assert_eq!(report.violations.len(), 33);
     }
 
     fn verdict(source: &str, rule: Rule) -> Verdict {

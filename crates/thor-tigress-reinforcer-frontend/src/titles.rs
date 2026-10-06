@@ -80,6 +80,7 @@ mod tests {
     fn names_the_teacher_set_every_rule_and_an_empty_name() {
         use thor_spark_safety_eval::rules::Rule;
         assert_eq!(source_title("teacher"), "Teacher conversations");
+        assert_eq!(source_title("field_notes"), "Field notes");
         assert!(Rule::ALL.iter().all(|&rule| !rule_title(rule).is_empty()));
         assert_eq!(humanize(""), "");
     }

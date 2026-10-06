@@ -87,14 +87,14 @@ impl Endpoint {
             .authorization
             .as_ref()
             .map_or(String::new(), |value| format!("Authorization: {value}\r\n"));
-        write!(
-            stream,
+        let head = format!(
             "{method} {path} HTTP/1.1\r\nHost: {}\r\n{authorization}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
             self.address,
             body.len()
-        )?;
+        );
+        stream.write_all(head.as_bytes())?;
         stream.write_all(body)?;
-        read_response(BufReader::new(stream), &self.address)
+        read_response(Box::new(BufReader::new(stream)), &self.address)
     }
 }
 
@@ -122,7 +122,7 @@ impl UpstreamResponse {
     /// # Errors
     ///
     /// `AgentError::Io` when either side's connection fails.
-    pub fn relay(mut self, client: &mut impl Write) -> Outcome {
+    pub fn relay(mut self, client: &mut dyn Write) -> Outcome {
         write!(
             client,
             "HTTP/1.1 {} Upstream\r\n{CORS}Content-Type: {}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
@@ -134,7 +134,7 @@ impl UpstreamResponse {
 }
 
 /// Reads a status line and headers from `reader`, leaving it at the body.
-fn read_response(mut reader: impl BufRead + Send + 'static, address: &str) -> Outcome<UpstreamResponse> {
+fn read_response(mut reader: Box<dyn BufRead + Send>, address: &str) -> Outcome<UpstreamResponse> {
     let mut status_line = String::new();
     reader.read_line(&mut status_line)?;
     let Some(status) = status_line.split_whitespace().nth(1).and_then(|code| code.parse().ok()) else {
@@ -163,14 +163,14 @@ fn read_response(mut reader: impl BufRead + Send + 'static, address: &str) -> Ou
 }
 
 /// Removes HTTP chunked transfer encoding from a body as it is read.
-struct Dechunk<R> {
-    inner: R,
+struct Dechunk {
+    inner: Box<dyn BufRead + Send>,
     remaining: usize,
     done: bool,
 }
 
-impl<R: BufRead> Dechunk<R> {
-    fn new(inner: R) -> Self {
+impl Dechunk {
+    fn new(inner: Box<dyn BufRead + Send>) -> Self {
         Dechunk { inner, remaining: 0, done: false }
     }
 
@@ -190,7 +190,7 @@ impl<R: BufRead> Dechunk<R> {
     }
 }
 
-impl<R: BufRead> Read for Dechunk<R> {
+impl Read for Dechunk {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
         if self.remaining == 0 && !self.next_chunk().map_err(io::Error::other)? {
             return Ok(0);
@@ -217,10 +217,13 @@ mod tests {
 
     #[test]
     fn dechunks_in_small_reads_and_stays_ended() -> Outcome {
-        let mut body = Dechunk::new(std::io::Cursor::new("3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n"));
+        let mut body = Dechunk::new(Box::new(std::io::Cursor::new("3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n")));
         let mut buffer = [0_u8; 3];
         let sizes = [body.read(&mut buffer)?, body.read(&mut buffer)?, body.read(&mut buffer)?, body.read(&mut buffer)?];
         assert_eq!(sizes, [3, 2, 0, 0]);
+        let mut partial = Dechunk::new(Box::new(std::io::Cursor::new("5\r\nhello\r\n0\r\n\r\n")));
+        let mut small = [0_u8; 2];
+        assert_eq!([partial.read(&mut small)?, partial.read(&mut small)?, partial.read(&mut small)?], [2, 2, 1]);
         Ok(())
     }
 
@@ -235,7 +238,7 @@ mod tests {
     use std::io::Cursor;
 
     fn parsed(raw: &'static str) -> Outcome<UpstreamResponse> {
-        read_response(Cursor::new(raw.as_bytes()), "test")
+        read_response(Box::new(Cursor::new(raw.as_bytes().to_vec())), "test")
     }
 
     #[test]

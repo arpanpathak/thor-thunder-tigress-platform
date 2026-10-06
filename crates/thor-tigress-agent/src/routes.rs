@@ -95,7 +95,7 @@ fn listed_file(path: &str) -> Option<StaticFile> {
 ///
 /// Whatever the route's handler returns: I/O, upstream, JSON or bad-request
 /// errors.
-pub fn answer(client: &mut impl Write, request: &Request, config: &Config) -> Outcome {
+pub fn answer(client: &mut dyn Write, request: &Request, config: &Config) -> Outcome {
     let route = Route::of(&request.method, &request.path);
     let needs_key = route != Route::Preflight && request.path.starts_with(paths::API);
     if needs_key && !config.admits(request.authorization.as_deref()) {
@@ -114,7 +114,7 @@ pub fn answer(client: &mut impl Write, request: &Request, config: &Config) -> Ou
     }
 }
 
-fn send_file(client: &mut impl Write, folder: &Path, file: StaticFile) -> Outcome {
+fn send_file(client: &mut dyn Write, folder: &Path, file: StaticFile) -> Outcome {
     let body = fs::read(folder.join(file.name))?;
     response::respond(client, Status::Ok, file.content_type, &body)
 }

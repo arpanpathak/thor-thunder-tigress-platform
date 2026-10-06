@@ -187,6 +187,16 @@ pub fn find(source: &str) -> Vec<Comment> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn finds_a_block_comment() {
+        assert_eq!(find("fn f() { /* note */ }").len(), 1);
+    }
+
+    #[test]
+    fn a_slash_in_a_char_literal_starts_no_comment() {
+        assert!(find("fn f() -> char { let c = '/'; c }").is_empty());
+    }
+
     fn texts(source: &str) -> Vec<String> {
         find(source)
             .into_iter()

@@ -131,7 +131,7 @@ mod tests {
     use crate::error::Outcome;
 
     fn written(value: &impl serde::Serialize) -> Outcome<String> {
-        serde_json::to_string(value).map_err(|error| crate::error::ReviewError::BadRequest(error.to_string()))
+        serde_json::to_string(value).map_err(crate::error::ReviewError::unserializable)
     }
 
     #[test]

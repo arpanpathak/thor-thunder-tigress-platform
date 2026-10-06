@@ -24,6 +24,7 @@ use std::{
     fs,
     io::{BufWriter, Write},
     path::{Path, PathBuf},
+    sync::mpsc,
     thread,
 };
 
@@ -307,21 +308,22 @@ fn read_entries(source: &Path) -> Result<Vec<Entry>, DataError> {
 fn check_all(entries: Vec<Entry>, scratch: &Path) -> Result<Vec<Outcome>, DataError> {
     let chunk_size = entries.len().div_ceil(WORKERS).max(1);
     let chunks: Vec<Vec<Entry>> = entries.chunks(chunk_size).map(<[_]>::to_vec).collect();
+    let (sender, receiver) = mpsc::channel();
     thread::scope(|scope| {
-        let workers: Vec<_> = chunks
-            .into_iter()
-            .enumerate()
-            .map(|(worker, chunk)| {
-                let folder = scratch.join(worker.to_string());
-                scope.spawn(move || check_chunk(chunk, &folder))
-            })
-            .collect();
-        let mut outcomes = Vec::new();
-        for worker in workers {
-            outcomes.extend(worker.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))?);
+        for (worker, chunk) in chunks.into_iter().enumerate() {
+            let sender = sender.clone();
+            let folder = scratch.join(worker.to_string());
+            scope.spawn(move || sender.send((worker, check_chunk(chunk, &folder))));
         }
-        Ok(outcomes)
-    })
+    });
+    drop(sender);
+    let mut finished: Vec<(usize, Result<Vec<Outcome>, DataError>)> = receiver.into_iter().collect();
+    finished.sort_by_key(|&(worker, _)| worker);
+    let mut outcomes = Vec::new();
+    for (_, checked) in finished {
+        outcomes.extend(checked?);
+    }
+    Ok(outcomes)
 }
 
 fn check_chunk(chunk: Vec<Entry>, folder: &Path) -> Result<Vec<Outcome>, DataError> {

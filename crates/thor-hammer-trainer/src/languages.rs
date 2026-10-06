@@ -312,6 +312,8 @@ mod tests {
         assert!(matches!(checked(Language::Json, "{\"a\": }")?, Built::BuildFailed(_)));
         assert_eq!(checked(Language::Shell, "set -eu\necho hi\n")?, Built::Clean { tests: 0, ran: false });
         assert!(matches!(checked(Language::JavaScript, "const a = ;\n")?, Built::BuildFailed(_)));
+        let tested = "const assert = require(\"node:assert\");\nassert.strictEqual(1 + 1, 2);\n";
+        assert_eq!(checked(Language::JavaScript, tested)?, Built::Clean { tests: 0, ran: true });
         Ok(())
     }
 

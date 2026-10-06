@@ -34,6 +34,12 @@ impl DataError {
         let path = path.display().to_string();
         move |source| DataError::Io { path, source }
     }
+
+    /// A converter for `map_err` that keeps the entry's origin next to its format error.
+    pub fn format(origin: &str) -> impl FnOnce(FormatError) -> DataError {
+        let origin = origin.to_string();
+        move |error| DataError::Format { origin, error }
+    }
 }
 
 impl From<serde_json::Error> for DataError {
@@ -72,7 +78,7 @@ mod tests {
     fn every_error_names_its_cause_and_keeps_its_source() {
         let io = DataError::io(Path::new("data/train.jsonl"))(io::Error::other("disk full"));
         let json = serde_json::from_str::<u8>("x").err().map(DataError::from);
-        let format = DataError::Format { origin: "a.md#2".to_string(), error: FormatError::NoTurns };
+        let format = DataError::format("a.md#2")(FormatError::NoTurns);
         assert_eq!(io.to_string(), "data/train.jsonl: disk full");
         assert!(json.as_ref().is_some_and(|error| error.to_string().starts_with("JSON: ")));
         assert_eq!(format.to_string(), "a.md#2: no ### User or ### Assistant section");

@@ -68,6 +68,8 @@ fn the_builder_writes_the_training_set() -> Result<(), DataError> {
     let tree = Tree::new("build")?;
     let built = tree.run(env!("CARGO_BIN_EXE_thor-hammer-trainer"), &["out"])?;
     assert!(built.status.success(), "{}", text(&built.stderr));
+    let defaulted = tree.run(env!("CARGO_BIN_EXE_thor-hammer-trainer"), &[])?;
+    assert!(defaulted.status.success() && tree.root.join("repo/data/train.jsonl").is_file());
     assert!(text(&built.stdout).contains("lib                    code repository, read by the teacher"));
     assert_eq!(tree.read("repo/out/train.jsonl")?.lines().count(), 2, "{}", tree.read("repo/out/train.jsonl")?);
     tree.write("repo/labels/slop_flags.jsonl", "{\"id\":\"gone\",\"note\":\"old\",\"spans\":[]}\n")?;

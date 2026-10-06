@@ -252,11 +252,7 @@ fn score_run(options: &ScoreOptions) -> Outcome<Report> {
     for (line, number) in text.lines().zip(1..).filter(|(line, _)| !line.trim().is_empty()) {
         let Scored { mut record, score } = score_line(line, number, options)?;
         summary.add(&score);
-        let spark = serde_json::to_value(&score).map_err(|source| EvalError::Json {
-            path: options.output.clone(),
-            line: number,
-            source,
-        })?;
+        let spark = serde_json::to_value(&score).map_err(EvalError::json(&options.output, number))?;
         if let Value::Object(fields) = &mut record {
             fields.insert("spark".to_string(), spark);
             fields.insert("spark_run".to_string(), Value::String(options.label.clone()));
@@ -280,11 +276,7 @@ fn score_run(options: &ScoreOptions) -> Outcome<Report> {
 
 /// Scores line `number` of the run.
 fn score_line(line: &str, number: usize, options: &ScoreOptions) -> Outcome<Scored> {
-    let record: Value = serde_json::from_str(line).map_err(|source| EvalError::Json {
-        path: options.input.clone(),
-        line: number,
-        source,
-    })?;
+    let record: Value = serde_json::from_str(line).map_err(EvalError::json(&options.input, number))?;
     let read = |name: &str| {
         record.get(name).and_then(Value::as_str).map(str::to_string).ok_or_else(|| EvalError::MissingField {
             path: options.input.clone(),
@@ -316,9 +308,8 @@ mod tests {
 
         fn file(&self, name: &str, text: &str) -> Outcome<PathBuf> {
             let path = self.0.join(name);
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent).map_err(EvalError::io(parent))?;
-            }
+            let parent = path.parent().unwrap_or(&self.0);
+            fs::create_dir_all(parent).map_err(EvalError::io(parent))?;
             fs::write(&path, text).map_err(EvalError::io(&path))?;
             Ok(path)
         }
@@ -326,9 +317,7 @@ mod tests {
 
     impl Drop for Folder {
         fn drop(&mut self) {
-            if let Err(error) = fs::remove_dir_all(&self.0) {
-                eprintln!("could not remove {}: {error}", self.0.display());
-            }
+            let _ = fs::remove_dir_all(&self.0);
         }
     }
 
@@ -340,11 +329,14 @@ mod tests {
     fn reads_each_command() -> Outcome {
         assert_eq!(Command::from_args(&args(&["rs", "src"]))?, Command::Rust(vec![PathBuf::from("src")]));
         assert_eq!(Command::from_args(&args(&["text", "a.md"]))?, Command::Text(vec![PathBuf::from("a.md")]));
-        let Command::Score(options) = Command::from_args(&args(&["score", "runs/base.jsonl", "--code-field", "code"]))? else {
-            return Err(EvalError::Usage("expected score".to_string()));
+        let expected = ScoreOptions {
+            input: PathBuf::from("runs/base.jsonl"),
+            field: "text".to_string(),
+            code_field: Some("code".to_string()),
+            label: "base".to_string(),
+            output: PathBuf::from("runs/base.scored.jsonl"),
         };
-        assert_eq!(options.output, PathBuf::from("runs/base.scored.jsonl"));
-        assert_eq!((options.label.as_str(), options.field.as_str(), options.code_field.as_deref()), ("base", "text", Some("code")));
+        assert_eq!(Command::from_args(&args(&["score", "runs/base.jsonl", "--code-field", "code"]))?, Command::Score(expected));
         Ok(())
     }
 
@@ -393,15 +385,13 @@ mod tests {
     #[test]
     fn scores_a_run_and_writes_each_line_back() -> Outcome {
         let folder = Folder::new("score")?;
-        let run = folder.file(
-            "run.jsonl",
-            "{\"text\":\"Great question!\",\"code\":\"fn a() { b().unwrap(); }\"}\n\n{\"text\":\"Plain.\",\"code\":\"\"}\n",
-        )?;
+        let lines = "{\"text\":\"Great question!\",\"code\":\"fn a() { b().unwrap(); }\"}\n\n{\"text\":\"Plain.\",\"code\":\"\"}\n";
+        let run = folder.file("run.jsonl", lines)?;
         let report = Command::from_args(&args(&["score", &run.to_string_lossy(), "--code-field", "code", "--label", "base"]))?.run()?;
         assert!(report.lines[1].starts_with("| base | 2 | 1 |"));
         let written = fs::read_to_string(folder.0.join("run.scored.jsonl")).map_err(EvalError::io(&folder.0))?;
         let first: Value = serde_json::from_str(written.lines().next().unwrap_or_default())
-            .map_err(|source| EvalError::Json { path: folder.0.clone(), line: 1, source })?;
+            .map_err(EvalError::json(&folder.0, 1))?;
         assert_eq!(first["spark_run"], "base");
         assert_eq!(first["spark"]["rules"]["no_unwrap"], "fail");
         Ok(())

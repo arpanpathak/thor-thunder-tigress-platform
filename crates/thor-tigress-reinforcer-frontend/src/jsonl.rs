@@ -39,13 +39,12 @@ pub fn read_lines<T: DeserializeOwned>(path: &Path) -> Outcome<Vec<T>> {
 pub fn write_lines<T: Serialize>(path: &Path, items: &[T]) -> Outcome {
     let mut text = String::new();
     for item in items {
-        let line = serde_json::to_string(item).map_err(|error| ReviewError::BadRequest(error.to_string()))?;
+        let line = serde_json::to_string(item).map_err(ReviewError::unserializable)?;
         text.push_str(&line);
         text.push('\n');
     }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(ReviewError::io(parent))?;
-    }
+    let folder = path.parent().unwrap_or(Path::new("."));
+    fs::create_dir_all(folder).map_err(ReviewError::io(folder))?;
     let temporary = path.with_extension("jsonl.tmp");
     fs::write(&temporary, text).map_err(ReviewError::io(&temporary))?;
     fs::rename(&temporary, path).map_err(ReviewError::io(path))

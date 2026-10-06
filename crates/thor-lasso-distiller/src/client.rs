@@ -176,6 +176,20 @@ mod tests {
     }
 
     #[test]
+    fn a_reply_without_json_or_a_message_and_a_closed_port_are_server_errors() -> Result<(), DistillError> {
+        let client = |address: String| Client { address, model: "teacher".to_string(), key: None };
+        let not_json = client(serve_once("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nnope".to_string())?);
+        assert!(matches!(not_json.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply is not JSON")));
+        let empty = client(serve_once("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}".to_string())?);
+        assert!(matches!(empty.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply has no message")));
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").map_err(DistillError::io("listener"))?;
+        let address = closed.local_addr().map_err(DistillError::io("listener"))?.to_string();
+        drop(closed);
+        assert!(matches!(client(address).complete(&[], 8, 0.0), Err(DistillError::Server(_))));
+        Ok(())
+    }
+
+    #[test]
     fn joins_chunked_bodies() {
         assert_eq!(dechunk("5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"), "hello world");
     }

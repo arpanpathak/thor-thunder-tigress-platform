@@ -33,7 +33,8 @@ mod titles;
 mod workspace;
 
 use std::{
-    io,
+    convert::Infallible,
+    io::{self, Read, Write},
     net::{TcpListener, TcpStream},
     path::Path,
     process::ExitCode,
@@ -49,7 +50,7 @@ use crate::{
 
 fn main() -> ExitCode {
     let outcome = match Command::from_args(std::env::args().skip(1)) {
-        Command::Serve { port, datasets } => serve(&port, &datasets),
+        Command::Serve { port, datasets } => serve(&port, &datasets).map(|never| match never {}),
         Command::Scan { training, out } => scan::run(&training, &out),
         Command::Apply { suggestions, flags } => scan::apply(&suggestions, &flags),
         Command::Usage(reason) => Err(ReviewError::BadRequest(format!("{reason}\n{USAGE}"))),
@@ -63,8 +64,9 @@ fn main() -> ExitCode {
     }
 }
 
-/// Opens the datasets, binds `127.0.0.1:port`, and answers each connection on its own thread.
-fn serve(port: &str, datasets: &[DatasetSpec]) -> Outcome {
+/// Opens the datasets, binds `127.0.0.1:port`, and answers each connection on
+/// its own thread, forever; it returns only when opening or binding fails.
+fn serve(port: &str, datasets: &[DatasetSpec]) -> Outcome<Infallible> {
     let workspace = Arc::new(Workspace::open(datasets)?);
     for info in workspace.infos()? {
         println!("{:<14} {:>7} records, {:>5} flagged  {}", info.name, info.records, info.flagged, info.file);
@@ -75,22 +77,28 @@ fn serve(port: &str, datasets: &[DatasetSpec]) -> Outcome {
     let address = format!("127.0.0.1:{port}");
     let listener = TcpListener::bind(&address).map_err(ReviewError::io(Path::new(&address)))?;
     println!("open http://{address}");
-    accept(listener.incoming(), &workspace);
-    Ok(())
+    loop {
+        accept(listener.incoming(), &workspace);
+    }
 }
 
 /// Answers each connection on its own thread, until `connections` ends.
 fn accept(connections: impl Iterator<Item = io::Result<TcpStream>>, workspace: &Arc<Workspace>) {
     for stream in connections.filter_map(Result::ok) {
         let workspace = Arc::clone(workspace);
-        thread::spawn(move || handle(stream, &workspace));
+        thread::spawn(move || handle(&mut { stream }, &workspace));
     }
 }
 
+/// A client connection: something to read the request from and write the answer to.
+trait Connection: Read + Write {}
+
+impl<T: Read + Write> Connection for T {}
+
 /// Answers one connection; a failure is logged and, when someone is still
 /// listening, answered with its status.
-fn handle(mut stream: TcpStream, workspace: &Workspace) {
-    let outcome = http::read_request(&stream).and_then(|request| api::answer(&mut stream, &request, workspace));
+fn handle(stream: &mut dyn Connection, workspace: &Workspace) {
+    let outcome = http::read_request(stream).and_then(|request| api::answer(stream, &request, workspace));
     let Err(error) = outcome else {
         return;
     };
@@ -99,7 +107,7 @@ fn handle(mut stream: TcpStream, workspace: &Workspace) {
         return;
     };
     let body = serde_json::json!({ "error": error.to_string() });
-    if let Err(unsent) = http::write_json(&mut stream, status, &body) {
+    if let Err(unsent) = http::write_json(stream, status, &body) {
         eprintln!("reinforcer: could not answer: {unsent}");
     }
 }
@@ -108,6 +116,61 @@ fn handle(mut stream: TcpStream, workspace: &Workspace) {
 mod tests {
     use super::*;
     use crate::testing::TempDir;
+
+    /// A client that sends `request` and is gone before the answer.
+    struct Vanishing {
+        request: io::Cursor<Vec<u8>>,
+    }
+
+    impl Read for Vanishing {
+        fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+            self.request.read(buffer)
+        }
+    }
+
+    impl Write for Vanishing {
+        fn write(&mut self, _: &[u8]) -> io::Result<usize> {
+            Err(io::Error::from(io::ErrorKind::BrokenPipe))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Err(io::Error::from(io::ErrorKind::BrokenPipe))
+        }
+    }
+
+    /// A client whose connection fails while the request is read.
+    struct Broken;
+
+    impl Read for Broken {
+        fn read(&mut self, _: &mut [u8]) -> io::Result<usize> {
+            Err(io::Error::from(io::ErrorKind::ConnectionReset))
+        }
+    }
+
+    impl Write for Broken {
+        fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+            Ok(buffer.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_vanished_or_broken_client_is_only_logged() -> Outcome {
+        let folder = TempDir::new()?;
+        let records = folder.file("train.jsonl", "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n")?;
+        let spec = DatasetSpec::new("train", &records, &folder.path().join("f.jsonl"), &folder.path().join("r.jsonl"));
+        let workspace = Workspace::open(&[spec])?;
+        let mut vanishing = Vanishing { request: io::Cursor::new(b"GET /missing HTTP/1.1\r\n\r\n".to_vec()) };
+        handle(&mut vanishing, &workspace);
+        assert!(vanishing.flush().is_err());
+        let mut broken = Broken;
+        handle(&mut broken, &workspace);
+        assert!(broken.write(b"x").is_ok() && broken.flush().is_ok());
+        Ok(())
+    }
     use std::io::{Read, Write};
 
     fn exchange(address: &str, request: &str) -> Outcome<String> {

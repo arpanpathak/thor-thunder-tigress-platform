@@ -17,14 +17,10 @@ fn every_crate_in_the_workspace_passes_the_five_rules() -> Outcome {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let files = cli::rust_files(std::slice::from_ref(&crates))?;
     assert!(files.len() > FEWEST_FILES, "found only {} files under {}", files.len(), crates.display());
-    let mut problems = Vec::new();
     for file in &files {
         let report = rules::check(&fs::read_to_string(file).map_err(EvalError::io(file))?);
-        problems.extend(report.parse_error.map(|error| format!("{}: {error}", file.display())));
-        problems.extend(report.violations.iter().map(|violation| {
-            format!("{}:{}: {}: {}", file.display(), violation.line, violation.rule.label(), violation.detail)
-        }));
+        assert_eq!(report.parse_error, None, "{} does not parse", file.display());
+        assert!(report.violations.is_empty(), "{}: {:?}", file.display(), report.violations);
     }
-    assert!(problems.is_empty(), "rule violations:\n{}", problems.join("\n"));
     Ok(())
 }

@@ -304,13 +304,11 @@ mod tests {
     #[test]
     fn scans_every_record_and_reports_counts() -> Outcome {
         let folder = TempDir::new()?;
-        let training = folder.file(
-            "train.jsonl",
-            concat!(
-                r#"{"id":"a","source":"chat","origin":"c","instruction":"Great question?","response":"In summary — fine — ok"}"#, "\n",
-                r#"{"id":"b","source":"book","origin":"x","instruction":"q","response":"plain"}"#, "\n"
-            ),
-        )?;
+        let records = concat!(
+            r#"{"id":"a","source":"chat","origin":"c","instruction":"Great question?","response":"In summary — fine — ok"}"#, "\n",
+            r#"{"id":"b","source":"book","origin":"x","instruction":"q","response":"plain"}"#, "\n"
+        );
+        let training = folder.file("train.jsonl", records)?;
         let out = folder.path().join("labels/auto.jsonl");
         run(&training, &out)?;
         let written: Vec<Suggestion> = jsonl::read_lines(&out)?;
@@ -323,8 +321,7 @@ mod tests {
 
     #[test]
     fn writes_the_auto_flags_format() -> Outcome {
-        let line = serde_json::to_string(&suggestion("a", "wrap_up_repeat"))
-            .map_err(|error| crate::error::ReviewError::BadRequest(error.to_string()))?;
+        let line = serde_json::to_string(&suggestion("a", "wrap_up_repeat")).map_err(crate::error::ReviewError::unserializable)?;
         assert_eq!(
             line,
             r#"{"id":"a","source":"chat","rule":"wrap_up_repeat","category":"wrap_up_repeat","field":"response","match":"in summary"}"#

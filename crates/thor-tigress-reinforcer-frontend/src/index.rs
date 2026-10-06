@@ -49,7 +49,7 @@ pub struct Entry {
     /// The stable example id.
     pub id: String,
     offset: u64,
-    length: u32,
+    length: usize,
     source: u16,
     origin: u32,
 }
@@ -173,7 +173,7 @@ impl Index {
         let entry = Entry {
             id: header.id.to_string(),
             offset,
-            length: u32::try_from(length).map_err(|_| ReviewError::BadRequest(format!("line of {length} bytes")))?,
+            length,
             source: self.sources.id_of(header.source).ok_or_else(too_many)?,
             origin: self.origins.id_of(header.origin).ok_or_else(too_many)?,
         };
@@ -276,7 +276,7 @@ impl Index {
     /// when the read fails, `ReviewError::BadRequest` for text that isn't UTF-8.
     pub fn record(&self, position: usize) -> Outcome<String> {
         let entry = self.entries.get(position).ok_or_else(|| ReviewError::NotFound(format!("record {position}")))?;
-        let mut buffer = vec![0; usize::try_from(entry.length).unwrap_or(0)];
+        let mut buffer = vec![0; entry.length];
         self.file.read_exact_at(&mut buffer, entry.offset).map_err(ReviewError::io(&self.path))?;
         String::from_utf8(buffer).map_err(|_| ReviewError::BadRequest(format!("record {position} is not UTF-8")))
     }
@@ -350,7 +350,41 @@ fn json_escaped(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn more_sources_than_ids_is_refused() -> Outcome {
+        let folder = TempDir::new()?;
+        let lines: String = (0..=usize::from(u16::MAX) + 1)
+            .map(|number| format!("{{\"id\":\"{number}\",\"source\":\"s{number}\",\"origin\":\"o\"}}\n"))
+            .collect();
+        let path = folder.file("train.jsonl", &lines)?;
+        assert!(matches!(Index::open(&path), Err(ReviewError::BadRequest(message)) if message.contains("too many")));
+        Ok(())
+    }
+
+    #[test]
+    fn a_record_changed_into_invalid_text_after_indexing_is_refused() -> Outcome {
+        let folder = TempDir::new()?;
+        let path = folder.file("train.jsonl", "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n")?;
+        let index = Index::open(&path)?;
+        std::fs::write(&path, [0xff_u8; 64]).map_err(ReviewError::io(&path))?;
+        assert!(matches!(index.record(0), Err(ReviewError::BadRequest(message)) if message.contains("not UTF-8")));
+        Ok(())
+    }
     use crate::testing::TempDir;
+
+    #[test]
+    fn equally_large_collections_come_in_folder_order() -> Outcome {
+        let folder = TempDir::new()?;
+        let lines = concat!(
+            r#"{"id":"r","source":"corpus","origin":"rbe/src/a.md"}"#, "\n",
+            r#"{"id":"t","source":"corpus","origin":"trpl/src/a.md"}"#, "\n"
+        );
+        let index = Index::open(&folder.file("train.jsonl", lines)?)?;
+        let folders: Vec<String> = index.collections().into_iter().map(|collection| collection.folder).collect();
+        assert_eq!(folders, ["rbe", "trpl"]);
+        Ok(())
+    }
 
     const LINES: &str = concat!(
         r#"{"id":"a1","instruction":"What is a page?","response":"A block.","source":"book","origin":"ch01.md"}"#,

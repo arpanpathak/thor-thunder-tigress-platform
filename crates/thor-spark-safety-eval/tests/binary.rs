@@ -11,7 +11,7 @@ fn exits_by_what_it_found() -> Result<(), EvalError> {
     let clean = folder.join("clean.rs");
     fs::write(&clean, "/// One.\npub const ONE: u8 = 1;\n").map_err(EvalError::io(&clean))?;
     let broken = folder.join("broken.rs");
-    fs::write(&broken, "pub fn f() { Some(1).unwrap(); }\n").map_err(EvalError::io(&broken))?;
+    fs::write(&broken, "pub fn f() { /* why */ Some(1).unwrap(); }\n").map_err(EvalError::io(&broken))?;
     let program = Path::new(env!("CARGO_BIN_EXE_spark"));
     let status = |arguments: &[&Path]| Command::new(program).arg("rs").args(arguments).output().map_err(EvalError::io(program));
     let passed = status(&[&clean])?;

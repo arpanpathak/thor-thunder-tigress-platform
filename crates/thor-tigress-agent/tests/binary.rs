@@ -37,6 +37,6 @@ fn exits_with_failure_and_a_reason() -> Result<(), RunError> {
     let busy = Command::new(program).args(["--listen", &address, "--key-file", "/nonexistent"]).output()?;
     assert!(!busy.status.success());
     assert!(String::from_utf8_lossy(&busy.stderr).starts_with("thor-tigress-agent: "));
-    assert_eq!(RunError::Io(io::Error::other("x")).to_string(), "x");
+    assert_eq!(RunError::from(io::Error::other("x")).to_string(), "x");
     Ok(())
 }

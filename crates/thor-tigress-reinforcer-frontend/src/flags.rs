@@ -247,6 +247,17 @@ mod tests {
     }
 
     #[test]
+    fn equally_common_phrases_come_in_alphabetical_order() -> Outcome {
+        let folder = TempDir::new()?;
+        let mut store = FlagStore::open(&folder.path().join("flags.jsonl"))?;
+        store.add_span("a", span("Truly remarkable"), "");
+        store.add_span("b", span("At the end of the day"), "");
+        let texts: Vec<String> = store.phrases().into_iter().map(|phrase| phrase.text).collect();
+        assert_eq!(texts, ["At the end of the day", "Truly remarkable"]);
+        Ok(())
+    }
+
+    #[test]
     fn a_machine_flag_is_not_reviewed_until_a_person_marks_it() {
         let auto = Flag { note: "auto: in summary".to_string(), spans: Vec::new() };
         let marked = Flag { note: "auto: in summary".to_string(), spans: vec![span("In summary")] };

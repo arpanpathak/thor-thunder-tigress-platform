@@ -49,6 +49,12 @@ impl ReviewError {
         move |source| ReviewError::Json { path, line, source }
     }
 
+    /// An answer that could not be turned into JSON.
+    #[must_use]
+    pub fn unserializable(error: serde_json::Error) -> ReviewError {
+        ReviewError::BadRequest(format!("could not write JSON: {error}"))
+    }
+
     /// The status this error is answered with; `None` when there is no one
     /// left to answer.
     #[must_use]

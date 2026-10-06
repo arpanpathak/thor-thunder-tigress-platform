@@ -43,6 +43,12 @@ impl EvalError {
         let path = path.into();
         move |source| EvalError::Io { path, source }
     }
+
+    /// A closure that wraps a JSON error with the file and line it happened on.
+    pub fn json(path: impl Into<PathBuf>, line: usize) -> impl FnOnce(serde_json::Error) -> EvalError {
+        let path = path.into();
+        move |source| EvalError::Json { path, line, source }
+    }
 }
 
 impl fmt::Display for EvalError {

@@ -126,7 +126,7 @@ impl Request {
 ///
 /// `ReviewError::Connection` when the connection fails, `ReviewError::BadRequest`
 /// for a body over 1 MiB.
-pub fn read_request(stream: impl Read) -> Outcome<Request> {
+pub fn read_request(stream: &mut dyn Read) -> Outcome<Request> {
     let mut reader = BufReader::new(stream);
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
@@ -208,14 +208,14 @@ fn hex_digit(byte: u8) -> Option<u8> {
 /// # Errors
 ///
 /// `ReviewError::Connection` when the client is gone.
-pub fn write_response(stream: &mut impl Write, status: Status, content_type: ContentType, body: &[u8]) -> Outcome {
-    write!(
-        stream,
+pub fn write_response(stream: &mut dyn Write, status: Status, content_type: ContentType, body: &[u8]) -> Outcome {
+    let head = format!(
         "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         status.line(),
         content_type.header(),
         body.len()
-    )?;
+    );
+    stream.write_all(head.as_bytes())?;
     stream.write_all(body)?;
     Ok(stream.flush()?)
 }
@@ -225,14 +225,31 @@ pub fn write_response(stream: &mut impl Write, status: Status, content_type: Con
 /// # Errors
 ///
 /// `ReviewError::Connection` when the client is gone.
-pub fn write_json(stream: &mut impl Write, status: Status, value: &impl Serialize) -> Outcome {
-    let body = serde_json::to_vec(value).map_err(|error| ReviewError::BadRequest(error.to_string()))?;
+pub fn write_json(stream: &mut dyn Write, status: Status, value: &impl Serialize) -> Outcome {
+    let body = serde_json::to_vec(value).map_err(ReviewError::unserializable)?;
     write_response(stream, status, ContentType::Json, &body)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A value whose serialization always fails.
+    struct Unserializable;
+
+    impl Serialize for Unserializable {
+        fn serialize<S: serde::Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+            Err(serde::ser::Error::custom("refused"))
+        }
+    }
+
+    #[test]
+    fn a_value_that_cannot_be_serialized_is_a_bad_request() {
+        let mut out = Vec::new();
+        let result = write_json(&mut out, Status::Ok, &Unserializable);
+        assert!(matches!(result, Err(ReviewError::BadRequest(message)) if message.contains("refused")));
+        assert!(out.is_empty());
+    }
 
     #[test]
     fn decodes_percent_escapes_and_plus() {
@@ -246,7 +263,7 @@ mod tests {
 
     #[test]
     fn reads_method_path_params_and_body() -> Outcome {
-        let request = read_request("post /api/page?start=20&q=page%20table&flagged=1&empty= HTTP/1.1\r\nContent-Length: 2\r\n\r\n{}".as_bytes())?;
+        let request = read_request(&mut "post /api/page?start=20&q=page%20table&flagged=1&empty= HTTP/1.1\r\nContent-Length: 2\r\n\r\n{}".as_bytes())?;
         assert_eq!((request.method.as_str(), request.path.as_str(), request.body.as_str()), ("POST", "/api/page", "{}"));
         assert_eq!(request.param("q"), Some("page table"));
         assert_eq!(request.number("start", 0), 20);
@@ -266,7 +283,7 @@ mod tests {
     #[test]
     fn rejects_a_body_over_the_limit() {
         let raw = format!("POST / HTTP/1.1\r\nContent-Length: {}\r\n\r\n", MAX_BODY + 1);
-        assert!(read_request(raw.as_bytes()).is_err_and(|error| error.to_string().starts_with("bad request: body over")));
+        assert!(read_request(&mut raw.as_bytes()).is_err_and(|error| error.to_string().starts_with("bad request: body over")));
     }
 
     #[test]

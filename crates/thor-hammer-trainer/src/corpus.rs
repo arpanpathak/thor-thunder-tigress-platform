@@ -325,24 +325,20 @@ pub const MAX_SOURCE_TOKENS: usize = 400_000;
 /// than taking its first chapters, and it is the same on every build. The kept
 /// sections stay in their original order.
 fn cap_tokens(examples: Vec<Example>, limit: usize) -> Vec<Example> {
-    let tokens = |example: &Example| example.char_count() / 4;
-    let mut by_id: Vec<(String, usize)> = examples
+    let mut by_id: Vec<(String, usize, usize)> = examples
         .iter()
         .enumerate()
-        .map(|(position, example)| (example.id(), position))
+        .map(|(position, example)| (example.id(), position, example.char_count() / 4))
         .collect();
     by_id.sort();
     let mut total = 0usize;
     let mut chosen = vec![false; examples.len()];
-    for (_, position) in by_id {
-        let size = examples.get(position).map_or(0, tokens);
+    for (_, position, size) in by_id {
         if total + size > limit {
             continue;
         }
         total += size;
-        if let Some(slot) = chosen.get_mut(position) {
-            *slot = true;
-        }
+        chosen[position] = true;
     }
     examples
         .into_iter()
@@ -509,7 +505,7 @@ static BLOCK_START: LazyLock<Option<Regex>> =
 /// code blocks are kept exactly, so `grid[i][j]` is never read as a link.
 fn tidy_prose(text: &str) -> String {
     let patterns = LINK_DEFINITION.as_ref().zip(REFERENCE_LINK.as_ref()).zip(BLOCK_START.as_ref());
-    patterns.map_or_else(|| text.to_string(), |((definition, reference), block_start)| tidy_with(text, definition, reference, block_start))
+    patterns.map_or(text.to_string(), |((definition, reference), block_start)| tidy_with(text, definition, reference, block_start))
 }
 
 /// [`tidy_prose`] with its patterns compiled.

@@ -71,6 +71,7 @@ mod tests {
         use std::error::Error as _;
         let error = serde_json::from_str::<u8>("x").map_err(AgentError::from).err();
         assert!(error.as_ref().and_then(|error| error.source()).is_some());
+        assert!(AgentError::from(std::io::Error::other("x")).source().is_some());
     }
     use std::error::Error;
 

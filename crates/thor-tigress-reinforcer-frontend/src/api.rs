@@ -101,7 +101,7 @@ struct Datasets {
 ///
 /// `ReviewError::NotFound` for an unknown route or dataset, and whatever the
 /// route's handler returns.
-pub fn answer(stream: &mut impl Write, request: &Request, workspace: &Workspace) -> Outcome {
+pub fn answer(stream: &mut dyn Write, request: &Request, workspace: &Workspace) -> Outcome {
     match Route::of(&request.method, &request.path) {
         Route::Page => http::write_response(stream, Status::Ok, ContentType::Html, PAGE.as_bytes()),
         Route::Datasets => ok(stream, &Datasets { datasets: workspace.infos()?, missing: workspace.missing().to_vec() }),
@@ -110,7 +110,7 @@ pub fn answer(stream: &mut impl Write, request: &Request, workspace: &Workspace)
 }
 
 /// Answers one request about one dataset.
-fn answer_in(stream: &mut impl Write, request: &Request, app: &App) -> Outcome {
+fn answer_in(stream: &mut dyn Write, request: &Request, app: &App) -> Outcome {
     match Route::of(&request.method, &request.path) {
         Route::Page | Route::Datasets => Err(ReviewError::NotFound(format!("{} {}", request.method, request.path))),
         Route::SlopFile => {
@@ -129,7 +129,7 @@ fn answer_in(stream: &mut impl Write, request: &Request, app: &App) -> Outcome {
     }
 }
 
-fn ok(stream: &mut impl Write, value: &impl Serialize) -> Outcome {
+fn ok(stream: &mut dyn Write, value: &impl Serialize) -> Outcome {
     http::write_json(stream, Status::Ok, value)
 }
 
@@ -494,14 +494,13 @@ mod tests {
         let folder = TempDir::new()?;
         let training = folder.file("train.jsonl", TRAINING)?;
         let slop = folder.file("slop.jsonl", "{\"id\":\"gone\",\"response\":\"old\"}\n")?;
-        let flags = folder.file(
-            "flags.jsonl",
-            concat!(
-                r#"{"id":"gone","note":"removed"}"#, "\n",
-                r#"{"id":"lost","note":"text changed","spans":[]}"#, "\n",
-                r#"{"id":"auto-only","note":"auto: x","spans":[]}"#, "\n"
-            ),
-        )?;
+        let flag_lines = concat!(
+            r#"{"id":"gone","note":"removed"}"#, "\n",
+            r#"{"id":"lost","note":"text changed","spans":[]}"#, "\n",
+            r#"{"id":"also-lost","note":"rebuilt","spans":[]}"#, "\n",
+            r#"{"id":"auto-only","note":"auto: x","spans":[]}"#, "\n"
+        );
+        let flags = folder.file("flags.jsonl", flag_lines)?;
         let app = App::open(&training, &flags, &slop)?;
         Ok(Setup { app, _folder: folder })
     }
@@ -582,7 +581,7 @@ mod tests {
     fn meta_counts_sources_books_and_flags() -> Outcome {
         let setup = setup()?;
         let meta = call(&setup.app, "GET", "/api/meta", "")?.body;
-        assert_eq!((meta["total"].as_u64(), meta["flagged"].as_u64()), (Some(3), Some(3)));
+        assert_eq!((meta["total"].as_u64(), meta["flagged"].as_u64()), (Some(3), Some(4)));
         assert_eq!(meta["sources"].as_array().map(Vec::len), Some(3));
         assert_eq!(meta["collections"][0]["title"], "The Rust Programming Language");
         Ok(())
@@ -592,7 +591,11 @@ mod tests {
     fn orphans_are_reviewed_flags_with_no_example() -> Outcome {
         let setup = setup()?;
         let orphans = call(&setup.app, "GET", "/api/orphans", "")?.body;
-        assert_eq!(orphans, serde_json::json!({ "orphans": [{ "id": "lost", "note": "text changed", "spans": [] }] }));
+        let expected = serde_json::json!({ "orphans": [
+            { "id": "also-lost", "note": "rebuilt", "spans": [] },
+            { "id": "lost", "note": "text changed", "spans": [] }
+        ] });
+        assert_eq!(orphans, expected);
         Ok(())
     }
 

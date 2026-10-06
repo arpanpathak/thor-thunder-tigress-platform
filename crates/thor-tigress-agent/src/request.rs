@@ -38,7 +38,7 @@ struct Headers {
 ///
 /// `AgentError::Io` when the connection fails, `AgentError::BadRequest` for
 /// a bad `Content-Length` or a body over 32 MiB.
-pub fn read_request(stream: impl Read) -> Outcome<Request> {
+pub fn read_request(stream: &mut dyn Read) -> Outcome<Request> {
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     reader.read_line(&mut line)?;
@@ -56,7 +56,7 @@ pub fn read_request(stream: impl Read) -> Outcome<Request> {
     })
 }
 
-fn read_headers(reader: &mut impl BufRead) -> Outcome<Headers> {
+fn read_headers(reader: &mut dyn BufRead) -> Outcome<Headers> {
     let mut headers = Headers::default();
     loop {
         let mut line = String::new();
@@ -88,7 +88,7 @@ impl Headers {
     }
 }
 
-fn read_body(reader: &mut impl Read, length: usize) -> Outcome<Vec<u8>> {
+fn read_body(reader: &mut dyn Read, length: usize) -> Outcome<Vec<u8>> {
     if length > MAX_BODY {
         return Err(AgentError::bad_request(format!("body over {MAX_BODY} bytes")));
     }
@@ -102,7 +102,7 @@ mod tests {
     use super::*;
 
     fn parse(raw: &str) -> Outcome<Request> {
-        read_request(raw.as_bytes())
+        read_request(&mut raw.as_bytes())
     }
 
     #[test]

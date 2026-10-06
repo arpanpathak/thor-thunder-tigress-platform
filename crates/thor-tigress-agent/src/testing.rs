@@ -4,15 +4,16 @@
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
-    thread::{self, JoinHandle},
+    sync::mpsc,
+    thread,
 };
 
-use crate::error::{AgentError, Outcome};
+use crate::error::Outcome;
 
 /// A server on `127.0.0.1` at a free port, serving canned responses in order.
 pub struct FakeServer {
     address: String,
-    worker: JoinHandle<Outcome<Vec<String>>>,
+    received: mpsc::Receiver<Outcome<String>>,
 }
 
 impl FakeServer {
@@ -20,16 +21,13 @@ impl FakeServer {
     pub fn start(responses: Vec<String>) -> Outcome<Self> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?.to_string();
-        let worker = thread::spawn(move || {
-            let mut requests = Vec::new();
+        let (sender, received) = mpsc::channel();
+        thread::spawn(move || {
             for response in responses {
-                let (mut stream, _) = listener.accept()?;
-                requests.push(read_raw_request(&stream)?);
-                stream.write_all(response.as_bytes())?;
+                let _ = sender.send(serve_one(&listener, &response));
             }
-            Ok(requests)
         });
-        Ok(FakeServer { address, worker })
+        Ok(FakeServer { address, received })
     }
 
     /// The `host:port` to call.
@@ -39,10 +37,16 @@ impl FakeServer {
 
     /// Waits until every response is sent, and returns the requests received.
     pub fn requests(self) -> Outcome<Vec<String>> {
-        self.worker
-            .join()
-            .map_err(|_| AgentError::Upstream("fake server panicked".to_string()))?
+        self.received.into_iter().collect()
     }
+}
+
+/// Accepts one connection, reads its request and answers with `response`.
+fn serve_one(listener: &TcpListener, response: &str) -> Outcome<String> {
+    let (mut stream, _) = listener.accept()?;
+    let request = read_raw_request(&stream)?;
+    stream.write_all(response.as_bytes())?;
+    Ok(request)
 }
 
 /// Reads one request as text: headers, then as many body bytes as

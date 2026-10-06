@@ -329,13 +329,14 @@ mod tests {
             r#"{"id":"1","instruction":"","response":"text","source":"corpus","origin":"trpl/src/a.md"}"#,
             r#"{"id":"2","instruction":"","response":"text","source":"book","origin":"docs/b.md"}"#,
             r#"{"id":"3","instruction":"q","response":"a","source":"chat","origin":"c"}"#,
+            r#"{"id":"4","instruction":"","response":"text","source":"corpus","origin":"gone/src/a.md"}"#,
         ];
         fs::write(&train, rows.join("\n")).map_err(DataError::io(&train))?;
         fs::write(&manifest, "source\tkind\tcommit\tlicence_file\tlicence\ntrpl\tbook\tabc\tLICENSE\tMIT License\n")
             .map_err(DataError::io(&manifest))?;
         let found = sections(&train, &manifest)?;
         let licences: Vec<(&str, &str)> = found.iter().map(|found| (found.id.as_str(), found.licence.as_str())).collect();
-        assert_eq!(licences, [("1", "MIT"), ("2", AUTHORS_OWN)]);
+        assert_eq!(licences, [("1", "MIT"), ("2", AUTHORS_OWN), ("4", "unknown")]);
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 }

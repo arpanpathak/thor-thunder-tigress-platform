@@ -446,11 +446,14 @@ mod tests {
             .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
             .and_then(|record| record.get("id").and_then(serde_json::Value::as_str).map(String::from))
             .unwrap_or_default();
-        fixture.write("flags.jsonl", &format!("{{\"id\":\"{id}\",\"note\":\"opens with filler\",\"spans\":[]}}\n{{\"id\":\"gone\",\"note\":\"old\",\"spans\":[]}}\n"))?;
+        fixture.write("flags.jsonl", &format!("{{\"id\":\"{id}\",\"note\":\"opens with filler\",\"spans\":[]}}\n{{\"id\":\"gone\",\"note\":\"old\",\"spans\":[]}}\n{{\"id\":\"also-gone\",\"note\":\"older\",\"spans\":[]}}\n"))?;
         let second = build_training_set(&fixture.inputs(), &fixture.root.join("out"))?;
         assert_eq!(fixture.read("out/train.jsonl")?.lines().count(), train.lines().count() - 1);
         assert_eq!(fixture.read("out/slop.jsonl")?.lines().count(), 1);
-        assert_eq!(second.warnings, ["warning: flag gone matched no example and was NOT applied: old"]);
+        assert_eq!(
+            second.warnings,
+            ["warning: flag also-gone matched no example and was NOT applied: older", "warning: flag gone matched no example and was NOT applied: old"]
+        );
         assert_ne!(first.report, second.report);
         Ok(())
     }
