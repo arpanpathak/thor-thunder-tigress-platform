@@ -2,11 +2,17 @@
 //!
 //! Every Rust block of every assistant turn must build on its own with
 //! `clippy-driver -D warnings -W clippy::pedantic`, its tests must pass, and
-//! spark must find no broken rule. The prose must have no slop and no claim the
-//! code contradicts. Blocks use only the standard library, so no Cargo project
-//! is needed.
+//! spark must find no broken rule. Blocks in other languages are built, and run
+//! when they check something, by [`crate::languages`]. The prose must have no
+//! slop and no claim the code contradicts. Rust blocks use only the standard
+//! library, so no Cargo project is needed.
+//!
+//! An entry written from a real section of the corpus may show what the source
+//! teaches, such as `unwrap()` in a chapter about `unwrap()`. For those, a
+//! broken rule is kept as a note instead of a problem.
 
 use std::{
+    collections::BTreeMap,
     fmt, fs,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -16,13 +22,13 @@ use std::{
 
 use thor_spark_safety_eval::answer;
 
-use crate::{error::DataError, teacher::Conversation};
+use crate::{error::DataError, languages, teacher::Conversation};
 
 /// The edition every block is built with.
 const EDITION: &str = "2024";
 
-/// How long one test binary may run.
-const TEST_LIMIT: Duration = Duration::from_secs(30);
+/// How long one test binary or program may run.
+pub(crate) const TEST_LIMIT: Duration = Duration::from_secs(30);
 
 /// How often a running test binary is polled.
 const POLL: Duration = Duration::from_millis(20);
@@ -40,13 +46,17 @@ pub enum Problem {
     Build {
         /// The turn, counting from 1.
         turn: usize,
+        /// The block's language.
+        language: &'static str,
         /// The first lines of the compiler's output.
         output: String,
     },
-    /// A block's tests fail.
+    /// A block's tests fail, or the program exits with an error.
     Tests {
         /// The turn, counting from 1.
         turn: usize,
+        /// The block's language.
+        language: &'static str,
         /// The first lines of the test output.
         output: String,
     },
@@ -81,8 +91,8 @@ pub enum Problem {
 impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Problem::Build { turn, output } => write!(f, "turn {turn}: does not build cleanly\n{output}"),
-            Problem::Tests { turn, output } => write!(f, "turn {turn}: tests fail\n{output}"),
+            Problem::Build { turn, language, output } => write!(f, "turn {turn}: {language} does not build cleanly\n{output}"),
+            Problem::Tests { turn, language, output } => write!(f, "turn {turn}: {language} tests or program fail\n{output}"),
             Problem::TimedOut { turn } => write!(f, "turn {turn}: tests ran over {} s", TEST_LIMIT.as_secs()),
             Problem::Rule { turn, detail } => write!(f, "turn {turn}: {detail}"),
             Problem::Slop { turn, phrases } => write!(f, "turn {turn}: slop: {}", phrases.join(", ")),
@@ -94,12 +104,44 @@ impl fmt::Display for Problem {
 /// What checking one conversation found.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Checked {
-    /// Rust blocks built.
-    pub blocks: usize,
-    /// Tests that ran and passed.
+    /// Blocks built, by language.
+    pub blocks: BTreeMap<&'static str, usize>,
+    /// Rust tests that ran and passed.
     pub tests: usize,
+    /// Programs in other languages that ran and exited cleanly.
+    pub runs: usize,
+    /// Blocks whose fence says `ignore`, counted but not built.
+    pub ignored: usize,
     /// Everything wrong; empty when the conversation can be used.
     pub problems: Vec<Problem>,
+    /// Broken rules in an entry written from a real section, kept for a reviewer.
+    pub notes: Vec<String>,
+}
+
+impl Checked {
+    /// Blocks built in every language.
+    #[must_use]
+    pub fn block_count(&self) -> usize {
+        self.blocks.values().sum()
+    }
+
+    fn record(&mut self, turn: usize, language: &'static str, built: Built) {
+        if built == Built::Ignored {
+            self.ignored += 1;
+            return;
+        }
+        *self.blocks.entry(language).or_insert(0) += 1;
+        match built {
+            Built::Clean { tests, ran } => {
+                self.tests += tests;
+                self.runs += usize::from(ran && language != "rust");
+            }
+            Built::BuildFailed(output) => self.problems.push(Problem::Build { turn, language, output }),
+            Built::TestsFailed(output) => self.problems.push(Problem::Tests { turn, language, output }),
+            Built::TimedOut => self.problems.push(Problem::TimedOut { turn }),
+            Built::Ignored => {}
+        }
+    }
 }
 
 /// What spark says about an answer that should lose: the reasons it would be
@@ -127,16 +169,21 @@ pub fn spark_objections(text: &str) -> Vec<String> {
 /// can't be started.
 pub fn check(conversation: &Conversation, scratch: &Path) -> Result<Checked, DataError> {
     let mut checked = Checked::default();
+    let grounded = conversation.section.is_some();
     for (turn, answer_turn) in conversation.answers() {
-        checked.problems.extend(spark_problems(turn, &answer_turn.content));
-        for block in answer::rust_blocks(&answer_turn.content) {
-            checked.blocks += 1;
-            match build_and_test(&block.code, scratch)? {
-                Built::Clean { tests } => checked.tests += tests,
-                Built::BuildFailed(output) => checked.problems.push(Problem::Build { turn, output }),
-                Built::TestsFailed(output) => checked.problems.push(Problem::Tests { turn, output }),
-                Built::TimedOut => checked.problems.push(Problem::TimedOut { turn }),
+        for problem in spark_problems(turn, &answer_turn.content) {
+            match problem {
+                Problem::Rule { .. } if grounded => checked.notes.push(problem.to_string()),
+                other => checked.problems.push(other),
             }
+        }
+        for block in languages::fenced(&answer_turn.content).into_iter().filter(|block| matches!(block.tag.as_str(), "rust" | "rs")) {
+            let built = if block.ignored { Built::Ignored } else { build_and_test(&block.code, scratch)? };
+            checked.record(turn, "rust", built);
+        }
+        for block in languages::blocks(&answer_turn.content) {
+            let built = languages::check(&block, scratch)?;
+            checked.record(turn, block.language.name(), built);
         }
     }
     Ok(checked)
@@ -166,13 +213,24 @@ fn spark_problems(turn: usize, text: &str) -> Vec<Problem> {
     rules.chain(slop).chain(claims).collect()
 }
 
-/// How a block fared.
+/// How one block fared.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Built {
-    Clean { tests: usize },
+pub enum Built {
+    /// It built; `tests` Rust tests passed and `ran` says whether a program ran cleanly.
+    Clean {
+        /// Rust tests that passed.
+        tests: usize,
+        /// True when the block was run and exited cleanly.
+        ran: bool,
+    },
+    /// It did not build; the first lines of the compiler's output.
     BuildFailed(String),
+    /// Its tests or the program failed; the first lines of the output.
     TestsFailed(String),
+    /// Its tests or the program ran longer than the limit.
     TimedOut,
+    /// Its fence says `ignore`, so it was not built.
+    Ignored,
 }
 
 /// Whether a block is a program or a library.
@@ -209,7 +267,7 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
         return Ok(Built::BuildFailed(output));
     }
     if !code.contains("#[test]") {
-        return Ok(Built::Clean { tests: 0 });
+        return Ok(Built::Clean { tests: 0, ran: false });
     }
     let test_binary = scratch.join("example-tests");
     let test_build = clippy(&source, scratch, &["--test", "-A", "dead_code", "-o"], &test_binary)?;
@@ -219,7 +277,7 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
     let mut run = Command::new(&test_binary);
     run.arg("--test-threads=1");
     Ok(match run_limited(run, scratch, TEST_LIMIT)? {
-        Finished::Passed(output) => Built::Clean { tests: passed_tests(&output) },
+        Finished::Passed(output) => Built::Clean { tests: passed_tests(&output), ran: true },
         Finished::Failed(output) => Built::TestsFailed(output),
         Finished::OverTime => Built::TimedOut,
     })
@@ -238,13 +296,13 @@ fn clippy(source: &Path, scratch: &Path, mode: &[&str], target: &Path) -> Result
 
 /// How a command ended.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Finished {
+pub(crate) enum Finished {
     Passed(String),
     Failed(String),
     OverTime,
 }
 
-fn run_limited(mut command: Command, scratch: &Path, limit: Duration) -> Result<Finished, DataError> {
+pub(crate) fn run_limited(mut command: Command, scratch: &Path, limit: Duration) -> Result<Finished, DataError> {
     let log: PathBuf = scratch.join("output.log");
     let file = fs::File::create(&log).map_err(DataError::io(&log))?;
     let copy = file.try_clone().map_err(DataError::io(&log))?;
@@ -308,7 +366,7 @@ mod tests {
     fn a_clean_block_builds_and_its_tests_count() -> Result<(), DataError> {
         let folder = scratch("good");
         let checked = check(&conversation(GOOD)?, &folder)?;
-        assert_eq!(checked, Checked { blocks: 1, tests: 1, problems: Vec::new() });
+        assert_eq!((checked.block_count(), checked.tests, checked.problems.len()), (1, 1, 0));
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 
@@ -348,7 +406,7 @@ mod tests {
         let folder = scratch("lint");
         let linted = GOOD.replace("values.iter().sum()", "values.iter().fold(0, |sum, value| sum + value)");
         let checked = check(&conversation(&linted)?, &folder)?;
-        assert!(matches!(checked.problems.as_slice(), [Problem::Build { turn: 2, .. }]));
+        assert!(matches!(checked.problems.as_slice(), [Problem::Build { turn: 2, language: "rust", .. }]));
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 
@@ -367,6 +425,29 @@ mod tests {
     fn only_a_main_function_makes_a_program() {
         assert_eq!(CrateType::of("fn main() {}"), CrateType::Bin);
         assert_eq!(CrateType::of("const CODE: &str = \"fn main() {}\";"), CrateType::Lib);
+    }
+
+    #[test]
+    fn checks_other_languages_and_counts_them() -> Result<(), DataError> {
+        let folder = scratch("python");
+        let answer = "Two blocks.\n\n```python\nassert max([3, 9]) == 9\n```\n\n```python\ndef f(:\n```";
+        let checked = check(&conversation(answer)?, &folder)?;
+        assert_eq!(checked.blocks.get("python"), Some(&2));
+        assert_eq!(checked.runs, 1);
+        assert!(matches!(checked.problems.as_slice(), [Problem::Build { language: "python", .. }]));
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    #[test]
+    fn a_grounded_entry_keeps_broken_rules_as_notes() -> Result<(), DataError> {
+        let folder = scratch("grounded");
+        let answer = "```rust\n/// One.\n#[must_use]\npub fn one(text: &str) -> u8 {\n    text.parse().unwrap_or(1)\n}\n\nfn main() {\n    let n: u8 = \"1\".parse().unwrap();\n    println!(\"{}\", one(\"x\") + n);\n}\n```";
+        let entry = format!("<!-- source: trpl; section: abc -->\n### User\nShow unwrap.\n### Assistant\n{answer}\n");
+        let grounded = teacher::parse(&entry, "x").map_err(|error| DataError::Format { origin: "x".to_string(), error })?;
+        let checked = check(&grounded, &folder)?;
+        assert!(checked.problems.is_empty(), "{:?}", checked.problems);
+        assert_eq!(checked.notes.len(), 1);
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 
     #[test]

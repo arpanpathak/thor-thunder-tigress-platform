@@ -21,7 +21,12 @@ MANIFEST="${ROOT}/train/corpus.manifest.tsv"
 
 mkdir -p "${CORPUS}"
 
-# name | url | kind | what it contributes
+# name | url | kind | what it contributes | folders to check out (optional)
+#
+# kind "code" marks a repository read for its source code rather than its
+# prose. A fifth field makes a sparse checkout of only those folders, so a
+# large repository (the Rust or Go standard library) costs megabytes, not
+# gigabytes. Licence files at the top level are always checked out.
 SOURCES=(
   "trpl|https://github.com/rust-lang/book|book|The Rust Programming Language"
   "rbe|https://github.com/rust-lang/rust-by-example|book|Rust by Example"
@@ -54,6 +59,27 @@ SOURCES=(
   "eng-practices|https://github.com/google/eng-practices|docs|Google Engineering Practices (code review)"
   "ms-api-guidelines|https://github.com/microsoft/api-guidelines|style|Microsoft REST API Guidelines"
   "twelve-factor|https://github.com/heroku/12factor|book|The Twelve-Factor App"
+  "rust-cli-book|https://github.com/rust-cli/book|book|Command Line Applications in Rust"
+  "rustwasm-book|https://github.com/rustwasm/book|book|Rust and WebAssembly"
+  "edition-guide|https://github.com/rust-lang/edition-guide|book|The Rust Edition Guide"
+  "unsafe-code-guidelines|https://github.com/rust-lang/unsafe-code-guidelines|docs|Rust unsafe code guidelines"
+  "brown-rust-book|https://github.com/cognitive-engineering-lab/rust-book|book|The Rust Book, Brown University edition with quizzes"
+  "cpp-core-guidelines|https://github.com/isocpp/CppCoreGuidelines|style|C++ Core Guidelines"
+  "uber-go-guide|https://github.com/uber-go/guide|style|Uber Go Style Guide"
+  "airbnb-javascript|https://github.com/airbnb/javascript|style|Airbnb JavaScript Style Guide"
+  "gobyexample|https://github.com/mmcgrana/gobyexample|code|Go by Example: annotated Go programs|examples"
+  "ods|https://github.com/patmorin/ods|code|Open Data Structures: Java implementations (java/ods is CC BY 2.5)|java/ods"
+  "ripgrep|https://github.com/BurntSushi/ripgrep|code|ripgrep: fast recursive search in Rust|crates"
+  "tokio|https://github.com/tokio-rs/tokio|code|tokio: async runtime for Rust|tokio/src/sync tokio/src/time tokio/src/task"
+  "serde|https://github.com/serde-rs/serde|code|serde: serialization framework for Rust|serde/src serde_derive/src"
+  "rust-std|https://github.com/rust-lang/rust|code|Rust standard library|library/core/src/iter library/core/src/option.rs library/core/src/result.rs library/alloc/src/collections library/std/src/sync"
+  "go-std|https://github.com/golang/go|code|Go standard library|src/sort src/container src/strings src/sync src/bufio src/slices src/maps"
+  "cpython-lib|https://github.com/python/cpython|code|Python standard library (pure Python modules)|Lib/heapq.py Lib/bisect.py Lib/functools.py Lib/collections Lib/textwrap.py Lib/dataclasses.py Lib/graphlib.py Lib/statistics.py"
+  "leveldb|https://github.com/google/leveldb|code|LevelDB: key-value store in C++|db util table"
+  "abseil-cpp|https://github.com/abseil/abseil-cpp|code|Abseil C++ libraries|absl/strings absl/container"
+  "requests|https://github.com/psf/requests|code|requests: HTTP for Python|src/requests"
+  "express|https://github.com/expressjs/express|code|Express: web framework for Node.js|lib"
+  "guava|https://github.com/google/guava|code|Guava: core Java libraries|guava/src/com/google/common/collect guava/src/com/google/common/base"
 )
 
 # Every licence file at the top of a repository, one per line. Third-party
@@ -65,13 +91,24 @@ licence_files() {
     | grep -iv 'third.party' | sort
 }
 
-# A single line summarising a licence file.
+# Licence titles that can sit deep inside a long licence file, past the part
+# the summary keeps. CPython's file starts with the history of the software.
+KNOWN_TITLES=(
+  "PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2"
+)
+
+# A single line summarising a licence file: any known title found anywhere in
+# it, then its first 400 characters.
 summarise() {
   local file="$1"
   if [ -z "${file}" ]; then
     printf 'NO-LICENCE-FILE'
     return 0
   fi
+  local title
+  for title in "${KNOWN_TITLES[@]}"; do
+    grep -qF "${title}" "${file}" && printf '%s: ' "${title}"
+  done
   tr '\n' ' ' < "${file}" \
     | tr -s ' ' \
     | cut -c1-400
@@ -80,14 +117,23 @@ summarise() {
 printf 'source\tkind\tcommit\tlicence_file\tlicence\n' > "${MANIFEST}"
 
 for entry in "${SOURCES[@]}"; do
-  IFS='|' read -r name url kind purpose <<< "${entry}"
+  IFS='|' read -r name url kind purpose paths <<< "${entry}"
   dir="${CORPUS}/${name}"
 
   if [ -d "${dir}/.git" ]; then
     printf 'have   %-22s %s\n' "${name}" "${purpose}"
   else
     printf 'clone  %-22s %s\n' "${name}" "${purpose}"
-    if ! git clone --depth 1 --quiet "${url}" "${dir}" 2>/dev/null; then
+    if [ -n "${paths:-}" ]; then
+      read -r -a folders <<< "${paths}"
+      cloned() {
+        git clone --depth 1 --filter=blob:none --sparse --quiet "${url}" "${dir}" 2>/dev/null \
+          && git -C "${dir}" sparse-checkout set --no-cone "/*" "!/*/" "${folders[@]/#//}" 2>/dev/null
+      }
+    else
+      cloned() { git clone --depth 1 --quiet "${url}" "${dir}" 2>/dev/null; }
+    fi
+    if ! cloned; then
       printf 'FAILED %-22s %s — not cloned, not used\n' "${name}" "${url}"
       printf '%s\t%s\t-\t-\tCLONE-FAILED\n' "${name}" "${kind}" >> "${MANIFEST}"
       continue

@@ -59,14 +59,16 @@ const SLOP_FLAGS_FILE: &str = "labels/slop_flags.jsonl";
 /// little to learn from.
 const MIN_EXAMPLE_CHARS: usize = 200;
 
-/// Build output, dependencies, rendered animation frames, and drafts that
-/// still need human review.
-const IGNORED_DIRECTORIES: [&str; 5] = [
+/// Build output, dependencies, rendered animation frames, drafts that still
+/// need human review, and the GPU Kubernetes book, which the author asked to
+/// keep out of training.
+const IGNORED_DIRECTORIES: [&str; 6] = [
     "target",
     "node_modules",
     "frames",
     "out",
     "__absolute__garbage_human_review_needed",
+    "gpu-accelerated-kubernetes",
 ];
 
 /// Markdown files about the books rather than book content. The anti-slop
@@ -214,6 +216,9 @@ fn open_corpus_examples() -> Result<Vec<Example>, DataError> {
             ),
             corpus::SourceOutcome::NoMarkdown => {
                 println!("  {:<22} no markdown found", report.name);
+            }
+            corpus::SourceOutcome::CodeOnly => {
+                println!("  {:<22} code repository, read by the teacher", report.name);
             }
         }
     }

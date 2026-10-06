@@ -3,6 +3,7 @@ name = "thor-hammer-trainer"
 version = "0.1.0"
 edition = "2024"
 description = "Builds the instruction/response training set."
+default-run = "thor-hammer-trainer"
 
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"] }

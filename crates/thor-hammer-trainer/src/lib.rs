@@ -3,7 +3,8 @@
 //! The data pipeline lives in [`build`]. `book`, `chat`, `readability` and
 //! `code` read the individual corpora; `example` and `report` hold the shared
 //! types, `slop_flags` scores what the result looks like. [`teacher`] reads the
-//! conversations the teacher wrote and [`verify`] builds and checks them.
+//! conversations the teacher wrote and [`verify`] builds and checks them, with
+//! [`languages`] for code that is not Rust.
 
 pub mod book;
 pub mod build;
@@ -13,8 +14,11 @@ pub mod code;
 pub mod corpus;
 pub mod error;
 pub mod example;
+pub mod languages;
+pub mod pick;
 pub mod readability;
 pub mod report;
 pub mod slop_flags;
 pub mod teacher;
+pub mod teacher_build;
 pub mod verify;

@@ -42,7 +42,7 @@ pub const MANIFEST_FILE: &str = "train/corpus.manifest.tsv";
 /// the English prose; an empty sub-tree means the whole checkout. Anything
 /// outside it is a translation, an old version, or site furniture. A source
 /// can be listed more than once.
-const PLAIN_SOURCES: [(&str, &str); 16] = [
+const PLAIN_SOURCES: [(&str, &str); 18] = [
     ("kubernetes-website", "content/en"),
     ("go-website", "_content"),
     ("ms-style-guide", "styleguide"),
@@ -59,12 +59,14 @@ const PLAIN_SOURCES: [(&str, &str); 16] = [
     ("ms-api-guidelines", "graph"),
     ("twelve-factor", "content/en"),
     ("google-styleguide", ""),
+    ("uber-go-guide", "src"),
+    ("airbnb-javascript", ""),
 ];
 
 /// Sources whose `README.md` files are the content rather than a table of
 /// contents: the System Design Primer is one long README, and its worked
-/// solutions are READMEs too.
-const README_IS_CONTENT: [&str; 1] = ["system-design-primer"];
+/// solutions are READMEs too; the Airbnb JavaScript guide is a README per topic.
+const README_IS_CONTENT: [&str; 2] = ["system-design-primer", "airbnb-javascript"];
 
 /// Parts of a source that are not prose worth learning from: the Kubernetes
 /// blog is release announcements, and its reference pages are generated from
@@ -115,6 +117,8 @@ pub enum Licence {
     CreativeCommonsRestricted,
     /// Mozilla Public License 2.0, which is file-level copyleft.
     MozillaPublic,
+    /// Python Software Foundation License 2, a permissive licence.
+    PythonSoftwareFoundation,
     /// A licence file that was present but not recognised.
     Unrecognised,
     /// No licence file at all.
@@ -132,6 +136,7 @@ impl Licence {
         let restricted = creative_commons && RESTRICTING_TERMS.iter().any(|term| text.contains(term));
         match text {
             _ if text.contains("Mozilla Public License") => Licence::MozillaPublic,
+            _ if text.contains("PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2") => Licence::PythonSoftwareFoundation,
             _ if restricted => Licence::CreativeCommonsRestricted,
             _ if text.contains("Apache License") => Licence::Apache,
             _ if text.contains("Permission is hereby granted") || text.contains("MIT License") => {
@@ -152,7 +157,11 @@ impl Licence {
     pub fn permits_reuse(self) -> bool {
         matches!(
             self,
-            Licence::Mit | Licence::Apache | Licence::Bsd | Licence::CreativeCommons
+            Licence::Mit
+                | Licence::Apache
+                | Licence::Bsd
+                | Licence::CreativeCommons
+                | Licence::PythonSoftwareFoundation
         )
     }
 
@@ -165,6 +174,7 @@ impl Licence {
             Licence::CreativeCommons => "CC-BY",
             Licence::CreativeCommonsRestricted => "CC with NC/ND/SA terms",
             Licence::MozillaPublic => "MPL-2.0",
+            Licence::PythonSoftwareFoundation => "PSF-2.0",
             Licence::Unrecognised => "unrecognised",
             Licence::Missing => "missing",
         }
@@ -200,6 +210,9 @@ pub enum SourceOutcome {
     LicenceRefused(Licence),
     /// No markdown was found under the expected directory.
     NoMarkdown,
+    /// A code repository (kind `code`): the teacher reads its source files,
+    /// so its markdown is not added as prose.
+    CodeOnly,
 }
 
 /// One source and what came of reading it.
@@ -243,12 +256,19 @@ pub fn read_manifest(path: &Path) -> Result<Vec<ManifestRow>, DataError> {
     Ok(rows)
 }
 
+/// The manifest kind of a repository read for its source code.
+pub const CODE_KIND: &str = "code";
+
 /// Reads every accepted source under `root` and turns it into examples.
 pub fn examples(root: &Path, manifest_path: &Path) -> Result<Corpus, DataError> {
     let mut examples = Vec::new();
     let mut reports = Vec::new();
     for row in read_manifest(manifest_path)? {
         let source_dir = root.join(&row.name);
+        if row.licence.permits_reuse() && row.kind == CODE_KIND {
+            reports.push(SourceReport { name: row.name, outcome: SourceOutcome::CodeOnly });
+            continue;
+        }
         if !row.licence.permits_reuse() {
             reports.push(SourceReport {
                 name: row.name,
@@ -726,6 +746,13 @@ mod tests {
             Licence::classify("Mozilla Public License Version 2.0"),
             Licence::MozillaPublic
         );
+        assert_eq!(
+            Licence::classify("A. HISTORY OF THE SOFTWARE PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2"),
+            Licence::PythonSoftwareFoundation
+        );
+        assert!(Licence::PythonSoftwareFoundation.permits_reuse());
+        let personal_use_only = "Standard C++ Foundation grants you a worldwide, nonexclusive, royalty-free, perpetual license to copy, use, modify, and create derivative works from this project for your personal or internal business use only.";
+        assert!(!Licence::classify(personal_use_only).permits_reuse());
         assert_eq!(
             Licence::classify("Attribution-NonCommercial-NoDerivatives 4.0 International"),
             Licence::CreativeCommonsRestricted

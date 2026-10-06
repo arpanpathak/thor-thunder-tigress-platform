@@ -22,7 +22,14 @@
 //! ```
 //!
 //! Entries are separated by a line holding only `---`. Each starts with a
-//! `source` comment naming the document, book or library it is based on. Turns
+//! `source` comment naming the document, book or library it is based on. An
+//! entry written from one real section of the corpus names it too:
+//!
+//! ```text
+//!   <!-- source: trpl/src/ch08-02-strings.md; section: 9f3c2a71d04e8b65; licence: Apache-2.0 -->
+//! ```
+//!
+//! `section` is the id of that section in `data/train.jsonl`. Turns
 //! alternate, start with the user and end with the assistant. `### Rejected` is
 //! optional and comes last; an entry with it is also a preference pair.
 
@@ -65,6 +72,11 @@ pub struct Turn {
 pub struct Conversation {
     /// The document, book or library the entry is based on.
     pub source: String,
+    /// The id of the real section in `data/train.jsonl` the entry was written
+    /// from, when it was written from one.
+    pub section: Option<String>,
+    /// The licence of that section's source.
+    pub licence: Option<String>,
     /// The file and entry number, so a reviewer can find it.
     pub origin: String,
     /// The turns, user first, assistant last.
@@ -182,7 +194,8 @@ pub fn entries(markdown: &str, file: &str) -> Vec<(String, Result<Conversation, 
 ///
 /// A [`FormatError`] naming the first thing the entry gets wrong.
 pub fn parse(entry: &str, origin: &str) -> Result<Conversation, FormatError> {
-    let (source, body) = source_and_body(entry).ok_or(FormatError::NoSource)?;
+    let (comment, body) = source_and_body(entry).ok_or(FormatError::NoSource)?;
+    let Provenance { source, section, licence } = Provenance::read(&comment);
     let sections = sections(body);
     let rejected_at = sections.iter().position(|(heading, _)| *heading == Heading::Rejected);
     let (turn_sections, rejected) = match rejected_at {
@@ -203,7 +216,32 @@ pub fn parse(entry: &str, origin: &str) -> Result<Conversation, FormatError> {
     if turns.iter().any(|turn| turn.content.is_empty()) || rejected.as_ref().is_some_and(String::is_empty) {
         return Err(FormatError::EmptySection);
     }
-    Ok(Conversation { source, origin: origin.to_string(), turns, rejected })
+    Ok(Conversation { source, section, licence, origin: origin.to_string(), turns, rejected })
+}
+
+/// What the source comment says about where an entry comes from.
+struct Provenance {
+    source: String,
+    section: Option<String>,
+    licence: Option<String>,
+}
+
+impl Provenance {
+    /// Reads `source; section: id; licence: name`; only the source is required.
+    fn read(comment: &str) -> Provenance {
+        let mut parts = comment.split(';').map(str::trim);
+        let source = parts.next().unwrap_or_default().to_string();
+        let mut provenance = Provenance { source, section: None, licence: None };
+        for (key, value) in parts.filter_map(|part| part.split_once(':')) {
+            let value = Some(value.trim().to_string());
+            match key.trim() {
+                "section" => provenance.section = value,
+                "licence" => provenance.licence = value,
+                _ => {}
+            }
+        }
+        provenance
+    }
 }
 
 fn source_and_body(entry: &str) -> Option<(String, &str)> {
@@ -254,6 +292,18 @@ mod tests {
         assert_eq!(conversation.last_answer().map(|turn| turn.content.as_str()), Some("Fixed."));
         assert_eq!(conversation.rejected.as_deref(), Some("Still unwraps."));
         assert_eq!(conversation.answers().map(|(position, _)| position).collect::<Vec<_>>(), [2, 4]);
+        Ok(())
+    }
+
+    #[test]
+    fn reads_the_section_and_licence_of_a_grounded_entry() -> Result<(), FormatError> {
+        let entry = "<!-- source: trpl/src/ch08.md; section: abc123; licence: Apache-2.0 -->\n### User\nQ\n### Assistant\nA\n";
+        let conversation = parse(entry, "x")?;
+        assert_eq!(conversation.source, "trpl/src/ch08.md");
+        assert_eq!(conversation.section.as_deref(), Some("abc123"));
+        assert_eq!(conversation.licence.as_deref(), Some("Apache-2.0"));
+        let plain = parse(ENTRY, "x")?;
+        assert_eq!((plain.section, plain.licence), (None, None));
         Ok(())
     }
 
