@@ -14,7 +14,7 @@ the other projects that run on the same device.
 | Repository | What it is | Here |
 |---|---|---|
 | **thor-thunder-tigress-platform** (this one) | Data pipeline, slop and rule checker, review page, teacher-question generator | `crates/` |
-| [openbatrangs](https://github.com/arpanpathak/openbatrangs) | Agentic coding CLI for local models through Ollama | `projects/openbatrangs` |
+| [openbatrangs](https://github.com/arpanpathak/openbatrangs) | Agentic coding CLI for Ollama or any OpenAI-compatible server, such as Nemotron on the Thor | `projects/openbatrangs` |
 | [local-copilot-codebuddy](https://github.com/arpanpathak/local-copilot-codebuddy) | Terminal coding copilot on TensorRT-LLM or llama.cpp, no server | `projects/local-copilot-codebuddy` |
 | [thor-sync](https://github.com/arpanpathak/thor-sync) | Keeps project folders copied to the Jetson over SSH or Tailscale | `tools/thor-sync` |
 

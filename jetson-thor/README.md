@@ -72,6 +72,25 @@ After changing openBatarangs on yahboom, rebuild it on the Thor:
 ssh thor 'cd ~/Projects/openbatrangs && ~/.cargo/bin/cargo install --path .'
 ```
 
+On yahboom the same `openbatrangs --thor` works through `thor-model-tunnel`.
+From any other machine, including macOS: `--openai-url
+https://arpanpathak.taildb9a39.ts.net/v1 --api-key-file
+~/.config/thor-chat/api-key` (book, chapter "Bring your own agent").
+
+## Claude Code with Nemotron
+
+`claude-thor` on yahboom (alias in `~/.bashrc`) runs Claude Code against
+Nemotron through the tunnel, with its own settings, history and memory in
+`~/.claude-thor`. Plain `claude` is unchanged.
+
+```bash
+mkdir -p ~/cc-thor-test && cd ~/cc-thor-test && claude-thor
+```
+
+The alias, the macOS version and what each variable does: book, chapter
+"Bring your own agent". The public address passes `/v1/messages` (Anthropic
+API) to llama-server and accepts the key as `x-api-key` or bearer.
+
 ## local-copilot-codebuddy with Nemotron on the Thor
 
 Built with llama.cpp for the Thor's GPU (sm_110) and no TensorRT-LLM:

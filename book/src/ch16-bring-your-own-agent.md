@@ -46,29 +46,46 @@ It lists one model. `401` means the key is wrong or no longer valid.
 
 ## Claude Code
 
-Claude Code speaks the Anthropic API, which llama-server also serves. Point
-it at the Thor with environment variables:
+Claude Code speaks the Anthropic API, which llama-server also serves. A
+`claude-thor` command switches it to the Thor only while it runs; plain
+`claude` keeps using your Claude account.
+
+macOS (`~/.zshrc`), or any machine without the SSH tunnel:
 
 ```bash
-export ANTHROPIC_BASE_URL=https://arpanpathak.taildb9a39.ts.net
-export ANTHROPIC_AUTH_TOKEN=$(cat ~/.config/thor-chat/api-key)
-export ANTHROPIC_MODEL=nemotron
-export ANTHROPIC_DEFAULT_OPUS_MODEL=nemotron
-export ANTHROPIC_DEFAULT_SONNET_MODEL=nemotron
-export ANTHROPIC_DEFAULT_HAIKU_MODEL=nemotron
-export CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000
-claude
+alias claude-thor='CLAUDE_CONFIG_DIR=$HOME/.claude-thor ANTHROPIC_BASE_URL=https://arpanpathak.taildb9a39.ts.net ANTHROPIC_AUTH_TOKEN=$(cat ~/.config/thor-chat/api-key) ANTHROPIC_MODEL=nemotron ANTHROPIC_DEFAULT_OPUS_MODEL=nemotron ANTHROPIC_DEFAULT_SONNET_MODEL=nemotron ANTHROPIC_DEFAULT_HAIKU_MODEL=nemotron CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000 claude'
 ```
 
-- The server ignores the model name; `nemotron` is a label.
-- `CLAUDE_CODE_MAX_CONTEXT_TOKENS` tells Claude Code the real window.
-  Without it, Claude Code assumes 200K for an unknown model.
-- Unset the variables, or open a new terminal, to go back to your normal
-  Claude account.
+yahboom (`~/.bashrc`, installed there): the same with
+`ANTHROPIC_BASE_URL=http://127.0.0.1:8079`, which goes through
+`thor-model-tunnel` straight to llama-server.
 
-Measured on 2026-10-05 (Claude Code 2.1.290, from yahboom): "create hello.rs
-that prints hello, compile it with rustc and run it" took 29 s, and the
-program printed `hello`.
+```bash
+source ~/.zshrc                       # or open a new terminal
+mkdir -p ~/cc-thor-test && cd ~/cc-thor-test
+claude-thor                           # interactive
+claude-thor -p "create hello.rs that prints hello, compile it with rustc and run it" \
+  --allowedTools "Write,Bash(rustc:*),Bash(./hello)"
+```
+
+| Variable | Why |
+|---|---|
+| `CLAUDE_CONFIG_DIR=$HOME/.claude-thor` | its own settings, history and memory; without it both commands share `~/.claude`, so a setting changed in one applies to the other and `/resume` lists both |
+| `ANTHROPIC_AUTH_TOKEN` | the key, sent as `Authorization: Bearer` |
+| `ANTHROPIC_*_MODEL=nemotron` | every model slot goes to the Thor; the server ignores the name |
+| `CLAUDE_CODE_MAX_CONTEXT_TOKENS` | the real window; Claude Code assumes 200K for a model it doesn't know |
+
+The first run in `~/.claude-thor` shows the welcome screen and asks about
+folder trust again; it doesn't ask you to log in. Two warnings are expected:
+claude.ai connectors are off, and `nemotron` is not in Claude Code's model
+list.
+
+To check it reaches the Thor, watch the server while it works:
+`ssh thor 'journalctl --user -fu thor-chat'`.
+
+Measured on 2026-10-05 (Claude Code 2.1.290, from yahboom): the `-p` task
+above took 29 s, and the program printed `hello`. Expect it to be slower than
+Claude and weaker at long multi-step work.
 
 ## openbatrangs
 
@@ -76,9 +93,10 @@ program printed `hello`.
 coding agent that edits files and runs commands in the current folder. It
 needs Rust (`curl https://sh.rustup.rs -sSf | sh`).
 
-Linux and macOS:
+Linux and macOS (Intel or Apple silicon):
 
 ```bash
+xcode-select --install       # macOS only: C compiler for the TLS library
 cargo install --git https://github.com/arpanpathak/openbatrangs --locked
 cd ~/some-project
 openbatrangs --openai-url https://arpanpathak.taildb9a39.ts.net/v1 \
