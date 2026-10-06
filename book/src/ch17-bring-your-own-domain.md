@@ -72,7 +72,7 @@ keeps working as long as the redirect does.
 |---|---|---|---|
 | `172.67.173.34`, `104.21.72.4`, `2606:4700:3037::ac43:ad22`, `2606:4700:3036::6815:4804` | Cloudflare (AS13335) | left over from when Cloudflare ran the domain's DNS; they answered with "error 1033", a Cloudflare tunnel with nothing behind it | **no: delete these records** |
 | `185.199.108.153` to `185.199.111.153`, `2606:50c0:8000::153` to `2606:50c0:8003::153` | Fastly (AS54113), which delivers GitHub Pages | GitHub Pages' published addresses, proposed for the GitHub Pages copy | **no: not used** |
-| Namecheap's redirect servers | Namecheap | created by Namecheap when a URL Redirect record exists; you never type them | yes, implicitly |
+| `192.64.119.155` | Namecheap (AS22612) | Namecheap's redirect server; Namecheap sets this `A` record itself when a URL Redirect record exists, so you never type it | yes, implicitly |
 | `208.111.35.209`, `208.111.34.11`, `2607:f740:0:3f::3cc`, `2607:f740:0:3f::2f0` | NetActuate (AS36236), hosting Tailscale's Funnel relays | what `arpanpathak.taildb9a39.ts.net` resolves to; Funnel relays the connection to the Thor | yes; the redirect's destination |
 | `100.84.254.65` | Tailscale (private range 100.64.0.0/10) | the Thor's address inside the tailnet | only on your own devices |
 | `192.168.0.189` | none; private home range | the Thor on the home Ethernet | only at home |
@@ -84,6 +84,7 @@ query:
 curl -s https://ipinfo.io/172.67.173.34/org      # AS13335 Cloudflare, Inc.
 curl -s https://ipinfo.io/185.199.108.153/org    # AS54113 Fastly, Inc.
 curl -s https://ipinfo.io/208.111.35.209/org     # AS36236 NetActuate, Inc
+curl -s https://ipinfo.io/192.64.119.155/org     # AS22612 Namecheap, Inc.
 ```
 
 The home connection's public IP appears nowhere in this table, and nothing in
@@ -159,9 +160,27 @@ curl -sI https://voltforge.tech/thor-tigress-cub | grep -iE "^HTTP|^location"
 curl -s  https://arpanpathak.taildb9a39.ts.net/health
 ```
 
-The first two answer `302` with a `location:` on the `.ts.net` address. The
-third prints `{"status":"ok"}`. Then open `voltforge.tech/thor-tigress-cub` in
-a browser: it lands on the chat, with the invite screen when there is no key.
+Measured on 2026-10-05, a few minutes after saving the records:
+
+| Request | Result |
+|---|---|
+| `http://voltforge.tech/thor-tigress-cub` | `302 Found`, `Location: https://arpanpathak.taildb9a39.ts.net`, `Server: namecheap-nginx` |
+| `http://voltforge.tech/` and `http://www.voltforge.tech/thor-tigress-cub` | the same |
+| `https://voltforge.tech/thor-tigress-cub` | **no answer**: the connection to port 443 times out |
+| a browser opening `voltforge.tech/thor-tigress-cub` | lands on `https://arpanpathak.taildb9a39.ts.net/`, the chat |
+
+Two things to know from these results:
+
+- **Namecheap drops the path.** Every address on the domain goes to the
+  Thor's `/`, which serves the chat. That is why `/thor-tigress-cub` works
+  without any extra rule.
+- **Namecheap's free redirect only works over HTTP.** Its redirect server
+  doesn't answer on port 443, so `https://voltforge.tech` fails. Share the
+  address as `voltforge.tech/thor-tigress-cub` or with `http://`, never with
+  `https://`. Only the first hop is plain HTTP, and it carries nothing but
+  the address; the chat itself, the key and every message go over HTTPS to
+  the `.ts.net` address. A browser in "HTTPS-only" mode will refuse the first
+  hop; the `.ts.net` address works there.
 
 ## What changes for visitors
 
@@ -186,6 +205,6 @@ a browser: it lands on the chat, with the invite screen when there is no key.
 | NS check still shows other nameservers | change not saved, or not spread yet | re-check step 1; wait up to 48 hours |
 | `voltforge.tech` shows "error 1033" | the old Cloudflare records are still there | step 2 |
 | `voltforge.tech` shows a Namecheap parking page | parking records still there, or the redirect not added | steps 2 and 3 |
-| `http://` redirects but `https://` fails with a certificate warning | the redirect service has no certificate for the domain | share the `http://` form; the `.ts.net` page itself is always HTTPS |
+| `https://voltforge.tech` times out or fails | Namecheap's free redirect has no HTTPS (measured above) | share `voltforge.tech/…` or `http://voltforge.tech/…`; the chat itself is always HTTPS |
 | lands on the Thor but shows "not found" | the Thor's server is older than the `/thor-tigress-cub` route | rebuild and restart `thor-tigress-agent` (chapter "Web chat: Thor Tigress Cub") |
 | red dot, "server not reachable" | the Thor or Funnel is down | `curl https://arpanpathak.taildb9a39.ts.net/health` |
