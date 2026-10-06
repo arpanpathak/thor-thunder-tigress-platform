@@ -5,6 +5,8 @@
 
 use std::{fmt, io, path::Path};
 
+use crate::teacher::FormatError;
+
 /// A failure that stops the build.
 #[derive(Debug)]
 pub enum DataError {
@@ -17,6 +19,13 @@ pub enum DataError {
     },
     /// The chat export did not parse, or an example could not be serialized.
     Json(serde_json::Error),
+    /// A teacher entry does not follow its format.
+    Format {
+        /// The file and entry number.
+        origin: String,
+        /// What is wrong with it.
+        error: FormatError,
+    },
 }
 
 impl DataError {
@@ -38,6 +47,7 @@ impl fmt::Display for DataError {
         match self {
             DataError::Io { path, source } => write!(f, "{path}: {source}"),
             DataError::Json(error) => write!(f, "JSON: {error}"),
+            DataError::Format { origin, error } => write!(f, "{origin}: {error}"),
         }
     }
 }
@@ -47,6 +57,7 @@ impl std::error::Error for DataError {
         match self {
             DataError::Io { source, .. } => Some(source),
             DataError::Json(error) => Some(error),
+            DataError::Format { error, .. } => Some(error),
         }
     }
 }

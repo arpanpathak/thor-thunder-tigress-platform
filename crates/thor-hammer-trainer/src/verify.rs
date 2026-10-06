@@ -1,0 +1,388 @@
+//! Checks a teacher conversation before it becomes training data.
+//!
+//! Every Rust block of every assistant turn must build on its own with
+//! `clippy-driver -D warnings -W clippy::pedantic`, its tests must pass, and
+//! spark must find no broken rule. The prose must have no slop and no claim the
+//! code contradicts. Blocks use only the standard library, so no Cargo project
+//! is needed.
+
+use std::{
+    fmt, fs,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    thread,
+    time::{Duration, Instant},
+};
+
+use thor_spark_safety_eval::answer;
+
+use crate::{error::DataError, teacher::Conversation};
+
+/// The edition every block is built with.
+const EDITION: &str = "2024";
+
+/// How long one test binary may run.
+const TEST_LIMIT: Duration = Duration::from_secs(30);
+
+/// How often a running test binary is polled.
+const POLL: Duration = Duration::from_millis(20);
+
+/// Lines of compiler or test output kept in a problem.
+const OUTPUT_LINES: usize = 12;
+
+/// The flags every build gets: warnings, clippy's included, are errors.
+const LINT_FLAGS: [&str; 4] = ["-D", "warnings", "-W", "clippy::pedantic"];
+
+/// What one check found wrong with one assistant turn.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Problem {
+    /// A block does not build, or clippy warns.
+    Build {
+        /// The turn, counting from 1.
+        turn: usize,
+        /// The first lines of the compiler's output.
+        output: String,
+    },
+    /// A block's tests fail.
+    Tests {
+        /// The turn, counting from 1.
+        turn: usize,
+        /// The first lines of the test output.
+        output: String,
+    },
+    /// A block's tests ran longer than the limit.
+    TimedOut {
+        /// The turn, counting from 1.
+        turn: usize,
+    },
+    /// spark found a broken rule.
+    Rule {
+        /// The turn, counting from 1.
+        turn: usize,
+        /// The rule and what broke it.
+        detail: String,
+    },
+    /// spark found slop in the prose.
+    Slop {
+        /// The turn, counting from 1.
+        turn: usize,
+        /// The phrases found.
+        phrases: Vec<String>,
+    },
+    /// The prose claims a rule the code breaks.
+    FalseClaim {
+        /// The turn, counting from 1.
+        turn: usize,
+        /// The words of the claim.
+        text: String,
+    },
+}
+
+impl fmt::Display for Problem {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Problem::Build { turn, output } => write!(f, "turn {turn}: does not build cleanly\n{output}"),
+            Problem::Tests { turn, output } => write!(f, "turn {turn}: tests fail\n{output}"),
+            Problem::TimedOut { turn } => write!(f, "turn {turn}: tests ran over {} s", TEST_LIMIT.as_secs()),
+            Problem::Rule { turn, detail } => write!(f, "turn {turn}: {detail}"),
+            Problem::Slop { turn, phrases } => write!(f, "turn {turn}: slop: {}", phrases.join(", ")),
+            Problem::FalseClaim { turn, text } => write!(f, "turn {turn}: false claim: {text}"),
+        }
+    }
+}
+
+/// What checking one conversation found.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Checked {
+    /// Rust blocks built.
+    pub blocks: usize,
+    /// Tests that ran and passed.
+    pub tests: usize,
+    /// Everything wrong; empty when the conversation can be used.
+    pub problems: Vec<Problem>,
+}
+
+/// What spark says about an answer that should lose: the reasons it would be
+/// caught without a person.
+#[must_use]
+pub fn spark_objections(text: &str) -> Vec<String> {
+    let score = answer::score(text);
+    let rules = score
+        .blocks
+        .iter()
+        .flat_map(|block| &block.report.violations)
+        .map(|violation| violation.rule.label().to_string());
+    let slop = score.slop.hits.iter().map(|hit| format!("slop: {}", hit.text));
+    let claims = score.false_claims.iter().map(|claim| format!("false claim: {}", claim.text));
+    let mut objections: Vec<String> = rules.chain(slop).chain(claims).collect();
+    objections.dedup();
+    objections
+}
+
+/// Checks every assistant turn of `conversation`, building in `scratch`.
+///
+/// # Errors
+///
+/// `DataError::Io` when the scratch folder can't be written or the compiler
+/// can't be started.
+pub fn check(conversation: &Conversation, scratch: &Path) -> Result<Checked, DataError> {
+    let mut checked = Checked::default();
+    for (turn, answer_turn) in conversation.answers() {
+        checked.problems.extend(spark_problems(turn, &answer_turn.content));
+        for block in answer::rust_blocks(&answer_turn.content) {
+            checked.blocks += 1;
+            match build_and_test(&block.code, scratch)? {
+                Built::Clean { tests } => checked.tests += tests,
+                Built::BuildFailed(output) => checked.problems.push(Problem::Build { turn, output }),
+                Built::TestsFailed(output) => checked.problems.push(Problem::Tests { turn, output }),
+                Built::TimedOut => checked.problems.push(Problem::TimedOut { turn }),
+            }
+        }
+    }
+    Ok(checked)
+}
+
+fn spark_problems(turn: usize, text: &str) -> Vec<Problem> {
+    let score = answer::score(text);
+    let rules = score.blocks.iter().flat_map(|block| {
+        let parse_error = block.report.parse_error.iter().map(move |error| Problem::Rule { turn, detail: format!("does not parse: {error}") });
+        let violations = block.report.violations.iter().map(move |violation| Problem::Rule {
+            turn,
+            detail: format!("{} at block line {}: {}", violation.rule.label(), violation.line, violation.detail),
+        });
+        parse_error.chain(violations)
+    });
+    let slop = (!score.slop.clean()).then(|| Problem::Slop {
+        turn,
+        phrases: score
+            .slop
+            .hits
+            .iter()
+            .map(|hit| hit.text.clone())
+            .chain((score.slop.em_dashes > 1).then(|| format!("{} em dashes", score.slop.em_dashes)))
+            .collect(),
+    });
+    let claims = score.false_claims.iter().map(|claim| Problem::FalseClaim { turn, text: claim.text.clone() });
+    rules.chain(slop).chain(claims).collect()
+}
+
+/// How a block fared.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Built {
+    Clean { tests: usize },
+    BuildFailed(String),
+    TestsFailed(String),
+    TimedOut,
+}
+
+/// Whether a block is a program or a library.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CrateType {
+    Bin,
+    Lib,
+}
+
+impl CrateType {
+    fn of(code: &str) -> CrateType {
+        if code.lines().any(|line| line.trim_start().starts_with("fn main(")) {
+            CrateType::Bin
+        } else {
+            CrateType::Lib
+        }
+    }
+
+    fn flag(self) -> &'static str {
+        match self {
+            CrateType::Bin => "bin",
+            CrateType::Lib => "lib",
+        }
+    }
+}
+
+fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
+    fs::create_dir_all(scratch).map_err(DataError::io(scratch))?;
+    let source = scratch.join("example.rs");
+    fs::write(&source, code).map_err(DataError::io(&source))?;
+    let crate_type = CrateType::of(code).flag();
+    let build = clippy(&source, scratch, &["--crate-type", crate_type, "--emit=metadata", "--out-dir"], scratch)?;
+    if let Finished::Failed(output) = build {
+        return Ok(Built::BuildFailed(output));
+    }
+    if !code.contains("#[test]") {
+        return Ok(Built::Clean { tests: 0 });
+    }
+    let test_binary = scratch.join("example-tests");
+    let test_build = clippy(&source, scratch, &["--test", "-A", "dead_code", "-o"], &test_binary)?;
+    if let Finished::Failed(output) = test_build {
+        return Ok(Built::BuildFailed(output));
+    }
+    let mut run = Command::new(&test_binary);
+    run.arg("--test-threads=1");
+    Ok(match run_limited(run, scratch, TEST_LIMIT)? {
+        Finished::Passed(output) => Built::Clean { tests: passed_tests(&output) },
+        Finished::Failed(output) => Built::TestsFailed(output),
+        Finished::OverTime => Built::TimedOut,
+    })
+}
+
+fn clippy(source: &Path, scratch: &Path, mode: &[&str], target: &Path) -> Result<Finished, DataError> {
+    let mut command = Command::new("clippy-driver");
+    command
+        .args(["--edition", EDITION, "--crate-name", "example"])
+        .args(LINT_FLAGS)
+        .args(mode)
+        .arg(target)
+        .arg(source);
+    run_limited(command, scratch, TEST_LIMIT * 4)
+}
+
+/// How a command ended.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Finished {
+    Passed(String),
+    Failed(String),
+    OverTime,
+}
+
+fn run_limited(mut command: Command, scratch: &Path, limit: Duration) -> Result<Finished, DataError> {
+    let log: PathBuf = scratch.join("output.log");
+    let file = fs::File::create(&log).map_err(DataError::io(&log))?;
+    let copy = file.try_clone().map_err(DataError::io(&log))?;
+    let program = PathBuf::from(command.get_program());
+    let mut child = command
+        .stdin(Stdio::null())
+        .stdout(file)
+        .stderr(copy)
+        .spawn()
+        .map_err(DataError::io(&program))?;
+    let started = Instant::now();
+    let status = loop {
+        if let Some(status) = child.try_wait().map_err(DataError::io(&program))? {
+            break Some(status);
+        }
+        if started.elapsed() > limit {
+            child.kill().map_err(DataError::io(&program))?;
+            child.wait().map_err(DataError::io(&program))?;
+            break None;
+        }
+        thread::sleep(POLL);
+    };
+    let output = fs::read_to_string(&log).map_err(DataError::io(&log))?;
+    Ok(match status {
+        Some(status) if status.success() => Finished::Passed(output),
+        Some(_) => Finished::Failed(first_lines(&output)),
+        None => Finished::OverTime,
+    })
+}
+
+fn first_lines(output: &str) -> String {
+    output.lines().take(OUTPUT_LINES).collect::<Vec<_>>().join("\n")
+}
+
+fn passed_tests(output: &str) -> usize {
+    output
+        .lines()
+        .filter_map(|line| line.strip_prefix("test result: ok. "))
+        .filter_map(|rest| rest.split_whitespace().next())
+        .filter_map(|count| count.parse::<usize>().ok())
+        .sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::teacher;
+
+    fn scratch(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("thor-hammer-verify-{name}-{}", std::process::id()))
+    }
+
+    fn conversation(answer: &str) -> Result<Conversation, DataError> {
+        let entry = format!("<!-- source: test -->\n### User\nWrite it.\n### Assistant\n{answer}\n");
+        teacher::parse(&entry, "test").map_err(|error| DataError::Format { origin: "test".to_string(), error })
+    }
+
+    const GOOD: &str = "Sums the values.\n\n```rust\n/// The sum of `values`.\n#[must_use]\npub fn total(values: &[u32]) -> u32 {\n    values.iter().sum()\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn adds() {\n        assert_eq!(total(&[1, 2]), 3);\n    }\n}\n```";
+
+    #[test]
+    fn a_clean_block_builds_and_its_tests_count() -> Result<(), DataError> {
+        let folder = scratch("good");
+        let checked = check(&conversation(GOOD)?, &folder)?;
+        assert_eq!(checked, Checked { blocks: 1, tests: 1, problems: Vec::new() });
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    fn kinds(checked: &Checked) -> Vec<&'static str> {
+        checked
+            .problems
+            .iter()
+            .map(|problem| match problem {
+                Problem::Rule { .. } => "rule",
+                Problem::Tests { .. } => "tests",
+                Problem::Build { .. } => "build",
+                Problem::TimedOut { .. } => "timed out",
+                Problem::Slop { .. } => "slop",
+                Problem::FalseClaim { .. } => "false claim",
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_failing_test_is_a_problem() -> Result<(), DataError> {
+        let folder = scratch("tests");
+        let checked = check(&conversation(&GOOD.replace("3);", "4);"))?, &folder)?;
+        assert_eq!(kinds(&checked), ["tests"]);
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    #[test]
+    fn an_unwrap_breaks_a_rule_and_clippy_pedantic() -> Result<(), DataError> {
+        let folder = scratch("unwrap");
+        let checked = check(&conversation(&GOOD.replace("values.iter().sum()", "values.first().copied().unwrap()"))?, &folder)?;
+        assert_eq!(kinds(&checked), ["rule", "build"]);
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    #[test]
+    fn a_clippy_warning_fails_the_build() -> Result<(), DataError> {
+        let folder = scratch("lint");
+        let linted = GOOD.replace("values.iter().sum()", "values.iter().fold(0, |sum, value| sum + value)");
+        let checked = check(&conversation(&linted)?, &folder)?;
+        assert!(matches!(checked.problems.as_slice(), [Problem::Build { turn: 2, .. }]));
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    #[test]
+    fn slop_and_false_claims_are_problems() -> Result<(), DataError> {
+        let folder = scratch("prose");
+        let sloppy = "Great question! This code never uses unwrap.\n\n```rust\n/// One.\n#[must_use]\npub fn one(values: &[u8]) -> u8 {\n    values.first().copied().unwrap()\n}\n```";
+        let checked = check(&conversation(sloppy)?, &folder)?;
+        assert!(checked.problems.iter().any(|problem| matches!(problem, Problem::Slop { .. })));
+        assert!(checked.problems.iter().any(|problem| matches!(problem, Problem::FalseClaim { .. })));
+        assert!(!spark_objections(sloppy).is_empty());
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    #[test]
+    fn only_a_main_function_makes_a_program() {
+        assert_eq!(CrateType::of("fn main() {}"), CrateType::Bin);
+        assert_eq!(CrateType::of("const CODE: &str = \"fn main() {}\";"), CrateType::Lib);
+    }
+
+    #[test]
+    fn counts_passed_tests_across_result_lines() {
+        assert_eq!(passed_tests("test result: ok. 3 passed; 0 failed\ntest result: ok. 2 passed;"), 5);
+        assert_eq!(passed_tests("nothing"), 0);
+    }
+
+    #[test]
+    fn describes_each_problem_with_its_turn() {
+        let problems = [
+            Problem::TimedOut { turn: 2 },
+            Problem::Slop { turn: 4, phrases: vec!["Great question".to_string()] },
+            Problem::FalseClaim { turn: 2, text: "never unwraps".to_string() },
+        ];
+        let lines: Vec<String> = problems.iter().map(ToString::to_string).collect();
+        assert_eq!(lines, ["turn 2: tests ran over 30 s", "turn 4: slop: Great question", "turn 2: false claim: never unwraps"]);
+    }
+}

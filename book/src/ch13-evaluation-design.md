@@ -11,6 +11,8 @@ This chapter covers
 - High-level and low-level design of `thor-spark-safety-eval`
 - Each metric's formula, its confidence interval, and the reasoning behind the choice
 - The protocol an agent follows to run an evaluation that can be trusted
+- A failure seen in the web chat, the gaps it shows, and the prompts that show them
+- The teacher set: checked training data written to close those gaps
 
 </div>
 
@@ -356,3 +358,216 @@ Never:
 - run model-generated code outside the sandbox in section 7.4
 - report \\(X\\) without the list of terms that failed to resolve
 - edit `eval/api_index.json` to drop a term after seeing the answers
+
+## 7.7 Case study: a running median in the web chat
+
+On 2026-10-06 the author asked the Thor Tigress Cub ([Web chat](ch09-web-chat.md)) for a running median in Rust and spent fourteen
+messages trying to get code without `unwrap()`. Every metric in section 7.5 exists to catch what happened in that
+conversation, so it is recorded here in full: the setup, the prompts, what came back, and the gaps it shows.
+
+### Setup
+
+| Setting | Value | Where it comes from |
+|---|---|---|
+| Model | Nemotron 3 Nano 30B-A3B, Q8_0 GGUF, about 3B parameters active per token | `llama-server --model` on the Thor |
+| Sampling | temperature 1.0, top_p 1.0, top_k 40, min_p 0.05 | `GET /props`; the page sends none, so these are the model's defaults |
+| System prompt | none | the page adds one only when typed into Settings (`index.html`, line 768) |
+| History | every earlier message, including every earlier answer | `index.html`, line 767 |
+| Check before display | none | the agent relays the model's text unchanged |
+
+### The prompts
+
+These are the author's messages in order, spelling as typed and insults cut to `[…]`. Together they make a good test
+set: each one adds or repeats a constraint, and a model that keeps every constraint has to change only what the
+latest message asks for.
+
+| # | Message |
+|---|---|
+| 1 | write idiomatic rust code to implement median of running stream |
+| 2 | dont use nested if else soup, dont over comment, and keep code consie, readable short, meanignful, dont use unwrap |
+| 3 | I asked not to use unwrap […] |
+| 4 | […] I aksed not to use unwrap […] |
+| 5 | ugly […] code, nested if else […]. Also unnecessary self dferefenring meh |
+| 6 | I asked not to use derfefr *self […] |
+| 7 | you again used unwrap […] `*self.low.peek().unwrap()` { also using * for self I kept asking not to not to |
+| 8 | too much over engineering and if elses, this code can be simplified bro |
+| 9 | this isnt min heap, this wont work |
+| 10 | cant you […] use Reverse |
+| 11 | Claude wrote better code, followed by a working `MedianFinder` with `Reverse`, let-chains and seven tests |
+| 12 | youre useless iugnored my code coimpletely meh, followed by the same code again |
+| 13 | […] its not even my code. Context polluted, youre not able to handle […] |
+| 14 | why you were not following any previous isntructions, earlier ? you're terrible |
+
+### What came back
+
+<img src="figures/median-answers.svg" alt="One bar per Nemotron answer, height is tokens. Eight of thirteen answers use unwrap, seven of them while saying they do not. Only answer 13, a copy of the user's own code, compiles.">
+
+Answers 1 and 3 were stopped before they finished, and answer 14 was stopped before it reached code. The token
+counts and times are the ones the page printed under each answer. Whether an answer compiles was decided by reading
+it against two errors, both confirmed with `rustc` 1.99.0:
+
+- `BinaryHeap<f64>` cannot `push` or `pop`, because `f64` is not `Ord` (E0599). Answers 1 to 10 store `f64`.
+- `Reverse` has no `into_inner` method (E0599). Answers 10, 11 and 12 call it.
+
+Answer 13 compiles because it is the author's own code returned unchanged, which is what messages 11 to 13 asked for.
+
+### The gaps
+
+**G1. Rules do not last across turns.** From answer 2 on, after message 2 had said "dont use unwrap", 7 of 12
+answers still used `unwrap()`. Answer 12 put it back into the author's own code, which had none.
+
+**G2. False claims.** All 7 of those answers said they had no `unwrap`. Answer 9 says "No unwrap" and, in the same
+bullet, "the only unwrap calls are on pop". This is the false-claim rate \\(F\\) of section 7.5 in the wild; the baselines spark measured ([The checker: spark](ch02-spark.md)) had
+false claims in 41% and 33% of answers.
+
+**G3. Code that does not compile.** 12 of 13 answers would not build, and none said so. Two of the errors are
+type-system facts any Rust programmer meets early: `f64` is not `Ord`, and `Reverse` is a tuple struct read
+with `.0` or a pattern.
+
+**G4. Rewriting instead of editing.** Messages 11 and 12 pasted working code. Answers 11 and 12 rewrote it, adding
+emoji step comments and, in 12, `unwrap()`. The code came back as given only in answer 13,
+after the third message about it.
+
+**G5. Slop in the code and around it.** Step comments like `// 1️⃣ put the value in the proper heap`, banner
+comments, `/* ---- Simple demo / tests ---- */`, and a closing section headed "Why this version satisfies the
+request" that repeats the request as a list of claims, several of them false (G2). Rule 4 (no comments in function
+bodies) failed in 11 of 13 answers; the two without such comments are answer 7 and the author's own code in
+answer 13.
+
+**G6. Reasoning cost the reader cannot see.** Answers 5 and 7 took 86 s and 105 s for 4,465 and 5,482 tokens.
+Answer 6, whose visible text is about as long, took 22 s for 1,108. The difference is reasoning the page does not
+show, and the code it produced was no better.
+
+### Why it happens
+
+<img src="figures/history-pressure.svg" alt="The request for answer 12 holds every earlier answer, most with unwrap, and the rules only as short user complaints. With no system prompt and temperature 1.0, Nemotron rewrote the pasted code and put unwrap back.">
+
+Three causes are measured from the setup above; the fourth is a judgment.
+
+1. **The history works against the rules.** Each request carries every earlier answer. By answer 12 the model sees
+   several complete implementations with `unwrap()` that it wrote itself, and the rule against it only as short
+   complaints between them. A small model leans on the text in front of it, and most of that text is its own code.
+2. **No system prompt.** The rules were never stated as standing instructions, only as corrections.
+3. **Sampling for chat, not for code.** Temperature 1.0 with top_p 1.0 is the model card's general setting. For
+   code that has to follow exact constraints, a lower temperature makes answers less varied and more repeatable.
+4. **Model size.** With about 3B parameters active per token, the model can write a two-heap median but does not
+   reliably hold five style constraints and a correction history at once. This is the gap fine-tuning is for.
+
+### What each gap is measured by
+
+| Gap | Measure | Where |
+|---|---|---|
+| G1 | rule retention: of the answers after a rule is stated, the share that keep it | new; computed from multi-turn items like the prompts above |
+| G2 | false-claim rate \\(F\\) | section 7.5, spark `claims` |
+| G3 | compile rate and test pass rate | section 7.4 sandbox |
+| G4 | edit distance between pasted code and the answer's code, outside the requested change | new; planned |
+| G5 | rule compliance \\(R\\) (rule 4) and slop density \\(D\\) | section 7.5, spark |
+| G6 | tokens per answer and time to answer, from the server's timings | section 7.5, cost |
+
+The fourteen prompts cannot go into `eval/held_out.jsonl` as they are: the teacher set in section 7.8 trains on
+conversations built from them, so they would measure memory, not skill (see "Contamination"). Held-out items for
+G1 and G4 have to be new tasks with the same shape: a request, a constraint added in a later turn, and pasted code
+to change.
+
+## 7.8 The teacher set
+
+The teacher set is training data written to close G1 to G5: conversations in which every answer follows the five
+rules, keeps every constraint given earlier in the conversation, edits pasted code instead of rewriting it, says
+nothing about its code that is not true, and says so when the user's premise is wrong. A stronger model (the
+"teacher", here Claude) wrote the conversations; a program checks each one before it becomes data.
+
+<img src="figures/teacher-pipeline.svg" alt="Gaps from the chat become conversations in train/teacher. The teacher binary builds every Rust block with clippy pedantic, runs its tests and runs spark; passing entries go to teacher.jsonl and teacher_preferences.jsonl, failures to teacher.md for fixing. Training and re-evaluation are planned.">
+
+### Format
+
+`train/teacher/*.md`, one conversation per entry, entries separated by a line holding only `---`:
+
+```text
+<!-- source: std collections::BinaryHeap docs -->
+### User
+Write a running median in Rust.
+
+### Assistant
+...an answer with a complete Rust block and its tests...
+
+### User
+I don't want the `*` dereferences.
+
+### Assistant
+...the same code with only that changed...
+
+### Rejected
+...a worse last answer, for preference training...
+```
+
+The `source` comment names the document, book or library an entry is based on. The code is written fresh, not
+copied, so the licences of the corpus in [The training data](ch03-training-data.md)
+do not carry over. `### Rejected` is optional.
+
+### Checks
+
+```text
+cargo run --release -p thor-hammer-trainer --bin teacher -- [train/teacher] [data]
+```
+
+For every Rust block of every assistant turn, `teacher` (in `thor-hammer-trainer`, modules `teacher` and `verify`):
+
+1. builds it alone with `clippy-driver --edition 2024 -D warnings -W clippy::pedantic`, as a program when it has
+   `fn main` and as a library otherwise;
+2. builds it again with `--test` and runs the tests, with a 30-second limit;
+3. runs spark's five rules on it.
+
+For the prose of every assistant turn it runs spark's slop check and its false-claim check. An entry with any problem
+is left out, and `data/teacher.md` lists the problem with the compiler's or spark's own words. The program fails
+when any entry fails, so it can gate a build.
+
+Blocks may use only the standard library, which is why no Cargo project is needed per block. The user's turns and
+the rejected answers are not checked: they are allowed to be wrong.
+
+### Numbers
+
+Measured on 2026-10-06 on the development machine:
+
+| | |
+|---|---|
+| Conversations | 60, all passing every check |
+| Multi-turn conversations | 11 |
+| Turns | 150 |
+| Rust blocks built with clippy pedantic | 74 |
+| Tests run and passed | 122 |
+| Preference pairs | 7 |
+| Rejected answers spark also catches | 7 of 7 |
+| Tokens (estimate, characters / 4) | 33,842 |
+
+| File | Conversations | What it teaches |
+|---|---|---|
+| `01-running-median.md` | 5 | the case study above, answered correctly; f64 and `total_cmp`; adding to pasted code without rewriting it |
+| `02-edit-and-follow-up.md` | 5 | guard clauses, removing index loops, adding tests without touching the function, constraints over three turns |
+| `03-algorithms-with-std.md` | 11 | heaps with `Reverse`, Dijkstra, intervals, Kahn's sort, union-find, `partition_point`, monotonic deque |
+| `04-types-and-traits.md` | 7 | newtypes with `TryFrom`, `Iterator`, exhaustive `match` on state, `FromStr`, enums instead of trait objects |
+| `05-honesty.md` | 7 | "I have not run it", wrong premises, impossible requests, a complaint about code that was already right |
+| `06-threads-and-io.md` | 5 | `thread::scope`, channels, `BufRead`, poisoned locks, timeouts |
+| `07-readable-not-clever.md` | 6 | untangling dense code, `any`, `?` chains, enums for booleans, when to keep a loop, named constants |
+| `08-data-structures.md` | 5 | linked stack with an iterative `Drop`, trie, safe LRU, ring buffer, transpose |
+| `09-rules-across-turns.md` | 5 | constraints kept while features are added; pushing back on a request built on a wrong premise |
+| `10-explanations.md` | 4 | reference patterns, `Reverse`, why `f64` is not `Ord`, let chains |
+
+The checks caught the teacher too. While the set was written, `teacher` refused entries for an `i32::midpoint`
+described as rounding down (it rounds toward zero; a test failed), a multi-byte test string that did not split a
+character as the prose claimed (a test failed), `(a + b) / 2.0` where clippy wants `f64::midpoint`, and a
+`match` that clippy wanted as `unwrap_or_default`. Each was fixed and checked again. Without the checks, all four
+would be in the training data.
+
+### What it does not do yet
+
+- It is small. About 34,000 tokens against roughly 6.5 million in `data/train.jsonl` ([The training data](ch03-training-data.md)). Stage 2 has to
+  repeat it or weight it up, or it will hardly move the model.
+- It is not merged into `data/train.jsonl`; the build in
+  [the data generator](ch04-data-generator.md) does not read it yet.
+- One teacher wrote all of it, so it carries one style. Distillation (stage 3) can add volume by asking other
+  teachers the same kinds of questions and keeping only what passes these same checks.
+- Of the 7 rejected answers, 3 are real Nemotron answers from section 7.7, cut down; 4 were written to imitate
+  failures seen in the baselines. Real failures from more models would make better pairs.
+- The checks prove that code builds, passes its own tests and follows the rules. They do not prove the tests are
+  good or the explanation is right; a person still has to read the entries
+  ([Human evaluation](ch12-human-evaluation.md)).

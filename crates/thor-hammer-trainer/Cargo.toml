@@ -8,6 +8,7 @@ description = "Builds the instruction/response training set."
 serde = { version = "1.0.229", features = ["derive"] }
 regex = "1"
 serde_json = "1.0.151"
+thor-spark-safety-eval = { path = "../thor-spark-safety-eval" }
 
 [[bin]]
 name = "thor-hammer-trainer"
@@ -16,3 +17,7 @@ path = "src/main.rs"
 [[bin]]
 name = "review"
 path = "src/bin/review.rs"
+
+[[bin]]
+name = "teacher"
+path = "src/bin/teacher.rs"

@@ -2,7 +2,8 @@
 //!
 //! The data pipeline lives in [`build`]. `book`, `chat`, `readability` and
 //! `code` read the individual corpora; `example` and `report` hold the shared
-//! types, and `slop_flags` scores what the result looks like.
+//! types, `slop_flags` scores what the result looks like. [`teacher`] reads the
+//! conversations the teacher wrote and [`verify`] builds and checks them.
 
 pub mod book;
 pub mod build;
@@ -15,3 +16,5 @@ pub mod example;
 pub mod readability;
 pub mod report;
 pub mod slop_flags;
+pub mod teacher;
+pub mod verify;

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" role="img" aria-label="Gaps from the chat become conversations in train/teacher. The teacher binary builds every Rust block with clippy pedantic, runs its tests and runs spark; passing entries go to teacher.jsonl and teacher_preferences.jsonl, failures to teacher.md for fixing. Training and re-evaluation are planned.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="470" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">From the gaps to checked training data</text>
+  <rect x="30" y="90" width="170" height="100" rx="10" class="outside"/>
+  <text x="115" y="128" class="name" text-anchor="middle">Gaps G1 to G6</text>
+  <text x="115" y="147" class="note" text-anchor="middle">seen in the chat</text>
+  <text x="115" y="164" class="note" text-anchor="middle">section 7.7</text>
+  <rect x="250" y="90" width="200" height="100" rx="10" class="box built"/>
+  <text x="350" y="128" class="name mono" text-anchor="middle">train/teacher/*.md</text>
+  <text x="350" y="147" class="note" text-anchor="middle">60 conversations</text>
+  <text x="350" y="164" class="note" text-anchor="middle">written by the teacher</text>
+  <path class="flow" d="M200,140 L248,140" marker-end="url(#arrow)"/>
+  <rect x="500" y="70" width="220" height="140" rx="10" class="box built"/>
+  <text x="610" y="102" class="name mono" text-anchor="middle">teacher</text>
+  <text x="610" y="122" class="note" text-anchor="middle">clippy -D warnings</text>
+  <text x="610" y="138" class="note" text-anchor="middle">-W clippy::pedantic</text>
+  <text x="610" y="156" class="note" text-anchor="middle">tests must pass</text>
+  <text x="610" y="172" class="note" text-anchor="middle">spark: rules, slop,</text>
+  <text x="610" y="190" class="note" text-anchor="middle">false claims</text>
+  <path class="flow" d="M450,140 L498,140" marker-end="url(#arrow)"/>
+  <rect x="760" y="70" width="190" height="60" rx="10" class="box built"/>
+  <text x="855" y="96" class="name mono" text-anchor="middle">teacher.jsonl</text>
+  <text x="855" y="116" class="note" text-anchor="middle">60 chats, for SFT</text>
+  <rect x="760" y="150" width="190" height="60" rx="10" class="box built"/>
+  <text x="855" y="176" class="name mono" text-anchor="middle">teacher_preferences</text>
+  <text x="855" y="196" class="note" text-anchor="middle">7 pairs, for DPO</text>
+  <path class="flow" d="M720,100 L758,100" marker-end="url(#arrow)"/>
+  <path class="flow" d="M720,180 L758,180" marker-end="url(#arrow)"/>
+  <rect x="500" y="260" width="220" height="70" rx="10" class="box built"/>
+  <text x="610" y="292" class="name mono" text-anchor="middle">teacher.md</text>
+  <text x="610" y="310" class="note" text-anchor="middle">numbers and every problem</text>
+  <path class="deny" d="M610,210 L610,258" marker-end="url(#arrow-deny)"/>
+  <text x="620" y="240" class="warn" text-anchor="start">an entry fails</text>
+  <path class="deny" d="M500,295 L360.0,295.0 Q350,295 350.0,285.0 L350,192" marker-end="url(#arrow-deny)"/>
+  <text x="425" y="288" class="warn" text-anchor="middle">fix and rerun</text>
+  <rect x="760" y="260" width="190" height="70" rx="10" class="planned"/>
+  <text x="855" y="292" class="name" text-anchor="middle">Stage 2 QLoRA</text>
+  <text x="855" y="310" class="note" text-anchor="middle">planned</text>
+  <path class="flow" d="M855,210 L855,258" marker-end="url(#arrow)"/>
+  <rect x="760" y="370" width="190" height="70" rx="10" class="planned"/>
+  <text x="855" y="393" class="name" text-anchor="middle">Same prompts, again</text>
+  <text x="855" y="412" class="note" text-anchor="middle">scored by spark</text>
+  <text x="855" y="429" class="note" text-anchor="middle">planned</text>
+  <path class="flow" d="M855,330 L855,368" marker-end="url(#arrow)"/>
+  <rect x="30" y="370" width="690" height="70" rx="10" class="planned"/>
+  <text x="375" y="402" class="name" text-anchor="middle">Runtime fixes, planned and independent of training</text>
+  <text x="375" y="420" class="note" text-anchor="middle">default system prompt · spark check and one retry before showing code · Think off and lower temperature for code</text>
+</svg>

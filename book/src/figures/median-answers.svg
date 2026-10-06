@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 452" width="960" height="452" role="img" aria-label="One bar per Nemotron answer, height is tokens. Eight of thirteen answers use unwrap, seven of them while saying they do not. Only answer 13, a copy of the user's own code, compiles.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="452" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Thirteen answers to one running-median request</text>
+  <text x="30" y="66" class="note" text-anchor="start">tokens per reply</text>
+  <line x1="180" y1="300" x2="918" y2="300" stroke="#E3E8EE" stroke-width="1"/>
+  <text x="174" y="304.0" class="note" text-anchor="end">0</text>
+  <line x1="180" y1="220" x2="918" y2="220" stroke="#E3E8EE" stroke-width="1"/>
+  <text x="174" y="224.0" class="note" text-anchor="end">2,000</text>
+  <line x1="180" y1="140" x2="918" y2="140" stroke="#E3E8EE" stroke-width="1"/>
+  <text x="174" y="144.0" class="note" text-anchor="end">4,000</text>
+  <text x="30" y="344" class="note" text-anchor="start">unwrap() in the code</text>
+  <text x="30" y="368" class="note" text-anchor="start">claims no unwrap, falsely</text>
+  <text x="30" y="392" class="note" text-anchor="start">compiles</text>
+  <rect x="198" y="282" width="40" height="18" rx="4" fill="#FFFFFF" stroke="#8A99AB" stroke-dasharray="4 3"/>
+  <text x="218.0" y="276" class="note" text-anchor="middle">stopped</text>
+  <text x="218.0" y="316" class="num" text-anchor="middle">1</text>
+  <text x="218.0" y="344" class="warn" text-anchor="middle">yes</text>
+  <text x="218.0" y="368" class="note" text-anchor="middle">·</text>
+  <text x="218.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="254" y="276" width="40" height="24" rx="4" fill="#F8E1D9" stroke="#D9542B" stroke-width="1.5"/>
+  <text x="274.0" y="267.64" class="note" text-anchor="middle">13 s</text>
+  <text x="274.0" y="316" class="num" text-anchor="middle">2</text>
+  <text x="274.0" y="344" class="warn" text-anchor="middle">yes</text>
+  <text x="274.0" y="368" class="warn" text-anchor="middle">yes</text>
+  <text x="274.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="310" y="282" width="40" height="18" rx="4" fill="#FFFFFF" stroke="#8A99AB" stroke-dasharray="4 3"/>
+  <text x="330.0" y="276" class="note" text-anchor="middle">stopped</text>
+  <text x="330.0" y="316" class="num" text-anchor="middle">3</text>
+  <text x="330.0" y="344" class="warn" text-anchor="middle">yes</text>
+  <text x="330.0" y="368" class="warn" text-anchor="middle">yes</text>
+  <text x="330.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="366" y="264" width="40" height="36" rx="4" fill="#F8E1D9" stroke="#D9542B" stroke-width="1.5"/>
+  <text x="386.0" y="255.68" class="note" text-anchor="middle">18 s</text>
+  <text x="386.0" y="316" class="num" text-anchor="middle">4</text>
+  <text x="386.0" y="344" class="warn" text-anchor="middle">yes</text>
+  <text x="386.0" y="368" class="warn" text-anchor="middle">yes</text>
+  <text x="386.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="422" y="121" width="40" height="179" rx="4" fill="#F8E1D9" stroke="#D9542B" stroke-width="1.5"/>
+  <text x="442.0" y="113.4" class="note" text-anchor="middle">86 s</text>
+  <text x="442.0" y="316" class="num" text-anchor="middle">5</text>
+  <text x="442.0" y="344" class="warn" text-anchor="middle">yes</text>
+  <text x="442.0" y="368" class="warn" text-anchor="middle">yes</text>
+  <text x="442.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="478" y="256" width="40" height="44" rx="4" fill="#F8E1D9" stroke="#D9542B" stroke-width="1.5"/>
+  <text x="498.0" y="247.68" class="note" text-anchor="middle">22 s</text>
+  <text x="498.0" y="316" class="num" text-anchor="middle">6</text>
+  <text x="498.0" y="344" class="warn" text-anchor="middle">yes</text>
+  <text x="498.0" y="368" class="warn" text-anchor="middle">yes</text>
+  <text x="498.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="534" y="81" width="40" height="219" rx="4" fill="#DDEFF4" stroke="#1E88A8" stroke-width="1.5"/>
+  <text x="554.0" y="72.72" class="note" text-anchor="middle">105 s</text>
+  <text x="554.0" y="316" class="num" text-anchor="middle">7</text>
+  <text x="554.0" y="344" class="note" text-anchor="middle">·</text>
+  <text x="554.0" y="368" class="note" text-anchor="middle">·</text>
+  <text x="554.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="590" y="218" width="40" height="82" rx="4" fill="#DDEFF4" stroke="#1E88A8" stroke-width="1.5"/>
+  <text x="610.0" y="210.24" class="note" text-anchor="middle">40 s</text>
+  <text x="610.0" y="316" class="num" text-anchor="middle">8</text>
+  <text x="610.0" y="344" class="note" text-anchor="middle">·</text>
+  <text x="610.0" y="368" class="note" text-anchor="middle">·</text>
+  <text x="610.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="646" y="199" width="40" height="101" rx="4" fill="#F8E1D9" stroke="#D9542B" stroke-width="1.5"/>
+  <text x="666.0" y="191.24" class="note" text-anchor="middle">49 s</text>
+  <text x="666.0" y="316" class="num" text-anchor="middle">9</text>
+  <text x="666.0" y="344" class="warn" text-anchor="middle">yes</text>
+  <text x="666.0" y="368" class="warn" text-anchor="middle">yes</text>
+  <text x="666.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="702" y="244" width="40" height="56" rx="4" fill="#DDEFF4" stroke="#1E88A8" stroke-width="1.5"/>
+  <text x="722.0" y="235.76" class="note" text-anchor="middle">28 s</text>
+  <text x="722.0" y="316" class="num" text-anchor="middle">10</text>
+  <text x="722.0" y="344" class="note" text-anchor="middle">·</text>
+  <text x="722.0" y="368" class="note" text-anchor="middle">·</text>
+  <text x="722.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="758" y="194" width="40" height="106" rx="4" fill="#DDEFF4" stroke="#1E88A8" stroke-width="1.5"/>
+  <text x="778.0" y="185.6" class="note" text-anchor="middle">52 s</text>
+  <text x="778.0" y="316" class="num" text-anchor="middle">11</text>
+  <text x="778.0" y="344" class="note" text-anchor="middle">·</text>
+  <text x="778.0" y="368" class="note" text-anchor="middle">·</text>
+  <text x="778.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="814" y="244" width="40" height="56" rx="4" fill="#F8E1D9" stroke="#D9542B" stroke-width="1.5"/>
+  <text x="834.0" y="235.84" class="note" text-anchor="middle">30 s</text>
+  <text x="834.0" y="316" class="num" text-anchor="middle">12</text>
+  <text x="834.0" y="344" class="warn" text-anchor="middle">yes</text>
+  <text x="834.0" y="368" class="warn" text-anchor="middle">yes</text>
+  <text x="834.0" y="392" class="note" text-anchor="middle">·</text>
+  <rect x="870" y="259" width="40" height="41" rx="4" fill="#DDEFF4" stroke="#1E88A8" stroke-width="1.5"/>
+  <text x="890.0" y="250.83999999999997" class="note" text-anchor="middle">21 s</text>
+  <text x="890.0" y="316" class="num" text-anchor="middle">13</text>
+  <text x="890.0" y="344" class="note" text-anchor="middle">·</text>
+  <text x="890.0" y="368" class="note" text-anchor="middle">·</text>
+  <text x="890.0" y="392" class="label" text-anchor="middle">yes</text>
+  <text x="30" y="316" class="note" text-anchor="start">answer</text>
+  <text x="30" y="432" class="note" text-anchor="start">Red bars: the answer uses unwrap(). Seconds are total reply time; the 4,465 and 5,482 token replies are mostly hidden reasoning.</text>
+</svg>

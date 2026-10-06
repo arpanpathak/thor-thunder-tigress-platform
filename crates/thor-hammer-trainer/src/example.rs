@@ -87,20 +87,22 @@ impl Example {
         )
     }
 
-    /// A stable id for the example: the FNV-1a hash of [`Example::dedup_key`], as 16
-    /// hex digits. It stays the same across rebuilds as long as the text does, so a
-    /// reviewer's slop flag keeps pointing at the right example.
+    /// A stable id for the example: [`stable_id`] of [`Example::dedup_key`]. It
+    /// stays the same across rebuilds as long as the text does, so a reviewer's
+    /// slop flag keeps pointing at the right example.
     pub fn id(&self) -> String {
-        const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
-        const FNV_PRIME: u64 = 0x0100_0000_01b3;
-        let hash = self
-            .dedup_key()
-            .bytes()
-            .fold(FNV_OFFSET_BASIS, |hash, byte| {
-                (hash ^ u64::from(byte)).wrapping_mul(FNV_PRIME)
-            });
-        format!("{hash:016x}")
+        stable_id(&self.dedup_key())
     }
+}
+
+/// The FNV-1a hash of `text`, as 16 hex digits.
+pub fn stable_id(text: &str) -> String {
+    const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0100_0000_01b3;
+    let hash = text
+        .bytes()
+        .fold(FNV_OFFSET_BASIS, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(FNV_PRIME));
+    format!("{hash:016x}")
 }
 
 /// Why an example or a file was left out of the training set.

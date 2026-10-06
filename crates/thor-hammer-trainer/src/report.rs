@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// A rough average for English and code; good enough to size a training run.
-const CHARS_PER_TOKEN: usize = 4;
+pub const CHARS_PER_TOKEN: usize = 4;
 
 /// Examples longer than this do not fit an 8k training context and get cut.
 const LONG_EXAMPLE_TOKENS: usize = 8_192;
