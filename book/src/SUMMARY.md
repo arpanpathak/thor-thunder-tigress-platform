@@ -18,6 +18,7 @@
 - [Bring your own agent](ch16-bring-your-own-agent.md)
 - [Bring your own domain](ch17-bring-your-own-domain.md)
 - [Security](ch10-security.md)
+- [Operations: recovery and hardening](ch18-operations.md)
 
 # Plans
 

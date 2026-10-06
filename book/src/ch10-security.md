@@ -57,6 +57,10 @@ they paste it.
 - **Read the logs after sharing widely.** `./serve.sh logs` on the Thor shows
   the requests, including each refused one.
 
+What to do when the key leaks, when someone abuses the chat, or when the
+public name has to change, step by step, and the list of known gaps: chapter
+"Operations: recovery and hardening".
+
 ## Next: sign-in with GitHub
 
 The shared key is the weak point: it can't be taken back from one person, and
