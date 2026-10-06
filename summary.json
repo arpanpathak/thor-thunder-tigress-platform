@@ -1,22 +1,22 @@
 {
-  "commit": "e9d54de",
-  "measured_at": "2026-10-06T11:57:00Z",
+  "commit": "1ad650b",
+  "measured_at": "2026-10-06T12:34:28Z",
   "all_passed": true,
-  "coverage": 82.89,
-  "tests": 212,
+  "coverage": 81.42,
+  "tests": 225,
   "rules": {
-    "files": 56,
+    "files": 59,
     "problems": 0
   },
   "crates": [
     {
       "crate": "thor-hammer-trainer",
       "passed": true,
-      "tests": 32,
+      "tests": 45,
       "failed": 0,
-      "lines": 1641,
-      "covered": 969,
-      "coverage": 59.04936014625228
+      "lines": 2186,
+      "covered": 1320,
+      "coverage": 60.384263494967975
     },
     {
       "crate": "thor-lasso-distiller",
