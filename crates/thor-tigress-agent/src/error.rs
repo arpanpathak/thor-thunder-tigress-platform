@@ -2,6 +2,10 @@
 
 use std::{fmt, io};
 
+/// The result of anything in this crate that can fail; `Outcome` alone means
+/// "done, or an error".
+pub type Outcome<T = ()> = Result<T, AgentError>;
+
 /// Everything that can go wrong while serving a request.
 #[derive(Debug)]
 pub enum AgentError {
@@ -80,7 +84,7 @@ mod tests {
 
     #[test]
     fn wrapped_errors_keep_their_source() {
-        let json = serde_json::from_str::<serde_json::Value>("{").map_err(AgentError::from);
+        let json: Outcome<serde_json::Value> = serde_json::from_str("{").map_err(AgentError::from);
         assert!(json.is_err_and(|error| error.to_string().starts_with("json: ") && error.source().is_some()));
         assert!(AgentError::bad_request("x").source().is_none());
     }

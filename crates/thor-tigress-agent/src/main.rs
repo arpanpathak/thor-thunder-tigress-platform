@@ -20,6 +20,7 @@ mod chat;
 mod config;
 mod error;
 mod messages;
+mod paths;
 mod request;
 mod response;
 mod routes;
@@ -30,7 +31,7 @@ mod upstream;
 
 use std::{net::TcpListener, process::ExitCode, sync::Arc, thread};
 
-use crate::{config::Config, error::AgentError};
+use crate::{config::Config, error::Outcome};
 
 fn main() -> ExitCode {
     let outcome = Config::from_args(std::env::args().skip(1)).and_then(serve);
@@ -44,7 +45,7 @@ fn main() -> ExitCode {
 }
 
 /// Accepts connections forever, one thread each.
-fn serve(config: Config) -> Result<(), AgentError> {
+fn serve(config: Config) -> Outcome {
     let listener = TcpListener::bind(&config.listen)?;
     eprintln!(
         "listening on {}, model {}, search {}, access key {}",
@@ -61,8 +62,12 @@ fn serve(config: Config) -> Result<(), AgentError> {
         let config = Arc::clone(&config);
         thread::spawn(move || {
             let outcome = request::read_request(&stream).and_then(|request| routes::answer(&mut stream, &request, &config));
-            if let Err(error) = outcome {
-                eprintln!("request failed: {error}");
+            let Err(error) = outcome else {
+                return;
+            };
+            eprintln!("request failed: {error}");
+            if let Err(unsent) = response::failure(&mut stream, &error) {
+                eprintln!("could not tell the client: {unsent}");
             }
         });
     }

@@ -10,7 +10,21 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::{error::AgentError, upstream::Endpoint};
+use crate::{
+    error::{AgentError, Outcome},
+    upstream::Endpoint,
+};
+
+/// Where the server listens unless `--listen` says otherwise.
+const DEFAULT_LISTEN: &str = "127.0.0.1:8080";
+/// Where llama-server listens.
+const DEFAULT_MODEL: &str = "127.0.0.1:8079";
+/// Where SearXNG listens.
+const DEFAULT_SEARCH: &str = "127.0.0.1:8888";
+/// The key file, relative to `$HOME`.
+const KEY_FILE: &str = ".config/thor-chat/api-key";
+/// How a key is sent in an `Authorization` header.
+pub const BEARER: &str = "Bearer ";
 
 /// The model server and the search engine.
 pub struct Upstreams {
@@ -39,10 +53,10 @@ impl Config {
     /// # Errors
     ///
     /// `AgentError::Config` for an unknown option or one without a value.
-    pub fn from_args(arguments: impl IntoIterator<Item = String>) -> Result<Self, AgentError> {
+    pub fn from_args(arguments: impl IntoIterator<Item = String>) -> Outcome<Self> {
         let options = Options::parse(arguments)?;
         let key = read_key(&options.key_file);
-        let authorization = key.as_ref().map(|key| format!("Bearer {key}"));
+        let authorization = key.as_ref().map(|key| format!("{BEARER}{key}"));
         Ok(Config {
             listen: options.listen,
             web: options.web,
@@ -62,7 +76,7 @@ impl Config {
             (None, _) => true,
             (Some(_), None) => false,
             (Some(key), Some(sent)) => sent
-                .strip_prefix("Bearer ")
+                .strip_prefix(BEARER)
                 .is_some_and(|given| same_secret(given, key)),
         }
     }
@@ -81,17 +95,17 @@ impl Default for Options {
     fn default() -> Self {
         let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
         Options {
-            listen: "127.0.0.1:8080".to_string(),
-            model: "127.0.0.1:8079".to_string(),
-            search: "127.0.0.1:8888".to_string(),
+            listen: DEFAULT_LISTEN.to_string(),
+            model: DEFAULT_MODEL.to_string(),
+            search: DEFAULT_SEARCH.to_string(),
             web: PathBuf::from("."),
-            key_file: home.join(".config/thor-chat/api-key"),
+            key_file: home.join(KEY_FILE),
         }
     }
 }
 
 impl Options {
-    fn parse(arguments: impl IntoIterator<Item = String>) -> Result<Self, AgentError> {
+    fn parse(arguments: impl IntoIterator<Item = String>) -> Outcome<Self> {
         let mut options = Options::default();
         let mut arguments = arguments.into_iter();
         while let Some(flag) = arguments.next() {
@@ -103,7 +117,7 @@ impl Options {
         Ok(options)
     }
 
-    fn set(&mut self, flag: &str, value: String) -> Result<(), AgentError> {
+    fn set(&mut self, flag: &str, value: String) -> Outcome {
         match flag {
             "--listen" => self.listen = value,
             "--model" => self.model = value,
@@ -142,14 +156,14 @@ mod tests {
         list.iter().map(ToString::to_string).collect()
     }
 
-    fn with_key(key: Option<&str>) -> Result<Config, AgentError> {
+    fn with_key(key: Option<&str>) -> Outcome<Config> {
         let mut config = Config::from_args(args(&["--key-file", "/nonexistent"]))?;
         config.key = key.map(ToString::to_string);
         Ok(config)
     }
 
     #[test]
-    fn defaults_point_at_localhost() -> Result<(), AgentError> {
+    fn defaults_point_at_localhost() -> Outcome {
         let config = Config::from_args(args(&["--key-file", "/nonexistent"]))?;
         assert_eq!(config.listen, "127.0.0.1:8080");
         assert_eq!(config.upstreams.model.address(), "127.0.0.1:8079");
@@ -159,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    fn options_override_defaults() -> Result<(), AgentError> {
+    fn options_override_defaults() -> Outcome {
         let config = Config::from_args(args(&[
             "--listen", "0.0.0.0:9000", "--model", "m:1", "--search", "s:2", "--web", "/srv", "--key-file", "/none",
         ]))?;
@@ -179,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn reads_the_key_file_trimmed() -> Result<(), AgentError> {
+    fn reads_the_key_file_trimmed() -> Outcome {
         let path = std::env::temp_dir().join(format!("thor-key-{}", std::process::id()));
         fs::write(&path, "  secret\n")?;
         let config = Config::from_args(args(&["--key-file", &path.to_string_lossy()]));
@@ -192,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_key_file_means_no_key() -> Result<(), AgentError> {
+    fn an_empty_key_file_means_no_key() -> Outcome {
         let path = std::env::temp_dir().join(format!("thor-empty-key-{}", std::process::id()));
         fs::write(&path, "\n")?;
         let key = read_key(&path);
@@ -202,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn admits_only_the_right_bearer_key() -> Result<(), AgentError> {
+    fn admits_only_the_right_bearer_key() -> Outcome {
         let open = with_key(None)?;
         let locked = with_key(Some("k3y"))?;
         assert!(open.admits(None));

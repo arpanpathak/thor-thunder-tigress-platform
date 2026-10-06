@@ -7,10 +7,19 @@ use std::{
     time::Duration,
 };
 
-use crate::{error::AgentError, response::CORS};
+use crate::{
+    error::{AgentError, Outcome},
+    response::CORS,
+};
 
 /// How long an upstream call may stay silent before it is given up on.
 const TIMEOUT: Duration = Duration::from_secs(600);
+
+/// HTTP's "OK".
+const HTTP_OK: u16 = 200;
+
+/// Assumed when an upstream response doesn't say what it is.
+const DEFAULT_CONTENT_TYPE: &str = "application/json";
 
 /// A server this one calls: its address and the `Authorization` value it
 /// expects, if any.
@@ -57,7 +66,7 @@ impl Endpoint {
     ///
     /// `AgentError::Upstream` when the server can't be reached or sends no
     /// status line; `AgentError::Io` when the connection fails midway.
-    pub fn get(&self, path: &str) -> Result<UpstreamResponse, AgentError> {
+    pub fn get(&self, path: &str) -> Outcome<UpstreamResponse> {
         self.send("GET", path, &[])
     }
 
@@ -66,11 +75,11 @@ impl Endpoint {
     /// # Errors
     ///
     /// As for [`Endpoint::get`].
-    pub fn post(&self, path: &str, body: &[u8]) -> Result<UpstreamResponse, AgentError> {
+    pub fn post(&self, path: &str, body: &[u8]) -> Outcome<UpstreamResponse> {
         self.send("POST", path, body)
     }
 
-    fn send(&self, method: &str, path: &str, body: &[u8]) -> Result<UpstreamResponse, AgentError> {
+    fn send(&self, method: &str, path: &str, body: &[u8]) -> Outcome<UpstreamResponse> {
         let mut stream = TcpStream::connect(&self.address)
             .map_err(|error| AgentError::Upstream(format!("{}: {error}", self.address)))?;
         stream.set_read_timeout(Some(TIMEOUT))?;
@@ -90,12 +99,18 @@ impl Endpoint {
 }
 
 impl UpstreamResponse {
+    /// Whether the server answered "200 OK".
+    #[must_use]
+    pub fn is_ok(&self) -> bool {
+        self.status == HTTP_OK
+    }
+
     /// Reads the whole body as text.
     ///
     /// # Errors
     ///
     /// `AgentError::Io` when the connection fails or the body isn't UTF-8.
-    pub fn text(mut self) -> Result<String, AgentError> {
+    pub fn text(mut self) -> Outcome<String> {
         let mut text = String::new();
         self.body.read_to_string(&mut text)?;
         Ok(text)
@@ -107,7 +122,7 @@ impl UpstreamResponse {
     /// # Errors
     ///
     /// `AgentError::Io` when either side's connection fails.
-    pub fn relay(mut self, client: &mut impl Write) -> Result<(), AgentError> {
+    pub fn relay(mut self, client: &mut impl Write) -> Outcome {
         write!(
             client,
             "HTTP/1.1 {} Upstream\r\n{CORS}Content-Type: {}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
@@ -119,14 +134,14 @@ impl UpstreamResponse {
 }
 
 /// Reads a status line and headers from `reader`, leaving it at the body.
-fn read_response(mut reader: impl BufRead + Send + 'static, address: &str) -> Result<UpstreamResponse, AgentError> {
+fn read_response(mut reader: impl BufRead + Send + 'static, address: &str) -> Outcome<UpstreamResponse> {
     let mut status_line = String::new();
     reader.read_line(&mut status_line)?;
     let Some(status) = status_line.split_whitespace().nth(1).and_then(|code| code.parse().ok()) else {
         return Err(AgentError::Upstream(format!("{address}: no status line")));
     };
     let mut chunked = false;
-    let mut content_type = "application/json".to_string();
+    let mut content_type = DEFAULT_CONTENT_TYPE.to_string();
     loop {
         let mut header = String::new();
         reader.read_line(&mut header)?;
@@ -160,7 +175,7 @@ impl<R: BufRead> Dechunk<R> {
     }
 
     /// Reads the next chunk's size line; `false` once the body is over.
-    fn next_chunk(&mut self) -> Result<bool, AgentError> {
+    fn next_chunk(&mut self) -> Outcome<bool> {
         if self.done {
             return Ok(false);
         }
@@ -202,27 +217,28 @@ mod tests {
     use crate::testing::FakeServer;
     use std::io::Cursor;
 
-    fn parsed(raw: &'static str) -> Result<UpstreamResponse, AgentError> {
+    fn parsed(raw: &'static str) -> Outcome<UpstreamResponse> {
         read_response(Cursor::new(raw.as_bytes()), "test")
     }
 
     #[test]
-    fn removes_chunked_encoding() -> Result<(), AgentError> {
+    fn removes_chunked_encoding() -> Outcome {
         let response = parsed("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6;x=1\r\n world\r\n0\r\n\r\n")?;
         assert_eq!(response.text()?, "hello world");
         Ok(())
     }
 
     #[test]
-    fn reads_status_and_content_type() -> Result<(), AgentError> {
+    fn reads_status_and_content_type() -> Outcome {
         let response = parsed("HTTP/1.1 404 Not Found\r\nContent-Type: Text/Plain\r\n\r\nnope")?;
+        assert!(!response.is_ok());
         assert_eq!((response.status, response.content_type.as_str()), (404, "text/plain"));
         assert_eq!(response.text()?, "nope");
         Ok(())
     }
 
     #[test]
-    fn content_type_defaults_to_json() -> Result<(), AgentError> {
+    fn content_type_defaults_to_json() -> Outcome {
         assert_eq!(parsed("HTTP/1.1 200 OK\r\n\r\n{}")?.content_type, "application/json");
         Ok(())
     }
@@ -233,21 +249,21 @@ mod tests {
     }
 
     #[test]
-    fn a_bad_chunk_size_is_an_error() -> Result<(), AgentError> {
+    fn a_bad_chunk_size_is_an_error() -> Outcome {
         let response = parsed("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nzz\r\n")?;
         assert!(response.text().is_err());
         Ok(())
     }
 
     #[test]
-    fn a_chunked_body_cut_short_ends_cleanly() -> Result<(), AgentError> {
+    fn a_chunked_body_cut_short_ends_cleanly() -> Outcome {
         let response = parsed("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n")?;
         assert_eq!(response.text()?, "");
         Ok(())
     }
 
     #[test]
-    fn relay_copies_status_type_and_body() -> Result<(), AgentError> {
+    fn relay_copies_status_type_and_body() -> Outcome {
         let mut client = Vec::new();
         parsed("HTTP/1.1 201 Created\r\nContent-Type: text/event-stream\r\n\r\ndata: x\n\n")?.relay(&mut client)?;
         let text = String::from_utf8_lossy(&client);
@@ -257,7 +273,7 @@ mod tests {
     }
 
     #[test]
-    fn sends_method_path_key_and_body() -> Result<(), AgentError> {
+    fn sends_method_path_key_and_body() -> Outcome {
         let server = FakeServer::start(vec!["HTTP/1.1 200 OK\r\n\r\nok".to_string()])?;
         let endpoint = Endpoint::new(server.address(), Some("Bearer k".to_string()));
         assert_eq!(endpoint.post("/v1/x", b"{}")?.text()?, "ok");

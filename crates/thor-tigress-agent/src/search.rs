@@ -1,8 +1,11 @@
 //! Web search through a SearXNG instance on localhost.
 
-use serde_json::Value;
+use serde::Deserialize;
 
-use crate::{error::AgentError, upstream::Endpoint};
+use crate::{
+    error::{AgentError, Outcome},
+    upstream::Endpoint,
+};
 
 /// How many results are given to the model per search.
 const MAX_RESULTS: usize = 6;
@@ -10,7 +13,13 @@ const MAX_RESULTS: usize = 6;
 /// The longest snippet kept per result, in characters.
 const MAX_SNIPPET: usize = 400;
 
-/// One search result.
+/// SearXNG's search path; `format=json` asks for JSON instead of a page.
+const SEARCH: &str = "/search";
+
+/// What the model reads when a search finds nothing.
+const NO_RESULTS: &str = "No results.";
+
+/// One search result, as the model and the page see it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchResult {
     /// The page title.
@@ -21,44 +30,53 @@ pub struct SearchResult {
     pub snippet: String,
 }
 
+/// SearXNG's JSON answer, as far as this server reads it.
+#[derive(Deserialize)]
+struct Answer {
+    #[serde(default)]
+    results: Vec<Found>,
+}
+
+/// One result in SearXNG's answer; any field may be missing or `null`.
+#[derive(Deserialize)]
+struct Found {
+    title: Option<String>,
+    url: Option<String>,
+    content: Option<String>,
+}
+
 /// Searches `query` on the SearXNG instance at `searxng`.
 ///
 /// # Errors
 ///
 /// `AgentError::Upstream` when SearXNG can't be reached or answers with an
 /// error; `AgentError::Json` when its answer isn't JSON.
-pub fn search(searxng: &Endpoint, query: &str) -> Result<Vec<SearchResult>, AgentError> {
-    let response = searxng.get(&format!("/search?q={}&format=json", encode(query)))?;
-    if response.status != 200 {
+pub fn search(searxng: &Endpoint, query: &str) -> Outcome<Vec<SearchResult>> {
+    let response = searxng.get(&format!("{SEARCH}?q={}&format=json", encode(query)))?;
+    if !response.is_ok() {
         return Err(AgentError::Upstream(format!("search returned {}", response.status)));
     }
-    let answer: Value = serde_json::from_str(&response.text()?)?;
-    let results = answer
-        .get("results")
-        .and_then(Value::as_array)
-        .map_or(&[][..], Vec::as_slice);
-    Ok(results.iter().filter_map(parse_result).take(MAX_RESULTS).collect())
+    let answer: Answer = serde_json::from_str(&response.text()?)?;
+    Ok(answer.results.into_iter().filter_map(Found::into_result).take(MAX_RESULTS).collect())
 }
 
-/// One SearXNG result; `None` when it has no address.
-fn parse_result(result: &Value) -> Option<SearchResult> {
-    let text = |name: &str| result.get(name).and_then(Value::as_str).unwrap_or_default().trim();
-    let url = text("url");
-    if url.is_empty() {
-        return None;
+impl Found {
+    /// The result with trimmed fields and a short snippet; `None` without an address.
+    fn into_result(self) -> Option<SearchResult> {
+        let url = self.url.as_deref().map(str::trim).filter(|url| !url.is_empty())?.to_string();
+        Some(SearchResult {
+            title: self.title.as_deref().unwrap_or_default().trim().to_string(),
+            url,
+            snippet: self.content.as_deref().unwrap_or_default().trim().chars().take(MAX_SNIPPET).collect(),
+        })
     }
-    Some(SearchResult {
-        title: text("title").to_string(),
-        url: url.to_string(),
-        snippet: text("content").chars().take(MAX_SNIPPET).collect(),
-    })
 }
 
 /// The results as the text the model reads: one numbered entry per result.
 #[must_use]
 pub fn as_tool_text(results: &[SearchResult]) -> String {
     if results.is_empty() {
-        return "No results.".to_string();
+        return NO_RESULTS.to_string();
     }
     let entries: Vec<String> = results
         .iter()
@@ -83,6 +101,7 @@ fn encode(text: &str) -> String {
 mod tests {
     use super::*;
     use crate::testing::{FakeServer, json_response};
+    use serde_json::json;
 
     #[test]
     fn encodes_a_query() {
@@ -100,17 +119,17 @@ mod tests {
             as_tool_text(&results),
             "[1] Announcing Rust 1.99.0\nhttps://blog.rust-lang.org/\nThe Rust team is happy"
         );
-        assert_eq!(as_tool_text(&[]), "No results.");
+        assert_eq!(as_tool_text(&[]), NO_RESULTS);
     }
 
     #[test]
-    fn keeps_six_results_with_addresses_and_short_snippets() -> Result<(), AgentError> {
+    fn keeps_six_results_with_addresses_and_short_snippets() -> Outcome {
         let long = "x".repeat(MAX_SNIPPET + 50);
-        let mut results: Vec<Value> = (0..8)
-            .map(|n| serde_json::json!({"title": format!(" t{n} "), "url": format!("https://e/{n}"), "content": long}))
+        let mut results: Vec<_> = (0..8)
+            .map(|n| json!({"title": format!(" t{n} "), "url": format!("https://e/{n}"), "content": long}))
             .collect();
-        results.insert(0, serde_json::json!({"title": "no address"}));
-        let server = FakeServer::start(vec![json_response(&serde_json::json!({ "results": results }).to_string())])?;
+        results.insert(0, json!({"title": "no address", "url": null}));
+        let server = FakeServer::start(vec![json_response(&json!({ "results": results }).to_string())])?;
         let found = search(&Endpoint::new(server.address(), None), "rust tokio")?;
         let request = server.requests()?;
         assert!(request[0].starts_with("GET /search?q=rust+tokio&format=json HTTP/1.1"));
@@ -121,7 +140,16 @@ mod tests {
     }
 
     #[test]
-    fn a_searxng_error_is_reported() -> Result<(), AgentError> {
+    fn an_answer_without_results_is_empty() -> Outcome {
+        let server = FakeServer::start(vec![json_response("{}")])?;
+        let found = search(&Endpoint::new(server.address(), None), "q")?;
+        server.requests()?;
+        assert_eq!(found, []);
+        Ok(())
+    }
+
+    #[test]
+    fn a_searxng_error_is_reported() -> Outcome {
         let server = FakeServer::start(vec!["HTTP/1.1 503 Busy\r\n\r\n".to_string()])?;
         let outcome = search(&Endpoint::new(server.address(), None), "q");
         server.requests()?;

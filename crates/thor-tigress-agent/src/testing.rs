@@ -7,17 +7,17 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::error::AgentError;
+use crate::error::{AgentError, Outcome};
 
 /// A server on `127.0.0.1` at a free port, serving canned responses in order.
 pub struct FakeServer {
     address: String,
-    worker: JoinHandle<Result<Vec<String>, AgentError>>,
+    worker: JoinHandle<Outcome<Vec<String>>>,
 }
 
 impl FakeServer {
     /// Starts a server that accepts one connection per response in `responses`.
-    pub fn start(responses: Vec<String>) -> Result<Self, AgentError> {
+    pub fn start(responses: Vec<String>) -> Outcome<Self> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?.to_string();
         let worker = thread::spawn(move || {
@@ -38,7 +38,7 @@ impl FakeServer {
     }
 
     /// Waits until every response is sent, and returns the requests received.
-    pub fn requests(self) -> Result<Vec<String>, AgentError> {
+    pub fn requests(self) -> Outcome<Vec<String>> {
         self.worker
             .join()
             .map_err(|_| AgentError::Upstream("fake server panicked".to_string()))?
@@ -47,7 +47,7 @@ impl FakeServer {
 
 /// Reads one request as text: headers, then as many body bytes as
 /// `Content-Length` says.
-fn read_raw_request(stream: &TcpStream) -> Result<String, AgentError> {
+fn read_raw_request(stream: &TcpStream) -> Outcome<String> {
     let mut reader = BufReader::new(stream);
     let mut raw = String::new();
     let mut length = 0;

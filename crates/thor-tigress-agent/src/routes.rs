@@ -6,27 +6,30 @@ use std::{fs, io::Write, path::Path};
 use crate::{
     chat,
     config::Config,
-    error::AgentError,
-    messages,
+    error::Outcome,
+    messages, paths,
     request::Request,
-    response::{self, Status},
+    response::{self, ContentType, Status},
 };
+
+/// What `/health` answers.
+const HEALTHY: &[u8] = br#"{"status":"ok"}"#;
 
 /// A file the server hands out, with its content type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StaticFile {
     name: &'static str,
-    content_type: &'static str,
+    content_type: ContentType,
 }
 
 /// The chat page.
-const PAGE: StaticFile = StaticFile { name: "index.html", content_type: "text/html; charset=utf-8" };
+const PAGE: StaticFile = StaticFile { name: "index.html", content_type: ContentType::Html };
 
 /// The other files in the web folder that may be served; nothing else is.
 const FILES: [StaticFile; 3] = [
-    StaticFile { name: "about.html", content_type: "text/html; charset=utf-8" },
-    StaticFile { name: "cub.svg", content_type: "image/svg+xml" },
-    StaticFile { name: "cub.png", content_type: "image/png" },
+    StaticFile { name: "about.html", content_type: ContentType::Html },
+    StaticFile { name: "cub.svg", content_type: ContentType::Svg },
+    StaticFile { name: "cub.png", content_type: ContentType::Png },
 ];
 
 /// What a request asks for.
@@ -56,21 +59,32 @@ impl Route {
     pub fn of(method: &str, path: &str) -> Route {
         match (method, path) {
             ("OPTIONS", _) => Route::Preflight,
-            ("GET", "/" | "/index.html" | "/thor-tigress-cub" | "/thor-tigress-cub/") => Route::File(PAGE),
-            ("GET", "/health") => Route::Health,
-            ("GET", "/v1/models") => Route::Models,
+            ("GET", path) if is_page(path) => Route::File(PAGE),
+            ("GET", paths::HEALTH) => Route::Health,
+            ("GET", paths::MODELS) => Route::Models,
             ("GET", path) => listed_file(path).map_or(Route::NotFound, Route::File),
-            ("POST", "/v1/chat/completions") => Route::ChatCompletions,
-            ("POST", "/v1/messages") => Route::Messages,
-            ("POST", "/v1/messages/count_tokens") => Route::CountTokens,
+            ("POST", paths::CHAT_COMPLETIONS) => Route::ChatCompletions,
+            ("POST", paths::MESSAGES) => Route::Messages,
+            ("POST", paths::COUNT_TOKENS) => Route::CountTokens,
             _ => Route::NotFound,
         }
     }
 }
 
+/// The path inside the site, with the `/thor-tigress-cub` folder removed.
+fn within_site(path: &str) -> &str {
+    path.strip_prefix(paths::CUB).unwrap_or(path)
+}
+
+/// Whether `path` is the chat page: `/`, `/index.html`, or the same under
+/// `/thor-tigress-cub`.
+fn is_page(path: &str) -> bool {
+    matches!(within_site(path), "" | "/" | "/index.html")
+}
+
 /// The listed file a path names, at the root or under `/thor-tigress-cub/`.
 fn listed_file(path: &str) -> Option<StaticFile> {
-    let name = path.strip_prefix("/thor-tigress-cub").unwrap_or(path).strip_prefix('/')?;
+    let name = within_site(path).strip_prefix('/')?;
     FILES.into_iter().find(|file| file.name == name)
 }
 
@@ -81,9 +95,9 @@ fn listed_file(path: &str) -> Option<StaticFile> {
 ///
 /// Whatever the route's handler returns: I/O, upstream, JSON or bad-request
 /// errors.
-pub fn answer(client: &mut impl Write, request: &Request, config: &Config) -> Result<(), AgentError> {
+pub fn answer(client: &mut impl Write, request: &Request, config: &Config) -> Outcome {
     let route = Route::of(&request.method, &request.path);
-    let needs_key = route != Route::Preflight && request.path.starts_with("/v1/");
+    let needs_key = route != Route::Preflight && request.path.starts_with(paths::API);
     if needs_key && !config.admits(request.authorization.as_deref()) {
         return response::unauthorized(client);
     }
@@ -91,16 +105,16 @@ pub fn answer(client: &mut impl Write, request: &Request, config: &Config) -> Re
     match route {
         Route::Preflight => response::preflight(client),
         Route::File(file) => send_file(client, &config.web, file),
-        Route::Health => response::respond(client, Status::Ok, "application/json", br#"{"status":"ok"}"#),
-        Route::Models => model.get("/v1/models")?.relay(client),
+        Route::Health => response::respond(client, Status::Ok, ContentType::Json, HEALTHY),
+        Route::Models => model.get(paths::MODELS)?.relay(client),
         Route::ChatCompletions => chat::answer(client, &request.body, &config.upstreams),
         Route::Messages => messages::forward(client, &request.body, model),
-        Route::CountTokens => model.post("/v1/messages/count_tokens", &request.body)?.relay(client),
-        Route::NotFound => response::respond(client, Status::NotFound, "text/plain", b"not found"),
+        Route::CountTokens => model.post(paths::COUNT_TOKENS, &request.body)?.relay(client),
+        Route::NotFound => response::respond(client, Status::NotFound, ContentType::Text, b"not found"),
     }
 }
 
-fn send_file(client: &mut impl Write, folder: &Path, file: StaticFile) -> Result<(), AgentError> {
+fn send_file(client: &mut impl Write, folder: &Path, file: StaticFile) -> Outcome {
     let body = fs::read(folder.join(file.name))?;
     response::respond(client, Status::Ok, file.content_type, &body)
 }
@@ -120,6 +134,8 @@ mod tests {
             ("OPTIONS", "/v1/chat/completions", Route::Preflight),
             ("GET", "/", Route::File(PAGE)),
             ("GET", "/thor-tigress-cub/", Route::File(PAGE)),
+            ("GET", "/thor-tigress-cub", Route::File(PAGE)),
+            ("GET", "/index.html", Route::File(PAGE)),
             ("GET", "/health", Route::Health),
             ("GET", "/v1/models", Route::Models),
             ("POST", "/v1/chat/completions", Route::ChatCompletions),
@@ -149,7 +165,7 @@ mod tests {
         folder: std::path::PathBuf,
     }
 
-    fn setup(responses: Vec<String>, key: Option<&str>) -> Result<Setup, AgentError> {
+    fn setup(responses: Vec<String>, key: Option<&str>) -> Outcome<Setup> {
         let folder = std::env::temp_dir().join(format!("thor-web-{}-{}", std::process::id(), rand_suffix()));
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("index.html"), "<p>cub</p>")?;
@@ -181,14 +197,14 @@ mod tests {
         }
     }
 
-    fn answered(setup: &Setup, request: &Request) -> Result<String, AgentError> {
+    fn answered(setup: &Setup, request: &Request) -> Outcome<String> {
         let mut client = Vec::new();
         answer(&mut client, request, &setup.config)?;
         Ok(String::from_utf8_lossy(&client).into_owned())
     }
 
     #[test]
-    fn serves_the_page_and_health_without_a_key() -> Result<(), AgentError> {
+    fn serves_the_page_and_health_without_a_key() -> Outcome {
         let setup = setup(Vec::new(), Some("k"))?;
         let page = answered(&setup, &request("GET", "/", None))?;
         let health = answered(&setup, &request("GET", "/health", None))?;
@@ -201,7 +217,7 @@ mod tests {
     }
 
     #[test]
-    fn the_model_needs_the_key_but_preflight_does_not() -> Result<(), AgentError> {
+    fn the_model_needs_the_key_but_preflight_does_not() -> Outcome {
         let setup = setup(Vec::new(), Some("k"))?;
         let refused = answered(&setup, &request("GET", "/v1/models", None))?;
         let wrong = answered(&setup, &request("GET", "/v1/embeddings", Some("Bearer x")))?;
@@ -214,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn passes_model_routes_through_with_the_key() -> Result<(), AgentError> {
+    fn passes_model_routes_through_with_the_key() -> Outcome {
         let setup = setup(vec![json_response(r#"{"data":[]}"#), json_response(r#"{"input_tokens":3}"#)], Some("k"))?;
         let models = answered(&setup, &request("GET", "/v1/models", Some("Bearer k")))?;
         let count = answered(&setup, &request("POST", "/v1/messages/count_tokens", Some("Bearer k")))?;

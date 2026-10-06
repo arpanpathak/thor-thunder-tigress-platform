@@ -3,7 +3,10 @@
 
 use std::io::{BufRead, BufReader, Read};
 
-use crate::error::AgentError;
+use crate::{
+    config::BEARER,
+    error::{AgentError, Outcome},
+};
 
 /// The largest request body accepted: a long conversation with pasted code.
 const MAX_BODY: usize = 32 << 20;
@@ -35,7 +38,7 @@ struct Headers {
 ///
 /// `AgentError::Io` when the connection fails, `AgentError::BadRequest` for
 /// a bad `Content-Length` or a body over 32 MiB.
-pub fn read_request(stream: impl Read) -> Result<Request, AgentError> {
+pub fn read_request(stream: impl Read) -> Outcome<Request> {
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     reader.read_line(&mut line)?;
@@ -53,7 +56,7 @@ pub fn read_request(stream: impl Read) -> Result<Request, AgentError> {
     })
 }
 
-fn read_headers(reader: &mut impl BufRead) -> Result<Headers, AgentError> {
+fn read_headers(reader: &mut impl BufRead) -> Outcome<Headers> {
     let mut headers = Headers::default();
     loop {
         let mut line = String::new();
@@ -70,7 +73,7 @@ fn read_headers(reader: &mut impl BufRead) -> Result<Headers, AgentError> {
 }
 
 impl Headers {
-    fn note(&mut self, name: &str, value: &str) -> Result<(), AgentError> {
+    fn note(&mut self, name: &str, value: &str) -> Outcome {
         match name {
             "content-length" => {
                 self.content_length = value
@@ -78,14 +81,14 @@ impl Headers {
                     .map_err(|_| AgentError::bad_request("bad content-length"))?;
             }
             "authorization" => self.authorization = Some(value.to_string()),
-            "x-api-key" => self.authorization = Some(format!("Bearer {value}")),
+            "x-api-key" => self.authorization = Some(format!("{BEARER}{value}")),
             _ => {}
         }
         Ok(())
     }
 }
 
-fn read_body(reader: &mut impl Read, length: usize) -> Result<Vec<u8>, AgentError> {
+fn read_body(reader: &mut impl Read, length: usize) -> Outcome<Vec<u8>> {
     if length > MAX_BODY {
         return Err(AgentError::bad_request(format!("body over {MAX_BODY} bytes")));
     }
@@ -98,12 +101,12 @@ fn read_body(reader: &mut impl Read, length: usize) -> Result<Vec<u8>, AgentErro
 mod tests {
     use super::*;
 
-    fn parse(raw: &str) -> Result<Request, AgentError> {
+    fn parse(raw: &str) -> Outcome<Request> {
         read_request(raw.as_bytes())
     }
 
     #[test]
-    fn reads_method_path_and_body() -> Result<(), AgentError> {
+    fn reads_method_path_and_body() -> Outcome {
         let request = parse("POST /v1/chat/completions?x=1 HTTP/1.1\r\nHost: t\r\nContent-Length: 2\r\n\r\n{}")?;
         assert_eq!(
             request,
@@ -118,21 +121,21 @@ mod tests {
     }
 
     #[test]
-    fn header_names_are_case_insensitive() -> Result<(), AgentError> {
+    fn header_names_are_case_insensitive() -> Outcome {
         let request = parse("GET / HTTP/1.1\r\nauthorization: Bearer k\r\n\r\n")?;
         assert_eq!(request.authorization.as_deref(), Some("Bearer k"));
         Ok(())
     }
 
     #[test]
-    fn x_api_key_becomes_a_bearer_key() -> Result<(), AgentError> {
+    fn x_api_key_becomes_a_bearer_key() -> Outcome {
         let request = parse("POST /v1/messages HTTP/1.1\r\nX-Api-Key: k\r\n\r\n")?;
         assert_eq!(request.authorization.as_deref(), Some("Bearer k"));
         Ok(())
     }
 
     #[test]
-    fn skips_lines_that_are_not_headers() -> Result<(), AgentError> {
+    fn skips_lines_that_are_not_headers() -> Outcome {
         let request = parse("GET /health HTTP/1.1\r\nnonsense\r\n\r\n")?;
         assert_eq!(request.path, "/health");
         Ok(())
@@ -152,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_connection_reads_as_an_empty_request() -> Result<(), AgentError> {
+    fn an_empty_connection_reads_as_an_empty_request() -> Outcome {
         let request = parse("")?;
         assert_eq!((request.method.as_str(), request.path.as_str()), ("", ""));
         Ok(())
