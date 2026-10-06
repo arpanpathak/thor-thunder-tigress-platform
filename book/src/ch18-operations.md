@@ -286,4 +286,4 @@ Not fixed yet; each needs a decision or work.
 | 9 | Accounts behind the domain | whoever gets into the Namecheap or GitHub account can redirect visitors | depends on those accounts | two-factor authentication on both, checked |
 | 10 | When the Thor is down, `voltforge.tech` still forwards | visitors land on a browser error instead of a message | | the forwarding page checks `/health` first and shows "the Thor is offline" |
 | 11 | Updates are manual | old llama.cpp or Tailscale with known bugs | the table above | a monthly reminder, or unattended upgrades for Tailscale |
-| 12 | The key is compared with a plain string comparison | in theory, response timing could reveal the key bit by bit; over the internet, through Funnel's relays, the noise makes this impractical | none | compare in constant time |
+| 12 | ~~The key is compared with a plain string comparison~~ | fixed on 2026-10-06: `thor-tigress-agent` compares keys in constant time (`config::same_secret`) | | |

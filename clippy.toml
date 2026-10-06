@@ -1,0 +1,2 @@
+# Product names written as plain words in doc comments, not code.
+doc-valid-idents = ["SearXNG", "OpenAI", "..", "DuckDuckGo", "GitHub", "TensorRT", "JetPack", "macOS"]
