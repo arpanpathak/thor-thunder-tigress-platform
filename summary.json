@@ -1,58 +1,58 @@
 {
-  "commit": "7c4aacf",
-  "measured_at": "2026-10-06T19:17:23Z",
+  "commit": "2103674",
+  "measured_at": "2026-10-06T19:47:28Z",
   "all_passed": true,
-  "coverage": 98.97,
-  "tests": 304,
+  "coverage": 100.0,
+  "tests": 317,
   "rules": {
-    "files": 68,
+    "files": 69,
     "problems": 0
   },
   "crates": [
     {
       "crate": "thor-hammer-trainer",
       "passed": true,
-      "tests": 88,
+      "tests": 89,
       "failed": 0,
-      "lines": 2892,
-      "covered": 2882,
-      "coverage": 99.65421853388658
+      "lines": 2897,
+      "covered": 2897,
+      "coverage": 100.0
     },
     {
       "crate": "thor-lasso-distiller",
       "passed": true,
-      "tests": 25,
+      "tests": 26,
       "failed": 0,
-      "lines": 774,
-      "covered": 771,
-      "coverage": 99.6124031007752
+      "lines": 787,
+      "covered": 787,
+      "coverage": 100.0
     },
     {
       "crate": "thor-spark-safety-eval",
       "passed": true,
-      "tests": 55,
+      "tests": 58,
       "failed": 0,
-      "lines": 1518,
-      "covered": 1494,
-      "coverage": 98.41897233201581
+      "lines": 1529,
+      "covered": 1529,
+      "coverage": 100.0
     },
     {
       "crate": "thor-tigress-agent",
       "passed": true,
-      "tests": 66,
+      "tests": 67,
       "failed": 0,
-      "lines": 1271,
-      "covered": 1255,
-      "coverage": 98.74114870180959
+      "lines": 1294,
+      "covered": 1294,
+      "coverage": 100.0
     },
     {
       "crate": "thor-tigress-reinforcer-frontend",
       "passed": true,
-      "tests": 70,
+      "tests": 77,
       "failed": 0,
-      "lines": 1678,
-      "covered": 1647,
-      "coverage": 98.15256257449344
+      "lines": 1747,
+      "covered": 1747,
+      "coverage": 100.0
     }
   ]
 }
