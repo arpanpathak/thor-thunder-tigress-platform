@@ -65,6 +65,13 @@ impl From<serde_json::Error> for AgentError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_json_error_keeps_its_source() {
+        use std::error::Error as _;
+        let error = serde_json::from_str::<u8>("x").map_err(AgentError::from).err();
+        assert!(error.as_ref().and_then(|error| error.source()).is_some());
+    }
     use std::error::Error;
 
     #[test]

@@ -110,11 +110,9 @@ pub struct Fenced {
 /// Every fenced block of `text`, in order.
 #[must_use]
 pub fn fenced(text: &str) -> Vec<Fenced> {
-    let Some(pattern) = FENCED.as_ref() else {
-        return Vec::new();
-    };
-    pattern
-        .captures_iter(text)
+    FENCED
+        .iter()
+        .flat_map(|pattern| pattern.captures_iter(text))
         .filter_map(|captures| {
             let info = captures.get(1)?.as_str();
             let mut words = info.split(',').map(str::trim);
@@ -252,11 +250,7 @@ pub fn check(block: &Block, scratch: &Path) -> Result<Built, DataError> {
     let Some(run) = run else {
         return Ok(Built::Clean { tests: 0, ran: false });
     };
-    Ok(match run_limited(run, scratch, TEST_LIMIT)? {
-        Finished::Passed(_) => Built::Clean { tests: 0, ran: true },
-        Finished::Failed(output) => Built::TestsFailed(output),
-        Finished::OverTime => Built::TimedOut,
-    })
+    Ok(Built::after_run(run_limited(run, scratch, TEST_LIMIT)?))
 }
 
 #[cfg(test)]
@@ -307,6 +301,7 @@ mod tests {
         assert_eq!(checked(Language::Cpp, cpp)?, Built::Clean { tests: 0, ran: true });
         let java = "public class Hello {\n    public static void main(String[] args) {\n        System.out.println(\"hi\");\n    }\n}\n";
         assert_eq!(checked(Language::Java, java)?, Built::Clean { tests: 0, ran: true });
+        assert_eq!(checked(Language::Cpp, "inline int twice(int x) { return 2 * x; }\n")?, Built::Clean { tests: 0, ran: false });
         Ok(())
     }
 

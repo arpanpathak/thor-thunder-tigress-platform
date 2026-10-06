@@ -753,6 +753,79 @@ fn shorten(text: &str, limit: usize) -> String {
 mod tests {
     use super::*;
 
+    const UNCOMMON_FORMS: &str = r##"use std::{fmt, io};
+
+/// A struct used as an error.
+#[derive(Debug)]
+pub struct Failure;
+
+impl fmt::Display for Failure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("failure")
+    }
+}
+
+impl std::error::Error for Failure {}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Derived {}
+
+pub trait Shape {
+    fn area(&self) -> f64 {
+        "1".parse().unwrap()
+    }
+}
+
+pub type Alias = u8;
+pub const LIMIT: u8 = 1;
+pub static NAME: &str = "x";
+pub mod inner {}
+pub union Bits { a: u8 }
+
+pub fn text() -> Result<(), &'static str> { Err("x") }
+pub fn borrowed() -> Result<(), &Failure> { Ok(()) }
+pub fn slice() -> Result<(), &[u8]> { Ok(()) }
+pub fn tuple() -> Result<(), (u8, u8)> { Ok(()) }
+pub fn aliased() -> Result<u8> { Ok(1) }
+pub fn io_result() -> io::Result<u8> { Ok(1) }
+pub fn array() -> [u8; 2] { [1, 2] }
+pub fn bare() -> Result { todo!() }
+pub fn three() -> Result<u8, u8, u8> { todo!() }
+pub fn boxed() -> Result<(), Box<dyn std::error::Error>> { Ok(()) }
+pub fn owned() -> Result<(), String> { Ok(()) }
+
+pub fn macros() -> anyhow::Result<()> {
+    println!("{}", Some(1).unwrap());
+    let items = vec![Some(2).unwrap()];
+    anyhow::bail!("stop {}", items.len());
+}
+"##;
+
+    #[test]
+    fn reports_every_uncommon_form() {
+        let report = check(UNCOMMON_FORMS);
+        let found: Vec<(usize, &str)> = report.violations.iter().map(|violation| (violation.line, violation.detail.as_str())).collect();
+        let expected = [
+            (13, "Failure is a struct, not an enum"),
+            (15, "uses the thiserror (derive(Error)) crate"),
+            (20, ".unwrap()"),
+            (27, "pub mod inner has no doc comment"),
+            (28, "pub union Bits has no doc comment"),
+            (30, "returns Result<_, &str>"),
+            (31, "Failure is a struct, not an enum"),
+            (35, "returns the library error io::Error, not a custom enum"),
+            (39, "returns Result<_, Box<dyn Error>>"),
+            (40, "returns Result<_, String>"),
+            (43, ".unwrap()"),
+            (44, ".unwrap()"),
+            (45, "uses the anyhow (bail!) crate"),
+        ];
+        assert!(expected.iter().all(|wanted| found.contains(wanted)), "{found:?}");
+        let undocumented = found.iter().filter(|(_, detail)| detail.ends_with("has no doc comment")).count();
+        assert_eq!(undocumented, 19);
+        assert_eq!(report.violations.len(), 30);
+    }
+
     fn verdict(source: &str, rule: Rule) -> Verdict {
         check(source)
             .verdicts

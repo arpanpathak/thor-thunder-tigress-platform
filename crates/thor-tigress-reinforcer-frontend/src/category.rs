@@ -109,6 +109,25 @@ impl From<Category> for SlopCategory {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_spark_category_has_a_flag_category() {
+        use thor_spark_safety_eval::slop::Category;
+        let converted: Vec<SlopCategory> = [
+            Category::FakeImportance,
+            Category::DramaticSetup,
+            Category::EmptyDepthWords,
+            Category::FakeBalanceHedging,
+            Category::FlatteryFillerOpener,
+            Category::WrapUpRepeat,
+            Category::RhythmTrick,
+        ]
+        .into_iter()
+        .map(SlopCategory::from)
+        .collect();
+        assert_eq!(converted.len(), 7);
+        assert!(!converted.contains(&SlopCategory::Other));
+    }
     use crate::error::Outcome;
 
     fn written(value: &impl serde::Serialize) -> Outcome<String> {

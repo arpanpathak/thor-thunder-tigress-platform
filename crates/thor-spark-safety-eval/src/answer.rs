@@ -59,12 +59,12 @@ static RUST_HINT: LazyLock<Option<Regex>> =
 /// like Rust (it contains `fn`, `let`, `impl` and the like).
 #[must_use]
 pub fn rust_blocks(text: &str) -> Vec<CodeBlock> {
-    let (Some(fenced), Some(hint)) = (FENCED.as_ref(), RUST_HINT.as_ref()) else {
-        return Vec::new();
-    };
-    fenced
-        .captures_iter(text)
-        .filter_map(|captures| {
+    FENCED
+        .as_ref()
+        .zip(RUST_HINT.as_ref())
+        .into_iter()
+        .flat_map(|(fenced, hint)| fenced.captures_iter(text).map(move |captures| (captures, hint)))
+        .filter_map(|(captures, hint)| {
             let language = captures.get(1).map_or("", |found| found.as_str());
             let code = captures.get(2)?;
             let is_rust = matches!(language, "rust" | "rs")

@@ -214,6 +214,23 @@ fn chunk_size(line: &str) -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dechunks_in_small_reads_and_stays_ended() -> Outcome {
+        let mut body = Dechunk::new(std::io::Cursor::new("3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n"));
+        let mut buffer = [0_u8; 3];
+        let sizes = [body.read(&mut buffer)?, body.read(&mut buffer)?, body.read(&mut buffer)?, body.read(&mut buffer)?];
+        assert_eq!(sizes, [3, 2, 0, 0]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_gone_client_stops_the_relay() -> Outcome {
+        let server = crate::testing::FakeServer::start(vec!["HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok".to_string()])?;
+        let response = Endpoint::new(server.address(), None).get("/")?;
+        assert!(response.relay(&mut crate::testing::Gone).is_err());
+        Ok(())
+    }
     use crate::testing::FakeServer;
     use std::io::Cursor;
 

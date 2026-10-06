@@ -15,6 +15,7 @@ use crate::{
     index::{Filter, Ids},
     stage0::{self, Suggestions},
     titles,
+    workspace::{DatasetInfo, Workspace},
 };
 
 /// The page, compiled into the binary.
@@ -41,6 +42,8 @@ const PHRASE_NOTE: &str = "phrase:";
 pub enum Route {
     /// The review page.
     Page,
+    /// The datasets the page can switch between.
+    Datasets,
     /// Counts for the header.
     Meta,
     /// Flags whose example is gone.
@@ -69,6 +72,7 @@ impl Route {
     pub fn of(method: &str, path: &str) -> Route {
         match (method, path) {
             ("GET", "/") => Route::Page,
+            ("GET", "/api/datasets") => Route::Datasets,
             ("GET", "/api/meta") => Route::Meta,
             ("GET", "/api/orphans") => Route::Orphans,
             ("GET", "/slop.jsonl") => Route::SlopFile,
@@ -83,15 +87,32 @@ impl Route {
     }
 }
 
-/// Answers one request.
+/// What the page's dataset switcher shows.
+#[derive(Serialize)]
+struct Datasets {
+    datasets: Vec<DatasetInfo>,
+    missing: Vec<String>,
+}
+
+/// Answers one request. Every route except the page and the dataset list
+/// works on the dataset named by `?dataset=`, the first one when not named.
 ///
 /// # Errors
 ///
-/// `ReviewError::NotFound` for an unknown route, and whatever the route's
-/// handler returns.
-pub fn answer(stream: &mut impl Write, request: &Request, app: &App) -> Outcome {
+/// `ReviewError::NotFound` for an unknown route or dataset, and whatever the
+/// route's handler returns.
+pub fn answer(stream: &mut impl Write, request: &Request, workspace: &Workspace) -> Outcome {
     match Route::of(&request.method, &request.path) {
         Route::Page => http::write_response(stream, Status::Ok, ContentType::Html, PAGE.as_bytes()),
+        Route::Datasets => ok(stream, &Datasets { datasets: workspace.infos()?, missing: workspace.missing().to_vec() }),
+        _ => answer_in(stream, request, &workspace.dataset(request.param("dataset"))?.app),
+    }
+}
+
+/// Answers one request about one dataset.
+fn answer_in(stream: &mut impl Write, request: &Request, app: &App) -> Outcome {
+    match Route::of(&request.method, &request.path) {
+        Route::Page | Route::Datasets => Err(ReviewError::NotFound(format!("{} {}", request.method, request.path))),
         Route::SlopFile => {
             let removed = fs::read(&app.slop).unwrap_or_default();
             http::write_response(stream, Status::Ok, ContentType::JsonLines, &removed)
@@ -266,6 +287,11 @@ struct Item {
     messages: Value,
     rejected: Value,
     suggestions: Suggestions,
+    source_text: Option<String>,
+    licence: Option<String>,
+    based_on: Option<String>,
+    entry: Option<String>,
+    notes: Vec<String>,
 }
 
 /// The parts of a record the page shows besides what the index holds.
@@ -279,6 +305,16 @@ struct RecordText {
     messages: Value,
     #[serde(default)]
     rejected: Value,
+    #[serde(default)]
+    source_text: Option<String>,
+    #[serde(default)]
+    licence: Option<String>,
+    #[serde(default)]
+    based_on: Option<String>,
+    #[serde(default)]
+    entry: Option<String>,
+    #[serde(default)]
+    notes: Vec<String>,
 }
 
 /// One record, with its flag if it has one. The length of the whole answer
@@ -308,6 +344,11 @@ fn item(app: &App, position: usize, length: Length) -> Outcome<Item> {
         flag: app.flags()?.get(&entry.id).cloned(),
         messages: record.messages,
         rejected: record.rejected,
+        source_text: record.source_text,
+        licence: record.licence,
+        based_on: record.based_on,
+        entry: record.entry,
+        notes: record.notes,
     })
 }
 
@@ -430,6 +471,14 @@ mod tests {
     use super::*;
     use crate::testing::TempDir;
 
+    #[test]
+    fn a_phrase_found_outside_the_answers_marks_nothing() -> Outcome {
+        let setup = setup()?;
+        let reply = call(&setup.app, "POST", "/api/flag-matches", r#"{"text":"trpl/src","category":"other"}"#)?;
+        assert_eq!((reply.body["matched"].as_u64(), reply.body["added"].as_u64()), (Some(0), Some(0)));
+        Ok(())
+    }
+
     const TRAINING: &str = concat!(
         r#"{"id":"a1","source":"chat","origin":"c1","instruction":"Why?","response":"Great question! Here's the thing: no."}"#, "\n",
         r#"{"id":"b2","source":"corpus","origin":"trpl/src/ch01.md","instruction":"What is a page?","response":"Here's The Thing about pages."}"#, "\n",
@@ -465,7 +514,7 @@ mod tests {
 
     fn call(app: &App, method: &str, target: &str, body: &str) -> Outcome<Reply> {
         let mut out = Vec::new();
-        answer(&mut out, &Request::new(method, target, body), app)?;
+        answer_in(&mut out, &Request::new(method, target, body), app)?;
         let text = String::from_utf8_lossy(&out).into_owned();
         let (head, body) = text.split_once("\r\n\r\n").unwrap_or((&text, ""));
         Ok(Reply {
@@ -495,13 +544,37 @@ mod tests {
     }
 
     #[test]
-    fn serves_the_page_and_the_removed_examples() -> Outcome {
+    fn serves_the_removed_examples() -> Outcome {
         let setup = setup()?;
-        let page = call(&setup.app, "GET", "/", "")?;
         let removed = call(&setup.app, "GET", "/slop.jsonl", "")?;
-        assert_eq!(page.status, "HTTP/1.1 200 OK");
-        assert_eq!(removed.body["id"], "gone");
+        assert_eq!((removed.status.as_str(), &removed.body["id"]), ("HTTP/1.1 200 OK", &Value::from("gone")));
         assert!(matches!(call(&setup.app, "DELETE", "/api/flag", ""), Err(ReviewError::NotFound(_))));
+        assert!(matches!(call(&setup.app, "GET", "/", ""), Err(ReviewError::NotFound(_))));
+        Ok(())
+    }
+
+    #[test]
+    fn serves_the_page_the_dataset_list_and_each_dataset() -> Outcome {
+        let folder = TempDir::new()?;
+        let train = folder.file("train.jsonl", TRAINING)?;
+        let teacher_line = r#"{"id":"t1","source":"teacher","origin":"trpl/src/ch08.md","entry":"grounded/trpl.md#1","based_on":"trpl/src/ch08.md","licence":"Apache-2.0","source_text":"Vectors hold values.","notes":["turn 2: R1"],"messages":[{"role":"user","content":"Q?"},{"role":"assistant","content":"A."}]}"#;
+        let teacher = folder.file("teacher.jsonl", &format!("{teacher_line}\n"))?;
+        let specs = [
+            crate::workspace::DatasetSpec::new("train", &train, &folder.path().join("f1.jsonl"), &folder.path().join("r1.jsonl")),
+            crate::workspace::DatasetSpec::new("teacher", &teacher, &folder.path().join("f2.jsonl"), &folder.path().join("r2.jsonl")),
+        ];
+        let workspace = Workspace::open(&specs)?;
+        let mut page = Vec::new();
+        answer(&mut page, &Request::new("GET", "/", ""), &workspace)?;
+        assert!(String::from_utf8_lossy(&page).starts_with("HTTP/1.1 200 OK"));
+        let mut listed = Vec::new();
+        answer(&mut listed, &Request::new("GET", "/api/datasets", ""), &workspace)?;
+        assert!(String::from_utf8_lossy(&listed).contains(r#""name":"teacher","#));
+        let mut records = Vec::new();
+        answer(&mut records, &Request::new("GET", "/api/page?dataset=teacher", ""), &workspace)?;
+        let text = String::from_utf8_lossy(&records).into_owned();
+        assert!(text.contains(r#""source_text":"Vectors hold values.""#) && text.contains(r#""licence":"Apache-2.0""#), "{text}");
+        assert!(text.contains(r#""collection_title":"The Rust Programming Language""#));
         Ok(())
     }
 

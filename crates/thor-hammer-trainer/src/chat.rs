@@ -263,6 +263,38 @@ fn append_paragraph(text: &mut String, paragraph: &str) {
 mod tests {
     use super::*;
 
+    #[test]
+    fn two_questions_in_a_row_become_one_and_an_empty_question_is_skipped() -> Result<(), DataError> {
+        let export = r#"[{"uuid": "c4", "chat_messages": [
+            {"sender": "human", "content": [{"type": "text", "text": "First part."}]},
+            {"sender": "human", "content": [{"type": "text", "text": "Second part."}]},
+            {"sender": "assistant", "content": [{"type": "text", "text": "One answer."}]},
+            {"sender": "human", "content": []},
+            {"sender": "assistant", "content": [{"type": "text", "text": "Answer to nothing."}]}
+        ]}]"#;
+        let mut skip_reasons = Vec::new();
+        let found = examples(export, &mut skip_reasons)?;
+        let questions: Vec<&str> = found.iter().map(|example| example.instruction.as_str()).collect();
+        assert_eq!(questions, ["First part.\n\nSecond part."]);
+        assert_eq!(skip_reasons, [SkipReason::EmptyTurn]);
+        Ok(())
+    }
+
+    #[test]
+    fn attachments_join_the_question_and_a_stray_answer_is_ignored() -> Result<(), DataError> {
+        let export = r#"[{"uuid": "c3", "chat_messages": [
+            {"sender": "assistant", "content": [{"type": "text", "text": "Hello before anything was asked."}]},
+            {"sender": "human", "content": [{"type": "text", "text": "Review this file."}],
+             "attachments": [{"file_name": "main.rs", "extracted_content": "fn main() {}"}]},
+            {"sender": "assistant", "content": [{"type": "text", "text": "It does nothing yet."}]}
+        ]}]"#;
+        let mut skip_reasons = Vec::new();
+        let found = examples(export, &mut skip_reasons)?;
+        let questions: Vec<&str> = found.iter().map(|example| example.instruction.as_str()).collect();
+        assert_eq!(questions, ["Review this file.\n\nAttached file `main.rs`:\n\nfn main() {}"]);
+        Ok(())
+    }
+
     const EXPORT: &str = r#"[
       {"uuid": "c1", "chat_messages": [
         {"sender": "human", "content": [{"type": "text", "text": "What is a futex?"}]},

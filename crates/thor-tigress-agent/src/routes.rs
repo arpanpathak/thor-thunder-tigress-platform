@@ -230,6 +230,22 @@ mod tests {
     }
 
     #[test]
+    fn sends_chat_and_messages_to_the_model() -> Outcome {
+        let reply = json_response(r#"{"choices":[{"message":{"role":"assistant","content":"hi"}}]}"#);
+        let setup = setup(vec![reply.clone(), reply], None)?;
+        let mut chat = request("POST", "/v1/chat/completions", None);
+        chat.body = br#"{"messages":[{"role":"user","content":"hi"}]}"#.to_vec();
+        let mut messages = request("POST", "/v1/messages", None);
+        messages.body = br#"{"model":"x","messages":[{"role":"user","content":"hi"}]}"#.to_vec();
+        let chatted = answered(&setup, &chat)?;
+        let forwarded = answered(&setup, &messages)?;
+        fs::remove_dir_all(&setup.folder)?;
+        assert!(chatted.starts_with("HTTP/1.1 200"), "{chatted}");
+        assert!(forwarded.starts_with("HTTP/1.1 200"), "{forwarded}");
+        Ok(())
+    }
+
+    #[test]
     fn passes_model_routes_through_with_the_key() -> Outcome {
         let setup = setup(vec![json_response(r#"{"data":[]}"#), json_response(r#"{"input_tokens":3}"#)], Some("k"))?;
         let models = answered(&setup, &request("GET", "/v1/models", Some("Bearer k")))?;

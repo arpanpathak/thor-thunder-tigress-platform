@@ -29,7 +29,7 @@ use crate::error::{Outcome, ReviewError};
 const READ_BUFFER: usize = 1 << 20;
 
 /// Sources whose origins are `folder/file` paths, so the folder names a book.
-const SOURCES_WITH_COLLECTIONS: [&str; 2] = ["book", "corpus"];
+const SOURCES_WITH_COLLECTIONS: [&str; 3] = ["book", "corpus", "teacher"];
 
 /// The ids a set of ids is checked against: the flagged examples.
 pub type Ids = HashSet<String>;

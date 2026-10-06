@@ -3,8 +3,11 @@
 //!
 //! [`conversations`] builds multi-turn conversations from book passages: the
 //! model writes the questions, the book's own text is every answer.
-//! [`client`] is the HTTP client for the server.
+//! [`client`] is the HTTP client for the server, and [`cli`] the command line.
 
+pub mod cli;
 pub mod client;
 pub mod conversations;
 pub mod error;
+#[cfg(test)]
+pub mod testing;

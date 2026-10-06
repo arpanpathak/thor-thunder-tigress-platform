@@ -61,3 +61,23 @@ impl std::error::Error for DataError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::teacher::FormatError;
+    use std::error::Error as _;
+
+    #[test]
+    fn every_error_names_its_cause_and_keeps_its_source() {
+        let io = DataError::io(Path::new("data/train.jsonl"))(io::Error::other("disk full"));
+        let json = serde_json::from_str::<u8>("x").err().map(DataError::from);
+        let format = DataError::Format { origin: "a.md#2".to_string(), error: FormatError::NoTurns };
+        assert_eq!(io.to_string(), "data/train.jsonl: disk full");
+        assert!(json.as_ref().is_some_and(|error| error.to_string().starts_with("JSON: ")));
+        assert_eq!(format.to_string(), "a.md#2: no ### User or ### Assistant section");
+        assert!(io.source().is_some());
+        assert!(json.as_ref().and_then(|error| error.source()).is_some());
+        assert!(format.source().is_some());
+    }
+}

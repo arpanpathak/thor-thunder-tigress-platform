@@ -84,3 +84,16 @@ pub fn event_stream(events: &[&str]) -> String {
     response.push_str("data: [DONE]\n\n");
     response
 }
+
+/// A writer whose every write fails, as if the client had gone.
+pub struct Gone;
+
+impl Write for Gone {
+    fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+        Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+    }
+}

@@ -22,6 +22,9 @@
 //! ```text
 //! cargo run --release -p thor-hammer-trainer -- [OUTPUT_DIR]
 //! ```
+//!
+//! [`Inputs`] names every input path, so the whole build can run on a small
+//! tree of test files.
 
 use std::{
     collections::HashSet,
@@ -92,14 +95,21 @@ const NOTES_FILES: [&str; 12] = [
 enum CorpusFile {
     /// A folder to walk into.
     Directory,
+    /// A file to read.
+    File(BookFile),
+    /// Anything else, including hidden files and ignored folders.
+    Ignored,
+}
+
+/// A file of the book repository that the build reads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum BookFile {
     /// A markdown chapter: one example per section.
     Chapter,
     /// A markdown file of notes: left out.
     Notes,
     /// A source file: one example if it has a header comment.
     Code,
-    /// Anything else, including hidden files and ignored folders.
-    Ignored,
 }
 
 /// One line of `train.jsonl`: the example and its stable id, which the review
@@ -121,21 +131,67 @@ impl<'a> TrainingRecord<'a> {
     }
 }
 
-/// Reads every input, filters the examples, and writes the output files.
-pub fn build_training_set(output_dir: &Path) -> Result<(), DataError> {
+/// Where the build reads from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Inputs {
+    /// The folder holding the chat export, the readability set and the
+    /// clever-vs-readable set.
+    pub datastore: PathBuf,
+    /// The book repository: chapters and source files.
+    pub book_repository: PathBuf,
+    /// The folder the open corpus was fetched into.
+    pub corpus: PathBuf,
+    /// The corpus manifest.
+    pub manifest: PathBuf,
+    /// The reviewer's slop flags.
+    pub slop_flags: PathBuf,
+}
+
+impl Inputs {
+    /// The usual layout: the datastore and book repository under `home`, the
+    /// corpus and labels relative to the repository root.
+    #[must_use]
+    pub fn under_home(home: &Path) -> Self {
+        Self {
+            datastore: home.join(DATASTORE),
+            book_repository: home.join(BOOK_REPOSITORY),
+            corpus: PathBuf::from(corpus::CORPUS_DIRECTORY),
+            manifest: PathBuf::from(corpus::MANIFEST_FILE),
+            slop_flags: PathBuf::from(SLOP_FLAGS_FILE),
+        }
+    }
+}
+
+/// What a build wrote, for the terminal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Built {
+    /// One line per corpus source: what it contributed, or why nothing.
+    pub corpus_lines: Vec<String>,
+    /// One warning per slop flag that matched no example.
+    pub warnings: Vec<String>,
+    /// The text of `stats.md`.
+    pub report: String,
+}
+
+/// Reads every input, filters the examples, and writes `train.jsonl`,
+/// `slop.jsonl`, `preferences.jsonl` and `stats.md` to `output_dir`.
+///
+/// # Errors
+///
+/// `DataError::Io` when an input can't be read or an output can't be written,
+/// and `DataError::Json` when an input does not parse.
+pub fn build_training_set(inputs: &Inputs, output_dir: &Path) -> Result<Built, DataError> {
     let mut skip_reasons = Vec::new();
-    let examples = read_all_examples(&mut skip_reasons)?;
+    let (examples, corpus_lines) = read_all_examples(inputs, &mut skip_reasons)?;
     let unique_examples = remove_short_and_duplicate(examples, &mut skip_reasons);
-    let slop_flags_by_id = slop_flags::read(Path::new(SLOP_FLAGS_FILE))?;
+    let slop_flags_by_id = slop_flags::read(&inputs.slop_flags)?;
     let (training_set, flagged_examples, unmatched_flags) =
         slop_flags::separate_flagged(unique_examples, &slop_flags_by_id, &mut skip_reasons);
-    for unmatched in &unmatched_flags {
-        eprintln!(
-            "warning: flag {} matched no example and was NOT applied: {}",
-            unmatched.id, unmatched.note
-        );
-    }
-    let preference_file = home_path(DATASTORE).join(CLEVER_VS_READABLE_DPO);
+    let warnings = unmatched_flags
+        .iter()
+        .map(|unmatched| format!("warning: flag {} matched no example and was NOT applied: {}", unmatched.id, unmatched.note))
+        .collect();
+    let preference_file = inputs.datastore.join(CLEVER_VS_READABLE_DPO);
     let preference_pairs = clever_vs_readable::preference_pairs(&read_file(&preference_file)?)?;
     let slop_span_counts = slop_flags::span_counts(&flagged_examples);
     let report = report::render(&ReportInput {
@@ -145,96 +201,52 @@ pub fn build_training_set(output_dir: &Path) -> Result<(), DataError> {
         slop_span_counts: &slop_span_counts,
         unmatched_flags: &unmatched_flags,
     });
-
-    let training_records: Vec<TrainingRecord> = training_set
-        .iter()
-        .map(TrainingRecord::new)
-        .collect();
+    let training_records: Vec<TrainingRecord> = training_set.iter().map(TrainingRecord::new).collect();
     fs::create_dir_all(output_dir).map_err(DataError::io(output_dir))?;
     write_jsonl(&output_dir.join("train.jsonl"), &training_records)?;
     write_jsonl(&output_dir.join("slop.jsonl"), &flagged_examples)?;
     write_jsonl(&output_dir.join("preferences.jsonl"), &preference_pairs)?;
     write_file(&output_dir.join("stats.md"), &report)?;
-    print!("{report}");
-    Ok(())
+    Ok(Built { corpus_lines, warnings, report })
 }
 
-/// Reads every source, curated sets first, so the curated copy of a duplicate is the one kept.
-fn read_all_examples(skip_reasons: &mut Vec<SkipReason>) -> Result<Vec<Example>, DataError> {
-    let datastore = home_path(DATASTORE);
-    let datastore = datastore.as_path();
+/// Reads every source, curated sets first, so the curated copy of a duplicate
+/// is the one kept. Also returns one line per corpus source.
+fn read_all_examples(inputs: &Inputs, skip_reasons: &mut Vec<SkipReason>) -> Result<(Vec<Example>, Vec<String>), DataError> {
+    let datastore = inputs.datastore.as_path();
     let readability_set = read_file(&datastore.join("readability_training.md"))?;
     let clever_vs_readable_set = read_file(&datastore.join(CLEVER_VS_READABLE_SFT))?;
     let chat_export = read_file(&datastore.join("work/extracted/conversations.json"))?;
     let single_chat = read_file(&datastore.join("chat_0.md"))?;
 
     let mut examples = readability::examples(&readability_set);
-    examples.extend(clever_vs_readable::examples(
-        &clever_vs_readable_set,
-        skip_reasons,
-    )?);
+    examples.extend(clever_vs_readable::examples(&clever_vs_readable_set, skip_reasons)?);
     examples.extend(chat::examples(&chat_export, skip_reasons)?);
     examples.extend(chat::example_from_question_file(&single_chat, "chat_0.md"));
-    examples.extend(book_repository_examples(
-        &home_path(BOOK_REPOSITORY),
-        skip_reasons,
-    )?);
-    examples.extend(open_corpus_examples()?);
-    Ok(examples)
+    examples.extend(book_repository_examples(&inputs.book_repository, skip_reasons)?);
+    let fetched = corpus::examples(&inputs.corpus, &inputs.manifest)?;
+    let corpus_lines = fetched.reports.iter().map(corpus_line).collect();
+    examples.extend(fetched.examples);
+    Ok((examples, corpus_lines))
 }
 
-/// Reads the open corpus fetched by `train/fetch_corpus.sh`.
-///
-/// A source whose licence is not permissive is refused by [`corpus::examples`]
-/// and reported here rather than quietly dropped.
-fn open_corpus_examples() -> Result<Vec<Example>, DataError> {
-    let fetched = corpus::examples(
-        Path::new(corpus::CORPUS_DIRECTORY),
-        Path::new(corpus::MANIFEST_FILE),
-    )?;
-    println!("open corpus:");
-    for report in &fetched.reports {
-        match &report.outcome {
-            corpus::SourceOutcome::Used {
-                examples,
-                before_cap,
-                licence,
-            } => println!(
-                "  {:<22} {:>6} examples  {}{}",
-                report.name,
-                examples,
-                licence.name(),
-                match examples < before_cap {
-                    true => format!("  (capped from {before_cap})"),
-                    false => String::new(),
-                }
-            ),
-            corpus::SourceOutcome::LicenceRefused(licence) => println!(
-                "  {:<22} refused, licence {}",
-                report.name,
-                licence.name()
-            ),
-            corpus::SourceOutcome::NoMarkdown => {
-                println!("  {:<22} no markdown found", report.name);
-            }
-            corpus::SourceOutcome::CodeOnly => {
-                println!("  {:<22} code repository, read by the teacher", report.name);
-            }
+/// One line saying what a corpus source contributed, or why nothing.
+fn corpus_line(report: &corpus::SourceReport) -> String {
+    let name = &report.name;
+    match &report.outcome {
+        corpus::SourceOutcome::Used { examples, before_cap, licence } if examples < before_cap => {
+            format!("  {name:<22} {examples:>6} examples  {}  (capped from {before_cap})", licence.name())
         }
+        corpus::SourceOutcome::Used { examples, licence, .. } => {
+            format!("  {name:<22} {examples:>6} examples  {}", licence.name())
+        }
+        corpus::SourceOutcome::LicenceRefused(licence) => format!("  {name:<22} refused, licence {}", licence.name()),
+        corpus::SourceOutcome::NoMarkdown => format!("  {name:<22} no markdown found"),
+        corpus::SourceOutcome::CodeOnly => format!("  {name:<22} code repository, read by the teacher"),
     }
-    Ok(fetched.examples)
 }
 
 /// Reads a whole UTF-8 file.
-/// `relative` under the home folder of whoever runs the build, so the same
-/// binary works on every machine the repositories are synced to.
-fn home_path(relative: &str) -> PathBuf {
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_default()
-        .join(relative)
-}
-
 fn read_file(path: &Path) -> Result<String, DataError> {
     fs::read_to_string(path).map_err(DataError::io(path))
 }
@@ -245,46 +257,32 @@ fn write_file(path: &Path, contents: &str) -> Result<(), DataError> {
 }
 
 /// Turns every chapter and source file under `root` into examples.
-fn book_repository_examples(
-    root: &Path,
-    skip_reasons: &mut Vec<SkipReason>,
-) -> Result<Vec<Example>, DataError> {
-    let mut corpus_files = Vec::new();
-    collect_corpus_files(root, &mut corpus_files)?;
-    corpus_files.sort();
-
+fn book_repository_examples(root: &Path, skip_reasons: &mut Vec<SkipReason>) -> Result<Vec<Example>, DataError> {
+    let mut book_files = Vec::new();
+    collect_book_files(root, &mut book_files)?;
+    book_files.sort();
     let mut examples = Vec::new();
-    for path in corpus_files {
-        let origin = path
-            .strip_prefix(root)
-            .unwrap_or(&path)
-            .display()
-            .to_string();
-        match classify(&path) {
-            CorpusFile::Chapter => {
-                examples.extend(book::examples(&corpus::clean(&read_file(&path)?), &origin))
-            }
-            CorpusFile::Code => match code::example(&read_file(&path)?, &path, &origin) {
+    for (path, kind) in book_files {
+        let origin = path.strip_prefix(root).unwrap_or(&path).display().to_string();
+        match kind {
+            BookFile::Chapter => examples.extend(book::examples(&corpus::clean(&read_file(&path)?), &origin)),
+            BookFile::Code => match code::example(&read_file(&path)?, &path, &origin) {
                 Some(example) => examples.push(example),
                 None => skip_reasons.push(SkipReason::NoHeaderComment),
             },
-            CorpusFile::Notes => skip_reasons.push(SkipReason::NotesFile),
-            CorpusFile::Directory | CorpusFile::Ignored => {}
+            BookFile::Notes => skip_reasons.push(SkipReason::NotesFile),
         }
     }
     Ok(examples)
 }
 
-/// Walks `directory` and collects every chapter, notes file and source file.
-fn collect_corpus_files(
-    directory: &Path,
-    corpus_files: &mut Vec<PathBuf>,
-) -> Result<(), DataError> {
+/// Walks `directory` and collects every chapter, notes file and source file with its kind.
+fn collect_book_files(directory: &Path, book_files: &mut Vec<(PathBuf, BookFile)>) -> Result<(), DataError> {
     for entry in fs::read_dir(directory).map_err(DataError::io(directory))? {
         let path = entry.map_err(DataError::io(directory))?.path();
         match classify(&path) {
-            CorpusFile::Directory => collect_corpus_files(&path, corpus_files)?,
-            CorpusFile::Chapter | CorpusFile::Notes | CorpusFile::Code => corpus_files.push(path),
+            CorpusFile::Directory => collect_book_files(&path, book_files)?,
+            CorpusFile::File(kind) => book_files.push((path, kind)),
             CorpusFile::Ignored => {}
         }
     }
@@ -293,23 +291,16 @@ fn collect_corpus_files(
 
 /// Decides what a path holds from its name, extension and type.
 fn classify(path: &Path) -> CorpusFile {
-    let name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("");
+    let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
     let is_hidden = name.starts_with('.');
     let is_ignored_directory = IGNORED_DIRECTORIES.contains(&name);
     let is_markdown = path.extension().is_some_and(|extension| extension == "md");
-    match (
-        is_hidden || is_ignored_directory,
-        path.is_dir(),
-        is_markdown,
-    ) {
+    match (is_hidden || is_ignored_directory, path.is_dir(), is_markdown) {
         (true, ..) => CorpusFile::Ignored,
         (false, true, ..) => CorpusFile::Directory,
-        (false, false, true) if NOTES_FILES.contains(&name) => CorpusFile::Notes,
-        (false, false, true) => CorpusFile::Chapter,
-        (false, false, false) if code::is_source_file(path) => CorpusFile::Code,
+        (false, false, true) if NOTES_FILES.contains(&name) => CorpusFile::File(BookFile::Notes),
+        (false, false, true) => CorpusFile::File(BookFile::Chapter),
+        (false, false, false) if code::is_source_file(path) => CorpusFile::File(BookFile::Code),
         (false, false, false) => CorpusFile::Ignored,
     }
 }
@@ -338,10 +329,7 @@ fn rejection(example: &Example, seen_texts: &mut HashSet<String>) -> Option<Skip
         return Some(SkipReason::TooShort);
     }
     let is_first_copy = seen_texts.insert(example.dedup_key());
-    match is_first_copy {
-        true => None,
-        false => Some(SkipReason::Duplicate),
-    }
+    (!is_first_copy).then_some(SkipReason::Duplicate)
 }
 
 /// Writes one JSON object per line.
@@ -358,6 +346,139 @@ fn write_jsonl<Record: Serialize>(path: &Path, records: &[Record]) -> Result<(),
 mod tests {
     use super::*;
     use crate::example::Source;
+
+    /// A small tree of every input, removed when dropped.
+    struct Fixture {
+        root: PathBuf,
+    }
+
+    impl Fixture {
+        fn new(name: &str) -> Result<Self, DataError> {
+            let root = std::env::temp_dir().join(format!("thor-hammer-build-{name}-{}", std::process::id()));
+            let fixture = Self { root };
+            let long = "A page is a fixed-size block of virtual memory that the kernel maps. ".repeat(4);
+            fixture.write("store/readability_training.md", &format!("# Set\n---\n### Instruction\nWhat is a page?\n### Response\n{long}\n"))?;
+            let sft = format!(r#"{{"messages": [{{"role": "user", "content": "Rewrite this loop."}}, {{"role": "assistant", "content": "{long}"}}], "meta": {{"id": "rs-x"}}}}"#);
+            fixture.write("store/clever_vs_readable/clever_vs_readable_sft.jsonl", &sft)?;
+            let dpo = r#"{"prompt":[{"role":"user","content":"Q"}],"chosen":[{"role":"assistant","content":"good"}],"rejected":[{"role":"assistant","content":"bad"}],"meta":{"id":"rs-x"}}"#;
+            fixture.write("store/clever_vs_readable/clever_vs_readable_dpo.jsonl", dpo)?;
+            let export = format!(r#"[{{"uuid": "c1", "chat_messages": [{{"sender": "human", "content": [{{"type": "text", "text": "What is a futex?"}}]}}, {{"sender": "assistant", "content": [{{"type": "text", "text": "A fast userspace mutex. {long}"}}]}}]}}]"#);
+            fixture.write("store/work/extracted/conversations.json", &export)?;
+            fixture.write("store/chat_0.md", &format!("#Question\nWhat is a TLB?\n#Answer\nA cache of page translations. {long}\n"))?;
+            fixture.write("books/book/ch01.md", &format!("# Memory\n\n## Pages\n\n{long}\n"))?;
+            fixture.write("books/book/WORKLOG.md", "notes")?;
+            fixture.write("books/lab/topk.rs", &format!("//! Top K frequent elements, using a heap. {long}\nfn main() {{}}\n"))?;
+            fixture.write("books/lab/bare.rs", "fn main() {}\n")?;
+            fixture.write("books/target/skip.md", "build output")?;
+            fixture.write("books/.git/HEAD.md", "hidden")?;
+            fixture.write("corpus/eng-practices/review/index.md", &format!("# Review\n\n## Design\n\n{long}\n"))?;
+            fixture.write("corpus/closed/review/a.md", "# Closed\n")?;
+            fixture.write("corpus/empty/README.txt", "nothing")?;
+            let manifest = "source\tkind\tcommit\tlicence_file\tlicence\neng-practices\tdocs\tabc\tLICENSE\tAttribution 4.0 International\nclosed\tdocs\tabc\tLICENSE\tAll rights reserved\nempty\tdocs\tabc\tLICENSE\tMIT License\nlib\tcode\tabc\tLICENSE\tMIT License\n";
+            fixture.write("manifest.tsv", manifest)?;
+            Ok(fixture)
+        }
+
+        fn write(&self, path: &str, text: &str) -> Result<(), DataError> {
+            let file = self.root.join(path);
+            let parent = file.parent().unwrap_or(&self.root);
+            fs::create_dir_all(parent).map_err(DataError::io(parent))?;
+            fs::write(&file, text).map_err(DataError::io(&file))
+        }
+
+        fn inputs(&self) -> Inputs {
+            Inputs {
+                datastore: self.root.join("store"),
+                book_repository: self.root.join("books"),
+                corpus: self.root.join("corpus"),
+                manifest: self.root.join("manifest.tsv"),
+                slop_flags: self.root.join("flags.jsonl"),
+            }
+        }
+
+        fn read(&self, path: &str) -> Result<String, DataError> {
+            read_file(&self.root.join(path))
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn builds_every_output_from_every_input() -> Result<(), DataError> {
+        let fixture = Fixture::new("all")?;
+        let built = build_training_set(&fixture.inputs(), &fixture.root.join("out"))?;
+        let train = fixture.read("out/train.jsonl")?;
+        let sources: Vec<String> = train
+            .lines()
+            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .filter_map(|record| record.get("source").and_then(serde_json::Value::as_str).map(String::from))
+            .collect();
+        assert_eq!(sources, ["readability", "clever_vs_readable", "chat", "chat", "book", "code", "corpus"]);
+        assert_eq!(fixture.read("out/preferences.jsonl")?.lines().count(), 1);
+        assert_eq!(fixture.read("out/slop.jsonl")?, "");
+        assert!(built.report.contains("1 markdown files of notes"));
+        assert!(built.report.contains("1 code files without a header comment"));
+        assert_eq!(
+            built.corpus_lines,
+            [
+                "  eng-practices               1 examples  CC-BY",
+                "  closed                 refused, licence unrecognised",
+                "  empty                  no markdown found",
+                "  lib                    code repository, read by the teacher",
+            ]
+        );
+        assert!(built.warnings.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn a_flag_moves_its_example_to_slop_and_a_stale_flag_warns() -> Result<(), DataError> {
+        let fixture = Fixture::new("flags")?;
+        let first = build_training_set(&fixture.inputs(), &fixture.root.join("out"))?;
+        let train = fixture.read("out/train.jsonl")?;
+        let id = train
+            .lines()
+            .next()
+            .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+            .and_then(|record| record.get("id").and_then(serde_json::Value::as_str).map(String::from))
+            .unwrap_or_default();
+        fixture.write("flags.jsonl", &format!("{{\"id\":\"{id}\",\"note\":\"opens with filler\",\"spans\":[]}}\n{{\"id\":\"gone\",\"note\":\"old\",\"spans\":[]}}\n"))?;
+        let second = build_training_set(&fixture.inputs(), &fixture.root.join("out"))?;
+        assert_eq!(fixture.read("out/train.jsonl")?.lines().count(), train.lines().count() - 1);
+        assert_eq!(fixture.read("out/slop.jsonl")?.lines().count(), 1);
+        assert_eq!(second.warnings, ["warning: flag gone matched no example and was NOT applied: old"]);
+        assert_ne!(first.report, second.report);
+        Ok(())
+    }
+
+    #[test]
+    fn a_missing_input_is_an_error_naming_the_file() -> Result<(), DataError> {
+        let fixture = Fixture::new("missing")?;
+        fs::remove_file(fixture.root.join("store/chat_0.md")).map_err(DataError::io(&fixture.root))?;
+        let error = build_training_set(&fixture.inputs(), &fixture.root.join("out")).err().map(|error| error.to_string());
+        assert!(error.is_some_and(|message| message.contains("chat_0.md")));
+        Ok(())
+    }
+
+    #[test]
+    fn a_capped_source_says_so() {
+        let report = corpus::SourceReport {
+            name: "kubernetes-website".to_string(),
+            outcome: corpus::SourceOutcome::Used { examples: 10, before_cap: 40, licence: corpus::Licence::CreativeCommons },
+        };
+        assert_eq!(corpus_line(&report), "  kubernetes-website         10 examples  CC-BY  (capped from 40)");
+    }
+
+    #[test]
+    fn the_usual_inputs_sit_under_home() {
+        let inputs = Inputs::under_home(Path::new("/home/a"));
+        assert_eq!(inputs.datastore, Path::new("/home/a").join(DATASTORE));
+        assert_eq!(inputs.slop_flags, PathBuf::from(SLOP_FLAGS_FILE));
+    }
 
     fn chat_example(response: &str) -> Example {
         Example {
@@ -384,18 +505,9 @@ mod tests {
 
     #[test]
     fn classifies_notes_and_chapters() {
-        assert!(matches!(
-            classify(Path::new("book/WORKLOG.md")),
-            CorpusFile::Notes
-        ));
-        assert!(matches!(
-            classify(Path::new("book/ch01.md")),
-            CorpusFile::Chapter
-        ));
-        assert!(matches!(
-            classify(Path::new("lab/topk.rs")),
-            CorpusFile::Code
-        ));
+        assert!(matches!(classify(Path::new("book/WORKLOG.md")), CorpusFile::File(BookFile::Notes)));
+        assert!(matches!(classify(Path::new("book/ch01.md")), CorpusFile::File(BookFile::Chapter)));
+        assert!(matches!(classify(Path::new("lab/topk.rs")), CorpusFile::File(BookFile::Code)));
         assert!(matches!(
             classify(Path::new("lab/notes.txt")),
             CorpusFile::Ignored

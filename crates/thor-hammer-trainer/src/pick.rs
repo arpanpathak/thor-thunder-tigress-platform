@@ -238,6 +238,19 @@ pub fn render_queue(picked: &[&Section]) -> String {
 mod tests {
     use super::*;
 
+    #[test]
+    fn skips_files_that_are_not_text() -> Result<(), DataError> {
+        let root = std::env::temp_dir().join(format!("thor-hammer-binary-{}", std::process::id()));
+        let folder = root.join("lib");
+        fs::create_dir_all(&folder).map_err(DataError::io(&folder))?;
+        let binary = folder.join("blob.rs");
+        fs::write(&binary, vec![0xff_u8; MIN_CODE_CHARS + 1]).map_err(DataError::io(&binary))?;
+        let manifest = root.join("manifest.tsv");
+        fs::write(&manifest, "source\tkind\tcommit\tlicence_file\tlicence\nlib\tcode\tabc\tLICENSE\tMIT License\n").map_err(DataError::io(&manifest))?;
+        assert_eq!(code_sections(&root, &manifest)?, []);
+        fs::remove_dir_all(&root).map_err(DataError::io(&root))
+    }
+
     fn section(id: &str, source: &str, file: &str, chars: usize) -> Section {
         Section {
             id: id.to_string(),

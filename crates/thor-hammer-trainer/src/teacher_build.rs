@@ -155,12 +155,20 @@ impl Outcome {
     }
 }
 
-/// One line of `teacher.jsonl`.
+/// The `source` every line of `teacher.jsonl` carries, so the review page
+/// shows the teacher set as one source.
+const TEACHER_SOURCE: &str = "teacher";
+
+/// One line of `teacher.jsonl`. `origin` is the real file a grounded entry
+/// was written from, or the entry itself for one the teacher wrote freely;
+/// `entry` is always the file and number of the entry.
 #[derive(Serialize)]
 struct ChatLine<'a> {
     id: String,
-    source: &'a str,
+    source: &'static str,
     origin: &'a str,
+    entry: &'a str,
+    based_on: &'a str,
     #[serde(skip_serializing_if = "Option::is_none")]
     section: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -257,14 +265,10 @@ pub fn check(paths: &Paths) -> Result<CheckResult, DataError> {
     }
     fs::create_dir_all(output).map_err(DataError::io(output))?;
     let passed: Vec<(&Conversation, &Checked)> = outcomes.iter().filter_map(Outcome::passed).collect();
-    write_jsonl(
-        &output.join("teacher.jsonl"),
-        passed.iter().map(|(conversation, checked)| chat_line(conversation, checked, &sections)),
-    )?;
-    write_jsonl(
-        &output.join("teacher_preferences.jsonl"),
-        passed.iter().filter_map(|(conversation, _)| preference_line(conversation)),
-    )?;
+    let chat_lines = passed.iter().map(|(conversation, checked)| chat_line(conversation, checked, &sections));
+    write_jsonl(&output.join("teacher.jsonl"), chat_lines)?;
+    let preference_lines = passed.iter().filter_map(|(conversation, _)| preference_line(conversation));
+    write_jsonl(&output.join("teacher_preferences.jsonl"), preference_lines)?;
     let report = render_report(&outcomes, &sections);
     let report_path = output.join("teacher.md");
     fs::write(&report_path, &report).map_err(DataError::io(&report_path))?;
@@ -314,11 +318,7 @@ fn check_all(entries: Vec<Entry>, scratch: &Path) -> Result<Vec<Outcome>, DataEr
             .collect();
         let mut outcomes = Vec::new();
         for worker in workers {
-            let checked = worker.join().map_err(|_| DataError::Io {
-                path: scratch.display().to_string(),
-                source: std::io::Error::other("a checking thread panicked"),
-            })??;
-            outcomes.extend(checked);
+            outcomes.extend(worker.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))?);
         }
         Ok(outcomes)
     })
@@ -341,8 +341,10 @@ fn chat_line<'a>(conversation: &'a Conversation, checked: &'a Checked, sections:
     let section = conversation.section.as_ref().and_then(|id| sections.get(id));
     ChatLine {
         id: conversation.id(),
-        source: &conversation.source,
-        origin: &conversation.origin,
+        source: TEACHER_SOURCE,
+        origin: section.map_or(conversation.origin.as_str(), |found| found.origin.as_str()),
+        entry: &conversation.origin,
+        based_on: &conversation.source,
         section: conversation.section.as_deref(),
         licence: conversation.licence.as_deref().or(section.map(|found| found.licence.as_str())),
         source_text: section.map(|found| found.text.as_str()),
@@ -456,9 +458,8 @@ mod tests {
 
         fn write(&self, path: &str, text: &str) -> Result<(), DataError> {
             let file = self.root.join(path);
-            if let Some(parent) = file.parent() {
-                fs::create_dir_all(parent).map_err(DataError::io(parent))?;
-            }
+            let parent = file.parent().unwrap_or(&self.root);
+            fs::create_dir_all(parent).map_err(DataError::io(parent))?;
             fs::write(&file, text).map_err(DataError::io(&file))
         }
 
@@ -488,16 +489,19 @@ mod tests {
     #[test]
     fn writes_passing_entries_and_reports_failing_ones() -> Result<(), DataError> {
         let workspace = Workspace::new("check")?;
-        workspace.write("teacher/a.md", GOOD)?;
+        workspace.write("teacher/a.md", &format!("{GOOD}---\n<!-- source: notes -->\n### User\nQ\n\n### Assistant\nGreat question!\n\n```python\nassert 1 + 1 == 2\n```\n---\n<!-- source: notes -->\n### User\nQ\n\n### Assistant\n```python\nassert sorted([2, 1]) == [1, 2]\n```\n"))?;
         let unknown = GOOD.replace("section: s1", "section: nowhere");
         workspace.write("teacher/more/b.md", &format!("{unknown}---\n### User\nno source comment\n"))?;
         let result = check(&workspace.paths)?;
         assert!(!result.all_passed);
-        assert!(result.summary().contains("| Passed every check | 1 |"));
+        assert!(result.summary().contains("| Passed every check | 2 |"));
+        assert!(result.report.contains("turn 2: slop: Great question"));
+        assert!(result.report.contains("| python | 1 |"));
         assert!(result.report.contains("section nowhere is not in"));
         assert!(result.report.contains("format: no <!-- source"));
         let chat = workspace.read("data/teacher.jsonl")?;
         assert!(chat.contains("\"source_text\":\"A long passage about heaps.\""));
+        assert!(chat.contains("\"source\":\"teacher\",\"origin\":\"book/heaps.md\",\"entry\":\"a.md#1\""));
         assert!(chat.contains("\"licence\":\"MIT\""));
         let preferences = workspace.read("data/teacher_preferences.jsonl")?;
         assert!(preferences.contains("\"rejected\":[{\"role\":\"assistant\",\"content\":\"Great question!"));

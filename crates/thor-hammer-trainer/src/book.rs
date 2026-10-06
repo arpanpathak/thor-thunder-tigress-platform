@@ -182,6 +182,12 @@ fn strip_numbering(heading: &str) -> String {
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_chapter_without_a_heading_is_named_after_its_file() {
+        assert_eq!(chapter_title("Only text, no heading.", "src/ch20-memory_and-context.md"), "ch20 memory and context");
+        assert_eq!(file_stem(""), "");
+    }
+
     const CHAPTER: &str = "# 13 An LRU cache\n\nIntro text.\n\n## 13.1 What an LRU cache does\n\nIt evicts.\n\n```bash\n# not a heading\n```\n\n## Summary\n\nWe built one.\n";
 
     fn first_lines(examples: &[Example]) -> Vec<String> {

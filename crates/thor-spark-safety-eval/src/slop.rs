@@ -310,6 +310,24 @@ pub fn check(text: &str) -> SlopReport {
 mod tests {
     use super::*;
 
+    #[test]
+    fn labels_every_category() {
+        let labels: Vec<&str> = [
+            Category::FakeImportance,
+            Category::DramaticSetup,
+            Category::EmptyDepthWords,
+            Category::FakeBalanceHedging,
+            Category::FlatteryFillerOpener,
+            Category::WrapUpRepeat,
+            Category::RhythmTrick,
+        ]
+        .into_iter()
+        .map(Category::label)
+        .collect();
+        assert_eq!(labels.len(), 7);
+        assert!(labels.iter().all(|label| !label.is_empty()));
+    }
+
     fn categories(text: &str) -> Vec<Category> {
         check(text)
             .hits

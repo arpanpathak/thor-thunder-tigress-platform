@@ -161,6 +161,16 @@ pub fn send_event(stream: &mut impl Write, data: &str) -> Outcome {
 mod tests {
     use super::*;
 
+    #[test]
+    fn every_writer_reports_a_gone_client() {
+        let mut gone = crate::testing::Gone;
+        assert!(respond(&mut gone, Status::Ok, ContentType::Json, b"{}").is_err());
+        assert!(preflight(&mut gone).is_err());
+        assert!(start_events(&mut gone).is_err());
+        assert!(unauthorized(&mut gone).is_err());
+        assert!(failure(&mut gone, &AgentError::bad_request("x")).is_err());
+    }
+
     fn written(write: impl FnOnce(&mut Vec<u8>) -> Outcome) -> Outcome<String> {
         let mut out = Vec::new();
         write(&mut out)?;

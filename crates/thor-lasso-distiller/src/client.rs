@@ -25,7 +25,7 @@ pub struct Message {
 }
 
 /// A server and the model name it serves.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Client {
     /// `host:port`, such as `127.0.0.1:8000`.
     pub address: String,
@@ -163,6 +163,15 @@ mod tests {
         };
         let outcome = client.complete(&[], 32, 0.7);
         assert!(matches!(outcome, Err(DistillError::Server(message)) if message.contains("engine not loaded")));
+        Ok(())
+    }
+
+    #[test]
+    fn reads_a_chunked_reply() -> Result<(), DistillError> {
+        let body = r#"{"choices":[{"message":{"role":"assistant","content":"chunked"}}]}"#;
+        let reply = format!("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n{body}\r\n0\r\n\r\n", body.len());
+        let client = Client { address: serve_once(reply)?, model: "teacher".to_string(), key: Some("k".to_string()) };
+        assert_eq!(client.complete(&[], 8, 0.0)?, "chunked");
         Ok(())
     }
 

@@ -508,11 +508,12 @@ static BLOCK_START: LazyLock<Option<Regex>> =
 /// a line that continues the paragraph or list item above it. Lines inside
 /// code blocks are kept exactly, so `grid[i][j]` is never read as a link.
 fn tidy_prose(text: &str) -> String {
-    let (Some(definition), Some(reference), Some(block_start)) =
-        (LINK_DEFINITION.as_ref(), REFERENCE_LINK.as_ref(), BLOCK_START.as_ref())
-    else {
-        return text.to_string();
-    };
+    let patterns = LINK_DEFINITION.as_ref().zip(REFERENCE_LINK.as_ref()).zip(BLOCK_START.as_ref());
+    patterns.map_or_else(|| text.to_string(), |((definition, reference), block_start)| tidy_with(text, definition, reference, block_start))
+}
+
+/// [`tidy_prose`] with its patterns compiled.
+fn tidy_with(text: &str, definition: &Regex, reference: &Regex, block_start: &Regex) -> String {
     let mut lines: Vec<(bool, String)> = Vec::new();
     let mut inside_code = false;
     let mut joinable = false;
@@ -782,6 +783,81 @@ mod tests {
         assert!(!Licence::MozillaPublic.permits_reuse());
         assert!(!Licence::Missing.permits_reuse());
         assert!(!Licence::Unrecognised.permits_reuse());
+    }
+
+    struct Tree {
+        root: PathBuf,
+    }
+
+    impl Tree {
+        fn new(name: &str) -> Self {
+            Self { root: std::env::temp_dir().join(format!("thor-hammer-corpus-{name}-{}", std::process::id())) }
+        }
+
+        fn write(&self, path: &str, text: &str) -> Result<(), DataError> {
+            let file = self.root.join(path);
+            let parent = file.parent().unwrap_or(&self.root);
+            fs::create_dir_all(parent).map_err(DataError::io(parent))?;
+            fs::write(&file, text).map_err(DataError::io(&file))
+        }
+    }
+
+    impl Drop for Tree {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
+    }
+
+    #[test]
+    fn walks_books_plain_sources_and_skips_what_it_should() -> Result<(), DataError> {
+        let tree = Tree::new("walk");
+        let section = "# Title\n\n## Part\n\nEnough words to make a section that is kept as an example.\n";
+        tree.write("corpus/mybook/guide/book.toml", "[book]\nsrc = \"text\"\n")?;
+        tree.write("corpus/mybook/guide/text/ch01.md", section)?;
+        tree.write("corpus/mybook/guide/text/SUMMARY.md", section)?;
+        tree.write("corpus/mybook/.hidden/book.toml", "")?;
+        tree.write("corpus/mybook/a/b/c/d/e/book.toml", "")?;
+        tree.write("corpus/aosa-500lines/ok/chapter.markdown", section)?;
+        tree.write("corpus/aosa-500lines/incomplete/draft.md", section)?;
+        tree.write("corpus/aosa-500lines/.git/x.md", section)?;
+        tree.write("corpus/eng-practices/other/x.md", section)?;
+        let manifest = "source\tkind\tcommit\tlicence_file\tlicence\nmybook\tbook\tabc\tLICENSE\tMIT License\naosa-500lines\tbook\tabc\tLICENSE\tMIT License\neng-practices\tdocs\tabc\tLICENSE\tMIT License\nnot-fetched\tbook\tabc\tLICENSE\tMIT License\nbroken line\n";
+        tree.write("manifest.tsv", manifest)?;
+        let corpus = examples(&tree.root.join("corpus"), &tree.root.join("manifest.tsv"))?;
+        let origins: Vec<&str> = corpus.examples.iter().map(|example| example.origin.as_str()).collect();
+        assert_eq!(origins, ["mybook/guide/text/ch01.md", "aosa-500lines/ok/chapter.markdown"]);
+        let outcomes: Vec<(&str, bool)> = corpus
+            .reports
+            .iter()
+            .map(|report| (report.name.as_str(), matches!(report.outcome, SourceOutcome::NoMarkdown)))
+            .collect();
+        assert_eq!(outcomes, [("mybook", false), ("aosa-500lines", false), ("eng-practices", true), ("not-fetched", true)]);
+        Ok(())
+    }
+
+    #[test]
+    fn names_every_licence() {
+        let names: Vec<&str> = [
+            Licence::Mit,
+            Licence::Apache,
+            Licence::Bsd,
+            Licence::CreativeCommons,
+            Licence::CreativeCommonsRestricted,
+            Licence::MozillaPublic,
+            Licence::PythonSoftwareFoundation,
+            Licence::Unrecognised,
+            Licence::Missing,
+        ]
+        .into_iter()
+        .map(Licence::name)
+        .collect();
+        assert_eq!(names, ["MIT", "Apache-2.0", "BSD", "CC-BY", "CC with NC/ND/SA terms", "MPL-2.0", "PSF-2.0", "unrecognised", "missing"]);
+    }
+
+    #[test]
+    fn keeps_an_unclosed_tag_and_an_unclosed_front_matter() {
+        assert_eq!(strip_html("a < b"), "a < b");
+        assert_eq!(strip_front_matter("---\ntitle: x\nno end"), "---\ntitle: x\nno end");
     }
 
     #[test]

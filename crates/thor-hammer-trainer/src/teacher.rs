@@ -197,13 +197,9 @@ pub fn parse(entry: &str, origin: &str) -> Result<Conversation, FormatError> {
     let (comment, body) = source_and_body(entry).ok_or(FormatError::NoSource)?;
     let Provenance { source, section, licence } = Provenance::read(&comment);
     let sections = sections(body);
-    let rejected_at = sections.iter().position(|(heading, _)| *heading == Heading::Rejected);
-    let (turn_sections, rejected) = match rejected_at {
-        Some(position) if position + 1 == sections.len() => {
-            (&sections[..position], Some(sections[position].1.clone()))
-        }
-        Some(_) => return Err(FormatError::RejectedNotLast),
-        None => (&sections[..], None),
+    let (rejected, turn_sections) = match sections.split_last() {
+        Some(((Heading::Rejected, text), before)) => (Some(text.clone()), before),
+        _ => (None, sections.as_slice()),
     };
     let turns = turn_sections
         .iter()
@@ -323,6 +319,22 @@ mod tests {
         assert_eq!(refused("<!-- source: s -->\n### User\nQ"), Some(FormatError::EndsWithUser));
         assert_eq!(refused("<!-- source: s -->\n### User\nQ\n### Rejected\nR\n### Assistant\nA"), Some(FormatError::RejectedNotLast));
         assert_eq!(refused("<!-- source: s -->\n### User\n\n### Assistant\nA"), Some(FormatError::EmptySection));
+    }
+
+    #[test]
+    fn describes_every_format_error_and_ignores_unknown_keys() -> Result<(), FormatError> {
+        let errors = [
+            FormatError::NoSource,
+            FormatError::NoTurns,
+            FormatError::OutOfOrder,
+            FormatError::EndsWithUser,
+            FormatError::RejectedNotLast,
+            FormatError::EmptySection,
+        ];
+        assert!(errors.iter().all(|error| !error.to_string().is_empty()));
+        assert_eq!(parse("<!-- source: s; topic: heaps -->\n### User\nQ\n### Assistant\nA", "x")?.section, None);
+        assert_eq!(parse("<!-- source: s -->\n### User\nQ\n### Assistant\nA\n### Rejected\nR\n### Rejected\nR", "x").err(), Some(FormatError::RejectedNotLast));
+        Ok(())
     }
 
     #[test]

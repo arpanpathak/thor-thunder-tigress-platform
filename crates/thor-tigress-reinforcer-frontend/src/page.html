@@ -3,249 +3,244 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Training Set Review</title>
+<title>Reinforcer review</title>
 <style>
   :root {
-    --bg: #fafaf9; --panel: #ffffff; --text: #1c1917; --muted: #78716c;
-    --border: #e7e5e4; --code-bg: #f5f5f4; --accent: #2563eb;
-    --mark: #fde047; --mark-text: #1c1917;
-    --slop: #dc2626; --slop-mark: #fecaca; --slop-mark-text: #7f1d1d;
-    --readability: #15803d; --chat: #2563eb; --book: #9333ea; --code: #c2410c;
-    --clever_vs_readable: #0e7490; --corpus: #0f766e;
-    --shadow: 0 1px 2px rgba(28,25,23,.05), 0 8px 24px -18px rgba(28,25,23,.35);
-    --header-h: 118px;
-    --code-block-bg: #fbfaf8; --code-bar-bg: #f1efec; --gutter: #a8a29e;
-    --tok-comment: #6b7280; --tok-string: #0a7d32; --tok-keyword: #a626a4;
-    --tok-type: #b45309; --tok-number: #0e7490; --tok-macro: #2563eb;
-    --tok-attr: #78716c; --tok-lifetime: #be185d; --tok-call: #1d4ed8;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #1c1917; --panel: #292524; --text: #f5f5f4; --muted: #a8a29e;
-      --border: #44403c; --code-bg: #262322; --accent: #60a5fa;
-      --mark: #ca8a04; --mark-text: #fefce8;
-      --slop: #f87171; --slop-mark: #7f1d1d; --slop-mark-text: #fee2e2;
-      --readability: #4ade80; --chat: #60a5fa; --book: #c084fc; --code: #fb923c;
-      --clever_vs_readable: #22d3ee; --corpus: #2dd4bf;
-      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -20px rgba(0,0,0,.9);
-      --code-block-bg: #161412; --code-bar-bg: #211e1c; --gutter: #57534e;
-      --tok-comment: #8b949e; --tok-string: #a5d6a7; --tok-keyword: #d2a8ff;
-      --tok-type: #ffcb6b; --tok-number: #79dcf2; --tok-macro: #82aaff;
-      --tok-attr: #a8a29e; --tok-lifetime: #f78fb3; --tok-call: #9cc4ff;
-    }
+    color-scheme: dark;
+    --bg: #0d1016; --rail: #11151d; --panel: #161b24; --panel-2: #1c2230; --raised: #222a3a;
+    --text: #e6e9f0; --muted: #8a94a8; --faint: #5d6679; --border: #262e3d; --border-strong: #354055;
+    --accent: #5eead4; --accent-ink: #062a26; --good: #4ade80; --slop: #fb7185; --warn: #fbbf24;
+    --code-bg: #0f131b; --code-bar-bg: #141a24; --gutter: #4b5568;
+    --mark: #854d0e; --mark-text: #fef3c7;
+    --tok-comment: #6b7a90; --tok-string: #a5e3b0; --tok-keyword: #d6a8ff;
+    --tok-type: #ffd27a; --tok-number: #7fd8f0; --tok-macro: #8fb4ff;
+    --tok-attr: #a3adbf; --tok-lifetime: #f7a1c4; --tok-call: #9cc8ff;
+    --c-flattery_filler_opener: #f472b6; --c-wrap_up_repeat: #a78bfa; --c-fake_importance: #fb923c;
+    --c-dramatic_setup: #f87171; --c-empty_depth_words: #facc15; --c-fake_balance_hedging: #38bdf8;
+    --c-rhythm_trick: #34d399; --c-other: #94a3b8;
+    --radius: 12px; --rail-w: 300px;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
-         -webkit-font-smoothing: antialiased; }
-  header { position: sticky; top: 0; z-index: 3; background: var(--bg);
-           border-bottom: 1px solid var(--border); padding: 11px 16px; }
-  h1 { font-size: 17px; margin: 0 0 3px; letter-spacing: -0.01em; }
-  #summary { color: var(--muted); font-size: 12.5px; margin-bottom: 9px; }
-  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  input[type=search], input[type=text], select, button {
-    font: inherit; color: var(--text); background: var(--panel);
-    border: 1px solid var(--border); border-radius: 7px; padding: 6px 10px;
-    transition: border-color .12s ease, background .12s ease; }
-  input:focus-visible, select:focus-visible, button:focus-visible {
-    outline: 2px solid var(--accent); outline-offset: 1px; }
-  input[type=search] { flex: 1 1 260px; min-width: 0; }
-  .controls select { flex: 0 1 240px; min-width: 0; }
-  button { cursor: pointer; }
-  button:hover:not(:disabled) { border-color: var(--accent); }
-  button:disabled { opacity: .4; cursor: default; }
-  label { display: flex; gap: 6px; align-items: center; font-size: 14px; white-space: nowrap; }
-  .pager { display: flex; gap: 6px; align-items: center; margin-left: auto; }
-  #page-info { color: var(--muted); font-size: 12.5px; white-space: nowrap;
-               font-variant-numeric: tabular-nums; }
-  main { max-width: 1000px; margin: 0 auto; padding: 16px 16px 64px; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body { font: 15px/1.6 Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  button, input, select { font: inherit; color: inherit; }
+  code, pre, .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+  a { color: var(--accent); }
 
-  article { background: var(--panel); border: 1px solid var(--border);
-            border-radius: 10px; margin-bottom: 16px; overflow: clip;
-            box-shadow: var(--shadow);
-            scroll-margin-top: calc(var(--header-h) + 8px); }
-  article.flagged { border-left: 4px solid var(--slop); }
-  article.focused { border-color: var(--accent); }
-  article.focused > .meta { background: var(--bg); }
+  .layout { display: grid; grid-template-columns: var(--rail-w) minmax(0, 1fr); min-height: 100vh; }
+  aside.rail { position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--rail);
+    border-right: 1px solid var(--border); padding: 20px 16px 28px; display: flex; flex-direction: column; gap: 22px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .logo { width: 32px; height: 32px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), #818cf8);
+    display: grid; place-items: center; color: var(--accent-ink); font-weight: 800; }
+  .brand h1 { font-size: 16px; margin: 0; letter-spacing: .2px; }
+  .brand p { margin: 0; font-size: 12px; color: var(--muted); }
+  .rail h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--faint); margin: 0 0 8px; }
+  .datasets { display: flex; flex-direction: column; gap: 6px; }
+  .dataset { text-align: left; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 10px 12px;
+    cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
+  .dataset:hover { background: var(--panel); }
+  .dataset.active { background: var(--panel-2); border-color: var(--border-strong); box-shadow: inset 3px 0 0 var(--accent); }
+  .dataset .name { font-weight: 600; }
+  .dataset .count { color: var(--muted); font-size: 12px; justify-self: end; align-self: center; }
+  .dataset .sub { grid-column: 1 / -1; font-size: 12px; color: var(--faint); }
+  .dataset .sub b { color: var(--slop); font-weight: 600; }
+  .missing { font-size: 12px; color: var(--faint); margin-top: 6px; }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+  .search { position: relative; }
+  .search input { width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 9px 36px 9px 12px; }
+  .search kbd { position: absolute; right: 8px; top: 8px; }
+  select { width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); outline-offset: 1px; }
+  .toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .toggle { border: 1px solid var(--border); background: var(--panel); border-radius: 999px; padding: 5px 11px; font-size: 13px; cursor: pointer; color: var(--muted); }
+  .toggle.on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 18px; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .keys { font-size: 12px; color: var(--muted); display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
+  kbd { font: 11px/1 "JetBrains Mono", ui-monospace, monospace; border: 1px solid var(--border-strong); border-bottom-width: 2px;
+    border-radius: 5px; padding: 3px 5px; background: var(--panel-2); color: var(--text); white-space: nowrap; }
 
-  .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
-          position: sticky; top: var(--header-h); z-index: 2;
-          padding: 8px 14px; border-bottom: 1px solid var(--border);
-          background: var(--panel); font-size: 12.5px; color: var(--muted); }
-  .badge { font-weight: 700; text-transform: uppercase; font-size: 10.5px;
-           letter-spacing: .05em; padding: 2px 7px; border-radius: 999px;
-           background: var(--bg); border: 1px solid var(--border); }
-  .badge.readability { color: var(--readability); }
-  .badge.chat { color: var(--chat); }
-  .badge.book { color: var(--book); }
-  .badge.code { color: var(--code); }
-  .badge.clever_vs_readable { color: var(--clever_vs_readable); }
-  .badge.corpus { color: var(--corpus); }
-  .origin { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
-  .book-title { color: var(--text); font-size: 13px; }
-  .question { font-weight: 600; font-size: 15.5px; }
-  .part.rejected { opacity: .75; }
-  .badge.conversation { color: var(--accent); }
-  .spacer { margin-left: auto; }
-  .hits { width: 100%; color: var(--text); }
-  .seen { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-          background: var(--border); flex: none; }
-  .seen.on { background: var(--accent); }
+  main { min-width: 0; }
+  .topbar { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; gap: 16px; }
+  .topbar .title { min-width: 0; flex: 1; }
+  .topbar h2 { margin: 0; font-size: 18px; }
+  .topbar .file { font-size: 12px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .progress { width: 180px; }
+  .progress .bar { height: 6px; background: var(--panel-2); border-radius: 99px; overflow: hidden; }
+  .progress .fill { height: 100%; background: linear-gradient(90deg, var(--accent), #818cf8); width: 0; transition: width .3s; }
+  .progress-text { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .pager { display: flex; align-items: center; gap: 8px; }
+  .icon { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--border); background: var(--panel); cursor: pointer; }
+  .icon:disabled { opacity: .35; cursor: default; }
+  .pager span { font-size: 13px; color: var(--muted); min-width: 120px; text-align: center; }
+  .banners { padding: 0 28px; }
+  .banner[hidden] { display: none; }
+  .banner { margin-top: 14px; border: 1px solid; border-radius: var(--radius); padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 14px; }
+  .banner.phrase { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .banner.orphans { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: color-mix(in srgb, var(--warn) 7%, transparent); flex-direction: column; align-items: stretch; }
+  .banner .item { display: flex; gap: 10px; align-items: center; }
+  .banner .item .id { color: var(--faint); font-size: 12px; }
+  .list { padding: 18px 28px 80px; display: flex; flex-direction: column; gap: 16px; max-width: 1180px; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
 
-  .part { padding: 12px 16px; }
-  .part + .part { border-top: 1px dashed var(--border); }
-  .label { display: flex; align-items: center; gap: 8px;
-           font-size: 11.5px; font-weight: 700; color: var(--muted);
-           text-transform: uppercase; letter-spacing: .05em; margin-bottom: 7px;
-           user-select: none; }
-  .label .size { margin-left: auto; font-weight: 500; letter-spacing: 0;
-                 text-transform: none; font-variant-numeric: tabular-nums; }
+  article { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: border-color .15s, box-shadow .15s; }
+  article.focused { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  article.flagged { border-color: color-mix(in srgb, var(--slop) 55%, var(--border)); }
+  article.good { border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
+  .card-head { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); font-size: 13px; flex-wrap: wrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+  .dot.on { background: var(--accent); }
+  .badge { border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+  .collection { font-weight: 600; }
+  .origin { color: var(--faint); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 360px; }
+  .chip { border: 1px solid var(--border-strong); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .verdict { display: flex; gap: 6px; }
+  .verdict button { border: 1px solid var(--border-strong); background: var(--panel); border-radius: 8px; padding: 4px 11px; font-size: 13px; cursor: pointer; display: flex; gap: 6px; align-items: center; }
+  .verdict button kbd { font-size: 10px; padding: 1px 4px; }
+  .verdict .good.on { border-color: var(--good); color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+  .verdict .slop.on { border-color: var(--slop); color: var(--slop); background: color-mix(in srgb, var(--slop) 12%, transparent); }
+  .hits { width: 100%; color: var(--warn); font-size: 12px; }
+
+  .part { padding: 14px 18px; border-bottom: 1px dashed var(--border); }
+  .part:last-of-type { border-bottom: none; }
+  .label { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); display: flex; gap: 10px; margin-bottom: 6px; }
+  .label .size { margin-left: auto; font-weight: 500; letter-spacing: 0; text-transform: none; }
+  .turn { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; padding: 14px 18px; border-bottom: 1px dashed var(--border); }
+  .turn .avatar { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+  .turn.user .avatar { background: color-mix(in srgb, #818cf8 22%, transparent); color: #a5b4fc; }
+  .turn.assistant .avatar { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .turn.user .bubble { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; }
+  .grounding { margin: 0; border-bottom: 1px solid var(--border); background: color-mix(in srgb, #818cf8 6%, transparent); }
+  .grounding summary { padding: 10px 18px; cursor: pointer; font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; list-style: none; }
+  .grounding summary::-webkit-details-marker { display: none; }
+  .grounding summary::before { content: "▸"; transition: transform .15s; }
+  .grounding[open] summary::before { transform: rotate(90deg); }
+  .grounding .body { padding: 4px 18px 14px; max-height: 420px; overflow: auto; }
+  .notes { padding: 8px 18px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--border); }
+  .notes div { font-size: 12px; color: var(--warn); }
+  .rejected .spans li .category { color: var(--warn); }
 
   .prose { overflow-wrap: anywhere; }
-  .prose p { margin: 0 0 10px; white-space: pre-wrap; }
-  .prose p:last-child { margin-bottom: 0; }
-  .prose h3 { font-size: 14.5px; margin: 14px 0 7px; letter-spacing: -0.01em; }
-  .prose ul, .prose ol { margin: 0 0 10px; padding-left: 22px; }
-  .prose li { margin: 3px 0; }
-  .prose a { color: var(--accent); }
-  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px;
-         background: var(--code-bg); border: 1px solid var(--border);
-         border-radius: 4px; padding: 1px 5px; }
-  .code-block { margin: 12px 0; border: 1px solid var(--border); border-radius: 8px;
-                overflow: hidden; background: var(--code-block-bg); }
-  .code-bar { display: flex; align-items: center; gap: 10px; padding: 4px 6px 4px 12px;
-              background: var(--code-bar-bg); border-bottom: 1px solid var(--border);
-              font-size: 11.5px; color: var(--muted); user-select: none; }
-  .code-lang { font-weight: 700; text-transform: lowercase; letter-spacing: .03em;
-               color: var(--text); font-family: ui-monospace, monospace; }
-  .code-lines { font-variant-numeric: tabular-nums; }
-  .code-copy { margin-left: auto; padding: 1px 9px; font-size: 11.5px; }
-  pre { margin: 0; padding: 10px 0; overflow-x: auto; max-width: 100%;
-        font: 13px/1.55 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace;
-        tab-size: 4; counter-reset: line; }
-  pre code { display: block; min-width: max-content; background: none; border: none;
-             padding: 0; font-size: inherit; }
+  .prose p { margin: .4em 0; white-space: pre-wrap; }
+  .prose h3 { font-size: 15px; margin: .8em 0 .3em; }
+  .prose ul, .prose ol { margin: .3em 0 .3em 1.3em; padding: 0; }
+  .prose code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .88em; }
+  .prose table { border-collapse: collapse; margin: .6em 0; font-size: 14px; display: block; overflow-x: auto; }
+  .prose th, .prose td { border: 1px solid var(--border); padding: 5px 10px; text-align: left; }
+  .prose th { background: var(--panel-2); }
+  .shortened { position: relative; }
+  .more { margin-top: 8px; border: 1px dashed var(--border-strong); background: transparent; border-radius: 8px; padding: 6px 12px; cursor: pointer; color: var(--accent); }
+
+  .code-block { margin: .7em 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--code-bg); }
+  .code-bar { display: flex; gap: 10px; align-items: center; padding: 6px 10px; background: var(--code-bar-bg); border-bottom: 1px solid var(--border); font-size: 12px; }
+  .code-lang { font-weight: 700; color: var(--text); font-family: "JetBrains Mono", ui-monospace, monospace; }
+  .code-lines { color: var(--faint); flex: 1; }
+  .code-copy { border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 1px 8px; cursor: pointer; font-size: 12px; }
+  pre { margin: 0; padding: 10px 0; overflow-x: auto; font-size: 13px; line-height: 1.55; counter-reset: line; }
   pre .line { display: block; padding-right: 16px; counter-increment: line; min-height: 1.55em; }
-  pre .line::before { content: counter(line); display: inline-block; width: 3.2em;
-                      padding-right: 1em; margin-right: .6em; text-align: right;
-                      color: var(--gutter); border-right: 1px solid var(--border);
-                      user-select: none; font-variant-numeric: tabular-nums; }
+  pre .line::before { content: counter(line); display: inline-block; width: 3.2em; padding-right: 1em; text-align: right; color: var(--gutter); user-select: none; }
   .short pre .line::before { display: none; }
   .short pre .line { padding-left: 14px; }
-  pre .line:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  pre .line:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  pre .line.violation { background: color-mix(in srgb, var(--slop) 10%, transparent); }
+  .rule-tag { float: right; margin-left: 12px; font-size: 11px; color: var(--slop); border: 1px solid color-mix(in srgb, var(--slop) 50%, transparent); border-radius: 5px; padding: 0 5px; user-select: none; }
   .tok-comment { color: var(--tok-comment); font-style: italic; }
   .tok-string { color: var(--tok-string); }
-  .tok-keyword { color: var(--tok-keyword); font-weight: 600; }
+  .tok-keyword { color: var(--tok-keyword); }
   .tok-type { color: var(--tok-type); }
   .tok-number { color: var(--tok-number); }
-  .tok-macro { color: var(--tok-macro); font-weight: 600; }
+  .tok-macro { color: var(--tok-macro); }
   .tok-attr { color: var(--tok-attr); }
   .tok-lifetime { color: var(--tok-lifetime); }
   .tok-call { color: var(--tok-call); }
-  table { border-collapse: collapse; margin: 10px 0; font-size: 13.5px;
-          display: block; overflow-x: auto; max-width: 100%; }
-  th, td { border: 1px solid var(--border); padding: 5px 10px; text-align: left;
-           vertical-align: top; }
-  th { background: var(--code-bg); font-weight: 600; }
-  tbody tr:nth-child(even) { background: color-mix(in srgb, var(--code-bg) 45%, transparent); }
-  mark { background: var(--mark); color: var(--mark-text); border-radius: 2px; }
-  mark.slop { background: var(--slop-mark); color: var(--slop-mark-text);
-              text-decoration: underline wavy var(--slop); }
 
-  mark.suggest { background: transparent; color: inherit; cursor: pointer;
-                 text-decoration: underline dashed var(--slop) 1.5px; text-underline-offset: 3px;
-                 border-radius: 2px; }
-  mark.suggest:hover { background: var(--slop-mark); color: var(--slop-mark-text); }
-  pre .line.violation { background: color-mix(in srgb, var(--slop) 10%, transparent); }
-  .rule-tag { float: right; margin-left: 12px; padding: 0 6px; border-radius: 4px;
-              font: 600 10.5px/1.7 system-ui, sans-serif; color: var(--slop);
-              border: 1px solid color-mix(in srgb, var(--slop) 45%, transparent);
-              user-select: none; position: sticky; right: 8px; }
-  .phrase-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 9px;
-                padding: 7px 11px; border: 1px solid var(--accent); border-radius: 8px;
-                font-size: 13px; background: color-mix(in srgb, var(--accent) 7%, transparent); }
-  .phrase-bar[hidden], .orphans[hidden] { display: none; }
-  .phrase-bar button.flag { border-color: var(--slop); color: var(--slop); }
-  .shortened { position: relative; }
-  .shortened::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0;
-                      height: 48px; pointer-events: none;
-                      background: linear-gradient(transparent, var(--panel)); }
-  .more { display: block; margin-top: 6px; border-color: var(--accent); color: var(--accent); }
-  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  mark { background: var(--mark); color: var(--mark-text); border-radius: 3px; padding: 0 1px; }
+  mark.slop { background: color-mix(in srgb, var(--cat, var(--slop)) 30%, transparent); color: var(--text);
+    box-shadow: inset 0 -2px 0 var(--cat, var(--slop)); }
+  mark.suggest { background: transparent; color: inherit; border-bottom: 2px dotted var(--cat, var(--warn)); cursor: pointer; }
+  mark.suggest:hover { background: color-mix(in srgb, var(--cat, var(--warn)) 18%, transparent); }
 
-  .curation { display: flex; flex-direction: column; gap: 8px;
-              padding: 11px 16px; border-top: 1px solid var(--border);
-              background: var(--bg); }
-  .curation .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .curation input[type=text] { flex: 1 1 260px; min-width: 0; background: var(--panel); }
-  .curation .state { font-size: 13px; font-weight: 600; color: var(--slop); }
-  .curation .selection { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
-  .curation button.flag { border-color: var(--slop); color: var(--slop); }
-  .spans { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; }
-  .spans li { display: flex; gap: 8px; align-items: baseline; font-size: 12.5px; }
-  .spans .category { font-weight: 700; color: var(--slop); white-space: nowrap; }
-  .spans .quote { overflow-wrap: anywhere; }
-  .spans button { padding: 0 8px; font-size: 12px; }
+  .curation { padding: 12px 18px 14px; background: var(--panel-2); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+  .curation:empty { display: none; }
+  .spans { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .spans li { display: flex; gap: 10px; align-items: center; font-size: 13px; }
+  .spans .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .spans .category { color: var(--muted); white-space: nowrap; }
+  .spans .quote { flex: 1; overflow-wrap: anywhere; }
+  .spans button, .note-row button { border: 1px solid var(--border-strong); background: var(--panel); border-radius: 7px; padding: 2px 9px; font-size: 12px; cursor: pointer; }
+  .note-row { display: flex; gap: 8px; }
+  .note-row input { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+  .hint { font-size: 12px; color: var(--faint); }
 
-  .orphans { display: flex; flex-direction: column; gap: 6px; margin-top: 9px;
-             padding: 8px 11px; border: 1px solid var(--slop); border-radius: 8px;
-             background: color-mix(in srgb, var(--slop) 8%, transparent); }
-  .orphans .title { font-size: 13px; font-weight: 700; color: var(--slop); }
-  .orphans .item { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline;
-                   font-size: 13px; }
-  .orphans .item .note { font-weight: 600; overflow-wrap: anywhere; }
-  .orphans .item .id { font-family: ui-monospace, monospace; color: var(--muted);
-                       font-size: 12px; }
-
-  #keys { color: var(--muted); font-size: 12.5px; display: flex; gap: 12px;
-          flex-wrap: wrap; margin-top: 8px; }
-  kbd { background: var(--panel); border: 1px solid var(--border);
-        border-bottom-width: 2px; border-radius: 5px; padding: 0 5px;
-        font: 11.5px/1.6 ui-monospace, monospace; }
-  #toast { position: fixed; left: 50%; bottom: 22px; z-index: 5;
-           transform: translateX(-50%) translateY(8px);
-           background: var(--accent); color: #fff; padding: 7px 16px;
-           border-radius: 999px; font-size: 13px; font-weight: 600;
-           opacity: 0; pointer-events: none;
-           transition: opacity .16s ease, transform .16s ease; }
-  #toast.on { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .popover { position: fixed; z-index: 30; background: var(--raised); border: 1px solid var(--border-strong); border-radius: 12px; padding: 8px;
+    box-shadow: 0 18px 40px -12px rgba(0,0,0,.7); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; width: 420px; }
+  .popover[hidden] { display: none; }
+  .popover .quote { grid-column: 1 / -1; font-size: 12px; color: var(--muted); padding: 2px 6px 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .popover button { display: flex; gap: 8px; align-items: center; text-align: left; border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 6px 8px; cursor: pointer; font-size: 13px; }
+  .popover button:hover, .popover button:focus-visible { background: var(--panel-2); border-color: var(--border-strong); }
+  .popover .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+  .popover kbd { margin-left: auto; }
+  .toast { position: fixed; right: 22px; bottom: 22px; background: var(--raised); border: 1px solid var(--border-strong); border-radius: 10px; padding: 10px 14px; font-size: 14px;
+    opacity: 0; transform: translateY(8px); transition: opacity .2s, transform .2s; pointer-events: none; z-index: 40; }
+  .toast.on { opacity: 1; transform: none; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside.rail { position: static; height: auto; }
+    .progress { display: none; }
+    .topbar, .list, .banners { padding-left: 14px; padding-right: 14px; }
+  }
 </style>
 </head>
 <body>
-<header id="header">
-  <h1>Training set review</h1>
-  <div id="summary">Loading…</div>
-  <div class="controls">
-    <input id="search" type="search" placeholder="Search instruction, response or origin  ( / )">
-    <select id="source">
-      <option value="">All sources</option>
-    </select>
-    <select id="collection">
-      <option value="">All books and docs</option>
-    </select>
-    <label><input id="sensitive" type="checkbox"> Personal data only</label>
-    <label><input id="slop-only" type="checkbox"> Flagged only</label>
-    <div class="pager">
-      <button id="prev">←</button>
-      <span id="page-info"></span>
-      <button id="next">→</button>
+<div class="layout">
+  <aside class="rail">
+    <div class="brand"><div class="logo">R</div><div><h1>Reinforcer</h1><p>Human review of training data</p></div></div>
+    <section><h2>Datasets</h2><div id="datasets" class="datasets"></div><div id="missing" class="missing"></div></section>
+    <section class="field">
+      <h2>Find</h2>
+      <div class="search"><input id="search" type="search" placeholder="Search text or file"><kbd>/</kbd></div>
+      <select id="source"><option value="">All sources</option></select>
+      <select id="collection"><option value="">All books, docs and repositories</option></select>
+      <div class="toggles">
+        <button id="flagged-only" class="toggle" type="button">Flagged</button>
+        <button id="unreviewed-only" class="toggle" type="button">Not reviewed</button>
+        <button id="sensitive-only" class="toggle" type="button">Personal data</button>
+      </div>
+    </section>
+    <section><h2>This dataset</h2><div class="stats" id="stats"></div></section>
+    <section>
+      <h2>Keys</h2>
+      <div class="keys">
+        <span><kbd>j</kbd> <kbd>k</kbd></span><span>next / previous example</span>
+        <span><kbd>a</kbd></span><span>mark good and go on</span>
+        <span><kbd>f</kbd></span><span>flag whole example as slop</span>
+        <span><kbd>1</kbd>…<kbd>8</kbd></span><span>category for selected text</span>
+        <span><kbd>e</kbd></span><span>load the full answer</span>
+        <span><kbd>n</kbd> <kbd>p</kbd></span><span>next / previous page</span>
+        <span><kbd>/</kbd></span><span>search</span>
+      </div>
+    </section>
+  </aside>
+  <main>
+    <div class="topbar">
+      <div class="title"><h2 id="title">Loading…</h2><div id="file" class="file"></div></div>
+      <div class="progress"><div class="bar"><div id="progress-fill" class="fill"></div></div><div id="progress-label" class="progress-text"></div></div>
+      <div class="pager"><button id="prev" class="icon" title="Previous page (p)">←</button><span id="page-info"></span><button id="next" class="icon" title="Next page (n)">→</button></div>
     </div>
-  </div>
-  <div id="keys">
-    <span><kbd>j</kbd><kbd>k</kbd> next / previous example</span>
-    <span><kbd>f</kbd> flag the focused one</span>
-    <span><kbd>e</kbd> full answer</span>
-    <span><kbd>g</kbd><kbd>G</kbd> first / last page</span>
-  </div>
-  <div id="phrase-bar" class="phrase-bar" hidden></div>
-  <div id="orphans" class="orphans" hidden></div>
-</header>
-<main id="list"></main>
-<div id="toast"></div>
-
+    <div class="banners"><div id="phrase-bar" class="banner phrase" hidden></div><div id="orphans" class="banner orphans" hidden></div></div>
+    <div id="list" class="list"></div>
+  </main>
+</div>
+<div id="popover" class="popover" hidden></div>
+<div id="toast" class="toast"></div>
 <script>
-const PAGE_SIZE = 20;
-
+// Rendering: markdown, code highlighting and marks, unchanged from the earlier page.
 const SENSITIVE = [
   ["email", /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g],
   ["API key", /\b(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|AKIA[0-9A-Z]{16}|xox[abprs]-[A-Za-z0-9-]{10,}|hf_[A-Za-z0-9]{30,})\b/g],
@@ -268,44 +263,6 @@ const SLOP_CATEGORIES = [
 ];
 const CATEGORY_LABELS = new Map(SLOP_CATEGORIES);
 
-const slopFlags = new Map();
-const pageCache = new Map();
-const reviewed = new Set(JSON.parse(localStorage.getItem("reviewed") || "[]"));
-let pendingSelection = null;
-let visible = [];
-let shown = [];
-let page = 0;
-let total = 0;
-let filteredTotal = 0;
-let slopOnly = false;
-let metaSources = [];
-let flaggedCount = 0;
-let learnedPhrases = [];
-let phraseSearch = null;
-let focusIndex = -1;
-let orphans = [];
-let pendingOrphan = null;
-
-const $ = (id) => document.getElementById(id);
-
-function element(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
-
-function toast(message) {
-  const node = $("toast");
-  node.textContent = message;
-  node.classList.add("on");
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => node.classList.remove("on"), 1300);
-}
-
-function rememberReviewed() {
-  localStorage.setItem("reviewed", JSON.stringify([...reviewed].slice(-5000)));
-}
 
 // Ranges to highlight in one piece of text: personal-data matches and the slop
 // spans marked on this field. Overlapping ranges are merged; slop wins the style.
@@ -347,7 +304,7 @@ function highlightRanges(text, slopSpans, suggestions = []) {
   for (const span of slopSpans) {
     const start = text.indexOf(span.text);
     if (start >= 0) {
-      ranges.push({ start, end: start + span.text.length, label: CATEGORY_LABELS.get(span.category), kind: "slop" });
+      ranges.push({ start, end: start + span.text.length, label: CATEGORY_LABELS.get(span.category), kind: "slop", category: span.category });
     }
   }
   ranges.sort((first, second) => first.start - second.start);
@@ -781,77 +738,94 @@ function violationsOf(example) {
   return (example.suggestions || {}).violations || [];
 }
 
-async function loadPhrases() {
-  const data = await fetchJson("/api/phrases").catch(() => ({ phrases: [] }));
-  learnedPhrases = data.phrases || [];
+// ---------------------------------------------------------------------------
+// State. Everything below belongs to the dataset picked in the rail; switching
+// datasets resets it.
+const PAGE_SIZE = 20;
+const DATASET_TITLES = {
+  train: ["Training set", "Books, docs, chat export and your own pairs"],
+  teacher: ["Teacher set", "Conversations the teacher wrote, checked by toolchains"],
+  conversations: ["Distilled conversations", "Questions from the teacher, answers from the books"],
+};
+let datasets = [];
+let dataset = "";
+let slopFlags = new Map();
+let pageCache = new Map();
+let reviewed = new Set();
+let shown = [];
+let page = 0;
+let filteredTotal = 0;
+let total = 0;
+let flaggedCount = 0;
+let learnedPhrases = [];
+let phraseSearch = null;
+let focusIndex = -1;
+let orphans = [];
+let pendingOrphan = null;
+let selection = null;
+const toggles = { flagged: false, unreviewed: false, sensitive: false };
+
+const $ = (id) => document.getElementById(id);
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
 }
 
-// Clicking a suggested phrase marks it on that example with the suggested
-// category: one click instead of select, pick, flag.
-document.addEventListener("click", (event) => {
-  const mark = event.target.closest("mark.suggest");
-  if (!mark) return;
-  const article = mark.closest("article");
-  const section = mark.closest("section.part");
-  const example = article && shown.find((candidate) => candidate.id === article.dataset.id);
-  if (!example || !section) return;
-  const flag = slopFlags.get(example.id) || { note: "", spans: [] };
-  const span = { field: section.dataset.field, text: mark.textContent, category: mark.dataset.category };
-  saveFlag(example, { note: flag.note, spans: [...flag.spans, span] }, article.querySelector(".curation"));
-});
-
-// Lists every example whose answer contains `span.text`, with a bar that
-// marks the phrase in all of them at once.
-async function findEverywhere(span) {
-  phraseSearch = { text: span.text, category: span.category };
-  $("search").value = span.text;
-  $("source").value = "";
-  $("collection").value = "";
-  $("slop-only").checked = false;
-  await applyFilters();
-  renderPhraseBar();
-  window.scrollTo({ top: 0 });
+function toast(message) {
+  const node = $("toast");
+  node.textContent = message;
+  node.classList.add("on");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => node.classList.remove("on"), 1600);
 }
 
-function renderPhraseBar() {
-  const bar = $("phrase-bar");
-  bar.replaceChildren();
-  bar.hidden = !phraseSearch || $("search").value !== phraseSearch.text;
-  if (bar.hidden) return;
-  const label = CATEGORY_LABELS.get(phraseSearch.category) || phraseSearch.category;
-  bar.append(element("span", "", `“${phraseSearch.text}” is in ${filteredTotal.toLocaleString()} examples.`));
-  const all = element("button", "flag", `Mark it in all ${filteredTotal.toLocaleString()} as ${label}`);
-  all.addEventListener("click", () => flagAllMatches(all));
-  const done = element("button", "", "Done");
-  done.addEventListener("click", async () => {
-    phraseSearch = null;
-    $("search").value = "";
-    await applyFilters();
-    renderPhraseBar();
-  });
-  bar.append(all, done);
-  measureHeader();
+function storageGet(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || "null") ?? fallback; } catch { return fallback; }
 }
 
-async function flagAllMatches(button) {
-  button.disabled = true;
-  const response = await fetch("/api/flag-matches", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(phraseSearch),
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    toast(`Not saved: ${result.error || response.statusText}`);
-    button.disabled = false;
-    return;
+function storageSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* private window: keep it in memory */ }
+}
+
+function rememberReviewed() {
+  storageSet(`reviewed:${dataset}`, [...reviewed].slice(-20000));
+}
+
+// Every API call names the dataset it is about.
+function api(path, params = new URLSearchParams()) {
+  params.set("dataset", dataset);
+  return `${path}?${params}`;
+}
+
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`${url}: ${response.statusText}`);
+  return response.json();
+}
+
+async function postJson(path, body) {
+  const response = await fetch(api(path), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || response.statusText);
+  return data;
+}
+
+function categoryColor(category) {
+  return `var(--c-${category}, var(--slop))`;
+}
+
+// A mark for one highlighted range, coloured by its slop category.
+function markFor(range, text) {
+  const mark = element("mark", range.kind === "sensitive" ? "" : range.kind, text);
+  mark.title = range.label || "";
+  if (range.category) {
+    mark.dataset.category = range.category;
+    mark.style.setProperty("--cat", categoryColor(range.category));
   }
-  toast(`Marked in ${result.added} more examples (${result.matched} contain it)`);
-  const meta = await fetchJson("/api/meta");
-  flaggedCount = meta.flagged;
-  await loadPhrases();
-  await applyFilters();
-  renderPhraseBar();
+  return mark;
 }
 
 function spansOf(example, field) {
@@ -860,28 +834,214 @@ function spansOf(example, field) {
   return flag.spans.filter((span) => span.field === field);
 }
 
-// One labelled part of an example. A long answer arrives shortened and is
-// fetched whole only when the reader asks, so one enormous record cannot make a
-// whole page heavy.
+async function loadPhrases() {
+  const data = await fetchJson(api("/api/phrases")).catch(() => ({ phrases: [] }));
+  learnedPhrases = data.phrases || [];
+}
+
+// ---------------------------------------------------------------------------
+// Datasets and filters.
+function datasetTitle(name) {
+  return (DATASET_TITLES[name] || [name.replace(/[-_]/g, " ")])[0];
+}
+
+function renderDatasets(missing) {
+  const list = $("datasets");
+  list.replaceChildren();
+  for (const info of datasets) {
+    const button = element("button", `dataset${info.name === dataset ? " active" : ""}`);
+    button.type = "button";
+    const sub = element("span", "sub");
+    sub.append(document.createTextNode(`${(DATASET_TITLES[info.name] || ["", info.file])[1]} · `), element("b", "", `${info.flagged.toLocaleString()} flagged`));
+    button.append(element("span", "name", datasetTitle(info.name)), element("span", "count", info.records.toLocaleString()), sub);
+    button.addEventListener("click", () => switchDataset(info.name));
+    list.append(button);
+  }
+  $("missing").textContent = missing.length ? `Not built yet: ${missing.join(", ")}` : "";
+}
+
+async function switchDataset(name) {
+  if (name === dataset) return;
+  dataset = name;
+  storageSet("dataset", name);
+  history.replaceState(null, "", `#${name}`);
+  await loadDataset();
+}
+
+function filterParams() {
+  const params = new URLSearchParams();
+  const query = $("search").value.trim();
+  if (query) params.set("q", query);
+  if ($("source").value) params.set("source", $("source").value);
+  if ($("collection").value) params.set("collection", $("collection").value);
+  if (toggles.flagged) params.set("flagged", "1");
+  return params;
+}
+
+function pageUrl(index) {
+  const params = filterParams();
+  params.set("start", String(index * PAGE_SIZE));
+  params.set("limit", String(PAGE_SIZE));
+  return api("/api/page", params);
+}
+
+async function fetchPage(index) {
+  const url = pageUrl(index);
+  if (pageCache.has(url)) return pageCache.get(url);
+  const data = await fetchJson(url);
+  if (pageCache.size > 40) pageCache.delete(pageCache.keys().next().value);
+  pageCache.set(url, data);
+  return data;
+}
+
+function rememberFlags(items) {
+  for (const item of items) {
+    if (item.flag) slopFlags.set(item.id, { note: item.flag.note || "", spans: item.flag.spans || [] });
+  }
+}
+
+function normalize(example) {
+  example.hits = highlightRanges(`${example.instruction || ""}\n${example.response || ""}`, []);
+  return example;
+}
+
+async function showPage(index) {
+  page = Math.max(0, index);
+  const data = await fetchPage(page);
+  filteredTotal = data.total;
+  const pages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE));
+  if (page >= pages && page > 0) return showPage(pages - 1);
+  let items = data.items.map(normalize);
+  rememberFlags(items);
+  if (toggles.sensitive) items = items.filter((example) => example.hits.length > 0);
+  if (toggles.unreviewed) items = items.filter((example) => !reviewed.has(example.id) && !slopFlags.has(example.id));
+  shown = items;
+  render();
+  fetchPage(page + 1).catch(() => {});
+}
+
+async function applyFilters() {
+  pageCache.clear();
+  focusIndex = -1;
+  await showPage(0);
+  renderPhraseBar();
+}
+
+function render() {
+  const pages = Math.max(1, Math.ceil(filteredTotal / PAGE_SIZE));
+  $("page-info").textContent = `${filteredTotal.toLocaleString()} · page ${page + 1} of ${pages.toLocaleString()}`;
+  $("prev").disabled = page === 0;
+  $("next").disabled = page >= pages - 1;
+  const list = $("list");
+  list.replaceChildren();
+  if (shown.length === 0) list.append(element("p", "empty", "Nothing here matches. Change the filters or the search."));
+  for (const example of shown) list.append(card(example));
+  summarize();
+}
+
+function summarize() {
+  const spanCount = [...slopFlags.values()].reduce((sum, flag) => sum + flag.spans.length, 0);
+  const stats = $("stats");
+  stats.replaceChildren();
+  const stat = (value, label) => {
+    const node = element("div", "stat");
+    node.append(element("b", "", value.toLocaleString()), element("span", "", label));
+    return node;
+  };
+  stats.append(stat(total, "records"), stat(flaggedCount, "flagged"), stat(reviewed.size, "marked good"), stat(spanCount, "marked phrases here"));
+  const done = Math.min(total, reviewed.size + flaggedCount);
+  const percent = total ? (100 * done) / total : 0;
+  $("progress-fill").style.width = `${percent.toFixed(2)}%`;
+  $("progress-label").textContent = `${done.toLocaleString()} of ${total.toLocaleString()} reviewed (${percent.toFixed(1)}%)`;
+}
+
+// ---------------------------------------------------------------------------
+// One example.
+function card(example) {
+  const article = element("article");
+  article.dataset.id = example.id;
+  article.classList.toggle("flagged", slopFlags.has(example.id));
+  article.classList.toggle("good", !slopFlags.has(example.id) && reviewed.has(example.id));
+  article.append(cardHead(example));
+  if (example.source_text) article.append(grounding(example));
+  if (Array.isArray(example.notes) && example.notes.length > 0) article.append(notesOf(example));
+  if (Array.isArray(example.messages)) {
+    article.append(...conversationParts(example));
+  } else {
+    const isPassage = (example.instruction || "").trim() === "";
+    if (!isPassage) article.append(part(example, "instruction", "Instruction"));
+    article.append(part(example, "response", isPassage ? "Passage (training text, no question)" : "Response"));
+  }
+  article.append(curationPanel(example));
+  return article;
+}
+
+function cardHead(example) {
+  const head = element("div", "card-head");
+  const isGood = reviewed.has(example.id) && !slopFlags.has(example.id);
+  head.append(
+    element("span", `dot${reviewed.has(example.id) || slopFlags.has(example.id) ? " on" : ""}`),
+    element("span", "", `#${example.position + 1}`),
+    element("span", "badge", example.source_title || example.source),
+  );
+  if (example.collection_title) head.append(element("span", "collection", example.collection_title));
+  const origin = element("span", "origin", example.origin);
+  origin.title = example.entry ? `${example.origin} (entry ${example.entry})` : example.origin;
+  head.append(origin);
+  if (example.licence) head.append(element("span", "chip", example.licence));
+  head.append(element("span", "spacer"));
+  const verdict = element("div", "verdict");
+  const good = element("button", `good${isGood ? " on" : ""}`);
+  good.type = "button";
+  good.title = "Nothing to flag: mark as reviewed and good (a)";
+  good.append("✓ Good", element("kbd", "", "a"));
+  good.addEventListener("click", () => markGood(example));
+  const slop = element("button", `slop${slopFlags.has(example.id) ? " on" : ""}`);
+  slop.type = "button";
+  slop.title = slopFlags.has(example.id) ? "Remove the flag" : "Flag the whole example as slop (f)";
+  slop.append(slopFlags.has(example.id) ? "⚑ Flagged" : "⚑ Slop", element("kbd", "", "f"));
+  slop.addEventListener("click", () => toggleSlop(example));
+  verdict.append(good, slop);
+  head.append(verdict);
+  if (example.hits.length > 0) {
+    head.append(element("div", "hits", `Possible ${[...new Set(example.hits.map((hit) => hit.label))].join(", ")}`));
+  }
+  return head;
+}
+
+function grounding(example) {
+  const details = element("details", "grounding");
+  const summary = element("summary");
+  summary.append(`Written from ${example.origin}`);
+  if (example.licence) summary.append(element("span", "chip", example.licence));
+  details.append(summary);
+  const body = element("div", "body");
+  const isCode = /\.(rs|go|py|java|js|ts|c|h|cc|cpp|hpp)$/.test(example.origin);
+  renderText(body, isCode ? "```\n" + example.source_text + "\n```" : example.source_text, [], example.origin);
+  details.append(body);
+  return details;
+}
+
+function notesOf(example) {
+  const box = element("div", "notes");
+  for (const note of example.notes) box.append(element("div", "", `Kept as a note: ${note}`));
+  return box;
+}
+
 function part(example, field, label) {
   const section = element("section", "part");
   section.dataset.field = field;
   const head = element("div", "label");
   head.append(element("span", "", label));
-  if (field === "response") {
-    head.append(element("span", "size", `${example.response_chars.toLocaleString()} chars`));
-  }
+  if (field === "response" && example.response_chars) head.append(element("span", "size", `${example.response_chars.toLocaleString()} chars`));
   section.append(head);
-
   const trimmed = field === "response" && example.shortened;
   const body = element("div", trimmed ? "shortened" : "");
-  renderText(body, example[field], spansOf(example, field), example.origin,
+  renderText(body, example[field] || "", spansOf(example, field), example.origin,
     suggestionsFor(example, field), field === "response" ? violationsOf(example) : []);
   section.append(body);
-
   if (trimmed) {
-    const more = element("button", "more",
-      `Show the full answer (${example.response_chars.toLocaleString()} chars)`);
+    const more = element("button", "more", `Load the full answer (${example.response_chars.toLocaleString()} chars)`);
     more.addEventListener("click", () => expand(example, section));
     section.append(more);
   }
@@ -889,69 +1049,29 @@ function part(example, field, label) {
 }
 
 async function expand(example, section) {
-  const data = await fetchJson(`/api/record?position=${example.position}`);
-  Object.assign(example, data);
-  example.hits = highlightRanges(`${example.instruction}\n${example.response}`, []);
-  section.replaceWith(part(example, "response", example.instruction.trim() === "" ? "Passage (training text, no question)" : "Response"));
+  const params = new URLSearchParams({ position: String(example.position) });
+  Object.assign(example, await fetchJson(api("/api/record", params)));
+  normalize(example);
+  section.replaceWith(part(example, "response", (example.instruction || "").trim() === "" ? "Passage (training text, no question)" : "Response"));
   toast("Full answer loaded");
 }
 
-function metaLine(example) {
-  const meta = element("div", "meta");
-  const size = `${(example.instruction.length + example.response_chars).toLocaleString()} chars`;
-  const seen = element("span", "seen" + (reviewed.has(example.id) ? " on" : ""));
-  seen.title = reviewed.has(example.id) ? "You have looked at this one" : "Not looked at yet";
-  meta.append(
-    seen,
-    element("span", "", `#${example.position + 1}`),
-    element("span", `badge ${example.source}`, example.source_title || example.source),
-    ...(example.collection_title ? [element("strong", "book-title", example.collection_title)] : []),
-    element("span", "origin", example.origin),
-    element("span", "spacer", ""),
-    element("span", "", size),
-  );
-  if (example.hits.length > 0) {
-    const labels = [...new Set(example.hits.map((hit) => hit.label))].join(", ");
-    meta.append(element("div", "hits", `Possible ${labels}`));
-  }
-  return meta;
-}
-
-function card(example) {
-  const article = element("article");
-  article.dataset.id = example.id;
-  article.classList.toggle("flagged", slopFlags.has(example.id));
-  if (Array.isArray(example.messages)) {
-    article.append(metaLine(example), ...conversationParts(example), curationPanel(example));
-    return article;
-  }
-  const isPassage = example.instruction.trim() === "";
-  article.append(
-    metaLine(example),
-    ...(isPassage ? [] : [part(example, "instruction", "Instruction")]),
-    part(example, "response", isPassage ? "Passage (training text, no question)" : "Response"),
-    curationPanel(example),
-  );
-  return article;
-}
-
-// A generated conversation: each question the teacher wrote, then the book
-// text that answers it, then the questions that were thrown away and why.
+// A conversation: each user turn is the instruction side of a flag, each
+// assistant turn the response side.
 function conversationParts(example) {
   const parts = [];
-  const turns = example.messages.filter((message) => message.role === "user" || message.role === "assistant");
-  turns.forEach((message, position) => {
-    const number = Math.floor(position / 2) + 1;
-    const section = element("section", "part");
-    section.dataset.field = "messages";
-    const head = element("div", "label");
-    head.append(element("span", "", message.role === "user" ? `Question ${number} (written by the model)` : `Answer ${number} (book text)`));
-    section.append(head);
-    const body = element("div", message.role === "user" ? "question" : "");
-    renderText(body, message.content, [], example.origin);
-    section.append(body);
-    parts.push(section);
-  });
+  const assistantName = dataset === "conversations" ? "Book" : "Teacher";
+  for (const message of example.messages.filter((entry) => entry.role === "user" || entry.role === "assistant")) {
+    const field = message.role === "user" ? "instruction" : "response";
+    const turn = element("section", `turn ${message.role} part`);
+    turn.dataset.field = field;
+    const avatar = element("div", "avatar", message.role === "user" ? "U" : assistantName[0]);
+    avatar.title = message.role === "user" ? "User" : assistantName;
+    const body = element("div", message.role === "user" ? "bubble" : "");
+    renderText(body, message.content, spansOf(example, field), example.origin, suggestionsFor({ ...example, response: message.content }, field));
+    turn.append(avatar, body);
+    parts.push(turn);
+  }
   if (Array.isArray(example.rejected) && example.rejected.length > 0) {
     const section = element("section", "part rejected");
     const head = element("div", "label");
@@ -968,315 +1088,255 @@ function conversationParts(example) {
   return parts;
 }
 
-// The panel under each example: mark a selected sentence with a slop category,
-// list the marked sentences, and flag, annotate or unflag the whole example.
+// Under each example: the marked phrases, and the note of a flag.
 function curationPanel(example) {
   const panel = element("div", "curation");
-  const flag = slopFlags.get(example.id) || { note: "", spans: [] };
-  const isFlagged = slopFlags.has(example.id);
-
-  const selectionRow = element("div", "row");
-  const category = element("select");
-  const prompt = element("option", "", "Slop category…");
-  prompt.value = "";
-  prompt.disabled = true;
-  prompt.selected = true;
-  category.append(prompt);
-  for (const [value, label] of SLOP_CATEGORIES) {
-    const option = element("option", "", label);
-    option.value = value;
-    category.append(option);
+  const flag = slopFlags.get(example.id);
+  if (!flag) {
+    if (!reviewed.has(example.id)) panel.append(element("div", "hint", "Select any text above to mark it with a slop category, or use Good / Slop."));
+    return panel;
   }
-  const flagSelection = element("button", "flag", "Flag selection");
-  const selectionText = element("span", "selection", "Select a sentence in the instruction or response above.");
-  flagSelection.addEventListener("click", () => {
-    const selection = pendingSelection;
-    if (!selection || selection.id !== example.id) {
-      selectionText.textContent = "Nothing selected in this example.";
-      return;
-    }
-    if (!category.value) {
-      selectionText.textContent = "Pick a slop category first.";
-      category.focus();
-      return;
-    }
-    const span = { field: selection.field, text: selection.text, category: category.value };
-    saveFlag(example, { note: note.value, spans: [...flag.spans, span] }, panel);
-  });
-  selectionRow.append(category, flagSelection, selectionText);
-
-  const spanList = element("ul", "spans");
+  const list = element("ul", "spans");
   flag.spans.forEach((span, position) => {
     const item = element("li");
-    const remove = element("button", "", "remove");
-    remove.addEventListener("click", () => {
-      const remaining = flag.spans.filter((kept, index) => index !== position);
-      saveFlag(example, { note: note.value, spans: remaining }, panel);
-    });
+    const swatch = element("span", "swatch");
+    swatch.style.background = categoryColor(span.category);
     const everywhere = element("button", "", "Find everywhere");
     everywhere.title = "List every example whose answer contains this phrase, and mark it in all of them";
     everywhere.addEventListener("click", () => findEverywhere(span));
-    item.append(
-      element("span", "category", CATEGORY_LABELS.get(span.category)),
-      element("span", "quote", `${span.field}: “${span.text}”`),
-      everywhere,
-      remove,
-    );
-    spanList.append(item);
+    const remove = element("button", "", "Remove");
+    remove.addEventListener("click", () => saveFlag(example, { note: flag.note, spans: flag.spans.filter((_, index) => index !== position) }));
+    item.append(swatch, element("span", "category", CATEGORY_LABELS.get(span.category) || span.category), element("span", "quote", `“${span.text}”`), everywhere, remove);
+    list.append(item);
   });
-
-  const noteRow = element("div", "row");
-  const state = element("span", "state", isFlagged ? "Flagged as AI slop" : "");
+  const row = element("div", "note-row");
   const note = element("input");
-  note.type = "text";
-  note.placeholder = "Note: what makes this example slop";
+  note.placeholder = "Why is this slop? (optional)";
   note.value = flag.note;
-  const flagWhole = element("button", "flag", isFlagged ? "Save note" : "Flag whole example");
-  flagWhole.addEventListener("click", () => saveFlag(example, { note: note.value, spans: flag.spans }, panel));
-  noteRow.append(state, note, flagWhole);
-  if (isFlagged) {
-    const unflag = element("button", "", "Unflag");
-    unflag.addEventListener("click", () => saveFlag(example, null, panel));
-    noteRow.append(unflag);
-  }
-
-  panel.append(selectionRow, spanList, noteRow);
+  note.addEventListener("keydown", (event) => { if (event.key === "Enter") saveFlag(example, { note: note.value, spans: flag.spans }); });
+  const save = element("button", "", "Save note");
+  save.addEventListener("click", () => saveFlag(example, { note: note.value, spans: flag.spans }));
+  row.append(note, save);
+  panel.append(list, row);
   return panel;
 }
 
-// Sends the complete new flag for one example; `null` removes the flag.
-async function saveFlag(example, flag, panel) {
-  let note = "";
-  if (flag !== null) {
-    note = flag.note.trim();
-    if (pendingOrphan) note = note ? `${pendingOrphan.note} | ${note}` : pendingOrphan.note;
-  }
-  const body = flag === null
-    ? { id: example.id, flagged: false }
-    : { id: example.id, note, spans: flag.spans, flagged: true };
-  const response = await fetch("/api/flag", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const detail = await response.json().catch(() => ({}));
-    panel.querySelector(".state").textContent = `Not saved: ${detail.error || response.statusText}`;
+function replaceCard(example) {
+  const old = document.querySelector(`#list article[data-id="${CSS.escape(example.id)}"]`);
+  if (!old) return;
+  const fresh = card(example);
+  fresh.classList.toggle("focused", old.classList.contains("focused"));
+  old.replaceWith(fresh);
+}
+
+async function saveFlag(example, flag) {
+  const wasFlagged = slopFlags.has(example.id);
+  let note = flag ? flag.note.trim() : "";
+  if (flag && pendingOrphan) note = note ? `${pendingOrphan.note} | ${note}` : pendingOrphan.note;
+  const body = flag ? { id: example.id, note, spans: flag.spans, flagged: true } : { id: example.id, flagged: false };
+  try {
+    await postJson("/api/flag", body);
+  } catch (error) {
+    toast(`Not saved: ${error.message}`);
     return;
   }
-  if (flag === null) {
-    slopFlags.delete(example.id);
-    flaggedCount = Math.max(0, flaggedCount - 1);
-    toast("Unflagged");
-  } else {
+  if (flag) {
     slopFlags.set(example.id, { note, spans: flag.spans });
-    flaggedCount += 1;
-    reviewed.add(example.id);
-    rememberReviewed();
-    toast(pendingOrphan ? "Flagged and re-pointed" : "Flagged");
+    reviewed.delete(example.id);
+    if (!wasFlagged) flaggedCount += 1;
+  } else {
+    slopFlags.delete(example.id);
+    if (wasFlagged) flaggedCount = Math.max(0, flaggedCount - 1);
   }
-  if (flag !== null && pendingOrphan) {
+  rememberReviewed();
+  if (flag && pendingOrphan) {
     const orphan = pendingOrphan;
     pendingOrphan = null;
-    await fetch("/api/flag", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: orphan.id, flagged: false }),
-    });
+    await postJson("/api/flag", { id: orphan.id, flagged: false }).catch(() => {});
     orphans = orphans.filter((entry) => entry.id !== orphan.id);
     flaggedCount = Math.max(0, flaggedCount - 1);
     renderOrphans();
   }
-  pendingSelection = null;
   pageCache.clear();
   await loadPhrases();
-  panel.closest("article").replaceWith(card(example));
+  replaceCard(example);
+  updateDatasetCount();
   summarize();
 }
 
-// Remembers the last text selection made inside an instruction or response,
-// so the "Flag selection" click can use it after the selection is gone.
-document.addEventListener("mouseup", () => {
-  const selection = window.getSelection();
-  const text = selection.toString().trim();
-  if (!text || selection.rangeCount === 0) return;
-  const container = selection.getRangeAt(0).commonAncestorContainer;
-  const startElement = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
-  const section = startElement.closest("section.part");
-  if (!section) return;
-  const article = section.closest("article");
-  pendingSelection = { id: article.dataset.id, field: section.dataset.field, text };
-  article.querySelector(".curation .selection").textContent = `Selected: “${text}”`;
+function updateDatasetCount() {
+  const info = datasets.find((entry) => entry.name === dataset);
+  if (info) info.flagged = flaggedCount;
+  renderDatasets(missingDatasets);
+}
+
+async function toggleSlop(example) {
+  if (slopFlags.has(example.id)) {
+    await saveFlag(example, null);
+    toast("Flag removed");
+  } else {
+    await saveFlag(example, { note: "", spans: [] });
+    toast("Flagged as slop");
+  }
+}
+
+async function markGood(example) {
+  if (slopFlags.has(example.id)) await saveFlag(example, null);
+  reviewed.add(example.id);
+  rememberReviewed();
+  replaceCard(example);
+  summarize();
+  toast("Marked good");
+}
+
+// ---------------------------------------------------------------------------
+// Marking text: select it, then pick a category in the pop-up (or press 1-8).
+function selectionTarget() {
+  const current = window.getSelection();
+  const text = current.toString().trim();
+  if (!text || current.rangeCount === 0) return null;
+  const range = current.getRangeAt(0);
+  const container = range.commonAncestorContainer;
+  const start = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+  const section = start.closest("[data-field]");
+  const article = start.closest("article");
+  if (!section || !article) return null;
+  const example = shown.find((candidate) => candidate.id === article.dataset.id);
+  if (!example) return null;
+  return { example, field: section.dataset.field, text, rect: range.getBoundingClientRect() };
+}
+
+function showPopover(target) {
+  selection = target;
+  const box = $("popover");
+  box.replaceChildren(element("div", "quote", `Mark “${target.text}” as…`));
+  SLOP_CATEGORIES.forEach(([value, label], position) => {
+    const button = element("button");
+    button.type = "button";
+    const swatch = element("span", "swatch");
+    swatch.style.background = categoryColor(value);
+    button.append(swatch, label, element("kbd", "", String(position + 1)));
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    button.addEventListener("click", () => markSelection(value));
+    box.append(button);
+  });
+  box.hidden = false;
+  const width = box.offsetWidth;
+  const left = Math.min(window.innerWidth - width - 12, Math.max(12, target.rect.left + target.rect.width / 2 - width / 2));
+  const below = target.rect.bottom + 8 + box.offsetHeight < window.innerHeight;
+  box.style.left = `${left}px`;
+  box.style.top = `${below ? target.rect.bottom + 8 : Math.max(12, target.rect.top - box.offsetHeight - 8)}px`;
+}
+
+function hidePopover() {
+  $("popover").hidden = true;
+  selection = null;
+}
+
+async function markSelection(category) {
+  if (!selection) return;
+  const { example, field, text } = selection;
+  hidePopover();
+  window.getSelection().removeAllRanges();
+  const flag = slopFlags.get(example.id) || { note: "", spans: [] };
+  await saveFlag(example, { note: flag.note, spans: [...flag.spans, { field, text, category }] });
+  toast(`Marked as ${CATEGORY_LABELS.get(category)}`);
+}
+
+document.addEventListener("mouseup", (event) => {
+  if (event.target instanceof Element && event.target.closest("#popover")) return;
+  setTimeout(() => {
+    const target = selectionTarget();
+    if (target) showPopover(target); else hidePopover();
+  }, 0);
 });
 
-// Adds the fields the renderer needs. The server sends only the record.
-function normalize(example) {
-  example.hits = highlightRanges(`${example.instruction}\n${example.response}`, []);
-  return example;
+document.addEventListener("click", (event) => {
+  const mark = event.target instanceof Element && event.target.closest("mark.suggest");
+  if (!mark) return;
+  const article = mark.closest("article");
+  const section = mark.closest("[data-field]");
+  const example = article && shown.find((candidate) => candidate.id === article.dataset.id);
+  if (!example || !section) return;
+  const flag = slopFlags.get(example.id) || { note: "", spans: [] };
+  saveFlag(example, { note: flag.note, spans: [...flag.spans, { field: section.dataset.field, text: mark.textContent, category: mark.dataset.category }] });
+});
+
+// ---------------------------------------------------------------------------
+// A phrase everywhere, and flags whose example is gone.
+async function findEverywhere(span) {
+  phraseSearch = { text: span.text, category: span.category };
+  $("search").value = span.text;
+  $("source").value = "";
+  $("collection").value = "";
+  toggles.flagged = false;
+  syncToggles();
+  await applyFilters();
+  window.scrollTo({ top: 0 });
 }
 
-async function fetchJson(url) {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`${url}: ${response.statusText}`);
-  return response.json();
-}
-
-async function fetchJsonLines(path) {
-  const response = await fetch(path);
-  if (!response.ok) return [];
-  const text = await response.text();
-  return text.split("\n").filter((line) => line.trim() !== "").map((line) => JSON.parse(line));
-}
-
-function rememberFlags(items) {
-  for (const item of items) {
-    if (item.flag) slopFlags.set(item.id, { note: item.flag.note || "", spans: item.flag.spans || [] });
-  }
-}
-
-// Every example the flag file knows about but which the generator has already
-// moved out of the training set, plus the ones still in it that are flagged.
-// The flagged side is fetched in pages: there can be more than one page of them.
-async function flaggedExamples() {
-  const pending = [];
-  let start = 0;
-  let total = Infinity;
-  while (start < total) {
-    const page = await fetchJson(`/api/page?flagged=1&start=${start}&limit=100`);
-    total = page.total;
-    if (page.items.length === 0) break;
-    pending.push(...page.items);
-    start += page.items.length;
-  }
-  const removed = await fetchJsonLines("/slop.jsonl");
-  const merged = new Map();
-  for (const item of removed) {
-    merged.set(item.id, {
-      ...item,
-      response_chars: (item.response || "").length,
-      shortened: false,
-      flag: { note: item.note || "", spans: item.spans || [] },
-    });
-  }
-  for (const item of pending) merged.set(item.id, item);
-  return [...merged.values()].map((example, index) => {
-    example.position = index;
-    return example;
+function renderPhraseBar() {
+  const bar = $("phrase-bar");
+  bar.replaceChildren();
+  bar.hidden = !phraseSearch || $("search").value !== phraseSearch.text;
+  if (bar.hidden) return;
+  const label = CATEGORY_LABELS.get(phraseSearch.category) || phraseSearch.category;
+  bar.append(element("span", "", `“${phraseSearch.text}” appears in ${filteredTotal.toLocaleString()} examples.`));
+  const all = element("button", "toggle on", `Mark it in all ${filteredTotal.toLocaleString()} as ${label}`);
+  all.addEventListener("click", async () => {
+    all.disabled = true;
+    try {
+      const result = await postJson("/api/flag-matches", phraseSearch);
+      toast(`Marked in ${result.added} more examples (${result.matched} contain it)`);
+      flaggedCount = (await fetchJson(api("/api/meta"))).flagged;
+      updateDatasetCount();
+      await loadPhrases();
+      await applyFilters();
+    } catch (error) {
+      toast(`Not saved: ${error.message}`);
+      all.disabled = false;
+    }
   });
+  const done = element("button", "toggle", "Done");
+  done.addEventListener("click", async () => {
+    phraseSearch = null;
+    $("search").value = "";
+    await applyFilters();
+  });
+  bar.append(all, done);
 }
 
-function filterParams() {
-  const params = new URLSearchParams();
-  const query = $("search").value.trim();
-  const source = $("source").value;
-  const collection = $("collection").value;
-  if (query) params.set("q", query);
-  if (source) params.set("source", source);
-  if (collection) params.set("collection", collection);
-  return params;
-}
-
-function pageUrl(index) {
-  const params = filterParams();
-  params.set("start", String(index * PAGE_SIZE));
-  params.set("limit", String(PAGE_SIZE));
-  return `/api/page?${params}`;
-}
-
-// Fetches one page and keeps it, so paging back and forth costs nothing.
-async function fetchPage(index) {
-  const url = pageUrl(index);
-  const cached = pageCache.get(url);
-  if (cached) return cached;
-  const started = performance.now();
-  const data = await fetchJson(url);
-  data.millis = Math.round(performance.now() - started);
-  data.bytes = new Blob([JSON.stringify(data)]).size;
-  if (pageCache.size > 40) pageCache.delete(pageCache.keys().next().value);
-  pageCache.set(url, data);
-  return data;
-}
-
-function prefetch(index) {
-  if (index < 0) return;
-  fetchPage(index).catch(() => {});
-}
-
-async function showPage(index) {
-  page = Math.max(0, index);
-  const data = await fetchPage(page);
-  filteredTotal = data.total;
-  visible = data.items.map(normalize);
-  rememberFlags(visible);
-  if ($("sensitive").checked) visible = visible.filter((example) => example.hits.length > 0);
-  render();
-  prefetch(page + 1);
-}
-
-async function applyFilters() {
-  pageCache.clear();
-  focusIndex = -1;
-  if ($("slop-only").checked) {
-    slopOnly = true;
-    visible = (await flaggedExamples()).map(normalize);
-    rememberFlags(visible);
-    render();
-    return;
+function renderOrphans() {
+  const banner = $("orphans");
+  banner.replaceChildren();
+  banner.hidden = orphans.length === 0;
+  if (orphans.length === 0) return;
+  banner.append(element("strong", "", `${orphans.length} flag(s) point at an example this build no longer has. Re-point or clear them.`));
+  for (const orphan of orphans) {
+    const item = element("div", "item");
+    const use = element("button", "toggle", "Use for next flag");
+    use.addEventListener("click", () => { pendingOrphan = orphan; toast("The next example you flag gets this note"); });
+    const clear = element("button", "toggle", "Clear");
+    clear.addEventListener("click", async () => {
+      await postJson("/api/flag", { id: orphan.id, flagged: false }).catch(() => {});
+      orphans = orphans.filter((entry) => entry.id !== orphan.id);
+      flaggedCount = Math.max(0, flaggedCount - 1);
+      renderOrphans();
+      summarize();
+    });
+    item.append(element("span", "", orphan.note || "(no note)"), element("span", "id mono", orphan.id), use, clear);
+    banner.append(item);
   }
-  slopOnly = false;
-  await showPage(0);
 }
 
-function render() {
-  const pages = Math.max(1, Math.ceil((slopOnly ? visible.length : filteredTotal) / PAGE_SIZE));
-  page = Math.min(page, pages - 1);
-  $("page-info").textContent = slopOnly
-    ? `${visible.length.toLocaleString()} flagged · ${page + 1} / ${pages}`
-    : `${filteredTotal.toLocaleString()} · ${page + 1} / ${pages}`;
-  $("prev").disabled = page === 0;
-  $("next").disabled = page >= pages - 1;
-
-  const list = $("list");
-  list.replaceChildren();
-  shown = slopOnly ? visible.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : visible;
-  if (shown.length === 0) list.append(element("p", "empty", "No examples match."));
-  for (const example of shown) list.append(card(example));
-  summarize();
-}
-
-function summarize() {
-  const perSource = metaSources.map((entry) => `${entry.title} ${entry.count.toLocaleString()}`).join(" · ");
-  const cached = pageCache.get(pageUrl(page));
-  const weight = cached && cached.bytes ? `${(cached.bytes / 1024).toFixed(0)} KB` : "–";
-  const timing = cached && cached.millis !== undefined ? ` in ${cached.millis} ms` : "";
-  const spanCount = [...slopFlags.values()].reduce((sum, flag) => sum + flag.spans.length, 0);
-  $("summary").textContent =
-    `${total.toLocaleString()} examples (${perSource}) · ` +
-    `${flaggedCount.toLocaleString()} flagged, ${spanCount.toLocaleString()} marked sentences, ` +
-    `${learnedPhrases.length.toLocaleString()} learned phrases · ` +
-    `${shown.length} records, ${weight}${timing}`;
-}
-
+// ---------------------------------------------------------------------------
+// Focus and keys.
 function setFocus(index) {
   const articles = [...document.querySelectorAll("#list article")];
   if (articles.length === 0) return;
   focusIndex = Math.max(0, Math.min(articles.length - 1, index));
   articles.forEach((article, position) => article.classList.toggle("focused", position === focusIndex));
-  const article = articles[focusIndex];
-  article.scrollIntoView({ block: "start", behavior: "smooth" });
-  const example = shown[focusIndex];
-  if (example && !reviewed.has(example.id)) {
-    reviewed.add(example.id);
-    rememberReviewed();
-  }
-}
-
-function focusedExample() {
-  return shown[focusIndex];
-}
-
-function articleFor(example) {
-  return document.querySelector(`#list article[data-id="${example.id}"]`);
+  articles[focusIndex].scrollIntoView({ block: "start", behavior: "smooth" });
 }
 
 async function go(delta) {
@@ -1285,142 +1345,103 @@ async function go(delta) {
   window.scrollTo({ top: 0 });
 }
 
+function syncToggles() {
+  $("flagged-only").classList.toggle("on", toggles.flagged);
+  $("unreviewed-only").classList.toggle("on", toggles.unreviewed);
+  $("sensitive-only").classList.toggle("on", toggles.sensitive);
+}
+
 let searchTimer;
 $("search").addEventListener("input", () => {
-  renderPhraseBar();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(applyFilters, 250);
 });
-$("search").addEventListener("keydown", (event) => {
-  if (event.key === "Escape") $("search").blur();
-});
-$("source").addEventListener("change", () => {
-  $("collection").value = "";
-  applyFilters();
-});
-$("collection").addEventListener("change", () => {
-  $("source").value = "";
-  applyFilters();
-});
-$("sensitive").addEventListener("change", () => {
-  if (slopOnly) { applyFilters(); return; }
-  visible = visible.filter((example) => example.hits.length > 0);
-  render();
-});
-$("slop-only").addEventListener("change", applyFilters);
+$("search").addEventListener("keydown", (event) => { if (event.key === "Escape") $("search").blur(); });
+$("source").addEventListener("change", () => { $("collection").value = ""; applyFilters(); });
+$("collection").addEventListener("change", () => { $("source").value = ""; applyFilters(); });
+for (const [id, key] of [["flagged-only", "flagged"], ["unreviewed-only", "unreviewed"], ["sensitive-only", "sensitive"]]) {
+  $(id).addEventListener("click", () => { toggles[key] = !toggles[key]; syncToggles(); applyFilters(); });
+}
 $("prev").addEventListener("click", () => go(-1));
 $("next").addEventListener("click", () => go(1));
 
 document.addEventListener("keydown", (event) => {
-  if (event.target.tagName === "INPUT" || event.target.tagName === "SELECT") return;
+  if (["INPUT", "SELECT", "TEXTAREA"].includes(event.target.tagName)) return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  if (!$("popover").hidden) {
+    const number = Number(event.key);
+    if (number >= 1 && number <= SLOP_CATEGORIES.length) { event.preventDefault(); markSelection(SLOP_CATEGORIES[number - 1][0]); return; }
+    if (event.key === "Escape") { hidePopover(); return; }
+  }
+  const focused = () => shown[focusIndex];
   const actions = {
     j: () => setFocus(focusIndex + 1),
     k: () => setFocus(focusIndex - 1),
     ArrowDown: () => setFocus(focusIndex + 1),
     ArrowUp: () => setFocus(focusIndex - 1),
-    f: () => {
-      const example = focusedExample();
-      if (!example) return;
-      const article = articleFor(example);
-      const spans = (slopFlags.get(example.id) || { spans: [] }).spans;
-      saveFlag(example, { note: "flagged in review", spans }, article.querySelector(".curation"));
-    },
+    a: async () => { const example = focused(); if (example) { await markGood(example); setFocus(focusIndex + 1); } },
+    f: () => { const example = focused(); if (example) toggleSlop(example); },
     e: () => {
-      const example = focusedExample();
+      const example = focused();
       if (!example || !example.shortened) return;
-      expand(example, articleFor(example).querySelector('section[data-field="response"]'));
+      const section = document.querySelector(`#list article[data-id="${CSS.escape(example.id)}"] section[data-field="response"]`);
+      if (section) expand(example, section);
     },
-    g: () => go(-page),
-    G: () => go(1e6),
+    n: () => go(1),
+    p: () => go(-1),
     "/": () => $("search").focus(),
   };
   const action = actions[event.key];
   if (action) { event.preventDefault(); action(); }
 });
 
-function measureHeader() {
-  document.documentElement.style.setProperty("--header-h", `${$("header").offsetHeight}px`);
-}
-window.addEventListener("resize", measureHeader);
+// ---------------------------------------------------------------------------
+// Loading.
+let missingDatasets = [];
 
-// The banner for flags whose example this build no longer has. Their ids are
-// content hashes, so a rebuild that changed the text orphans them; they have to
-// be shown and re-pointed, never dropped.
-function renderOrphans() {
-  const banner = $("orphans");
-  banner.replaceChildren();
-  banner.hidden = orphans.length === 0;
-  if (orphans.length === 0) return;
-  banner.append(element("div", "title",
-    `${orphans.length} flag(s) matched no example — re-point or clear them`));
-  for (const orphan of orphans) {
-    const item = element("div", "item");
-    item.append(
-      element("span", "note", orphan.note || "(no note)"),
-      element("span", "id", orphan.id),
-    );
-    const use = element("button", "", "Use for next flag");
-    use.addEventListener("click", () => {
-      pendingOrphan = orphan;
-      toast("The next example you flag gets this note");
-    });
-    const clear = element("button", "", "Clear");
-    clear.addEventListener("click", () => clearOrphan(orphan));
-    item.append(use, clear);
-    banner.append(item);
-  }
-}
-
-async function clearOrphan(orphan) {
-  const response = await fetch("/api/flag", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: orphan.id, flagged: false }),
-  });
-  if (!response.ok) return;
-  orphans = orphans.filter((entry) => entry.id !== orphan.id);
-  if (pendingOrphan && pendingOrphan.id === orphan.id) pendingOrphan = null;
-  flaggedCount = Math.max(0, flaggedCount - 1);
-  renderOrphans();
-  summarize();
-}
-
-async function load() {
-  const meta = await fetchJson("/api/meta");
+async function loadDataset() {
+  slopFlags = new Map();
+  pageCache = new Map();
+  reviewed = new Set(storageGet(`reviewed:${dataset}`, []));
+  phraseSearch = null;
+  pendingOrphan = null;
+  $("search").value = "";
+  renderDatasets(missingDatasets);
+  const meta = await fetchJson(api("/api/meta"));
   total = meta.total;
-  metaSources = meta.sources;
   flaggedCount = meta.flagged;
+  $("title").textContent = datasetTitle(dataset);
+  $("file").textContent = meta.file;
   const source = $("source");
-  if (source.options.length <= 1) {
-    for (const entry of meta.sources) {
-      const option = element("option", "", `${entry.title} (${entry.count.toLocaleString()})`);
-      option.value = entry.name;
-      source.append(option);
-    }
-  }
+  source.replaceChildren(new Option("All sources", ""));
+  for (const entry of meta.sources) source.append(new Option(`${entry.title} (${entry.count.toLocaleString()})`, entry.name));
   const collection = $("collection");
-  if (collection.options.length <= 1) {
-    const titles = new Map(meta.sources.map((entry) => [entry.name, entry.title]));
-    for (const sourceName of [...new Set(meta.collections.map((entry) => entry.source))]) {
-      const group = element("optgroup");
-      group.label = titles.get(sourceName) || sourceName;
-      for (const entry of meta.collections.filter((candidate) => candidate.source === sourceName)) {
-        const option = element("option", "", `${entry.title} (${entry.count.toLocaleString()})`);
-        option.value = entry.name;
-        group.append(option);
-      }
-      collection.append(group);
+  collection.replaceChildren(new Option("All books, docs and repositories", ""));
+  const titles = new Map(meta.sources.map((entry) => [entry.name, entry.title]));
+  for (const sourceName of [...new Set(meta.collections.map((entry) => entry.source))]) {
+    const group = element("optgroup");
+    group.label = titles.get(sourceName) || sourceName;
+    for (const entry of meta.collections.filter((candidate) => candidate.source === sourceName)) {
+      group.append(new Option(`${entry.title} (${entry.count.toLocaleString()})`, entry.name));
     }
+    collection.append(group);
   }
   await loadPhrases();
-  const orphanData = await fetchJson("/api/orphans");
-  orphans = orphanData.orphans || [];
+  orphans = (await fetchJson(api("/api/orphans"))).orphans || [];
   renderOrphans();
-  measureHeader();
   await applyFilters();
 }
 
-load();
+async function load() {
+  const listed = await fetchJson("/api/datasets");
+  datasets = listed.datasets;
+  missingDatasets = listed.missing || [];
+  const wanted = location.hash.slice(1) || storageGet("dataset", "");
+  dataset = datasets.some((info) => info.name === wanted) ? wanted : datasets[0].name;
+  await loadDataset();
+}
+
+load().catch((error) => { $("title").textContent = `Could not load: ${error.message}`; });
 </script>
 </body>
 </html>

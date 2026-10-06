@@ -219,6 +219,11 @@ pub fn span_counts(flagged: &[FlaggedExample]) -> Vec<(SlopCategory, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_flags_path_that_is_a_folder_is_an_error() {
+        assert!(matches!(read(&std::env::temp_dir()), Err(DataError::Io { .. })));
+    }
     use crate::example::Source;
 
     fn example(response: &str) -> Example {

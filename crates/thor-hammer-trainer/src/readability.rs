@@ -73,6 +73,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn skips_an_entry_without_a_response_and_an_unclosed_comment() {
+        let set = "# Set\n---\n### Instruction\nNo answer here.\n---\n### Instruction\nQ\n### Response\nA <!-- never closed";
+        let pairs: Vec<(String, String)> = examples(set).into_iter().map(|example| (example.instruction, example.response)).collect();
+        assert_eq!(pairs, [("Q".to_string(), "A".to_string())]);
+    }
+
+    #[test]
     fn reads_entries_and_ignores_comments() {
         let readability_set = "# Title\n<!-- each entry has ### Instruction and ### Response -->\n---\n### Instruction\n<!-- Tags: a -->\nWhy?\n### Response\nBecause.\n---\n### Instruction\nHow?\n### Response\nLike this.\n";
         let pairs: Vec<(String, String)> = examples(readability_set)

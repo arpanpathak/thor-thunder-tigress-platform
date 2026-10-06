@@ -88,6 +88,21 @@ pub enum Problem {
     },
 }
 
+impl Problem {
+    /// A short name for the kind of problem.
+    #[must_use]
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Problem::Build { .. } => "build",
+            Problem::Tests { .. } => "tests",
+            Problem::TimedOut { .. } => "timed out",
+            Problem::Rule { .. } => "rule",
+            Problem::Slop { .. } => "slop",
+            Problem::FalseClaim { .. } => "false claim",
+        }
+    }
+}
+
 impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -126,11 +141,9 @@ impl Checked {
     }
 
     fn record(&mut self, turn: usize, language: &'static str, built: Built) {
-        if built == Built::Ignored {
-            self.ignored += 1;
-            return;
+        if built != Built::Ignored {
+            *self.blocks.entry(language).or_insert(0) += 1;
         }
-        *self.blocks.entry(language).or_insert(0) += 1;
         match built {
             Built::Clean { tests, ran } => {
                 self.tests += tests;
@@ -139,7 +152,7 @@ impl Checked {
             Built::BuildFailed(output) => self.problems.push(Problem::Build { turn, language, output }),
             Built::TestsFailed(output) => self.problems.push(Problem::Tests { turn, language, output }),
             Built::TimedOut => self.problems.push(Problem::TimedOut { turn }),
-            Built::Ignored => {}
+            Built::Ignored => self.ignored += 1,
         }
     }
 }
@@ -233,6 +246,19 @@ pub enum Built {
     Ignored,
 }
 
+impl Built {
+    /// How a block fared once it built and was run: the Rust tests counted in
+    /// `output` pass, or the run failed or ran over time.
+    #[must_use]
+    pub fn after_run(finished: Finished) -> Built {
+        match finished {
+            Finished::Passed(output) => Built::Clean { tests: passed_tests(&output), ran: true },
+            Finished::Failed(output) => Built::TestsFailed(output),
+            Finished::OverTime => Built::TimedOut,
+        }
+    }
+}
+
 /// Whether a block is a program or a library.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CrateType {
@@ -276,11 +302,7 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
     }
     let mut run = Command::new(&test_binary);
     run.arg("--test-threads=1");
-    Ok(match run_limited(run, scratch, TEST_LIMIT)? {
-        Finished::Passed(output) => Built::Clean { tests: passed_tests(&output), ran: true },
-        Finished::Failed(output) => Built::TestsFailed(output),
-        Finished::OverTime => Built::TimedOut,
-    })
+    Ok(Built::after_run(run_limited(run, scratch, TEST_LIMIT)?))
 }
 
 fn clippy(source: &Path, scratch: &Path, mode: &[&str], target: &Path) -> Result<Finished, DataError> {
@@ -296,9 +318,12 @@ fn clippy(source: &Path, scratch: &Path, mode: &[&str], target: &Path) -> Result
 
 /// How a command ended.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Finished {
+pub enum Finished {
+    /// It exited with success; everything it printed.
     Passed(String),
+    /// It exited with failure; the first lines it printed.
     Failed(String),
+    /// It ran longer than its limit and was killed.
     OverTime,
 }
 
@@ -371,18 +396,7 @@ mod tests {
     }
 
     fn kinds(checked: &Checked) -> Vec<&'static str> {
-        checked
-            .problems
-            .iter()
-            .map(|problem| match problem {
-                Problem::Rule { .. } => "rule",
-                Problem::Tests { .. } => "tests",
-                Problem::Build { .. } => "build",
-                Problem::TimedOut { .. } => "timed out",
-                Problem::Slop { .. } => "slop",
-                Problem::FalseClaim { .. } => "false claim",
-            })
-            .collect()
+        checked.problems.iter().map(Problem::kind).collect()
     }
 
     #[test]
@@ -448,6 +462,54 @@ mod tests {
         assert!(checked.problems.is_empty(), "{:?}", checked.problems);
         assert_eq!(checked.notes.len(), 1);
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    #[test]
+    fn a_command_over_its_limit_is_killed() -> Result<(), DataError> {
+        let folder = scratch("limit");
+        fs::create_dir_all(&folder).map_err(DataError::io(&folder))?;
+        let mut sleeper = Command::new("sleep");
+        sleeper.arg("5");
+        assert_eq!(run_limited(sleeper, &folder, Duration::from_millis(50))?, Finished::OverTime);
+        assert_eq!(Built::after_run(Finished::OverTime), Built::TimedOut);
+        assert_eq!(Built::after_run(Finished::Failed("x".to_string())), Built::TestsFailed("x".to_string()));
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    #[test]
+    fn records_every_outcome_of_a_block() {
+        let mut checked = Checked::default();
+        checked.record(2, "rust", Built::Ignored);
+        checked.record(2, "go", Built::TimedOut);
+        checked.record(2, "go", Built::TestsFailed("panic".to_string()));
+        checked.record(4, "python", Built::BuildFailed("syntax".to_string()));
+        assert_eq!(checked.ignored, 1);
+        assert_eq!(checked.block_count(), 3);
+        let lines: Vec<String> = checked.problems.iter().map(ToString::to_string).collect();
+        assert_eq!(lines, ["turn 2: tests ran over 30 s", "turn 2: go tests or program fail\npanic", "turn 4: python does not build cleanly\nsyntax"]);
+    }
+
+    #[test]
+    fn a_warning_only_in_test_code_fails_the_test_build() -> Result<(), DataError> {
+        let folder = scratch("testlint");
+        let linted = GOOD.replace("assert_eq!(total(&[1, 2]), 3);", "let unused = 1;\n        assert_eq!(total(&[1, 2]), 3);");
+        let checked = check(&conversation(&linted)?, &folder)?;
+        assert_eq!(kinds(&checked), ["build"]);
+        fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    }
+
+    #[test]
+    fn names_every_kind_of_problem() {
+        let problems = [
+            Problem::Build { turn: 1, language: "rust", output: String::new() },
+            Problem::Tests { turn: 1, language: "rust", output: String::new() },
+            Problem::TimedOut { turn: 1 },
+            Problem::Rule { turn: 1, detail: String::new() },
+            Problem::Slop { turn: 1, phrases: Vec::new() },
+            Problem::FalseClaim { turn: 1, text: String::new() },
+        ];
+        let kinds: Vec<&str> = problems.iter().map(Problem::kind).collect();
+        assert_eq!(kinds, ["build", "tests", "timed out", "rule", "slop", "false claim"]);
     }
 
     #[test]

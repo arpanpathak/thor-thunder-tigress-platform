@@ -13,6 +13,7 @@ pub fn source_title(source: &str) -> String {
         "code" => "Your code files".to_string(),
         "corpus" => "Open-source books and docs".to_string(),
         "conversation" => "Generated conversations".to_string(),
+        "teacher" => "Teacher conversations".to_string(),
         other => humanize(other),
     }
 }
@@ -74,6 +75,14 @@ fn humanize(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_the_teacher_set_every_rule_and_an_empty_name() {
+        use thor_spark_safety_eval::rules::Rule;
+        assert_eq!(source_title("teacher"), "Teacher conversations");
+        assert!(Rule::ALL.iter().all(|&rule| !rule_title(rule).is_empty()));
+        assert_eq!(humanize(""), "");
+    }
 
     #[test]
     fn names_known_books_and_humanizes_the_rest() {
