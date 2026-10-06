@@ -97,7 +97,7 @@ Contributions:
 
 Contributions:
 
-- base, prompted-base and fine-tuned models compared on every metric of chapter 10
+- base, prompted-base and fine-tuned models compared on every metric of chapter "Evaluation design"
 - the effect of SFT alone and SFT plus DPO on the clever-vs-readable pairs
 - ablations: without the readability repetition, and without removing the human-flagged examples
 

@@ -12,8 +12,9 @@
 
 - [Access and syncing](ch07-thor-access.md)
 - [Local models](ch08-local-models.md)
-- [Web chat](ch09-web-chat.md)
+- [Web chat: Thor Tigress Cub](ch09-web-chat.md)
 - [Bring your own agent](ch16-bring-your-own-agent.md)
+- [Bring your own domain](ch17-bring-your-own-domain.md)
 - [Security](ch10-security.md)
 
 # Plans

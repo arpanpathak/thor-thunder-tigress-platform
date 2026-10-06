@@ -79,9 +79,12 @@ https://arpanpathak.taildb9a39.ts.net/v1 --api-key-file
 
 ## Claude Code with Nemotron
 
-`claude-thor` on yahboom (alias in `~/.bashrc`) runs Claude Code against
-Nemotron through the tunnel, with its own settings, history and memory in
-`~/.claude-thor`. Plain `claude` is unchanged.
+`claude-thor` (thinking off) and `claude-thor-think` (thinking on) on yahboom
+(aliases in `~/.bashrc`) run Claude Code against Nemotron through the tunnel to
+`thor-tigress-agent` on port 8080, with their own settings, history and memory
+in `~/.claude-thor`. Plain `claude` is unchanged. Measured: thinking on works
+but is slow (207 s for a small crate); thinking off is fast but ignored the
+task. openbatrangs is the better agent here.
 
 ```bash
 mkdir -p ~/cc-thor-test && cd ~/cc-thor-test && claude-thor
@@ -111,12 +114,15 @@ To rebuild after changing edgechat on yahboom:
 ssh thor 'bash -lc "cd ~/Projects/edgechat && cargo install --path ."'
 ```
 
-## Nemotron chat in the browser
+## Thor Tigress Cub: chat in the browser
 
-`web/` holds the chat page (`index.html`, one file, no outside scripts) and
-`serve.sh`, which runs llama.cpp's `llama-server` with Nemotron on
-`127.0.0.1:8080`, serving the page and an OpenAI-compatible API. It is
-installed as the `thor-chat` user service and starts at boot.
+`web/` holds the chat page (`index.html`, one file with the cub art inline, no
+outside scripts), the art (`cub.svg`) and `serve.sh`. `serve.sh install`
+creates two user services that start at boot: `thor-chat` (llama.cpp's
+`llama-server` with Nemotron on `127.0.0.1:8079`) and `thor-tigress-agent`
+(the page, the key check, web search and the API on `127.0.0.1:8080`).
+`site/` builds the copy published at voltforge.tech. Full guide: the book,
+chapter "Web chat: Thor Tigress Cub".
 
 | Setting | Value |
 |---|---|
@@ -126,9 +132,9 @@ installed as the `thor-chat` user service and starts at boot.
 | Measured | 53 tok/s, first token 0.2 s |
 
 Change settings in `~/.config/thor-chat/env` (e.g. `USERS=8`), then
-`./serve.sh install`. The page has a think toggle, a stop
-button, copyable highlighted code and an optional system prompt in settings
-(none by default).
+`./serve.sh install`. The page has Web and Think switches, a stop key (Esc),
+highlighted code with copy, twelve themes and an optional system prompt in
+Settings (none by default).
 
 ```bash
 ./serve.sh logs          # follow the server log
@@ -149,8 +155,8 @@ rm ~/.config/thor-chat/api-key && systemctl --user restart thor-chat thor-tigres
 ```
 
 The key is 24 random bytes from `/dev/urandom`, kept in
-`~/.config/thor-chat/api-key` (readable only by you). People enter it once in
-the page: ⚙ → Access key → Save. Their browser remembers it.
+`~/.config/thor-chat/api-key` (readable only by you). People paste it once on
+the page's invite screen; their browser remembers it (Settings can change it).
 
 ### Reach it over Tailscale
 
@@ -176,14 +182,13 @@ Who can open it:
   `serve`, and run `./serve.sh key` first so only people you give the key to
   can chat. Turn it off with `sudo tailscale funnel --bg 8080 off`.
 
-### chat.voltforge.tech
+### voltforge.tech/thor-tigress-cub
 
-Tailscale addresses end in `.ts.net` and cannot be renamed. To share
-`chat.voltforge.tech`: Namecheap → Domain List → voltforge.tech → Advanced
-DNS → Add New Record → URL Redirect Record, host `chat`, value
-`https://<thor-name>.<tailnet>.ts.net`, Permanent (301). The browser then
-shows the `.ts.net` address. Keeping `voltforge.tech` in the address bar
-needs a reverse proxy such as Cloudflare Tunnel instead.
+The chat page is also published on GitHub Pages at
+`https://voltforge.tech/thor-tigress-cub/` and calls the Thor's `.ts.net`
+address for every reply (the server allows cross-site calls). Build the site
+with `site/build.sh ~/Projects/voltforge.tech`; DNS and GitHub steps are in the
+book, chapter "Bring your own domain".
 
 ## Platform tools on the Thor
 
@@ -197,22 +202,11 @@ and open http://localhost:8787.
 `~/Projects/edgechat/convo_datastore`, `~/Projects/nvidia-cloud-software-engineer-interview`
 and `corpus/` (`bash train/fetch_corpus.sh`).
 
-## Coding agent: OpenCode with Nemotron
+## Coding agent: OpenCode (removed)
 
-On yahboom, `opencode` in any project folder starts a terminal coding agent
-that uses Nemotron on the Thor. Set up: OpenCode in `~/.opencode/bin`, the
-config `~/.config/opencode/opencode.json` (provider `thor`, default model
-`thor/nemotron`, thinking off for agent work, base URL `http://127.0.0.1:8079/v1`, key read from
-`~/.config/thor-chat/api-key`), and the `thor-model-tunnel` user service that
-keeps `127.0.0.1:8079` (llama-server) and `127.0.0.1:8888` (SearXNG) tunnelled to the Thor. Plan mode uses Nemotron with thinking on; web search and page reading come from the `mcp-searxng` plugin.
-
-```bash
-cd ~/Projects/some-project && opencode
-systemctl --user status thor-model-tunnel      # tunnel up?
-curl -s 127.0.0.1:8079/health                  # model reachable?
-```
-
-Full setup, including macOS: the book, chapter "Local models".
+OpenCode was tried on yahboom on 2026-10-05 and removed the same day; its tool
+calls with Nemotron often came back as text. The config is kept in the book,
+chapter "Local models". Use openbatrangs (`openbatrangs --thor`) instead.
 
 ## Ollama
 

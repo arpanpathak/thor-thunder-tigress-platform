@@ -1,19 +1,68 @@
 # Security
 
-What the public chat exposes, tested on the Thor:
+The Thor sits on a home network and is reachable from the internet. This
+chapter lists what is exposed, what protects it, and what is still missing.
 
-| Reachable through the tunnel | Without the key |
-|---|---|
-| the page (`/`) and `/health` | open, nothing sensitive |
-| chat, completion, Anthropic messages, tokenize, embedding, slots, props, metrics | refused (401) |
-| anything else on the Thor (SSH, files, other ports) | not exposed |
+## What is exposed
+
+Tailscale Funnel forwards one port, 8080, to `thor-tigress-agent`. llama-server
+(8079) and SearXNG (8888) listen on `127.0.0.1` only. SSH is reachable on the
+home network and the tailnet, never from the internet. Tested through the
+public address on 2026-10-05:
+
+| Path | Without the key | With the key |
+|---|---|---|
+| the page (`/`), `/health` | open; nothing sensitive | open |
+| `OPTIONS` on any path (CORS preflight) | headers only | headers only |
+| `/v1/models`, `/v1/chat/completions`, `/v1/messages` | `401` | answered |
+| other `/v1/…` paths, e.g. `/v1/embeddings` | `401` | `404`, not passed through |
+| llama-server's own `/tokenize`, `/slots`, `/props`, `/metrics` | `404` | `404`, not passed through |
+| anything else on the Thor | not reachable | not reachable |
+
+The copy of the page on GitHub Pages (`voltforge.tech/thor-tigress-cub/`)
+holds no secrets: it is the same HTML file with the Thor's public address
+filled in. Your home IP address is not published anywhere; GitHub serves the
+page and Tailscale relays the requests.
+
+## Why `Access-Control-Allow-Origin: *` is safe here
+
+Every response from `thor-tigress-agent` lets any site read it, so the GitHub
+Pages copy can call the Thor. Browsers only attach credentials they hold on
+their own, such as cookies, and this server uses none. The key travels in a
+header that a page must set itself, so a site can only call the model with a
+key it already has. A leaked key is the risk; CORS doesn't add one.
+
+## The access key
+
+There is one key, shared by everyone invited. It is stored on the Thor in
+`~/.config/thor-chat/api-key` (mode 600), and in each visitor's browser after
+they paste it.
+
+- **Don't put it in chats, repositories or screenshots.** If it leaks, make a
+  new one: `./serve.sh key && systemctl --user restart thor-chat thor-tigress-agent`.
+  Everyone then needs the new key.
+- **Give it out for a limited time.** Changing the key is how access ends.
+- **Anyone with the key can keep the GPU busy.** There are no per-person
+  limits yet. Four replies run at once; a fifth waits.
 
 ## Keep it that way
 
-- **Don't share the key in chats or repositories.** If it leaks, make a new
-  one: `./serve.sh key && systemctl --user restart thor-chat thor-tigress-agent`.
-- **Update llama.cpp now and then.** The remaining risk is a bug in
-  `llama-server` itself, which runs as your user.
+- **Update llama.cpp and Tailscale now and then.** The remaining risk is a bug
+  in a program that runs as your user.
 - **Prefer private (`tailscale serve`) for people you know.** Public
-  (`funnel`) lets anyone with the link try.
-- **Anyone with the key can keep the GPU busy;** there are no per-person limits.
+  (`funnel`) lets anyone with the link see the page and try keys.
+- **Read the logs after sharing widely.** `./serve.sh logs` on the Thor shows
+  the requests, including each refused one.
+
+## Next: sign-in with GitHub
+
+The shared key is the weak point: it can't be taken back from one person, and
+it says nothing about who uses what. The next version of `thor-tigress-agent`
+(async Rust, planned) replaces it:
+
+| Now | Next |
+|---|---|
+| one shared key | sign in with GitHub; a personal key per person for agents |
+| no limits | a daily token allowance per person, and a fair queue for the four slots |
+| a new key locks everyone out | block or allow one person |
+| no record of who | usage counted per person |

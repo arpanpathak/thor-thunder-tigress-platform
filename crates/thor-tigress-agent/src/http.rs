@@ -13,6 +13,11 @@ use crate::error::AgentError;
 /// The largest request body accepted: a long conversation with pasted code.
 const MAX_BODY: usize = 32 << 20;
 
+/// Sent with every response, so the chat page can be hosted on another site
+/// (GitHub Pages) and call this server. Safe because access is by bearer key,
+/// not cookies: another site cannot use a visitor's key without having it.
+const CORS: &str = "Access-Control-Allow-Origin: *\r\n";
+
 /// How long an upstream call may stay silent before it is given up on.
 const UPSTREAM_TIMEOUT: Duration = Duration::from_secs(600);
 
@@ -79,10 +84,20 @@ pub fn read_request(stream: &TcpStream) -> Result<Request, AgentError> {
 pub fn respond(stream: &mut TcpStream, status: &str, content_type: &str, body: &[u8]) -> Result<(), AgentError> {
     write!(
         stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\n{CORS}Content-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         body.len()
     )?;
     stream.write_all(body)?;
+    Ok(stream.flush()?)
+}
+
+/// Answers a CORS preflight: the browser asks before a cross-site request
+/// with an `Authorization` header.
+pub fn preflight(stream: &mut TcpStream) -> Result<(), AgentError> {
+    write!(
+        stream,
+        "HTTP/1.1 204 No Content\r\n{CORS}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: Authorization, Content-Type, x-api-key, anthropic-version\r\nAccess-Control-Max-Age: 86400\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+    )?;
     Ok(stream.flush()?)
 }
 
@@ -91,7 +106,7 @@ pub fn respond(stream: &mut TcpStream, status: &str, content_type: &str, body: &
 pub fn start_events(stream: &mut TcpStream) -> Result<(), AgentError> {
     write!(
         stream,
-        "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
+        "HTTP/1.1 200 OK\r\n{CORS}Content-Type: text/event-stream\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"
     )?;
     Ok(stream.flush()?)
 }
@@ -185,7 +200,7 @@ pub fn call(
 pub fn relay(stream: &mut TcpStream, mut response: UpstreamResponse) -> Result<(), AgentError> {
     write!(
         stream,
-        "HTTP/1.1 {} Upstream\r\nContent-Type: {}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} Upstream\r\n{CORS}Content-Type: {}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
         response.status, response.content_type
     )?;
     std::io::copy(&mut response.body, stream)?;

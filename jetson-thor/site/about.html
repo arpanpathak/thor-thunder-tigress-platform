@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>About · Thor Tigress Cub</title>
+<meta name="description" content="Nemotron 3 Nano, a 30-billion-parameter model, running on one NVIDIA Jetson AGX Thor. Chat with it in the browser or point your coding agent at it.">
+<meta property="og:title" content="Thor Tigress Cub">
+<meta property="og:description" content="A 30B model on a Jetson AGX Thor. Chat with it, or point your coding agent at it.">
+<meta property="og:image" content="cub.png">
+<link rel="icon" href="cub.svg" type="image/svg+xml">
+<script>try { const t = localStorage.getItem("cub-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+<style>
+  :root {
+    --bg: #F6F8FC; --bg-2: #EAEFF8; --panel: #FFFFFF; --text: #131B2E; --muted: #55627F; --border: #D5DDEB;
+    --accent: #1F6FB2; --accent-2: #5ED3F3; --gold: #E9A93A; --on-accent: #FFFFFF;
+    --glow: rgb(94 211 243 / .28); --shadow: 0 1px 2px rgb(19 27 46 / .06), 0 8px 28px rgb(19 27 46 / .08);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1221; --bg-2: #111B30; --panel: #141F36; --text: #EAF0FA; --muted: #9AA9C6; --border: #24314D;
+      --accent: #5ED3F3; --accent-2: #5ED3F3; --gold: #F2B84B; --on-accent: #0B1221;
+      --glow: rgb(94 211 243 / .18); --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 10px 30px rgb(0 0 0 / .35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1221; --bg-2: #111B30; --panel: #141F36; --text: #EAF0FA; --muted: #9AA9C6; --border: #24314D;
+    --accent: #5ED3F3; --accent-2: #5ED3F3; --gold: #F2B84B; --on-accent: #0B1221;
+    --glow: rgb(94 211 243 / .18); --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 10px 30px rgb(0 0 0 / .35);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 17px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); }
+  img { max-width: 100%; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+  nav { display: flex; align-items: center; gap: 18px; padding: 16px 0; }
+  nav .brand { white-space: nowrap; display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); text-decoration: none; }
+  nav .brand img { width: 34px; height: 34px; }
+  nav .spacer { flex: 1; }
+  nav a.link { color: var(--muted); text-decoration: none; font-size: 15px; }
+  nav a.link:hover { color: var(--text); }
+  #theme { background: none; border: 1px solid var(--border); border-radius: 999px; color: var(--muted);
+           width: 36px; height: 36px; cursor: pointer; font-size: 18px; flex: none; }
+  @media (max-width: 560px) { nav a.link.optional { display: none; } nav { gap: 12px; } }
+  @media (max-width: 400px) { nav a.link.github { display: none; } }
+
+  .hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: center; padding: 40px 0 56px; }
+  @media (max-width: 820px) { .hero { grid-template-columns: 1fr; text-align: center; padding-top: 16px; } .hero .art { order: -1; } }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted);
+             border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; background: var(--panel); }
+  .eyebrow .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .eyebrow .dot.ok { background: #2FBF71; box-shadow: 0 0 0 4px rgb(47 191 113 / .18); }
+  .eyebrow .dot.bad { background: #E5484D; }
+  h1 { font-size: clamp(40px, 6vw, 64px); line-height: 1.05; margin: 18px 0 16px; letter-spacing: -0.02em; }
+  h1 .bolt { color: var(--accent-2); }
+  .lede { font-size: 19px; color: var(--muted); margin: 0 0 28px; max-width: 34em; }
+  @media (max-width: 820px) { .lede { margin-left: auto; margin-right: auto; } }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  @media (max-width: 820px) { .actions { justify-content: center; } }
+  .button { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 12px;
+            font-weight: 600; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--panel); }
+  .button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .button:hover { transform: translateY(-1px); }
+  .art { position: relative; display: grid; place-items: center; }
+  .art::before { content: ""; position: absolute; inset: 8% 10%; border-radius: 50%;
+                 background: radial-gradient(circle, var(--glow), transparent 68%); }
+  .art img { position: relative; width: min(420px, 80vw); animation: float 5s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-8px); } }
+  @media (prefers-reduced-motion: reduce) { .art img { animation: none; } .button:hover { transform: none; } }
+
+  .facts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border);
+           border: 1px solid var(--border); border-radius: 16px; overflow: hidden; margin-bottom: 72px; }
+  @media (max-width: 820px) { .facts { grid-template-columns: repeat(2, 1fr); } .facts div:last-child { grid-column: span 2; } }
+  .facts div { background: var(--panel); padding: 18px 16px; text-align: center; }
+  .facts strong { display: block; font-size: 24px; font-variant-numeric: tabular-nums; }
+  .facts span { font-size: 14px; color: var(--muted); }
+
+  section { margin-bottom: 80px; }
+  h2 { font-size: 30px; letter-spacing: -0.01em; margin: 0 0 10px; }
+  .sub { color: var(--muted); margin: 0 0 28px; max-width: 42em; }
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 820px) { .cards { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); }
+  .card h3 { margin: 10px 0 6px; font-size: 19px; }
+  .card p { margin: 0 0 12px; color: var(--muted); font-size: 16px; }
+  .card .icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
+                background: var(--bg-2); color: var(--accent); }
+  .card ul { margin: 0; padding-left: 20px; color: var(--muted); font-size: 15px; }
+  code, pre { font: 14px/1.55 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace; }
+  pre { background: var(--bg-2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px;
+        overflow-x: auto; margin: 0; }
+
+  .snippets { display: grid; grid-template-columns: 3fr 2fr; gap: 14px; }
+  .snippets > * { min-width: 0; }
+  @media (max-width: 820px) { .snippets { grid-template-columns: 1fr; } }
+  .flow { display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+  .flow .step { flex: 1 1 160px; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+  .flow .step b { display: block; }
+  .flow .step span { color: var(--muted); font-size: 14px; }
+  .flow .arrow { display: grid; place-items: center; color: var(--muted); font-size: 22px; }
+  @media (max-width: 820px) { .flow { flex-direction: column; } .flow .arrow { transform: rotate(90deg); } }
+
+  .access { display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; background: var(--panel);
+            border: 1px solid var(--border); border-radius: 20px; padding: 28px; box-shadow: var(--shadow); }
+  .access img { width: 150px; }
+  @media (max-width: 680px) { .access { grid-template-columns: 1fr; text-align: center; } .access img { margin: 0 auto; } }
+  .access h2 { font-size: 26px; }
+  .access p { color: var(--muted); margin: 0 0 14px; }
+
+  details { border-bottom: 1px solid var(--border); padding: 14px 0; }
+  details summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; }
+  details summary::after { content: "+"; color: var(--muted); }
+  details[open] summary::after { content: "−"; }
+  details p { color: var(--muted); margin: 10px 0 0; }
+
+  footer { border-top: 1px solid var(--border); padding: 28px 0 40px; color: var(--muted); font-size: 15px; }
+  footer .wrap { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; }
+  footer .spacer { flex: 1; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="./about.html"><img src="cub.svg" alt=""> Thor Tigress Cub</a>
+    <span class="spacer"></span>
+    <a class="link optional" href="#agents">For agents</a>
+    <a class="link optional" href="#faq">FAQ</a>
+    <a class="link" href="https://arpanpathak.github.io/thor-thunder-tigress-platform/">Book</a>
+    <a class="link github" href="https://github.com/arpanpathak/thor-thunder-tigress-platform">GitHub</a>
+    <button id="theme" title="Switch light and dark" aria-label="Switch light and dark">◐</button>
+  </nav>
+
+  <header class="hero">
+    <div>
+      <span class="eyebrow"><span id="status-dot" class="dot"></span><span id="status-text">Checking the Thor…</span></span>
+      <h1>A 30B model on a desk&#8209;sized <span class="bolt">Thor</span>.</h1>
+      <p class="lede">Nemotron 3 Nano runs on one NVIDIA Jetson AGX Thor in a home office. Chat with it in your
+        browser, or point your own coding agent at it. Same model, same machine, no cloud.</p>
+      <div class="actions">
+        <a class="button primary" id="chat-link" href="./">Open the chat →</a>
+        <a class="button" href="#agents">Use it from your agent</a>
+      </div>
+    </div>
+    <div class="art"><img src="cub.svg" alt="Thor Tigress Cub, a tiger cub in a winged helmet raising a small hammer that throws sparks"></div>
+  </header>
+
+  <div class="facts">
+    <div><strong>30B</strong><span>parameters, 3B active</span></div>
+    <div><strong>1M</strong><span>tokens of context</span></div>
+    <div><strong>~53</strong><span>tokens per second</span></div>
+    <div><strong>128 GB</strong><span>unified memory</span></div>
+    <div><strong>4</strong><span>conversations at once</span></div>
+  </div>
+
+  <section>
+    <h2>What you can do with it</h2>
+    <p class="sub">Everything below runs on the Thor itself: the model, the web search, and the server in front of them.</p>
+    <div class="cards">
+      <div class="card">
+        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg></div>
+        <h3>Chat</h3>
+        <p>Replies stream as they are written. Turn on <b>think</b> to see the model reason first, or <b>web</b> to let it search before it answers.</p>
+        <ul><li>Code blocks with highlighting and copy</li><li>Sources listed for every search</li><li>Twelve themes, from Paper to Material Deep Ocean</li></ul>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-5-6-5M12 19h8"/></svg></div>
+        <h3>Your coding agent</h3>
+        <p>The Thor speaks the OpenAI and Anthropic APIs, so terminal agents and SDKs work with a base URL and a key.</p>
+        <ul><li>openbatrangs, with <code>--openai-url</code></li><li>OpenCode and other OpenAI clients</li><li>Python, curl, anything that streams</li></ul>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5V5a2 2 0 0 1 2-2h14v16H6a2 2 0 0 0-2 2zM8 7h8M8 11h6"/></svg></div>
+        <h3>Open, and written down</h3>
+        <p>The server is a small Rust program; the setup, numbers and mistakes are in a book you can read and copy.</p>
+        <ul><li>Apache-2.0 source on GitHub</li><li>Measured speeds, not estimates</li><li>Step-by-step guides for each tool</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>How a reply gets to you</h2>
+    <p class="sub">Your message travels over Tailscale to the Thor. Nothing is sent to a cloud model.</p>
+    <div class="flow">
+      <div class="step"><b>You</b><span>browser or agent</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>Tailscale Funnel</b><span>HTTPS, no open ports at home</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>thor-tigress-agent</b><span>Rust; checks access, runs web search</span></div>
+      <div class="arrow">→</div>
+      <div class="step"><b>llama-server</b><span>Nemotron 3 Nano on the Thor's GPU</span></div>
+    </div>
+  </section>
+
+  <section id="agents">
+    <h2>Use it from your agent</h2>
+    <p class="sub">Base URL <code>https://arpanpathak.taildb9a39.ts.net/v1</code>, model name anything, key from the author.
+      The <a href="https://arpanpathak.github.io/thor-thunder-tigress-platform/ch16-bring-your-own-agent.html">guide</a> covers each tool, including how to turn thinking on and off.</p>
+    <div class="snippets">
+        <pre><code># openbatrangs (Linux and macOS)
+cargo install --git https://github.com/arpanpathak/openbatrangs --locked
+openbatrangs --openai-url https://arpanpathak.taildb9a39.ts.net/v1 \
+             --api-key-file ~/.config/thor-chat/api-key</code></pre>
+        <pre><code>curl https://arpanpathak.taildb9a39.ts.net/v1/models \
+  -H "Authorization: Bearer $KEY"</code></pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="access">
+      <img src="cub.svg" alt="">
+      <div>
+        <h2>Invite-only, for now</h2>
+        <p>The Thor is one machine with four reply slots, shared by everyone. Access is given to people who ask, for a
+          limited time. Sign-in with GitHub is next; until then the author hands out keys.</p>
+        <a class="button primary" href="https://github.com/arpanpathak">Ask Arpan for access</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <h2>Questions</h2>
+    <details><summary>What hardware is this?</summary>
+      <p>An NVIDIA Jetson AGX Thor developer kit: a 14-core Arm CPU and a Blackwell GPU sharing 128 GB of memory. The model
+        is Nemotron 3 Nano 30B-A3B, quantized to 8 bits, served by llama.cpp.</p></details>
+    <details><summary>Why is it sometimes slower?</summary>
+      <p>Four replies are generated at once at most. Generating is limited by memory bandwidth (273 GB/s), so when everyone
+        is typing, each reply gets a share of it. A fifth person waits for a slot.</p></details>
+    <details><summary>Who can see what I send?</summary>
+      <p>Your messages are processed on the author's machine, not stored by a cloud provider. The chat history lives in your
+        browser. Don't send secrets.</p></details>
+    <details><summary>Is it free?</summary>
+      <p>Yes, while it lasts. It runs on electricity at someone's home, so access is limited in time and can be withdrawn.</p></details>
+    <details><summary>Can I run this myself?</summary>
+      <p>Yes. The book walks through the whole setup, from the first SSH login to serving the model and sharing it safely.</p></details>
+  </section>
+</div>
+
+<footer>
+  <div class="wrap">
+    <span>Built by <a href="https://github.com/arpanpathak">Arpan Pathak</a> on a Jetson AGX Thor.</span>
+    <span class="spacer"></span>
+    <a href="https://arpanpathak.github.io/thor-thunder-tigress-platform/">Book</a>
+    <a href="https://github.com/arpanpathak/thor-thunder-tigress-platform">Source</a>
+  </div>
+</footer>
+
+<script>
+const CHAT = "https://arpanpathak.taildb9a39.ts.net";
+const root = document.documentElement;
+document.getElementById("theme").addEventListener("click", () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("cub-theme", root.dataset.theme); } catch {}
+});
+(async () => {
+  const dot = document.getElementById("status-dot");
+  const text = document.getElementById("status-text");
+  try {
+    const response = await fetch(`${CHAT}/health`, { cache: "no-store" });
+    if (!response.ok) throw new Error(String(response.status));
+    dot.className = "dot ok";
+    text.textContent = "The Thor is online";
+  } catch {
+    dot.className = "dot";
+    text.textContent = "Nemotron 3 Nano · Jetson AGX Thor";
+  }
+})();
+</script>
+</body>
+</html>

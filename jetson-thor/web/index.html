@@ -3,25 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Thor Chat</title>
+<title>Thor Tigress Cub</title>
+<!-- Where the model server is. Empty: the server that serves this page (the Thor).
+     The copy on voltforge.tech sets the Thor's public address here. -->
+<meta name="thor-api" content="">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
 <script>try { const t = JSON.parse(localStorage.getItem("theme")); if (t && t !== "system") document.documentElement.dataset.theme = t; } catch {}</script>
 <style>
   /* Themes. "system" follows the device: paper when light, night when dark. */
-  :root, :root[data-theme="paper"] {
+  :root {
+    --bg: #F6F8FC; --panel: #FFFFFF; --text: #131B2E; --muted: #5B6987; --border: #D9E0EC;
+    --accent: #1F6FB2; --accent-text: #FFFFFF; --user: #E8EEF8; --code-bg: #F1F4FA; --bar: #E7ECF5;
+    --danger: #C4314B; --glow: rgb(94 211 243 / .30);
+    --tok-comment: #6B7690; --tok-string: #0A7D52; --tok-keyword: #8B3FD9; --tok-type: #B25E09;
+    --tok-number: #0B7AA6; --tok-macro: #1F6FB2; --tok-attr: #6B7690; --tok-lifetime: #C02A6B; --tok-call: #1F5FBF;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) {
+      --bg: #0B1221; --panel: #141F36; --text: #EAF0FA; --muted: #93A2C0; --border: #24314D;
+      --accent: #5ED3F3; --accent-text: #0B1221; --user: #18243F; --code-bg: #0E182B; --bar: #15213A;
+      --danger: #F07178; --glow: rgb(94 211 243 / .16);
+      --tok-comment: #5F6E8E; --tok-string: #C3E88D; --tok-keyword: #C792EA; --tok-type: #FFCB6B;
+      --tok-number: #F78C6C; --tok-macro: #89DDFF; --tok-attr: #FFCB6B; --tok-lifetime: #FF9CAC; --tok-call: #82AAFF;
+    }
+  }
+  :root[data-theme="paper"] {
     --bg: #fbfaf8; --panel: #ffffff; --text: #1c1917; --muted: #78716c; --border: #e7e5e4;
     --accent: #2f6f4f; --accent-text: #ffffff; --user: #f1efeb; --code-bg: #f6f5f2; --bar: #efede9;
     --danger: #b42318;
     --tok-comment: #6b7280; --tok-string: #0a7d32; --tok-keyword: #a626a4; --tok-type: #b45309;
     --tok-number: #0e7490; --tok-macro: #2563eb; --tok-attr: #78716c; --tok-lifetime: #be185d; --tok-call: #1d4ed8;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme]) {
-      --bg: #141312; --panel: #1c1b19; --text: #ecebe8; --muted: #9c978f; --border: #2e2c29;
-      --accent: #7fc8a0; --accent-text: #0f1a14; --user: #24221f; --code-bg: #181715; --bar: #201f1c;
-      --danger: #f97066;
-      --tok-comment: #8b949e; --tok-string: #a5d6a7; --tok-keyword: #d2a8ff; --tok-type: #ffcb6b;
-      --tok-number: #79dcf2; --tok-macro: #82aaff; --tok-attr: #a8a29e; --tok-lifetime: #f78fb3; --tok-call: #9cc4ff;
-    }
   }
   :root[data-theme="night"] {
     --bg: #141312; --panel: #1c1b19; --text: #ecebe8; --muted: #9c978f; --border: #2e2c29;
@@ -100,6 +111,7 @@
   :root { color-scheme: light; }
   :root[data-theme="night"], :root[data-theme="deep-ocean"], :root[data-theme="solarized-dark"], :root[data-theme="nord"], :root[data-theme="dracula"], :root[data-theme="one-dark"], :root[data-theme="gruvbox-dark"], :root[data-theme="monokai"] { color-scheme: dark; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme]) { color-scheme: dark; } }
+  
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body { margin: 0; background: var(--bg); color: var(--text);
@@ -112,26 +124,65 @@
   button:disabled { opacity: .45; cursor: default; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  header { display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+  header { display: flex; align-items: center; gap: 10px; padding: 8px 14px;
            border-bottom: 1px solid var(--border); background: var(--bg); }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; white-space: nowrap; }
+  .brand svg { width: 34px; height: 34px; }
+  .model-chip { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 3px 10px; border-radius: 999px;
+                border: 1px solid var(--border); background: var(--panel); color: var(--muted); }
+  @media (max-width: 640px) { .brand .name, .model-chip { display: none; } }
+  .pill { display: flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 14px;
+          border: 1px solid var(--border); color: var(--muted); cursor: pointer; user-select: none; }
+  .pill input { position: absolute; opacity: 0; pointer-events: none; }
+  .pill:has(input:checked) { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .pill:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pill svg { width: 15px; height: 15px; }
+  .about { color: var(--muted); font-size: 14px; text-decoration: none; margin-right: 4px; }
+  .about:hover { color: var(--text); }
+  @media (max-width: 480px) { .about { display: none; } }
+  .icon-btn { width: 34px; height: 34px; padding: 0; display: grid; place-items: center; border-radius: 10px; }
+  .icon-btn svg { width: 17px; height: 17px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
   .dot.ok { background: var(--accent); }
   .dot.bad { background: var(--danger); }
-  #model { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #model { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
   header .spacer { flex: 1; }
-  #theme { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px;
-           font-size: 14px; max-width: 150px; }
-  @media (max-width: 520px) { #theme { max-width: 96px; } .toggle { font-size: 0; gap: 0; } .toggle input { margin: 0; } }
-  .toggle { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--muted); cursor: pointer;
-            user-select: none; }
-  .toggle input { accent-color: var(--accent); }
+  dialog select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; }
 
   main { flex: 1; overflow-y: auto; }
   #thread { max-width: 780px; margin: 0 auto; padding: 24px 16px 32px; }
-  .empty { color: var(--muted); text-align: center; margin-top: 18vh; font-size: 15px; }
-  .empty strong { display: block; color: var(--text); font-size: 20px; margin-bottom: 6px; }
+  .empty { text-align: center; margin-top: 6vh; }
+  .empty .hero { position: relative; display: inline-grid; place-items: center; }
+  .empty .hero::before { content: ""; position: absolute; inset: 6% 4%; border-radius: 50%;
+                         background: radial-gradient(circle, var(--glow, rgb(94 211 243 / .22)), transparent 68%); }
+  .empty .hero svg { position: relative; width: min(230px, 52vw); height: auto; animation: float 5s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-6px); } }
+  @media (prefers-reduced-motion: reduce) { .empty .hero svg { animation: none; } }
+  .empty h1, .gate h1 { line-height: 1.2; }
+  .empty h1 { font-size: 26px; margin: 10px 0 6px; letter-spacing: -0.01em; }
+  .empty p { color: var(--muted); margin: 0 auto 22px; max-width: 30em; }
+  .chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 620px; margin: 0 auto; text-align: left; }
+  @media (max-width: 560px) { .chips { grid-template-columns: 1fr; } }
+  .chips button { text-align: left; padding: 12px 14px; border-radius: 12px; background: var(--panel); line-height: 1.4; }
+  .chips button b { display: block; font-size: 14px; }
+  .chips button span { font-size: 13px; color: var(--muted); }
+  .gate { max-width: 460px; margin: 6vh auto 0; text-align: center; }
+  .gate .hero svg { width: 170px; }
+  .gate form { display: flex; gap: 8px; margin: 16px 0 10px; }
+  .gate input { flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; }
+  .gate .primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; border-radius: 10px; }
+  .gate small { color: var(--muted); }
 
   .msg { margin: 0 0 22px; }
+  .msg.assistant { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--panel); border: 1px solid var(--border);
+            overflow: hidden; display: grid; place-items: center; }
+  .avatar svg { width: 34px; height: 34px; margin-top: 4px; }
+  .dots { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); font-size: 14px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: hop 1.2s infinite ease-in-out; }
+  .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+  .dots span { margin-left: 6px; }
+  @keyframes hop { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
   .msg.user { display: flex; justify-content: flex-end; }
   .msg.user .body { background: var(--user); border-radius: 14px; padding: 9px 14px; max-width: 85%;
                     white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -182,7 +233,8 @@
   .composer textarea:focus-visible { outline: none; }
   textarea { flex: 1; border: none; outline: none; resize: none; background: none; max-height: 40vh;
              padding: 4px 0; line-height: 1.5; }
-  #send { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  #send { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600;
+          border-radius: 10px; min-width: 64px; }
   .hint { max-width: 780px; margin: 6px auto 0; font-size: 12px; color: var(--muted); text-align: center; }
 
   dialog { border: 1px solid var(--border); border-radius: 14px; background: var(--panel); color: var(--text);
@@ -197,44 +249,162 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="cape" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4A6396"/>
+      <stop offset="1" stop-color="#2E4170"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4F7FC"/>
+      <stop offset="1" stop-color="#C9D3E4"/>
+    </linearGradient>
+    <radialGradient id="fur" cx="0.45" cy="0.35" r="0.75">
+      <stop offset="0" stop-color="#B3C0D9"/>
+      <stop offset="1" stop-color="#8F9DBA"/>
+    </radialGradient>
+  
+  <g id="cub-art">
+  <g stroke="#131B2E" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+
+    <path d="M150,282 C128,330 112,384 104,428 C170,442 250,442 316,428 C308,384 292,330 270,282 Z" fill="url(#cape)"/>
+
+    <path d="M152,388 C102,392 66,370 64,328 C62,298 84,282 104,292" fill="none" stroke-width="30"/>
+    <path d="M152,388 C102,392 66,370 64,328 C62,298 84,282 104,292" fill="none" stroke="#97A5C1" stroke-width="20"/>
+    <g stroke="#3E4F78" stroke-width="5">
+      <path d="M120,384 L116,396"/><path d="M90,372 L80,380"/><path d="M70,346 L58,348"/><path d="M70,312 L58,306"/>
+    </g>
+
+    <ellipse cx="210" cy="356" rx="72" ry="62" fill="url(#fur)"/>
+    <ellipse cx="210" cy="370" rx="42" ry="38" fill="#EEF2F9" stroke="none"/>
+    <circle cx="210" cy="328" r="15" fill="url(#steel)" stroke-width="4"/>
+    <path d="M213,318 L204,330 L211,330 L206,340 L217,326 L210,326 Z" fill="#5ED3F3" stroke-width="2"/>
+
+    <ellipse cx="172" cy="414" rx="27" ry="16" fill="#97A5C1"/>
+    <ellipse cx="248" cy="414" rx="27" ry="16" fill="#97A5C1"/>
+    <path d="M164,410 L164,420 M180,410 L180,420 M240,410 L240,420 M256,410 L256,420" stroke-width="3"/>
+
+    <ellipse cx="146" cy="356" rx="17" ry="27" fill="#97A5C1" transform="rotate(14 146 356)"/>
+
+    <path d="M104,184 L78,206 L100,214 L80,238 L106,240 L94,262 L126,250 Z" fill="#97A5C1"/>
+    <path d="M316,184 L342,206 L320,214 L340,238 L314,240 L326,262 L294,250 Z" fill="#97A5C1"/>
+
+    <circle cx="124" cy="112" r="34" fill="#97A5C1"/>
+    <circle cx="124" cy="115" r="17" fill="#E9B7C1" stroke-width="3"/>
+    <circle cx="296" cy="112" r="34" fill="#97A5C1"/>
+    <circle cx="296" cy="115" r="17" fill="#E9B7C1" stroke-width="3"/>
+
+    <ellipse cx="210" cy="206" rx="116" ry="98" fill="url(#fur)"/>
+
+    <path d="M118,152 C120,86 300,86 302,152 Z" fill="url(#steel)"/>
+    <path d="M150,104 C176,92 206,90 226,92" fill="none" stroke="#FFFFFF" stroke-width="6" opacity="0.8"/>
+    <path d="M202,94 C204,80 206,72 210,62 C214,72 216,80 218,94 Z" fill="#2E4170" stroke-width="4"/>
+    <rect x="112" y="140" width="196" height="24" rx="11" fill="#8E9AB3"/>
+    <path d="M210,138 L224,152 L210,166 L196,152 Z" fill="#5ED3F3" stroke-width="4"/>
+
+    <path d="M118,146 C92,138 70,112 58,74 C80,90 92,96 104,100 C92,86 86,70 88,54 C106,80 122,108 130,136 Z" fill="url(#steel)"/>
+    <path d="M302,146 C328,138 350,112 362,74 C340,90 328,96 316,100 C328,86 334,70 332,54 C314,80 298,108 290,136 Z" fill="url(#steel)"/>
+
+    <g stroke="#3E4F78" stroke-width="6">
+      <path d="M186,170 L190,182"/><path d="M234,170 L230,182"/>
+      <path d="M100,196 L124,202"/><path d="M98,218 L120,220"/>
+      <path d="M320,196 L296,202"/><path d="M322,218 L300,220"/>
+    </g>
+    <path d="M213,172 L205,184 L211,184 L207,194 L217,181 L211,181 Z" fill="#5ED3F3" stroke-width="2.5"/>
+
+    <ellipse cx="210" cy="252" rx="54" ry="38" fill="#EEF2F9"/>
+
+    <ellipse cx="164" cy="214" rx="23" ry="26" fill="#F2B84B" stroke-width="4"/>
+    <ellipse cx="166" cy="217" rx="12" ry="16" fill="#131B2E" stroke="none"/>
+    <circle cx="172" cy="207" r="6" fill="#FFFFFF" stroke="none"/>
+    <circle cx="160" cy="225" r="3" fill="#FFFFFF" stroke="none"/>
+    <ellipse cx="256" cy="214" rx="23" ry="26" fill="#F2B84B" stroke-width="4"/>
+    <ellipse cx="254" cy="217" rx="12" ry="16" fill="#131B2E" stroke="none"/>
+    <circle cx="260" cy="207" r="6" fill="#FFFFFF" stroke="none"/>
+    <circle cx="248" cy="225" r="3" fill="#FFFFFF" stroke="none"/>
+
+    <ellipse cx="140" cy="252" rx="15" ry="8" fill="#F4A6B6" stroke="none" opacity="0.7"/>
+    <ellipse cx="280" cy="252" rx="15" ry="8" fill="#F4A6B6" stroke="none" opacity="0.7"/>
+
+    <path d="M196,236 Q210,229 224,236 Q219,250 210,252 Q201,250 196,236 Z" fill="#D98C99" stroke-width="4"/>
+    <path d="M210,252 L210,260" stroke-width="4"/>
+    <path d="M190,259 Q200,272 210,260 Q220,272 230,259" fill="none" stroke-width="4"/>
+    <path d="M216,265 L220,276 L224,264 Z" fill="#FFFFFF" stroke-width="2.5"/>
+
+    <g fill="#131B2E" stroke="none">
+      <circle cx="182" cy="256" r="2.5"/><circle cx="176" cy="264" r="2.5"/><circle cx="188" cy="266" r="2.5"/>
+      <circle cx="238" cy="256" r="2.5"/><circle cx="244" cy="264" r="2.5"/><circle cx="232" cy="266" r="2.5"/>
+    </g>
+    <g stroke="#5D6C8D" stroke-width="3">
+      <path d="M160,262 L108,256"/><path d="M160,270 L112,276"/>
+      <path d="M260,262 L312,256"/><path d="M260,270 L308,276"/>
+    </g>
+
+    <path d="M262,326 C290,312 318,292 336,262" fill="none" stroke-width="32"/>
+    <path d="M262,326 C290,312 318,292 336,262" fill="none" stroke="#97A5C1" stroke-width="22"/>
+    <path d="M340,256 L356,172" stroke-width="16"/>
+    <path d="M340,256 L356,172" stroke="#8A5A33" stroke-width="8"/>
+    <g transform="rotate(12 360 156)">
+      <rect x="322" y="134" width="76" height="42" rx="7" fill="url(#steel)"/>
+      <rect x="322" y="163" width="76" height="13" rx="4" fill="#8E9AB3" stroke-width="4"/>
+      <path d="M363,139 L352,155 L361,155 L354,169 L370,150 L361,150 Z" fill="#5ED3F3" stroke-width="2.5"/>
+    </g>
+    <circle cx="338" cy="260" r="18" fill="#97A5C1"/>
+    <g fill="#5ED3F3" stroke-width="3">
+      <path d="M414,92 L400,114 L410,114 L402,134 L424,106 L413,106 Z"/>
+      <path d="M426,170 L418,180 L424,181 L419,191 L432,177 L426,177 Z"/>
+    </g>
+    <g stroke="#5ED3F3" stroke-width="4">
+      <path d="M388,112 L382,100"/><path d="M410,150 L422,146"/>
+    </g>
+  </g>
+</g>
+  </defs>
+</svg>
 <header>
-  <span id="status" class="dot" title="server status"></span>
-  <span id="model">connecting…</span>
+  <span class="brand"><svg viewBox="70 40 300 300" aria-hidden="true"><use href="#cub-art"/></svg><span class="name">Thor Tigress Cub</span></span>
+  <span class="model-chip"><span id="status" class="dot" title="server status"></span><span id="model">connecting…</span></span>
   <span class="spacer"></span>
-  <label class="toggle" title="Let the model search the web before answering"><input id="web" type="checkbox"> web</label>
-  <label class="toggle" title="Let the model reason before answering"><input id="think" type="checkbox"> think</label>
-  <select id="theme" title="Theme" aria-label="Theme">
-    <option value="system">System</option>
-    <option value="paper">Paper</option>
-    <option value="night">Night</option>
-    <option value="deep-ocean">Material Deep Ocean</option>
-    <option value="github-light">GitHub Light</option>
-    <option value="solarized-light">Solarized Light</option>
-    <option value="solarized-dark">Solarized Dark</option>
-    <option value="nord">Nord</option>
-    <option value="dracula">Dracula</option>
-    <option value="one-dark">One Dark</option>
-    <option value="gruvbox-dark">Gruvbox Dark</option>
-    <option value="monokai">Monokai</option>
-  </select>
-  <button id="new" title="Start a new conversation">New</button>
-  <button id="open-settings" title="Settings" aria-label="Settings">⚙</button>
+  <a id="about" class="about" href="about.html" hidden>About</a>
+  <label class="pill" title="Let the model search the web before answering"><input id="web" type="checkbox">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Web</label>
+  <label class="pill" title="Let the model reason before answering (slower, often better)"><input id="think" type="checkbox">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Think</label>
+  <button id="new" class="icon-btn" title="New conversation" aria-label="New conversation">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button id="open-settings" class="icon-btn" title="Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
 </header>
 
 <main id="scroller"><div id="thread"></div></main>
 
 <footer>
   <form class="composer" id="composer">
-    <textarea id="input" rows="1" placeholder="Message" autocomplete="off"></textarea>
+    <textarea id="input" rows="1" placeholder="Message the cub" autocomplete="off"></textarea>
     <button id="send" type="submit">Send</button>
   </form>
-  <div class="hint">Enter sends · Shift+Enter new line · Esc stops</div>
+  <div class="hint">Nemotron 3 Nano on a Jetson AGX Thor · Enter sends · Shift+Enter new line · Esc stops</div>
 </footer>
 
 <dialog id="settings">
   <form method="dialog">
     <h2>Settings</h2>
-    <label for="key">Access key (if the server needs one)</label>
+    <label for="theme">Theme</label>
+    <select id="theme">
+      <option value="system">Cub (follows your device)</option>
+      <option value="paper">Paper</option>
+      <option value="night">Night</option>
+      <option value="deep-ocean">Material Deep Ocean</option>
+      <option value="github-light">GitHub Light</option>
+      <option value="solarized-light">Solarized Light</option>
+      <option value="solarized-dark">Solarized Dark</option>
+      <option value="nord">Nord</option>
+      <option value="dracula">Dracula</option>
+      <option value="one-dark">One Dark</option>
+      <option value="gruvbox-dark">Gruvbox Dark</option>
+      <option value="monokai">Monokai</option>
+    </select>
+    <label for="key">Access key</label>
     <input id="key" type="password" autocomplete="off">
     <label for="system">System prompt (empty: none)</label>
     <textarea id="system"></textarea>
@@ -246,6 +416,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+const API = document.querySelector('meta[name="thor-api"]').content;
 const store = {
   get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
@@ -262,6 +433,26 @@ function element(tag, className, text) {
   if (text !== undefined) node.textContent = text;
   return node;
 }
+
+const SVG = "http://www.w3.org/2000/svg";
+function cub(viewBox = "0 0 440 460") {
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("viewBox", viewBox);
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS(SVG, "use");
+  use.setAttribute("href", "#cub-art");
+  svg.append(use);
+  return svg;
+}
+
+const SUGGESTIONS = [
+  ["Explain ownership in Rust", "with a small example that does not compile, then the fix"],
+  ["Review my SQL schema", "paste it and ask what will hurt at a million rows"],
+  ["What is new in CUDA 13?", "turn on Web first so it can search"],
+  ["Plan a weekend project", "something I can build on a Raspberry Pi"],
+];
+
+let needsKey = false;
 
 function headers() {
   const result = { "Content-Type": "application/json" };
@@ -435,6 +626,11 @@ function markdown(parent, text) {
 function renderMessage(message) {
   const wrap = element("div", `msg ${message.role}`);
   const body = element("div", "body");
+  if (message.role === "assistant") {
+    const avatar = element("div", "avatar");
+    avatar.append(cub("100 66 220 220"));
+    wrap.append(avatar);
+  }
   if (message.role === "user") {
     body.textContent = message.content;
   } else {
@@ -459,10 +655,16 @@ function renderMessage(message) {
       details.append(element("summary", "", message.thinkingDone ? "thought" : "thinking…"), element("div", "text", message.reasoning));
       body.append(details);
     }
-    const content = element("div");
-    markdown(content, message.content || "");
-    if (message.streaming) content.classList.add("cursor");
-    body.append(content);
+    if (message.streaming && !message.content && !message.reasoning) {
+      const dots = element("div", "dots");
+      dots.append(element("i"), element("i"), element("i"), element("span", "", $("web").checked ? "searching and thinking…" : "thinking…"));
+      body.append(dots);
+    } else {
+      const content = element("div");
+      markdown(content, message.content || "");
+      if (message.streaming) content.classList.add("cursor");
+      body.append(content);
+    }
     if (message.error) body.append(element("div", "error", message.error));
     if (message.stats) body.append(element("div", "stats", message.stats));
   }
@@ -473,9 +675,47 @@ function renderMessage(message) {
 function render() {
   const thread = $("thread");
   thread.replaceChildren();
+  if (needsKey) {
+    const gate = element("div", "gate");
+    const hero = element("div", "hero");
+    hero.append(cub());
+    const form = element("form");
+    const field = element("input");
+    field.type = "password"; field.placeholder = "Paste your access key"; field.autocomplete = "off";
+    const go = element("button", "primary", "Unlock");
+    form.append(field, go);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!field.value.trim()) return;
+      settings.key = field.value.trim();
+      store.set("settings", settings);
+      connect();
+    });
+    const ask = element("a", "", "Ask Arpan for one");
+    ask.href = "https://github.com/arpanpathak"; ask.target = "_blank"; ask.rel = "noreferrer";
+    const note = element("small");
+    note.append("No key? ", ask, ". Access is invite-only and given for a limited time.");
+    gate.append(hero, element("h1", "", "The cub is invite-only for now"),
+      element("p", "", "One Jetson Thor, four reply slots, shared by everyone who has a key."), form, note);
+    thread.append(gate);
+    setTimeout(() => field.focus(), 0);
+    return;
+  }
   if (messages.length === 0) {
     const empty = element("div", "empty");
-    empty.append(element("strong", "", modelName || "Thor"), "Ask about code, systems or anything else. Replies stream from the Jetson Thor.");
+    const hero = element("div", "hero");
+    hero.append(cub());
+    const chips = element("div", "chips");
+    SUGGESTIONS.forEach(([title, detail]) => {
+      const chip = element("button");
+      chip.type = "button";
+      chip.append(element("b", "", title), element("span", "", detail));
+      chip.addEventListener("click", () => { input.value = title; autosize(); input.focus(); });
+      chips.append(chip);
+    });
+    empty.append(hero, element("h1", "", "Hi, I'm the Thor Tigress Cub."),
+      element("p", "", `I'm ${modelName || "Nemotron 3 Nano"}, running on a Jetson AGX Thor in a home office. Ask me about code, systems, or anything else.`),
+      chips);
     thread.append(empty);
     return;
   }
@@ -503,14 +743,16 @@ function save() { store.set("messages", messages.map(({ streaming, ...rest }) =>
 // ---- server ----
 async function connect() {
   try {
-    const response = await fetch("v1/models", { headers: headers() });
-    if (response.status === 401) { $("status").className = "dot bad"; $("model").textContent = "access key needed"; $("settings").showModal(); return; }
+    const response = await fetch(`${API}v1/models`, { headers: headers() });
+    if (response.status === 401) { $("status").className = "dot bad"; $("model").textContent = "access key needed"; needsKey = true; render(); return; }
+    needsKey = false;
     const data = await response.json();
-    modelName = (data.data && data.data[0] && data.data[0].id || "model").split("/").pop().replace(/\.gguf$/, "");
+    modelName = (data.data && data.data[0] && data.data[0].id || "model").split("/").pop().replace(/\.gguf$/, "")
+      .replace(/^NVIDIA-/, "").replace(/-(Q\d\w*)$/i, " · $1").replace(/-/g, " ");
     $("model").textContent = modelName;
     $("status").className = "dot ok";
-    document.title = `${modelName} · Thor Chat`;
-    if (messages.length === 0) render();
+    document.title = "Thor Tigress Cub";
+    render();
   } catch {
     $("status").className = "dot bad";
     $("model").textContent = "server not reachable";
@@ -535,7 +777,7 @@ async function send(text) {
   const started = performance.now();
   let firstToken = 0;
   try {
-    const response = await fetch("v1/chat/completions", {
+    const response = await fetch(`${API}v1/chat/completions`, {
       method: "POST", headers: headers(), body: JSON.stringify(body), signal: controller.signal,
     });
     if (!response.ok) throw new Error(response.status === 401 ? "Access key needed: open settings (⚙)." : `${response.status} ${await response.text()}`);
@@ -633,6 +875,7 @@ $("settings").addEventListener("close", () => {
   connect();
 });
 
+$("about").hidden = !API;
 render();
 connect();
 input.focus();

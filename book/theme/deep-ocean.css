@@ -157,3 +157,12 @@ img.cover {
     width: 100%;
     margin: 1em auto 2em;
 }
+
+/* The Thor Tigress Cub, the chat's mascot: smaller than a chapter plate. */
+img.cub {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    margin: 0.5em auto 1.2em;
+}
+figure img.phone { max-width: 300px; }

@@ -36,7 +36,13 @@ your machine: opencode ─► 127.0.0.1:8079 ─► SSH tunnel ─► thor: llam
 The tunnel uses your existing SSH access, so nothing new is opened on the
 network.
 
-### Setup on Linux (done on yahboom)
+OpenCode was set up on yahboom on 2026-10-05 and removed the same day. In the
+sessions there, Nemotron's tool calls often came back as plain text instead of
+calls, so files it reported as written did not exist, and with a project-level
+`CLAUDE.md` in the folder it refused multi-file work. openbatrangs (below)
+replaced it. The setup is kept here for anyone who wants to try it.
+
+### Setup on Linux
 
 ```bash
 curl -fsSL https://opencode.ai/install | bash        # installs to ~/.opencode/bin
@@ -95,11 +101,11 @@ The tunnel as a user service that starts at boot and reconnects,
 
 ```ini
 [Unit]
-Description=SSH tunnel to Nemotron on the Thor
+Description=SSH tunnel to the Thor: Nemotron (8079), SearXNG (8888), front server (8080)
 After=network-online.target
 
 [Service]
-ExecStart=/usr/bin/ssh -o ControlMaster=no -o ControlPath=none -o BatchMode=yes -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:8079:127.0.0.1:8079 -L 127.0.0.1:8888:127.0.0.1:8888 thor
+ExecStart=/usr/bin/ssh -o ControlMaster=no -o ControlPath=none -o BatchMode=yes -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:8079:127.0.0.1:8079 -L 127.0.0.1:8888:127.0.0.1:8888 -L 127.0.0.1:8080:127.0.0.1:8080 thor
 Restart=always
 RestartSec=5
 

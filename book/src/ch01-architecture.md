@@ -16,6 +16,7 @@
 | `thor-hammer-trainer` | `thor-hammer-trainer` | builds `data/train.jsonl` from licensed sources |
 | `thor-tigress-reinforcer-frontend` | `reinforcer` | review page: mark slop, flag records |
 | `thor-lasso-distiller` | `lasso` | turns book sections into conversations using a teacher model |
+| `thor-tigress-agent` | `thor-tigress-agent` | the Thor Tigress Cub's server: page, access key, web search, API |
 
 ## Machines
 

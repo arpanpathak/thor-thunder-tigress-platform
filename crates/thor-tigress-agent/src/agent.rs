@@ -81,6 +81,22 @@ pub fn chat(browser: &mut TcpStream, body: &[u8], upstreams: &Upstreams) -> Resu
     http::send_event(browser, "[DONE]")
 }
 
+/// Prepares an Anthropic `/v1/messages` body for llama-server, which ignores
+/// the `thinking` field. Unless the client asks for thinking (`enabled` or
+/// `adaptive`), thinking is turned off through the chat template. A client
+/// that sets `chat_template_kwargs` itself is left as it is.
+pub fn messages_body(body: &[u8]) -> Result<Vec<u8>, AgentError> {
+    let mut request: Value = serde_json::from_slice(body)?;
+    let wants_thinking = matches!(
+        request.pointer("/thinking/type").and_then(Value::as_str),
+        Some("enabled" | "adaptive")
+    );
+    if !wants_thinking && request.get("chat_template_kwargs").is_none() {
+        request["chat_template_kwargs"] = json!({ "enable_thinking": false });
+    }
+    Ok(serde_json::to_vec(&request)?)
+}
+
 fn search_loop(browser: &mut TcpStream, mut request: Value, upstreams: &Upstreams) -> Result<(), AgentError> {
     for round in 0..MAX_ROUNDS {
         match round + 1 < MAX_ROUNDS {
@@ -223,5 +239,23 @@ mod tests {
             }]
         );
         assert_eq!(round.content, "ok");
+    }
+
+    fn thinking_sent(body: Value) -> Result<Value, AgentError> {
+        let prepared: Value = serde_json::from_slice(&messages_body(&serde_json::to_vec(&body)?)?)?;
+        Ok(prepared["chat_template_kwargs"]["enable_thinking"].clone())
+    }
+
+    #[test]
+    fn messages_think_only_when_asked() -> Result<(), AgentError> {
+        assert_eq!(thinking_sent(json!({"messages": []}))?, json!(false));
+        assert_eq!(thinking_sent(json!({"thinking": {"type": "disabled"}}))?, json!(false));
+        assert_eq!(thinking_sent(json!({"thinking": {"type": "adaptive"}}))?, Value::Null);
+        assert_eq!(thinking_sent(json!({"thinking": {"type": "enabled", "budget_tokens": 1024}}))?, Value::Null);
+        assert_eq!(
+            thinking_sent(json!({"chat_template_kwargs": {"enable_thinking": true}}))?,
+            json!(true)
+        );
+        Ok(())
     }
 }
