@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="139" height="28" viewBox="0 0 139 28" role="img" aria-label="coverage: 59%">
+  <title>coverage: 59%</title>
+  <clipPath id="r"><rect width="139" height="28" rx="8"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="95" height="28" fill="#1e293b"/>
+    <rect x="95" width="44" height="28" fill="#dc2626"/>
+  </g>
+  <g transform="translate(10 6.0)" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8 2.8 3.9v3.9c0 3.2 2.2 5.6 5.2 6.4 3-.8 5.2-3.2 5.2-6.4V3.9Z M5.6 8.1l1.7 1.7 3.2-3.4"/></g>
+  <g fill="#ffffff" font-family="Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" font-weight="600" letter-spacing=".2">
+    <text x="32" y="18.2" fill="#e2e8f0">coverage</text>
+    <text x="105" y="18.2">59%</text>
+  </g>
+</svg>

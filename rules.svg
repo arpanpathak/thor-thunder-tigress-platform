@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="213" height="28" viewBox="0 0 213 28" role="img" aria-label="five rust rules: 0 problems">
+  <title>five rust rules: 0 problems</title>
+  <clipPath id="r"><rect width="213" height="28" rx="8"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="129" height="28" fill="#1e293b"/>
+    <rect x="129" width="84" height="28" fill="#16a34a"/>
+  </g>
+  <g transform="translate(10 6.0)" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Z M5.2 8.2l1.9 1.9 3.8-4"/></g>
+  <g fill="#ffffff" font-family="Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" font-weight="600" letter-spacing=".2">
+    <text x="32" y="18.2" fill="#e2e8f0">five rust rules</text>
+    <text x="139" y="18.2">0 problems</text>
+  </g>
+</svg>

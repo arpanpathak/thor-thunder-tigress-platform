@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="123" height="28" viewBox="0 0 123 28" role="img" aria-label="rust: 1.99.0">
+  <title>rust: 1.99.0</title>
+  <clipPath id="r"><rect width="123" height="28" rx="8"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="68" height="28" fill="#1e293b"/>
+    <rect x="68" width="55" height="28" fill="#b7410e"/>
+  </g>
+  <g transform="translate(10 6.0)" fill="none" stroke="#e2e8f0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2Z M8 1.5v2 M8 12.5v2 M1.5 8h2 M12.5 8h2 M3.4 3.4l1.4 1.4 M11.2 11.2l1.4 1.4 M3.4 12.6l1.4-1.4 M11.2 4.8l1.4-1.4"/></g>
+  <g fill="#ffffff" font-family="Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" font-weight="600" letter-spacing=".2">
+    <text x="32" y="18.2" fill="#e2e8f0">rust</text>
+    <text x="78" y="18.2">1.99.0</text>
+  </g>
+</svg>
