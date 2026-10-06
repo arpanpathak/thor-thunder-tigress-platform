@@ -55,6 +55,7 @@ impl Rule {
     ];
 
     /// A short label for tables, such as `R1 no unwrap`.
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Rule::NoUnwrap => "R1 no unwrap",
@@ -105,24 +106,56 @@ pub struct CodeReport {
 
 impl CodeReport {
     /// True when the code parsed and no rule failed.
+    #[must_use]
     pub fn all_pass(&self) -> bool {
         self.parsed && self.verdicts.values().all(|verdict| *verdict != Verdict::Fail)
     }
 }
 
+/// How code is wrapped before parsing, since answers are often fragments.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Wrapping {
+    /// As it is: a whole file.
+    File,
+    /// As the body of a function: statements.
+    FunctionBody,
+    /// As the body of an `impl`: methods.
+    ImplBody,
+}
+
+impl Wrapping {
+    /// The order fragments are tried in.
+    const ALL: [Wrapping; 3] = [Wrapping::File, Wrapping::FunctionBody, Wrapping::ImplBody];
+
+    fn prefix(self) -> &'static str {
+        match self {
+            Wrapping::File => "",
+            Wrapping::FunctionBody => "fn __spark_snippet() {\n",
+            Wrapping::ImplBody => "impl __SparkSnippet {\n",
+        }
+    }
+
+    fn suffix(self) -> &'static str {
+        match self {
+            Wrapping::File => "",
+            Wrapping::FunctionBody | Wrapping::ImplBody => "\n}",
+        }
+    }
+
+    /// Lines the prefix adds, so violation lines can point at the original.
+    fn offset(self) -> usize {
+        self.prefix().lines().count()
+    }
+}
+
 /// Checks `source` against the five rules.
+#[must_use]
 pub fn check(source: &str) -> CodeReport {
-    let wrappers = [
-        (String::new(), String::new()),
-        ("fn __spark_snippet() {\n".to_string(), "\n}".to_string()),
-        ("impl __SparkSnippet {\n".to_string(), "\n}".to_string()),
-    ];
     let mut first_error = None;
-    for (prefix, suffix) in &wrappers {
-        let wrapped = format!("{prefix}{source}{suffix}");
-        let offset = prefix.lines().count();
+    for wrapping in Wrapping::ALL {
+        let wrapped = format!("{}{source}{}", wrapping.prefix(), wrapping.suffix());
         match syn::parse_file(&wrapped) {
-            Ok(file) => return judge(&file, source, offset),
+            Ok(file) => return judge(&file, source, wrapping),
             Err(error) if first_error.is_none() => {
                 let start = error.span().start();
                 first_error = Some(format!("line {}: {error}", start.line));
@@ -141,20 +174,17 @@ pub fn check(source: &str) -> CodeReport {
     }
 }
 
-fn judge(file: &File, source: &str, offset: usize) -> CodeReport {
+fn judge(file: &File, source: &str, wrapping: Wrapping) -> CodeReport {
     let mut scan = Scan {
-        offset,
+        offset: wrapping.offset(),
         ..Scan::default()
     };
     scan.visit_file(file);
-    let comments = comments::find(source);
-    let whole_file = offset == 0;
-    let body_comments = match whole_file {
-        true => scan.comments_in_bodies(&comments),
-        false => Vec::new(),
-    };
+    let whole_file = wrapping == Wrapping::File;
     let mut violations = scan.violations.clone();
-    violations.extend(body_comments);
+    if whole_file {
+        violations.extend(scan.comments_in_bodies(&comments::find(source)));
+    }
     violations.extend(scan.errors.violations());
     violations.sort_by_key(|violation| (violation.line, violation.rule));
     let applies = |rule: Rule| match rule {
@@ -192,17 +222,37 @@ enum ErrorType {
     Named(String),
 }
 
+/// Something found on a line of the checked code.
+struct At<T> {
+    line: usize,
+    value: T,
+}
+
+/// `impl Trait for Type`, by name.
+struct Implementation {
+    line: usize,
+    trait_name: String,
+    type_name: String,
+}
+
 /// What rule 2 needs to know, gathered over the whole file.
-#[derive(Debug, Default, Clone)]
+#[derive(Default)]
 struct ErrorFacts {
-    crates: Vec<(usize, String)>,
-    returned: Vec<(usize, ErrorType)>,
+    /// Error crates used, such as `anyhow`.
+    crates: Vec<At<String>>,
+    /// The error types of returned `Result`s.
+    returned: Vec<At<ErrorType>>,
     enums: BTreeSet<String>,
     structs: BTreeSet<String>,
-    impls: Vec<(usize, String, String)>,
+    impls: Vec<Implementation>,
+    /// `use a::B as C`: from `C` back to `B`.
     renames: BTreeMap<String, String>,
+    /// `type Result<T> = …`: the error type each alias stands for.
     aliases: BTreeMap<String, ErrorType>,
 }
+
+/// The most characters of a comment a violation quotes.
+const DETAIL_CHARS: usize = 60;
 
 const ERROR_CRATES: [&str; 5] = ["anyhow", "thiserror", "eyre", "color_eyre", "snafu"];
 
@@ -226,18 +276,15 @@ impl ErrorFacts {
         !self.crates.is_empty() || !self.returned.is_empty() || self.implementors("Error").next().is_some()
     }
 
-    fn implementors<'a>(&'a self, trait_name: &'a str) -> impl Iterator<Item = (usize, &'a str)> {
-        self.impls
-            .iter()
-            .filter(move |(_, implemented, _)| {
-                self.renames.get(implemented).unwrap_or(implemented) == trait_name
-            })
-            .map(|(line, _, self_name)| (*line, self_name.as_str()))
+    /// The `impl`s of `trait_name`, following `use … as …` renames.
+    fn implementors<'a>(&'a self, trait_name: &'a str) -> impl Iterator<Item = &'a Implementation> {
+        self.impls.iter().filter(move |implementation| {
+            self.renames.get(&implementation.trait_name).unwrap_or(&implementation.trait_name) == trait_name
+        })
     }
 
     fn implements(&self, trait_name: &str, type_name: &str) -> bool {
-        self.implementors(trait_name)
-            .any(|(_, implementor)| implementor == type_name)
+        self.implementors(trait_name).any(|implementation| implementation.type_name == type_name)
     }
 
     fn local(&self, name: &str) -> bool {
@@ -245,57 +292,68 @@ impl ErrorFacts {
     }
 
     fn violations(&self) -> Vec<Violation> {
-        let violation = |line: usize, detail: String| Violation {
-            rule: Rule::ErrorEnum,
-            line,
-            detail,
-        };
+        let violation = |line: usize, detail: String| Violation { rule: Rule::ErrorEnum, line, detail };
         let mut found: Vec<Violation> = self
             .crates
             .iter()
-            .map(|(line, name)| violation(*line, format!("uses the {name} crate")))
+            .map(|used| violation(used.line, format!("uses the {} crate", used.value)))
             .collect();
-        for (line, name) in self.implementors("Error") {
-            if self.structs.contains(name) {
-                found.push(violation(line, format!("{name} is a struct, not an enum")));
+        for implementation in self.implementors("Error") {
+            if self.structs.contains(&implementation.type_name) {
+                found.push(violation(implementation.line, format!("{} is a struct, not an enum", implementation.type_name)));
             }
         }
         let mut reported = BTreeSet::new();
-        for (line, error) in &self.returned {
-            let resolved = match error {
-                ErrorType::Named(name) => self.aliases.get(name).unwrap_or(error),
-                other => other,
-            };
-            let problem = match resolved {
-                ErrorType::Text(text) => Some(format!("returns Result<_, {text}>")),
-                ErrorType::Boxed => Some("returns Result<_, Box<dyn Error>>".to_string()),
-                ErrorType::Named(name) if self.enums.contains(name) => {
-                    let missing: Vec<&str> = [
-                        ("Display", self.implements("Display", name)),
-                        ("Error", self.implements("Error", name)),
-                    ]
-                    .iter()
-                    .filter(|(_, present)| !present)
-                    .map(|(trait_name, _)| *trait_name)
-                    .collect();
-                    (!missing.is_empty())
-                        .then(|| format!("{name} does not implement {}", missing.join(" or ")))
-                }
-                ErrorType::Named(name) if self.structs.contains(name) => {
-                    Some(format!("{name} is a struct, not an enum"))
-                }
-                ErrorType::Named(name) if !self.local(name) && LIBRARY_ERRORS.contains(&name.as_str()) => {
-                    Some(format!("returns the library error {name}, not a custom enum"))
-                }
-                ErrorType::Named(_) => None,
-            };
-            if let Some(detail) = problem
+        for returned in &self.returned {
+            if let Some(detail) = self.problem(&returned.value)
                 && reported.insert(detail.clone())
             {
-                found.push(violation(*line, detail));
+                found.push(violation(returned.line, detail));
             }
         }
         found
+    }
+
+    /// What is wrong with returning `error`, after following type aliases.
+    fn problem(&self, error: &ErrorType) -> Option<String> {
+        let resolved = match error {
+            ErrorType::Named(name) => self.aliases.get(name).unwrap_or(error),
+            ErrorType::Text(_) | ErrorType::Boxed => error,
+        };
+        match resolved {
+            ErrorType::Text(text) => Some(format!("returns Result<_, {text}>")),
+            ErrorType::Boxed => Some("returns Result<_, Box<dyn Error>>".to_string()),
+            ErrorType::Named(name) if self.enums.contains(name) => self.missing_traits(name),
+            ErrorType::Named(name) if self.structs.contains(name) => Some(format!("{name} is a struct, not an enum")),
+            ErrorType::Named(name) if !self.local(name) && LIBRARY_ERRORS.contains(&name.as_str()) => {
+                Some(format!("returns the library error {name}, not a custom enum"))
+            }
+            ErrorType::Named(_) => None,
+        }
+    }
+
+    /// Which of `Display` and `Error` the local enum `name` lacks, if any.
+    fn missing_traits(&self, name: &str) -> Option<String> {
+        let missing: Vec<&str> = ["Display", "Error"]
+            .into_iter()
+            .filter(|trait_name| !self.implements(trait_name, name))
+            .collect();
+        (!missing.is_empty()).then(|| format!("{name} does not implement {}", missing.join(" or ")))
+    }
+}
+
+/// Where a function body's braces are.
+#[derive(Clone, Copy)]
+struct Body {
+    open: LineColumn,
+    close: LineColumn,
+}
+
+impl Body {
+    /// True when `comment` starts between the braces.
+    fn contains(self, comment: &Comment) -> bool {
+        let at = (comment.line, comment.column);
+        (self.open.line, self.open.column) < at && at < (self.close.line, self.close.column)
     }
 }
 
@@ -305,7 +363,7 @@ struct Scan {
     offset: usize,
     in_trait_impl: bool,
     violations: Vec<Violation>,
-    bodies: Vec<(LineColumn, LineColumn)>,
+    bodies: Vec<Body>,
     pub_items: usize,
     errors: ErrorFacts,
 }
@@ -320,7 +378,7 @@ impl Scan {
         self.violations.push(Violation { rule, line, detail });
     }
 
-    fn check_docs(&mut self, visibility: &Visibility, attributes: &[Attribute], name: String, span: Span) {
+    fn check_docs(&mut self, visibility: &Visibility, attributes: &[Attribute], name: &str, span: Span) {
         if !matches!(visibility, Visibility::Public(_)) {
             return;
         }
@@ -340,22 +398,17 @@ impl Scan {
             line: position.line.saturating_sub(self.offset),
             column: position.column,
         };
-        self.bodies.push((shift(open), shift(close)));
+        self.bodies.push(Body { open: shift(open), close: shift(close) });
     }
 
     fn comments_in_bodies(&self, comments: &[Comment]) -> Vec<Violation> {
         comments
             .iter()
-            .filter(|comment| {
-                let at = (comment.line, comment.column);
-                self.bodies.iter().any(|(open, close)| {
-                    (open.line, open.column) < at && at < (close.line, close.column)
-                })
-            })
+            .filter(|comment| self.bodies.iter().any(|body| body.contains(comment)))
             .map(|comment| Violation {
                 rule: Rule::NoBodyComments,
                 line: comment.line,
-                detail: shorten(comment.text.trim(), 60),
+                detail: shorten(comment.text.trim(), DETAIL_CHARS),
             })
             .collect()
     }
@@ -366,7 +419,7 @@ impl Scan {
         };
         if let Some(error) = result_error(returned) {
             let line = self.line(signature.span());
-            self.errors.returned.push((line, error));
+            self.errors.returned.push(At { line, value: error });
         }
     }
 
@@ -383,11 +436,8 @@ impl Scan {
                 found
             });
         if derives {
-            let line = attributes
-                .first()
-                .map(|attribute| self.line(attribute.span()))
-                .unwrap_or(1);
-            self.errors.crates.push((line, "thiserror (derive(Error))".to_string()));
+            let line = attributes.first().map_or(1, |attribute| self.line(attribute.span()));
+            self.errors.crates.push(At { line, value: "thiserror (derive(Error))".to_string() });
         }
     }
 }
@@ -407,7 +457,7 @@ impl<'ast> Visit<'ast> for Scan {
             Item::Union(item) => (&item.vis, &item.attrs, format!("union {}", item.ident)),
             _ => return visit::visit_item(self, item),
         };
-        self.check_docs(visibility, attributes, name, item.span());
+        self.check_docs(visibility, attributes, &name, item.span());
         match item {
             Item::Struct(item) => {
                 self.errors.structs.insert(item.ident.to_string());
@@ -429,7 +479,7 @@ impl<'ast> Visit<'ast> for Scan {
     }
 
     fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
-        self.check_docs(&item.vis, &item.attrs, format!("fn {}", item.sig.ident), item.span());
+        self.check_docs(&item.vis, &item.attrs, &format!("fn {}", item.sig.ident), item.span());
         if !self.in_trait_impl {
             self.signature(&item.sig);
         }
@@ -453,7 +503,7 @@ impl<'ast> Visit<'ast> for Scan {
             .map(|segment| segment.ident.to_string());
         if let (Some(trait_name), Some(self_name)) = (trait_name, type_name(&item.self_ty)) {
             let line = self.line(item.span());
-            self.errors.impls.push((line, trait_name, self_name));
+            self.errors.impls.push(Implementation { line, trait_name, type_name: self_name });
         }
         let outer = self.in_trait_impl;
         self.in_trait_impl = item.trait_.is_some();
@@ -473,7 +523,7 @@ impl<'ast> Visit<'ast> for Scan {
             && ERROR_CRATES.contains(&root.as_str())
         {
             let line = self.line(item.span());
-            self.errors.crates.push((line, root));
+            self.errors.crates.push(At { line, value: root });
         }
         visit::visit_item_use(self, item);
     }
@@ -530,11 +580,11 @@ impl<'ast> Visit<'ast> for Scan {
             .map(|segment| segment.ident.to_string());
         if let Some(name) = last.filter(|name| name == "anyhow" || name == "bail") {
             let line = self.line(mac.span());
-            self.errors.crates.push((line, format!("anyhow ({name}!)")));
+            self.errors.crates.push(At { line, value: format!("anyhow ({name}!)") });
         }
-        macro_arguments(mac)
-            .iter()
-            .for_each(|argument| self.visit_expr(argument));
+        for argument in &macro_arguments(mac) {
+            self.visit_expr(argument);
+        }
         visit::visit_macro(self, mac);
     }
 }
@@ -557,9 +607,9 @@ impl<'ast> Visit<'ast> for IndexFinder<'_> {
     }
 
     fn visit_macro(&mut self, mac: &'ast Macro) {
-        macro_arguments(mac)
-            .iter()
-            .for_each(|argument| self.visit_expr(argument));
+        for argument in &macro_arguments(mac) {
+            self.visit_expr(argument);
+        }
     }
 }
 

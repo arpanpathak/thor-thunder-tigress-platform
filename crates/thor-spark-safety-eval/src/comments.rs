@@ -107,9 +107,9 @@ impl Cursor<'_> {
         while let Some(next) = self.bump() {
             let closes = next == '"' && (0..hashes).all(|ahead| self.peek(ahead) == Some('#'));
             if closes {
-                (0..hashes).for_each(|_| {
+                for _ in 0..hashes {
                     self.bump();
-                });
+                }
                 return;
             }
         }
@@ -152,6 +152,7 @@ impl Cursor<'_> {
 }
 
 /// Every comment in `source`, in order.
+#[must_use]
 pub fn find(source: &str) -> Vec<Comment> {
     let mut cursor = Cursor {
         rest: source.chars(),
@@ -203,12 +204,12 @@ mod tests {
 
     #[test]
     fn ignores_slashes_inside_strings() {
-        assert!(texts(r#"let url = "http://x"; let raw = r"//"; let c = '/';"#).is_empty());
+        assert_eq!(texts(r#"let url = "http://x"; let raw = r"//"; let c = '/';"#), Vec::<String>::new());
     }
 
     #[test]
     fn ignores_slashes_inside_raw_strings_with_hashes() {
-        assert!(texts(r###"let s = r#"a "quoted" // part"#;"###).is_empty());
+        assert_eq!(texts(r##"let s = r#"a "quoted" // part"#;"##), Vec::<String>::new());
     }
 
     #[test]

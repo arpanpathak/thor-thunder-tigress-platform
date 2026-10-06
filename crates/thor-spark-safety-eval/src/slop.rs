@@ -49,6 +49,7 @@ impl Category {
     ];
 
     /// The heading the taxonomy uses.
+    #[must_use]
     pub fn label(self) -> &'static str {
         match self {
             Category::FakeImportance => "fake importance",
@@ -89,11 +90,13 @@ pub struct SlopReport {
 
 impl SlopReport {
     /// Phrase hits plus one for an em-dash habit (two or more).
+    #[must_use]
     pub fn score(&self) -> usize {
         self.hits.len() + usize::from(self.em_dashes >= EM_DASH_HABIT)
     }
 
     /// True when no phrase matched and there is no em-dash habit.
+    #[must_use]
     pub fn clean(&self) -> bool {
         self.score() == 0
     }
@@ -252,22 +255,23 @@ static FENCE: LazyLock<Option<Regex>> =
 static INLINE_CODE: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"`[^`\n]+`").ok());
 
 /// `text` with fenced blocks and inline code replaced by spaces, byte for byte.
+#[must_use]
 pub fn prose_only(text: &str) -> String {
     let mut bytes = text.as_bytes().to_vec();
     let patterns = [FENCE.as_ref(), INLINE_CODE.as_ref()];
     for regex in patterns.into_iter().flatten() {
         let blank_text = String::from_utf8_lossy(&bytes).into_owned();
         for found in regex.find_iter(&blank_text) {
-            bytes[found.range()]
-                .iter_mut()
-                .filter(|byte| **byte != b'\n')
-                .for_each(|byte| *byte = b' ');
+            for byte in bytes[found.range()].iter_mut().filter(|byte| **byte != b'\n') {
+                *byte = b' ';
+            }
         }
     }
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
 /// Finds the slop in `text`.
+#[must_use]
 pub fn check(text: &str) -> SlopReport {
     let prose = prose_only(text);
     let mut hits: Vec<Hit> = PHRASE_PATTERNS
@@ -334,7 +338,7 @@ mod tests {
     #[test]
     fn ignores_phrases_inside_code() {
         let text = "Run this:\n```rust\n// great question\nlet x = 1;\n```\nand `delve into` is a name.";
-        assert!(check(text).hits.is_empty());
+        assert_eq!(check(text).hits, []);
     }
 
     #[test]
@@ -349,8 +353,8 @@ mod tests {
 
     #[test]
     fn does_not_match_inside_a_longer_word() {
-        assert!(check("The game-changers list is a heading.").hits.is_empty());
-        assert!(check("Antithesis: the truth isn't here.").hits.is_empty());
+        assert_eq!(check("The game-changers list is a heading.").hits, []);
+        assert_eq!(check("Antithesis: the truth isn't here.").hits, []);
     }
 
     #[test]

@@ -8,10 +8,11 @@
 //! rates a run is compared on.
 //!
 //! It does not compile code or run tests; a block can pass every rule and
-//! still not build.
+//! still not build. [`cli`] holds the `spark` commands.
 
 pub mod answer;
 pub mod claims;
+pub mod cli;
 pub mod comments;
 pub mod error;
 pub mod report;

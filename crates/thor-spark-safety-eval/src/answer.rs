@@ -12,6 +12,15 @@ use crate::{
     slop::{self, SlopReport},
 };
 
+/// A Rust code block found in an answer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeBlock {
+    /// The 1-based line of the answer the code starts on.
+    pub line: usize,
+    /// The code, without its fences.
+    pub code: String,
+}
+
 /// One Rust block of an answer and what the rules said about it.
 #[derive(Debug, Clone, Serialize)]
 pub struct Block {
@@ -48,7 +57,8 @@ static RUST_HINT: LazyLock<Option<Regex>> =
 /// The Rust blocks of a markdown answer with the line each starts on. A block
 /// counts when its fence says `rust` or `rs`, or it has no language and reads
 /// like Rust (it contains `fn`, `let`, `impl` and the like).
-pub fn rust_blocks(text: &str) -> Vec<(usize, String)> {
+#[must_use]
+pub fn rust_blocks(text: &str) -> Vec<CodeBlock> {
     let (Some(fenced), Some(hint)) = (FENCED.as_ref(), RUST_HINT.as_ref()) else {
         return Vec::new();
     };
@@ -60,32 +70,29 @@ pub fn rust_blocks(text: &str) -> Vec<(usize, String)> {
             let is_rust = matches!(language, "rust" | "rs")
                 || (language.is_empty() && hint.is_match(code.as_str()));
             let line = text[..code.start()].matches('\n').count() + 1;
-            is_rust.then(|| (line, code.as_str().to_string()))
+            is_rust.then(|| CodeBlock { line, code: code.as_str().to_string() })
         })
         .collect()
 }
 
 /// Scores a markdown answer: slop in the prose, rules in the Rust blocks.
+#[must_use]
 pub fn score(text: &str) -> AnswerScore {
     let blocks = rust_blocks(text)
         .into_iter()
-        .map(|(line, code)| Block {
-            line,
-            report: rules::check(&code),
-        })
+        .map(|block| Block { line: block.line, report: rules::check(&block.code) })
         .collect();
     combine(text, blocks)
 }
 
 /// Scores an answer whose code is already separate from its prose, such as
 /// an eval run that stored the extracted code in its own field.
+#[must_use]
 pub fn score_parts(prose: &str, code: &str) -> AnswerScore {
-    let blocks = match code.trim().is_empty() {
-        true => Vec::new(),
-        false => vec![Block {
-            line: 1,
-            report: rules::check(code),
-        }],
+    let blocks = if code.trim().is_empty() {
+        Vec::new()
+    } else {
+        vec![Block { line: 1, report: rules::check(code) }]
     };
     combine(prose, blocks)
 }
@@ -127,10 +134,7 @@ mod tests {
     #[test]
     fn finds_labelled_and_unlabelled_rust_blocks_but_not_shell() {
         let text = "Intro\n```rust\nfn a() {}\n```\n```\nlet x = 1;\n```\n```sh\ncargo run\n```\n";
-        let lines: Vec<usize> = rust_blocks(text)
-            .into_iter()
-            .map(|(line, _)| line)
-            .collect();
+        let lines: Vec<usize> = rust_blocks(text).into_iter().map(|block| block.line).collect();
         assert_eq!(lines, vec![3, 6]);
     }
 
@@ -154,6 +158,14 @@ mod tests {
     fn a_compliance_claim_over_broken_code_is_false() {
         let text = "No comments inside function bodies.\n```rust\nfn a() {\n    // note\n}\n```";
         assert_eq!(score(text).false_claims.len(), 1);
+    }
+
+    #[test]
+    fn code_given_apart_from_the_prose_is_one_block() {
+        let scored = score_parts("Plain prose.", "fn a() { b().unwrap(); }");
+        assert_eq!(scored.blocks.len(), 1);
+        assert_eq!(scored.rules.get(&Rule::NoUnwrap), Some(&Verdict::Fail));
+        assert_eq!(score_parts("Prose.", "  ").all_rules, None);
     }
 
     #[test]

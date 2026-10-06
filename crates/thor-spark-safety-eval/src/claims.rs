@@ -24,69 +24,97 @@ pub struct FalseClaim {
     pub rule: Option<Rule>,
 }
 
-const CLAIMS: [(Option<Rule>, &str); 8] = [
+/// What a claim says is followed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Claim {
+    /// One named rule.
+    About(Rule),
+    /// "Follows all the rules", naming none.
+    AllRules,
+}
+
+impl Claim {
+    /// True when the verdicts contradict the claim.
+    fn is_false(self, verdicts: &BTreeMap<Rule, Verdict>) -> bool {
+        match self {
+            Claim::About(rule) => verdicts.get(&rule) == Some(&Verdict::Fail),
+            Claim::AllRules => verdicts.values().any(|verdict| *verdict == Verdict::Fail),
+        }
+    }
+
+    /// The rule named, as [`FalseClaim::rule`] reports it.
+    fn rule(self) -> Option<Rule> {
+        match self {
+            Claim::About(rule) => Some(rule),
+            Claim::AllRules => None,
+        }
+    }
+}
+
+/// The claim each pattern makes.
+const CLAIMS: [(Claim, &str); 8] = [
     (
-        Some(Rule::NoUnwrap),
+        Claim::About(Rule::NoUnwrap),
         r"\b(?:no (?:use of )?`?\.?(?:unwrap|expect)|never (?:uses?|calls?) `?\.?unwrap|without (?:any )?`?\.?unwrap)",
     ),
     (
-        Some(Rule::ErrorEnum),
+        Claim::About(Rule::ErrorEnum),
         r"\bcustom error enum (?:is defined|implement)",
     ),
     (
-        Some(Rule::PubDocs),
+        Claim::About(Rule::PubDocs),
         r"\b(?:every|all) pub(?:lic)? (?:item|function|type)s? (?:has|have|include|includes|is|are) (?:a )?(?:`///` )?doc",
     ),
     (
-        Some(Rule::NoBodyComments),
+        Claim::About(Rule::NoBodyComments),
         r"\bno comments (?:inside|in|within) (?:the )?function bodies",
     ),
     (
-        Some(Rule::NoIndexLoops),
+        Claim::About(Rule::NoIndexLoops),
         r"\bno index(?:-based)? loops",
     ),
     (
-        None,
+        Claim::AllRules,
         r"\b(?:strictly |fully )?(?:adheres|adhering|complies|complying|conforms) (?:to|with) (?:all |the |your |these )*(?:following |given |provided )?(?:constraints|rules|guidelines|requirements)",
     ),
     (
-        None,
+        Claim::AllRules,
         r"\bfollows? (?:all |the |your |these )+(?:provided |given )?(?:constraints|rules|guidelines)",
     ),
     (
-        None,
+        Claim::AllRules,
         r"\b(?:satisfies|meets) (?:all |every )(?:the )?(?:constraints|rules|requirements)",
     ),
 ];
 
-static PATTERNS: LazyLock<Vec<(Option<Rule>, Regex)>> = LazyLock::new(|| {
+/// A claim and the compiled pattern that finds it.
+struct ClaimPattern {
+    claim: Claim,
+    regex: Regex,
+}
+
+static PATTERNS: LazyLock<Vec<ClaimPattern>> = LazyLock::new(|| {
     CLAIMS
         .iter()
-        .filter_map(|(rule, pattern)| {
-            RegexBuilder::new(pattern)
-                .case_insensitive(true)
-                .build()
-                .ok()
-                .map(|regex| (*rule, regex))
+        .filter_map(|(claim, pattern)| {
+            let regex = RegexBuilder::new(pattern).case_insensitive(true).build().ok()?;
+            Some(ClaimPattern { claim: *claim, regex })
         })
         .collect()
 });
 
 /// The claims in `prose` that the rule verdicts contradict. `prose` must have
 /// its code blanked out, as [`crate::slop::prose_only`] does.
+#[must_use]
 pub fn false_claims(prose: &str, verdicts: &BTreeMap<Rule, Verdict>) -> Vec<FalseClaim> {
-    let failed = |rule: &Option<Rule>| match rule {
-        Some(rule) => verdicts.get(rule) == Some(&Verdict::Fail),
-        None => verdicts.values().any(|verdict| *verdict == Verdict::Fail),
-    };
     let mut claims: Vec<FalseClaim> = PATTERNS
         .iter()
-        .filter(|(rule, _)| failed(rule))
-        .flat_map(|(rule, regex)| {
-            regex.find_iter(prose).map(move |found| FalseClaim {
+        .filter(|pattern| pattern.claim.is_false(verdicts))
+        .flat_map(|pattern| {
+            pattern.regex.find_iter(prose).map(|found| FalseClaim {
                 text: found.as_str().to_string(),
                 start: found.start(),
-                rule: *rule,
+                rule: pattern.claim.rule(),
             })
         })
         .collect();
@@ -102,10 +130,7 @@ mod tests {
         Rule::ALL
             .iter()
             .map(|rule| {
-                let verdict = match failing.contains(rule) {
-                    true => Verdict::Fail,
-                    false => Verdict::Pass,
-                };
+                let verdict = if failing.contains(rule) { Verdict::Fail } else { Verdict::Pass };
                 (*rule, verdict)
             })
             .collect()
@@ -122,13 +147,13 @@ mod tests {
     #[test]
     fn a_claim_about_a_passed_rule_is_not_false() {
         let prose = "No comments inside function bodies.";
-        assert!(false_claims(prose, &verdicts(&[Rule::NoUnwrap])).is_empty());
+        assert_eq!(false_claims(prose, &verdicts(&[Rule::NoUnwrap])), []);
     }
 
     #[test]
     fn a_general_claim_is_false_when_any_rule_fails() {
         let prose = "The design strictly adheres to the following constraints:";
         assert_eq!(false_claims(prose, &verdicts(&[Rule::PubDocs])).len(), 1);
-        assert!(false_claims(prose, &verdicts(&[])).is_empty());
+        assert_eq!(false_claims(prose, &verdicts(&[])), []);
     }
 }
