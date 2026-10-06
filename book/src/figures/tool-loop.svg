@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" role="img" aria-label="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron calls web_search, which queries SearXNG and search engines, or the planned fetch_page, which passes a safety gate before reading one public page. After at most three rounds the model must answer.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" width="960" height="500" role="img" aria-label="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron calls web_search, which queries SearXNG and search engines, or the planned fetch_page, which passes a safety gate before reading one public page. After at most three rounds the model must answer.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
@@ -6,64 +6,66 @@
     .note { fill: #5B6B7C; font-size: 12px; }
     .label { fill: #1E88A8; font-size: 12px; }
     .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
     .mono { font-family: "JetBrains Mono", Menlo, monospace; }
     .box { fill: #F4F7FA; stroke-width: 2; }
     .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
     .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
     .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
     .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
-    .deny { stroke: #D9542B; stroke-width: 1.8; fill: none; stroke-dasharray: 4 4; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#D9542B"/>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
     </marker>
   </defs>
-  <rect width="960" height="470" fill="#FFFFFF"/>
+  <rect width="960" height="500" fill="#FFFFFF"/>
   <text x="30" y="36" class="title">Tool calling in the chat: today and planned</text>
-  <rect x="30" y="150" width="150" height="80" rx="10" class="outside"/>
-  <text x="105.0" y="186" class="name" text-anchor="middle">Browser</text>
-  <text x="105.0" y="206" class="note" text-anchor="middle">Web switch on</text>
-  <rect x="220" y="56" width="500" height="400" rx="14" class="zone"/>
+  <rect x="30" y="160" width="150" height="80" rx="10" class="outside"/>
+  <text x="105" y="196" class="name" text-anchor="middle">Browser</text>
+  <text x="105" y="216" class="note" text-anchor="middle">Web switch on</text>
+  <rect x="220" y="56" width="500" height="420" rx="14" class="zone"/>
   <text x="234" y="76" class="zonelabel">Jetson AGX Thor</text>
-  <rect x="250" y="140" width="200" height="100" rx="10" class="box built"/>
-  <text x="350.0" y="168" class="name mono" text-anchor="middle">thor-tigress-agent</text>
-  <text x="350.0" y="188" class="note" text-anchor="middle">runs the loop:</text>
-  <text x="350.0" y="205" class="note" text-anchor="middle">up to 3 rounds of tools,</text>
-  <text x="350.0" y="222" class="note" text-anchor="middle">then an answer</text>
-  <path class="flow" d="M182,190 L248,190" marker-end="url(#arrow)"/>
+  <rect x="250" y="150" width="200" height="100" rx="10" class="box built"/>
+  <text x="350" y="180" class="name mono" text-anchor="middle">thor-tigress-agent</text>
+  <text x="350" y="198" class="note" text-anchor="middle">runs the loop: up to</text>
+  <text x="350" y="216" class="note" text-anchor="middle">3 rounds of tools,</text>
+  <text x="350" y="232" class="note" text-anchor="middle">then an answer</text>
+  <path class="flow" d="M180,200 L248,200" marker-end="url(#arrow)"/>
   <rect x="520" y="80" width="180" height="80" rx="10" class="box built"/>
-  <text x="610.0" y="107" class="name mono" text-anchor="middle">llama-server</text>
-  <text x="610.0" y="127" class="note" text-anchor="middle">Nemotron decides:</text>
-  <text x="610.0" y="144" class="note" text-anchor="middle">call a tool or answer</text>
-  <path class="flow" d="M452,170 C486,170 486,120 518,120" marker-end="url(#arrow)"/>
-  <text x="462" y="96" class="label" text-anchor="middle">messages + tools</text>
-  <path class="flow" d="M520,150 C490,150 490,200 454,200" marker-end="url(#arrow)"/>
-  <text x="498" y="226" class="label" text-anchor="middle">tool call</text>
-  <rect x="520" y="280" width="180" height="80" rx="10" class="box built"/>
-  <text x="610.0" y="307" class="name mono" text-anchor="middle">web_search</text>
-  <text x="610.0" y="327" class="note" text-anchor="middle">SearXNG :8888</text>
-  <text x="610.0" y="344" class="note" text-anchor="middle">6 results, snippets</text>
-  <path class="flow" d="M352,242 C352,320 420,320 518,320" marker-end="url(#arrow)"/>
-  <rect x="250" y="370" width="200" height="72" rx="10" class="box" style="stroke:#B7791F;stroke-width:2;stroke-dasharray:7 5"/>
-  <text x="350.0" y="402" class="name mono" text-anchor="middle">fetch_page (planned)</text>
-  <text x="350.0" y="422" class="note" text-anchor="middle">one page as text</text>
-  <path class="flow" d="M300,242 C300,300 300,330 300,368" marker-end="url(#arrow)"/>
-  <rect x="510" y="376" width="196" height="64" rx="10" class="box" style="stroke:#B7791F;stroke-width:2;stroke-dasharray:7 5"/>
-  <text x="608.0" y="404" class="name" text-anchor="middle">Safety gate (planned)</text>
-  <text x="608.0" y="424" class="note" text-anchor="middle">public HTTPS only</text>
-  <path class="flow" d="M452,406 L508,406" marker-end="url(#arrow)"/>
-  <rect x="760" y="376" width="160" height="64" rx="10" class="outside"/>
-  <text x="840.0" y="404" class="name" text-anchor="middle">The internet</text>
-  <text x="840.0" y="424" class="note" text-anchor="middle">the page itself</text>
-  <path class="flow" d="M708,408 L758,408" marker-end="url(#arrow)"/>
-  <rect x="760" y="280" width="160" height="80" rx="10" class="outside"/>
-  <text x="840.0" y="307" class="name" text-anchor="middle">Search engines</text>
-  <text x="840.0" y="327" class="note" text-anchor="middle">DuckDuckGo, Google</text>
-  <text x="840.0" y="344" class="note" text-anchor="middle">(Brave suspended)</text>
-  <path class="flow" d="M702,320 L758,320" marker-end="url(#arrow)"/>
+  <text x="610" y="108" class="name mono" text-anchor="middle">llama-server</text>
+  <text x="610" y="127" class="note" text-anchor="middle">Nemotron decides:</text>
+  <text x="610" y="144" class="note" text-anchor="middle">a tool call or an answer</text>
+  <path class="flow" d="M350,150 L350.0,120.0 Q350,110 360.0,110.0 L518,110" marker-end="url(#arrow)"/>
+  <text x="434" y="102" class="label" text-anchor="middle">messages + tools</text>
+  <path class="flow" d="M520,140 L490.0,140.0 Q480,140 480.0,150.0 L480.0,176.0 Q480,186 470.0,186.0 L452,186" marker-end="url(#arrow)"/>
+  <text x="500" y="204" class="label" text-anchor="start">tool call</text>
+  <rect x="520" y="290" width="180" height="80" rx="10" class="box built"/>
+  <text x="610" y="318" class="name mono" text-anchor="middle">web_search</text>
+  <text x="610" y="337" class="note" text-anchor="middle">SearXNG :8888</text>
+  <text x="610" y="354" class="note" text-anchor="middle">6 results, snippets</text>
+  <path class="flow" d="M400,250 L400.0,320.0 Q400,330 410.0,330.0 L518,330" marker-end="url(#arrow)"/>
+  <rect x="250" y="390" width="200" height="70" rx="10" class="planned"/>
+  <text x="350" y="422" class="name mono" text-anchor="middle">fetch_page</text>
+  <text x="350" y="440" class="note" text-anchor="middle">planned: one page as text</text>
+  <path class="flow" d="M300,250 L300,388" marker-end="url(#arrow)"/>
+  <rect x="510" y="390" width="196" height="70" rx="10" class="planned"/>
+  <text x="608" y="422" class="name" text-anchor="middle">Safety gate</text>
+  <text x="608" y="440" class="note" text-anchor="middle">planned: public HTTPS only</text>
+  <path class="flow" d="M450,425 L508,425" marker-end="url(#arrow)"/>
+  <rect x="760" y="290" width="170" height="80" rx="10" class="outside"/>
+  <text x="845" y="318" class="name" text-anchor="middle">Search engines</text>
+  <text x="845" y="337" class="note" text-anchor="middle">DuckDuckGo, Google</text>
+  <text x="845" y="354" class="note" text-anchor="middle">(Brave suspended)</text>
+  <path class="flow" d="M700,330 L758,330" marker-end="url(#arrow)"/>
+  <rect x="760" y="390" width="170" height="70" rx="10" class="outside"/>
+  <text x="845" y="422" class="name" text-anchor="middle">The internet</text>
+  <text x="845" y="440" class="note" text-anchor="middle">the page itself</text>
+  <path class="flow" d="M706,425 L758,425" marker-end="url(#arrow)"/>
 </svg>

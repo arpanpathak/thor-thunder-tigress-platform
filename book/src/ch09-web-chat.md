@@ -203,7 +203,7 @@ cd jetson-thor/web
 | Setting | Default | Notes |
 |---|---|---|
 | `USERS` | 4 | replies generated at once; a fifth waits |
-| `CONTEXT` | 1,048,576 | tokens per reply; memory for all four is reserved at start (57.8 GB measured) |
+| `CONTEXT` | 1,048,576 | tokens per reply; memory for all four is reserved at start (57.8 GB measured); what this costs and how to change it: chapter "Memory, context and slots" |
 | `MODEL` | Nemotron 3 Nano 30B-A3B Q8_0 | any GGUF with a chat template |
 | `PORT` / `MODEL_PORT` / `SEARCH_PORT` | 8080 / 8079 / 8888 | |
 

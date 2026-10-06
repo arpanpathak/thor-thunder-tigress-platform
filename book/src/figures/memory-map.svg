@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 410" width="960" height="410" role="img" aria-label="A 128 GB bar: about 32 GB model weights, 24 GiB reserved for the context of four slots of one million tokens, the rest of the 73 GB in use by buffers, the OS and other programs, and about 49 GB available. Below, the arithmetic: 6 KiB per token, 6 GiB per slot, 24 GiB reserved.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="410" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Where the Thor's memory goes while serving</text>
+  <rect x="40.0" y="90" width="220.0" height="70" fill="#DCEBC9" stroke="#4E8A16" stroke-width="2"/>
+  <text x="150" y="120" class="name" text-anchor="middle">Model weights</text>
+  <text x="150" y="140" class="note" text-anchor="middle">32 GB, read every step</text>
+  <rect x="260.0" y="90" width="165.0" height="70" fill="#D6E6F8" stroke="#3B6FD4" stroke-width="2"/>
+  <text x="342" y="120" class="name" text-anchor="middle">Context</text>
+  <text x="342" y="140" class="note" text-anchor="middle">24 GiB reserved</text>
+  <rect x="425.0" y="90" width="116.9" height="70" fill="#ECEFF3" stroke="#8A99AB" stroke-width="2"/>
+  <text x="483" y="120" class="name" text-anchor="middle">Other</text>
+  <text x="483" y="140" class="note" text-anchor="middle">OS, buffers</text>
+  <rect x="541.9" y="90" width="378.1" height="70" fill="#FFFFFF" stroke="#8A99AB" stroke-width="2"/>
+  <text x="731" y="120" class="name" text-anchor="middle">Free and file cache</text>
+  <text x="731" y="140" class="note" text-anchor="middle">about 49 GB available</text>
+  <line x1="301.2" y1="146" x2="301.2" y2="160" stroke="#3B6FD4" stroke-width="1.5"/>
+  <line x1="342.5" y1="146" x2="342.5" y2="160" stroke="#3B6FD4" stroke-width="1.5"/>
+  <line x1="383.8" y1="146" x2="383.8" y2="160" stroke="#3B6FD4" stroke-width="1.5"/>
+  <text x="281" y="176" class="note" text-anchor="middle">slot 0</text>
+  <text x="322" y="176" class="note" text-anchor="middle">slot 1</text>
+  <text x="363" y="176" class="note" text-anchor="middle">slot 2</text>
+  <text x="404" y="176" class="note" text-anchor="middle">slot 3</text>
+  <text x="40" y="78" class="note" text-anchor="start">0</text>
+  <text x="920" y="78" class="note" text-anchor="end">128 GB, shared by CPU and GPU</text>
+  <line x1="40" y1="200" x2="425.0" y2="200" stroke="#1D2733" stroke-width="1.5"/>
+  <text x="232" y="218" class="num" text-anchor="middle">llama-server: 57.8 GB measured</text>
+  <rect x="40" y="290" width="270" height="96" rx="10" class="outside"/>
+  <text x="175" y="318" class="name" text-anchor="middle">Per token of context</text>
+  <text x="175" y="336" class="note" text-anchor="middle">6 KiB: only 6 of 52 layers</text>
+  <text x="175" y="354" class="note" text-anchor="middle">are attention layers, each</text>
+  <text x="175" y="370" class="note" text-anchor="middle">with 2 key/value heads of 128</text>
+  <rect x="345" y="290" width="270" height="96" rx="10" class="outside"/>
+  <text x="480" y="318" class="name" text-anchor="middle">Per slot</text>
+  <text x="480" y="336" class="note" text-anchor="middle">1,048,576 tokens × 6 KiB</text>
+  <text x="480" y="354" class="note" text-anchor="middle">= 6 GiB, plus a small</text>
+  <text x="480" y="370" class="note" text-anchor="middle">fixed state for the other layers</text>
+  <rect x="650" y="290" width="270" height="96" rx="10" class="outside"/>
+  <text x="785" y="318" class="name" text-anchor="middle">Reserved at start</text>
+  <text x="785" y="336" class="note" text-anchor="middle">for all 4 slots, used or not:</text>
+  <text x="785" y="354" class="note" text-anchor="middle">4 × 6 GiB = 24 GiB;</text>
+  <text x="785" y="370" class="note" text-anchor="middle">today's longest chat: 41,674 tokens</text>
+</svg>

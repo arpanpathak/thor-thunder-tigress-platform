@@ -6,51 +6,53 @@
     .note { fill: #5B6B7C; font-size: 12px; }
     .label { fill: #1E88A8; font-size: 12px; }
     .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
     .mono { font-family: "JetBrains Mono", Menlo, monospace; }
     .box { fill: #F4F7FA; stroke-width: 2; }
     .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
     .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
     .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
     .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
-    .deny { stroke: #D9542B; stroke-width: 1.8; fill: none; stroke-dasharray: 4 4; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#D9542B"/>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
     </marker>
   </defs>
   <rect width="960" height="310" fill="#FFFFFF"/>
   <text x="30" y="36" class="title">OpenCode on your machine, the model on the Thor</text>
   <rect x="24" y="56" width="330" height="230" rx="14" class="zone"/>
   <text x="38" y="76" class="zonelabel">Your machine</text>
-  <rect x="44" y="90" width="120" height="80" rx="10" class="outside"/>
-  <text x="104.0" y="117" class="name" text-anchor="middle">opencode</text>
-  <text x="104.0" y="137" class="note" text-anchor="middle">reads, edits,</text>
-  <text x="104.0" y="154" class="note" text-anchor="middle">runs commands</text>
-  <rect x="198" y="80" width="136" height="56" rx="10" class="outside"/>
-  <text x="266.0" y="113" class="name mono" text-anchor="middle">127.0.0.1:8079</text>
-  <rect x="198" y="196" width="136" height="56" rx="10" class="outside"/>
-  <text x="266.0" y="229" class="name mono" text-anchor="middle">127.0.0.1:8888</text>
-  <path class="flow" d="M166,118 L196,110" marker-end="url(#arrow)"/>
-  <path class="flow" d="M166,150 C182,150 180,224 196,224" marker-end="url(#arrow)"/>
-  <rect x="400" y="130" width="170" height="80" rx="10" class="outside"/>
-  <text x="485.0" y="157" class="name" text-anchor="middle">SSH tunnel</text>
-  <text x="485.0" y="177" class="note" text-anchor="middle">existing SSH access;</text>
-  <text x="485.0" y="194" class="note" text-anchor="middle">nothing new exposed</text>
-  <path class="flow" d="M336,108 C370,108 368,158 398,158" marker-end="url(#arrow)"/>
-  <path class="flow" d="M336,224 C370,224 368,184 398,184" marker-end="url(#arrow)"/>
+  <rect x="44" y="120" width="120" height="80" rx="10" class="outside"/>
+  <text x="104" y="148" class="name" text-anchor="middle">opencode</text>
+  <text x="104" y="167" class="note" text-anchor="middle">reads, edits,</text>
+  <text x="104" y="184" class="note" text-anchor="middle">runs commands</text>
+  <rect x="200" y="84" width="136" height="56" rx="10" class="outside"/>
+  <text x="268" y="117" class="name mono" text-anchor="middle">127.0.0.1:8079</text>
+  <rect x="200" y="180" width="136" height="56" rx="10" class="outside"/>
+  <text x="268" y="213" class="name mono" text-anchor="middle">127.0.0.1:8888</text>
+  <path class="flow" d="M164,140 L173.0,140.0 Q182,140 182.0,130.0 L182.0,122.0 Q182,112 190.0,112.0 L198,112" marker-end="url(#arrow)"/>
+  <path class="flow" d="M164,180 L173.0,180.0 Q182,180 182.0,190.0 L182.0,198.0 Q182,208 190.0,208.0 L198,208" marker-end="url(#arrow)"/>
+  <rect x="400" y="120" width="170" height="80" rx="10" class="outside"/>
+  <text x="485" y="148" class="name" text-anchor="middle">SSH tunnel</text>
+  <text x="485" y="167" class="note" text-anchor="middle">your SSH login;</text>
+  <text x="485" y="184" class="note" text-anchor="middle">nothing new exposed</text>
+  <path class="flow" d="M336,112 L358.0,112.0 Q368,112 368.0,122.0 L368.0,136.0 Q368,146 378.0,146.0 L398,146" marker-end="url(#arrow)"/>
+  <path class="flow" d="M336,208 L358.0,208.0 Q368,208 368.0,198.0 L368.0,184.0 Q368,174 378.0,174.0 L398,174" marker-end="url(#arrow)"/>
   <rect x="610" y="56" width="322" height="230" rx="14" class="zone"/>
   <text x="624" y="76" class="zonelabel">Jetson AGX Thor</text>
-  <rect x="640" y="80" width="270" height="56" rx="10" class="box built"/>
-  <text x="775.0" y="104" class="name mono" text-anchor="middle">llama-server :8079</text>
-  <text x="775.0" y="124" class="note" text-anchor="middle">Nemotron</text>
-  <rect x="640" y="196" width="270" height="56" rx="10" class="box built"/>
-  <text x="775.0" y="220" class="name mono" text-anchor="middle">SearXNG :8888</text>
-  <text x="775.0" y="240" class="note" text-anchor="middle">web search</text>
-  <path class="flow" d="M572,158 C606,158 604,108 638,108" marker-end="url(#arrow)"/>
-  <path class="flow" d="M572,184 C606,184 604,224 638,224" marker-end="url(#arrow)"/>
+  <rect x="640" y="84" width="270" height="56" rx="10" class="box built"/>
+  <text x="775" y="108" class="name mono" text-anchor="middle">llama-server :8079</text>
+  <text x="775" y="128" class="note" text-anchor="middle">Nemotron</text>
+  <rect x="640" y="180" width="270" height="56" rx="10" class="box built"/>
+  <text x="775" y="204" class="name mono" text-anchor="middle">SearXNG :8888</text>
+  <text x="775" y="224" class="note" text-anchor="middle">web search</text>
+  <path class="flow" d="M570,146 L594.0,146.0 Q604,146 604.0,136.0 L604.0,122.0 Q604,112 614.0,112.0 L638,112" marker-end="url(#arrow)"/>
+  <path class="flow" d="M570,174 L594.0,174.0 Q604,174 604.0,184.0 L604.0,198.0 Q604,208 614.0,208.0 L638,208" marker-end="url(#arrow)"/>
 </svg>

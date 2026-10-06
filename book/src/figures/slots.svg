@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" width="960" height="460" role="img" aria-label="Any number of people send requests with the same key. llama-server keeps a queue and four slots; each request borrows a free slot for one reply, up to 1,048,576 tokens, and gives it back. All slots share one copy of the model weights.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="460" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">People, slots and the model</text>
+  <rect x="30" y="70" width="130" height="50" rx="10" class="outside"/>
+  <text x="95" y="100" class="name" text-anchor="middle">Browser</text>
+  <path class="flow" d="M160,95 L186.0,95.0 Q196,95 196.0,105.0 L196.0,226.0 Q196,236 206.0,236.0 L228,236" marker-end="url(#arrow)"/>
+  <rect x="30" y="136" width="130" height="50" rx="10" class="outside"/>
+  <text x="95" y="166" class="name" text-anchor="middle">Browser</text>
+  <path class="flow" d="M160,161 L186.0,161.0 Q196,161 196.0,171.0 L196.0,226.0 Q196,236 206.0,236.0 L228,236" marker-end="url(#arrow)"/>
+  <rect x="30" y="202" width="130" height="50" rx="10" class="outside"/>
+  <text x="95" y="232" class="name" text-anchor="middle">Agent</text>
+  <path class="flow" d="M160,236 L228,236" marker-end="url(#arrow)"/>
+  <rect x="30" y="268" width="130" height="50" rx="10" class="outside"/>
+  <text x="95" y="298" class="name" text-anchor="middle">Browser</text>
+  <path class="flow" d="M160,293 L186.0,293.0 Q196,293 196.0,283.0 L196.0,246.0 Q196,236 206.0,236.0 L228,236" marker-end="url(#arrow)"/>
+  <rect x="30" y="334" width="130" height="50" rx="10" class="outside"/>
+  <text x="95" y="364" class="name" text-anchor="middle">Agent</text>
+  <path class="flow" d="M160,359 L186.0,359.0 Q196,359 196.0,349.0 L196.0,246.0 Q196,236 206.0,236.0 L228,236" marker-end="url(#arrow)"/>
+  <text x="95" y="410" class="note" text-anchor="middle">any number of people,</text>
+  <text x="95" y="426" class="note" text-anchor="middle">one key</text>
+  <rect x="250" y="56" width="682" height="390" rx="14" class="zone"/>
+  <text x="264" y="76" class="zonelabel">Jetson AGX Thor: llama-server, --parallel 4</text>
+  <rect x="270" y="186" width="150" height="100" rx="10" class="box built"/>
+  <text x="345" y="216" class="name" text-anchor="middle">Queue</text>
+  <text x="345" y="234" class="note" text-anchor="middle">requests wait here</text>
+  <text x="345" y="252" class="note" text-anchor="middle">when all 4 slots</text>
+  <text x="345" y="268" class="note" text-anchor="middle">are busy</text>
+  <path class="flow" d="M420,236 L448,236" marker-end="url(#arrow)"/>
+  <rect x="472" y="84" width="200" height="66" rx="10" class="box built"/>
+  <text x="572" y="105" class="name" text-anchor="middle">Slot 0</text>
+  <text x="572" y="124" class="note" text-anchor="middle">up to 1,048,576 tokens</text>
+  <text x="572" y="141" class="note" text-anchor="middle">borrowed for one reply</text>
+  <path class="flow" d="M450,236 L450.0,127.0 Q450,117 460.0,117.0 L470,117" marker-end="url(#arrow)"/>
+  <rect x="472" y="170" width="200" height="66" rx="10" class="box built"/>
+  <text x="572" y="191" class="name" text-anchor="middle">Slot 1</text>
+  <text x="572" y="210" class="note" text-anchor="middle">up to 1,048,576 tokens</text>
+  <text x="572" y="227" class="note" text-anchor="middle">borrowed for one reply</text>
+  <path class="flow" d="M450,203 L470,203" marker-end="url(#arrow)"/>
+  <rect x="472" y="256" width="200" height="66" rx="10" class="box built"/>
+  <text x="572" y="277" class="name" text-anchor="middle">Slot 2</text>
+  <text x="572" y="296" class="note" text-anchor="middle">up to 1,048,576 tokens</text>
+  <text x="572" y="313" class="note" text-anchor="middle">borrowed for one reply</text>
+  <path class="flow" d="M450,289 L470,289" marker-end="url(#arrow)"/>
+  <rect x="472" y="342" width="200" height="66" rx="10" class="box built"/>
+  <text x="572" y="363" class="name" text-anchor="middle">Slot 3</text>
+  <text x="572" y="382" class="note" text-anchor="middle">up to 1,048,576 tokens</text>
+  <text x="572" y="399" class="note" text-anchor="middle">borrowed for one reply</text>
+  <path class="flow" d="M450,236 L450.0,365.0 Q450,375 460.0,375.0 L470,375" marker-end="url(#arrow)"/>
+  <rect x="722" y="140" width="190" height="190" rx="10" class="box built"/>
+  <text x="817" y="198" class="name" text-anchor="middle">Model weights</text>
+  <text x="817" y="216" class="note" text-anchor="middle">one copy, 32 GB,</text>
+  <text x="817" y="234" class="note" text-anchor="middle">shared by all slots;</text>
+  <text x="817" y="250" class="note" text-anchor="middle">every step reads</text>
+  <text x="817" y="268" class="note" text-anchor="middle">the weights it uses</text>
+  <text x="817" y="284" class="note" text-anchor="middle">once for all slots</text>
+  <path class="flow" d="M672,203 L720,203" marker-end="url(#arrow)"/>
+  <path class="flow" d="M672,289 L720,289" marker-end="url(#arrow)"/>
+  <path class="flow" d="M672,117 L686.0,117.0 Q696,117 696.0,127.0 L696.0,160.0 Q696,170 706.0,170.0 L720,170" marker-end="url(#arrow)"/>
+  <path class="flow" d="M672,375 L686.0,375.0 Q696,375 696.0,365.0 L696.0,310.0 Q696,300 706.0,300.0 L720,300" marker-end="url(#arrow)"/>
+</svg>

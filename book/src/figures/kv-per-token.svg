@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 390" width="960" height="390" role="img" aria-label="Memory per token of context: Nemotron 3 Nano 6 KiB, Llama 3 8B 128 KiB, Llama 3 70B 320 KiB. For one million tokens: 6 GiB, 128 GiB, 320 GiB.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="390" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Why a 1M-token context fits on the Thor</text>
+  <text x="40" y="76" class="note" text-anchor="start">Memory per token of context (16-bit keys and values)</text>
+  <text x="920" y="76" class="note" text-anchor="end">for 1,048,576 tokens</text>
+  <text x="40" y="114" class="name" text-anchor="start">Nemotron 3 Nano 30B-A3B</text>
+  <text x="40" y="132" class="note" text-anchor="start">6 attention layers × 2 KV heads × 128</text>
+  <rect x="330" y="102" width="7.9" height="34" rx="4" fill="#4E8A16" opacity="0.85"/>
+  <text x="346" y="124" class="num" text-anchor="start">6 KiB</text>
+  <text x="920" y="124" class="num" text-anchor="end">6 GiB</text>
+  <text x="40" y="192" class="name" text-anchor="start">Llama 3 8B</text>
+  <text x="40" y="210" class="note" text-anchor="start">32 layers × 8 KV heads × 128</text>
+  <rect x="330" y="180" width="168.0" height="34" rx="4" fill="#3B6FD4" opacity="0.85"/>
+  <text x="506" y="202" class="num" text-anchor="start">128 KiB</text>
+  <text x="920" y="202" class="num" text-anchor="end">128 GiB</text>
+  <text x="40" y="270" class="name" text-anchor="start">Llama 3 70B</text>
+  <text x="40" y="288" class="note" text-anchor="start">80 layers × 8 KV heads × 128</text>
+  <rect x="330" y="258" width="420.0" height="34" rx="4" fill="#3B6FD4" opacity="0.85"/>
+  <text x="758" y="280" class="num" text-anchor="start">320 KiB</text>
+  <text x="920" y="280" class="num" text-anchor="end">320 GiB</text>
+  <line x1="40" y1="338" x2="920" y2="338" stroke="#D5DCE4" stroke-width="1"/>
+  <text x="40" y="362" class="note" text-anchor="start">The Thor has about 115 GB usable: a 1M-token conversation fits only because most of Nemotron's layers keep a fixed-size state instead.</text>
+</svg>

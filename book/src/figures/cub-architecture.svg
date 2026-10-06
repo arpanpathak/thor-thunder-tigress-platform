@@ -6,55 +6,59 @@
     .note { fill: #5B6B7C; font-size: 12px; }
     .label { fill: #1E88A8; font-size: 12px; }
     .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
     .mono { font-family: "JetBrains Mono", Menlo, monospace; }
     .box { fill: #F4F7FA; stroke-width: 2; }
     .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
     .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
     .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
     .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
-    .deny { stroke: #D9542B; stroke-width: 1.8; fill: none; stroke-dasharray: 4 4; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#D9542B"/>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
     </marker>
   </defs>
   <rect width="960" height="380" fill="#FFFFFF"/>
   <text x="30" y="36" class="title">How a request reaches Nemotron</text>
-  <rect x="30" y="90" width="150" height="80" rx="10" class="outside"/>
-  <text x="105.0" y="126" class="name" text-anchor="middle">Browser</text>
-  <text x="105.0" y="146" class="note" text-anchor="middle">or agent</text>
-  <rect x="250" y="64" width="220" height="72" rx="10" class="outside"/>
-  <text x="360.0" y="96" class="name" text-anchor="middle">voltforge.tech</text>
-  <text x="360.0" y="116" class="note" text-anchor="middle">GitHub Pages: forwarding page</text>
-  <path class="flow" d="M182,112 C214,112 216,100 248,100" marker-end="url(#arrow)"/>
-  <text x="214" y="82" class="label" text-anchor="middle">1. short address</text>
-  <path class="flow" d="M360,138 C360,176 300,176 182,152" marker-end="url(#arrow)"/>
-  <text x="332" y="196" class="label" text-anchor="middle">2. go to the .ts.net address</text>
-  <rect x="250" y="238" width="220" height="80" rx="10" class="outside"/>
-  <text x="360.0" y="265" class="name" text-anchor="middle">Tailscale Funnel</text>
-  <text x="360.0" y="285" class="note" text-anchor="middle">HTTPS at the .ts.net name</text>
-  <text x="360.0" y="302" class="note" text-anchor="middle">relays; no open port at home</text>
-  <path class="flow" d="M105,172 C105,278 180,278 248,278" marker-end="url(#arrow)"/>
-  <text x="150" y="300" class="label" text-anchor="middle">3. every request</text>
-  <rect x="520" y="56" width="412" height="300" rx="14" class="zone"/>
-  <text x="534" y="76" class="zonelabel">Jetson AGX Thor: everything listens on 127.0.0.1</text>
-  <rect x="548" y="238" width="190" height="80" rx="10" class="box built"/>
-  <text x="643.0" y="274" class="name mono" text-anchor="middle">thor-tigress-agent</text>
-  <text x="643.0" y="294" class="note" text-anchor="middle">:8080 page, key, search, API</text>
-  <path class="flow" d="M472,278 L546,278" marker-end="url(#arrow)"/>
-  <rect x="762" y="98" width="158" height="80" rx="10" class="box built"/>
-  <text x="841.0" y="125" class="name mono" text-anchor="middle">llama-server</text>
-  <text x="841.0" y="145" class="note" text-anchor="middle">:8079</text>
-  <text x="841.0" y="162" class="note" text-anchor="middle">Nemotron 3 Nano</text>
-  <rect x="762" y="238" width="158" height="80" rx="10" class="box built"/>
-  <text x="841.0" y="265" class="name mono" text-anchor="middle">SearXNG</text>
-  <text x="841.0" y="285" class="note" text-anchor="middle">:8888</text>
-  <text x="841.0" y="302" class="note" text-anchor="middle">web search</text>
-  <path class="flow" d="M740,262 C752,262 748,138 760,138" marker-end="url(#arrow)"/>
-  <path class="flow" d="M740,288 L760,288" marker-end="url(#arrow)"/>
+  <rect x="30" y="70" width="160" height="80" rx="10" class="outside"/>
+  <text x="110" y="106" class="name" text-anchor="middle">Browser</text>
+  <text x="110" y="126" class="note" text-anchor="middle">or agent</text>
+  <rect x="290" y="70" width="210" height="80" rx="10" class="outside"/>
+  <text x="395" y="98" class="name" text-anchor="middle">voltforge.tech</text>
+  <text x="395" y="117" class="note" text-anchor="middle">GitHub Pages:</text>
+  <text x="395" y="134" class="note" text-anchor="middle">forwarding page</text>
+  <path class="flow" d="M190,98 L288,98" marker-end="url(#arrow)"/>
+  <text x="239" y="90" class="label" text-anchor="middle">1. short address</text>
+  <path class="flow" d="M290,128 L192,128" marker-end="url(#arrow)"/>
+  <text x="240" y="146" class="label" text-anchor="middle">2. go to .ts.net</text>
+  <rect x="290" y="250" width="210" height="80" rx="10" class="outside"/>
+  <text x="395" y="278" class="name" text-anchor="middle">Tailscale Funnel</text>
+  <text x="395" y="297" class="note" text-anchor="middle">HTTPS at the .ts.net name;</text>
+  <text x="395" y="314" class="note" text-anchor="middle">no open port at home</text>
+  <path class="flow" d="M110,150 L110.0,280.0 Q110,290 120.0,290.0 L288,290" marker-end="url(#arrow)"/>
+  <text x="160" y="280" class="label" text-anchor="middle">3. every request</text>
+  <rect x="540" y="56" width="392" height="300" rx="14" class="zone"/>
+  <text x="554" y="76" class="zonelabel">Jetson AGX Thor: all on 127.0.0.1</text>
+  <rect x="560" y="250" width="180" height="80" rx="10" class="box built"/>
+  <text x="650" y="278" class="name mono" text-anchor="middle">thor-tigress-agent</text>
+  <text x="650" y="297" class="note" text-anchor="middle">:8080 page, key,</text>
+  <text x="650" y="314" class="note" text-anchor="middle">search, API</text>
+  <path class="flow" d="M500,290 L558,290" marker-end="url(#arrow)"/>
+  <rect x="770" y="110" width="150" height="80" rx="10" class="box built"/>
+  <text x="845" y="138" class="name mono" text-anchor="middle">llama-server</text>
+  <text x="845" y="157" class="note" text-anchor="middle">:8079</text>
+  <text x="845" y="174" class="note" text-anchor="middle">Nemotron 3 Nano</text>
+  <rect x="770" y="250" width="150" height="80" rx="10" class="box built"/>
+  <text x="845" y="278" class="name mono" text-anchor="middle">SearXNG</text>
+  <text x="845" y="297" class="note" text-anchor="middle">:8888</text>
+  <text x="845" y="314" class="note" text-anchor="middle">web search</text>
+  <path class="flow" d="M650,250 L650.0,160.0 Q650,150 660.0,150.0 L768,150" marker-end="url(#arrow)"/>
+  <path class="flow" d="M740,290 L768,290" marker-end="url(#arrow)"/>
 </svg>

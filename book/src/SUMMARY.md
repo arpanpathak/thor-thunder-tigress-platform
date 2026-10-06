@@ -19,6 +19,7 @@
 - [Bring your own domain](ch17-bring-your-own-domain.md)
 - [Security](ch10-security.md)
 - [Operations: recovery and hardening](ch18-operations.md)
+- [Memory, context and slots](ch20-memory-and-context.md)
 
 # Plans
 

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 390" width="960" height="390" role="img" aria-label="Sources feed thor-hammer-trainer, which writes data/train.jsonl; the reinforcer review page and lasso read it. Separately, model answers go to spark, which writes scores.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" width="960" height="380" role="img" aria-label="Sources feed thor-hammer-trainer, which writes data/train.jsonl, read by the reinforcer review page and by lasso. Model answers go to spark, which writes scores.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
@@ -6,54 +6,56 @@
     .note { fill: #5B6B7C; font-size: 12px; }
     .label { fill: #1E88A8; font-size: 12px; }
     .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
     .mono { font-family: "JetBrains Mono", Menlo, monospace; }
     .box { fill: #F4F7FA; stroke-width: 2; }
     .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
     .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
     .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
     .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
-    .deny { stroke: #D9542B; stroke-width: 1.8; fill: none; stroke-dasharray: 4 4; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#D9542B"/>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
     </marker>
   </defs>
-  <rect width="960" height="390" fill="#FFFFFF"/>
+  <rect width="960" height="380" fill="#FFFFFF"/>
   <text x="30" y="36" class="title">The crates and the files between them</text>
-  <rect x="30" y="70" width="190" height="96" rx="10" class="outside"/>
-  <text x="125.0" y="105" class="name" text-anchor="middle">Sources</text>
-  <text x="125.0" y="125" class="note" text-anchor="middle">books and docs</text>
-  <text x="125.0" y="142" class="note" text-anchor="middle">chat export, own pairs</text>
-  <path class="flow" d="M222,118 L276,118" marker-end="url(#arrow)"/>
-  <rect x="278" y="70" width="200" height="96" rx="10" class="box built"/>
-  <text x="378.0" y="114" class="name mono" text-anchor="middle">thor-hammer-trainer</text>
-  <text x="378.0" y="134" class="note" text-anchor="middle">builds the training set</text>
-  <path class="flow" d="M480,118 L534,118" marker-end="url(#arrow)"/>
-  <rect x="536" y="70" width="170" height="96" rx="10" class="box built"/>
-  <text x="621.0" y="114" class="name mono" text-anchor="middle">data/train.jsonl</text>
-  <text x="621.0" y="134" class="note" text-anchor="middle">13,114 records</text>
-  <path class="flow" d="M708,100 C744,100 744,86 780,86" marker-end="url(#arrow)"/>
-  <path class="flow" d="M708,136 C744,136 744,196 780,196" marker-end="url(#arrow)"/>
-  <rect x="782" y="52" width="150" height="72" rx="10" class="box built"/>
-  <text x="857.0" y="84" class="name mono" text-anchor="middle">reinforcer</text>
-  <text x="857.0" y="104" class="note" text-anchor="middle">review page</text>
-  <rect x="782" y="160" width="150" height="72" rx="10" class="box built"/>
-  <text x="857.0" y="192" class="name mono" text-anchor="middle">lasso</text>
-  <text x="857.0" y="212" class="note" text-anchor="middle">conversations</text>
-  <rect x="30" y="272" width="190" height="72" rx="10" class="outside"/>
-  <text x="125.0" y="313" class="name" text-anchor="middle">Model answers</text>
-  <path class="flow" d="M222,308 L276,308" marker-end="url(#arrow)"/>
-  <rect x="278" y="262" width="200" height="92" rx="10" class="box built"/>
-  <text x="378.0" y="295" class="name mono" text-anchor="middle">spark</text>
-  <text x="378.0" y="315" class="note" text-anchor="middle">slop and the five</text>
-  <text x="378.0" y="332" class="note" text-anchor="middle">Rust rules</text>
-  <path class="flow" d="M480,308 L534,308" marker-end="url(#arrow)"/>
-  <rect x="536" y="272" width="170" height="72" rx="10" class="outside"/>
-  <text x="621.0" y="304" class="name" text-anchor="middle">Scores</text>
-  <text x="621.0" y="324" class="note" text-anchor="middle">per answer</text>
+  <rect x="30" y="76" width="190" height="84" rx="10" class="outside"/>
+  <text x="125" y="106" class="name" text-anchor="middle">Sources</text>
+  <text x="125" y="125" class="note" text-anchor="middle">books and docs</text>
+  <text x="125" y="142" class="note" text-anchor="middle">chat export, own pairs</text>
+  <path class="flow" d="M220,118 L276,118" marker-end="url(#arrow)"/>
+  <rect x="278" y="76" width="200" height="84" rx="10" class="box built"/>
+  <text x="378" y="114" class="name mono" text-anchor="middle">thor-hammer-trainer</text>
+  <text x="378" y="134" class="note" text-anchor="middle">builds the training set</text>
+  <path class="flow" d="M478,118 L534,118" marker-end="url(#arrow)"/>
+  <rect x="536" y="76" width="170" height="84" rx="10" class="box built"/>
+  <text x="621" y="114" class="name mono" text-anchor="middle">data/train.jsonl</text>
+  <text x="621" y="134" class="note" text-anchor="middle">13,114 records</text>
+  <rect x="782" y="72" width="150" height="64" rx="10" class="box built"/>
+  <text x="857" y="100" class="name mono" text-anchor="middle">reinforcer</text>
+  <text x="857" y="120" class="note" text-anchor="middle">review page</text>
+  <rect x="782" y="156" width="150" height="64" rx="10" class="box built"/>
+  <text x="857" y="184" class="name mono" text-anchor="middle">lasso</text>
+  <text x="857" y="204" class="note" text-anchor="middle">conversations</text>
+  <path class="flow" d="M706,104 L780,104" marker-end="url(#arrow)"/>
+  <path class="flow" d="M706,132 L734.0,132.0 Q744,132 744.0,142.0 L744.0,178.0 Q744,188 754.0,188.0 L780,188" marker-end="url(#arrow)"/>
+  <rect x="30" y="270" width="190" height="72" rx="10" class="outside"/>
+  <text x="125" y="311" class="name" text-anchor="middle">Model answers</text>
+  <path class="flow" d="M220,306 L276,306" marker-end="url(#arrow)"/>
+  <rect x="278" y="262" width="200" height="88" rx="10" class="box built"/>
+  <text x="378" y="294" class="name mono" text-anchor="middle">spark</text>
+  <text x="378" y="313" class="note" text-anchor="middle">slop and the five</text>
+  <text x="378" y="330" class="note" text-anchor="middle">Rust rules</text>
+  <path class="flow" d="M478,306 L534,306" marker-end="url(#arrow)"/>
+  <rect x="536" y="270" width="170" height="72" rx="10" class="outside"/>
+  <text x="621" y="302" class="name" text-anchor="middle">Scores</text>
+  <text x="621" y="322" class="note" text-anchor="middle">per answer</text>
 </svg>

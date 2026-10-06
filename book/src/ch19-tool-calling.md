@@ -28,7 +28,7 @@ This chapter covers
 
 <figure>
 <img src="figures/tool-loop.svg" alt="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron calls web_search, which queries SearXNG and search engines, or the planned fetch_page, which passes a safety gate before reading one public page. After at most three rounds the model must answer.">
-<figcaption><b>Figure 17.1</b> The tool loop in <code>thor-tigress-agent</code>. Solid: built. Dashed: planned.</figcaption>
+<figcaption><b>Figure 18.1</b> The tool loop in <code>thor-tigress-agent</code>. Solid: built. Dashed: planned.</figcaption>
 </figure>
 
 1. The page sends the conversation with `thor_web_search: true` (the **Web**

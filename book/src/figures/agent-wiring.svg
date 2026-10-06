@@ -6,56 +6,58 @@
     .note { fill: #5B6B7C; font-size: 12px; }
     .label { fill: #1E88A8; font-size: 12px; }
     .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
     .mono { font-family: "JetBrains Mono", Menlo, monospace; }
     .box { fill: #F4F7FA; stroke-width: 2; }
     .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
     .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
     .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
     .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
-    .deny { stroke: #D9542B; stroke-width: 1.8; fill: none; stroke-dasharray: 4 4; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#D9542B"/>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
     </marker>
   </defs>
   <rect width="960" height="350" fill="#FFFFFF"/>
   <text x="30" y="36" class="title">How agents reach the Thor</text>
-  <rect x="30" y="70" width="200" height="100" rx="10" class="outside"/>
-  <text x="130.0" y="107" class="name" text-anchor="middle">Your agent</text>
-  <text x="130.0" y="127" class="note" text-anchor="middle">openbatrangs, Claude Code,</text>
-  <text x="130.0" y="144" class="note" text-anchor="middle">OpenCode, Python, curl</text>
-  <rect x="290" y="70" width="190" height="100" rx="10" class="outside"/>
-  <text x="385.0" y="107" class="name" text-anchor="middle">Tailscale Funnel</text>
-  <text x="385.0" y="127" class="note" text-anchor="middle">https://…ts.net</text>
-  <text x="385.0" y="144" class="note" text-anchor="middle">HTTPS, key in a header</text>
-  <path class="flow" d="M232,120 L288,120" marker-end="url(#arrow)"/>
-  <rect x="530" y="40" width="402" height="290" rx="14" class="zone"/>
-  <text x="544" y="60" class="zonelabel">Jetson AGX Thor</text>
-  <rect x="558" y="70" width="200" height="100" rx="10" class="box built"/>
-  <text x="658.0" y="98" class="name mono" text-anchor="middle">thor-tigress-agent</text>
-  <text x="658.0" y="118" class="note" text-anchor="middle">:8080 checks the key</text>
-  <text x="658.0" y="135" class="note" text-anchor="middle">/v1/messages: thinking off</text>
-  <text x="658.0" y="152" class="note" text-anchor="middle">unless asked</text>
-  <path class="flow" d="M482,120 L556,120" marker-end="url(#arrow)"/>
-  <rect x="790" y="70" width="126" height="100" rx="10" class="box built"/>
-  <text x="853.0" y="98" class="name mono" text-anchor="middle">llama-server</text>
-  <text x="853.0" y="118" class="note" text-anchor="middle">:8079</text>
-  <text x="853.0" y="135" class="note" text-anchor="middle">OpenAI and</text>
-  <text x="853.0" y="152" class="note" text-anchor="middle">Anthropic APIs</text>
+  <rect x="30" y="76" width="200" height="88" rx="10" class="outside"/>
+  <text x="130" y="108" class="name" text-anchor="middle">Your agent</text>
+  <text x="130" y="127" class="note" text-anchor="middle">openbatrangs, Claude Code,</text>
+  <text x="130" y="144" class="note" text-anchor="middle">OpenCode, Python, curl</text>
+  <rect x="290" y="76" width="190" height="88" rx="10" class="outside"/>
+  <text x="385" y="108" class="name" text-anchor="middle">Tailscale Funnel</text>
+  <text x="385" y="127" class="note" text-anchor="middle">https://…ts.net</text>
+  <text x="385" y="144" class="note" text-anchor="middle">key in a header</text>
+  <path class="flow" d="M230,120 L288,120" marker-end="url(#arrow)"/>
+  <rect x="530" y="50" width="402" height="280" rx="14" class="zone"/>
+  <text x="544" y="70" class="zonelabel">Jetson AGX Thor</text>
+  <rect x="560" y="76" width="200" height="88" rx="10" class="box built"/>
+  <text x="660" y="100" class="name mono" text-anchor="middle">thor-tigress-agent</text>
+  <text x="660" y="118" class="note" text-anchor="middle">:8080 checks the key;</text>
+  <text x="660" y="136" class="note" text-anchor="middle">/v1/messages: thinking</text>
+  <text x="660" y="152" class="note" text-anchor="middle">off unless asked</text>
+  <path class="flow" d="M480,120 L558,120" marker-end="url(#arrow)"/>
+  <rect x="790" y="76" width="126" height="88" rx="10" class="box built"/>
+  <text x="853" y="100" class="name mono" text-anchor="middle">llama-server</text>
+  <text x="853" y="118" class="note" text-anchor="middle">:8079</text>
+  <text x="853" y="136" class="note" text-anchor="middle">OpenAI and</text>
+  <text x="853" y="152" class="note" text-anchor="middle">Anthropic APIs</text>
   <path class="flow" d="M760,120 L788,120" marker-end="url(#arrow)"/>
-  <rect x="30" y="222" width="200" height="80" rx="10" class="outside"/>
-  <text x="130.0" y="249" class="name" text-anchor="middle">Your machine</text>
-  <text x="130.0" y="269" class="note" text-anchor="middle">with SSH access to the Thor</text>
-  <text x="130.0" y="286" class="note" text-anchor="middle">127.0.0.1:8080</text>
-  <rect x="290" y="222" width="190" height="80" rx="10" class="outside"/>
-  <text x="385.0" y="249" class="name" text-anchor="middle">SSH tunnel</text>
-  <text x="385.0" y="269" class="note" text-anchor="middle">ssh -L 8080:…</text>
-  <text x="385.0" y="286" class="note" text-anchor="middle">no public hop</text>
-  <path class="flow" d="M232,262 L288,262" marker-end="url(#arrow)"/>
-  <path class="flow" d="M482,262 C520,262 520,150 556,150" marker-end="url(#arrow)"/>
+  <rect x="30" y="220" width="200" height="80" rx="10" class="outside"/>
+  <text x="130" y="248" class="name" text-anchor="middle">Your machine</text>
+  <text x="130" y="267" class="note" text-anchor="middle">with SSH access</text>
+  <text x="130" y="284" class="note" text-anchor="middle">to the Thor</text>
+  <rect x="290" y="220" width="190" height="80" rx="10" class="outside"/>
+  <text x="385" y="248" class="name" text-anchor="middle">SSH tunnel</text>
+  <text x="385" y="267" class="note" text-anchor="middle">127.0.0.1:8080</text>
+  <text x="385" y="284" class="note" text-anchor="middle">no public hop</text>
+  <path class="flow" d="M230,260 L288,260" marker-end="url(#arrow)"/>
+  <path class="flow" d="M480,260 L650.0,260.0 Q660,260 660.0,250.0 L660,166" marker-end="url(#arrow)"/>
 </svg>
