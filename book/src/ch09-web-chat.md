@@ -153,13 +153,10 @@ nowhere else. Another browser or device starts empty.
 
 ## How it fits together
 
-```text
-             voltforge.tech/thor-tigress-cub (GitHub Pages: a forwarding page only)
-                          │
-browser ─► https://<thor>.<tailnet>.ts.net ─► Tailscale Funnel ─► thor-tigress-agent :8080
-                                                                     ├─► llama-server :8079 (Nemotron)
-                                                                     └─► SearXNG :8888 (web search)
-```
+<figure>
+<img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor, which calls llama-server and SearXNG on localhost.">
+<figcaption><b>Figure 8.6</b> How a request reaches Nemotron.</figcaption>
+</figure>
 
 | Part | Where | What it does |
 |---|---|---|

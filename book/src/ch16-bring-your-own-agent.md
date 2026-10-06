@@ -178,10 +178,10 @@ Leave out `extra_body` to let it think first.
 
 ## How it is wired
 
-```text
-your agent ─► https://…ts.net ─► Tailscale Funnel ─► thor-tigress-agent :8080 ─► llama-server :8079
-                                                     (checks the key)
-```
+<figure>
+<img src="figures/agent-wiring.svg" alt="Agents call the .ts.net address through Tailscale Funnel with the key in a header; thor-tigress-agent checks it and passes requests to llama-server. yahboom reaches the same server through an SSH tunnel.">
+<figcaption><b>Figure 9.1</b> How agents reach the Thor.</figcaption>
+</figure>
 
 | Path | What `thor-tigress-agent` does |
 |---|---|

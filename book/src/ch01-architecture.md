@@ -77,13 +77,10 @@ Consequences for the design:
 
 ## 1.4 Crates and machines today
 
-```text
- books, docs, chat export, own pairs ─► thor-hammer-trainer ─► data/train.jsonl
-                                                                 │
-                                         reinforcer (review) ◄───┤
-                                         lasso (conversations) ◄─┘
- model answers ─► spark ─► scores
-```
+<figure>
+<img src="figures/crates-today.svg" alt="Sources feed thor-hammer-trainer, which writes data/train.jsonl, read by the reinforcer review page and by lasso. Model answers go to spark, which writes scores.">
+<figcaption><b>Figure 1.3</b> The crates and the files between them.</figcaption>
+</figure>
 
 | Crate | Binary | Does |
 |---|---|---|

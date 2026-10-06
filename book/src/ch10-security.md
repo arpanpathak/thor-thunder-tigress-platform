@@ -27,6 +27,34 @@ published anywhere (chapter "Bring your own domain" lists every address).
 The Thor serves a fixed list of files (the page, the About page, the art);
 `serve.sh` and everything else in the folder answers `404`.
 
+
+## How the key is checked
+
+<figure>
+<img src="figures/key-flow.svg" alt="One key file on the Thor. Browsers and agents send the key in a header over HTTPS through Tailscale Funnel; thor-tigress-agent compares it and answers 401 when it is wrong; otherwise it forwards with its own key to llama-server, which checks again.">
+<figcaption><b>Figure 11.1</b> How the access key is checked.</figcaption>
+</figure>
+
+1. `./serve.sh key` writes 24 random bytes from `/dev/urandom`, base64
+   encoded with `/`, `+` and `=` removed, to `~/.config/thor-chat/api-key`
+   (mode 600, readable only by the Thor's user).
+2. Both programs read that file when they start: `thor-tigress-agent`
+   (`--key-file`) and llama-server (`--api-key-file`). A new key needs a
+   restart of both.
+3. Visitors paste the key on the invite screen; the page keeps it in the
+   browser's local storage for that address and sends
+   `Authorization: Bearer <key>` with every `/v1/` request. Agents send the
+   same header from a key file or an environment variable; Claude Code may
+   send `x-api-key: <key>` instead, which `thor-tigress-agent` treats the same.
+4. Funnel carries the request over HTTPS, so the header is encrypted until it
+   reaches the Thor.
+5. `thor-tigress-agent` compares the header with `Bearer <key>`. For any path
+   under `/v1/` that doesn't match, it answers `401` and stops. The page,
+   `/health`, the About page and the art need no key.
+6. A matching request is passed to llama-server on `127.0.0.1:8079` with the
+   agent's own `Authorization` header, and llama-server checks the key again.
+   Even a program on the Thor that bypasses `thor-tigress-agent` needs it.
+
 ## Why `Access-Control-Allow-Origin: *` is safe here
 
 Every response from `thor-tigress-agent` lets any site read it, so pages and

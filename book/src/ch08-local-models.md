@@ -28,10 +28,10 @@ files and runs commands on the machine you use, and calls Nemotron on the Thor
 for the model. Your code stays on your machine; only model calls reach the
 Thor.
 
-```text
-your machine: opencode ─► 127.0.0.1:8079 ─► SSH tunnel ─► thor: llama-server :8079 (Nemotron)
-                     └──► 127.0.0.1:8888 ─► SSH tunnel ─► thor: SearXNG :8888 (search)
-```
+<figure>
+<img src="figures/opencode-tunnel.svg" alt="opencode on your machine calls 127.0.0.1:8079 and 127.0.0.1:8888; an SSH tunnel carries both to llama-server and SearXNG on the Thor.">
+<figcaption><b>Figure 7.1</b> OpenCode on your machine, the model on the Thor.</figcaption>
+</figure>
 
 The tunnel uses your existing SSH access, so nothing new is opened on the
 network.
