@@ -59,8 +59,9 @@ to Thor: commit on yahboom, because a commit made on the Thor is overwritten.
 ```bash
 ssh thor
 cd ~/Projects/some-project
-openbatrangs                                  # interactive TUI
-openbatrangs -m qwen3.6:27b --max-ctx 32768 "fix the failing test"
+openbatrangs --thor                           # interactive TUI on Nemotron
+openbatrangs --thor "fix the failing test"    # one task (thinking on; --no-think to turn off)
+openbatrangs -m qwen3.6:27b --max-ctx 32768 "fix the failing test"   # Ollama instead
 openbatrangs --read-only "explain this repo"  # no file writes or commands
 openbatrangs doctor                           # check Ollama and the model
 ```
@@ -210,5 +211,6 @@ ollama stop qwen3.6:27b              # unload to free memory
 | 2026-10-04 | openBatarangs build on the Thor (release, 14 cores) | 19.5 s |
 | 2026-10-04 | openBatarangs, qwen3.6:27b, read-only "list the crates" task | 6 steps, 21 s, correct |
 | 2026-10-05 | openBatarangs, qwen3.6:27b, 262,144 context, "create, compile and run hello.rs" | 3 steps, 9 s, correct |
+| 2026-10-05 | openBatarangs `--thor` (Nemotron, thinking on), 5-module DSA crate with tests | 14 steps, 293 s, 14 tests pass |
 | 2026-10-05 | codebuddy, Nemotron 3 Nano 30B-A3B Q8_0 (llama.cpp), 1,046,528 context | 51.8 tok/s, first token 0.5 s |
 | 2026-10-05 | web chat (llama-server), Nemotron Q8_0, 4 × 1,048,576 context, thinking off | 53 tok/s, first token 0.2 s |

@@ -22,7 +22,7 @@ stops writing AI slop, in prose and in Rust.
 |---|---|
 | [thor-thunder-tigress-platform](https://github.com/arpanpathak/thor-thunder-tigress-platform) | the crates, this book, `jetson-thor/` |
 | [local-copilot-codebuddy](https://github.com/arpanpathak/local-copilot-codebuddy) | terminal coding assistant |
-| [openbatrangs](https://github.com/arpanpathak/openbatrangs) | agentic coding CLI for Ollama |
+| [openbatrangs](https://github.com/arpanpathak/openbatrangs) | agentic coding CLI for Ollama or Nemotron on the Thor |
 | [thor-sync](https://github.com/arpanpathak/thor-sync) | keeps project folders copied to the Jetson |
 
 ## Reading this book locally

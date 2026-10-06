@@ -146,10 +146,50 @@ ollama ps                           # must show 100% GPU
 ollama stop qwen3.6:27b             # free its memory
 ```
 
-## openbatrangs
+## Coding agent: openbatrangs with Nemotron
 
-The agentic CLI runs against Ollama. It's on hold: it works for small tasks,
-but needs more work.
+[openbatrangs](https://github.com/arpanpathak/openbatrangs) is a terminal
+coding agent: it writes files and runs commands in the current folder, one
+action per step, until the task is done. `--thor` points it at Nemotron's
+llama-server instead of Ollama.
+
+```bash
+ssh thor
+mkdir -p ~/some-project && cd ~/some-project
+openbatrangs --thor                  # interactive; /models lists the served model
+openbatrangs --thor "create a cargo project named dsa with a stack and a queue, with tests, then run cargo test"
+```
+
+| Option | Effect |
+|---|---|
+| `--thor` | llama-server at `127.0.0.1:8079/v1`, key from `~/.config/thor-chat/api-key` |
+| `--openai-url URL --api-key-file PATH` | any other OpenAI-compatible server |
+| `--no-think` | thinking off (on by default; reasoning is shown dimmed after 💭) |
+| `--max-steps N` | step limit, default 40 |
+
+The same command works on yahboom through `thor-model-tunnel` (above). Install
+on either machine: `cargo install --path ~/Projects/openbatrangs --locked`.
+
+Measured on 2026-10-05, from yahboom, thinking on, task: "a cargo project with
+a stack, a queue, a singly linked list, binary search and quicksort, each with
+unit tests, then run cargo test and fix anything that fails":
+
+| Steps | Time | Result |
+|---|---|---|
+| 14 of 40 | 293 s | 5 modules; fixed two rounds of compile errors itself; 14 tests pass |
+
+Each step is 10–20 s of generation at about 53 tok/s. A run takes one of the
+four chat slots, so it competes with web chat users while it works.
+
+Two bugs that made it look like it was overthinking:
+
+- Commands ran with a relative `TMPDIR`, so `cd dsa && cargo test` failed in
+  the doc-test step every time. The model saw a failing test and kept
+  rewriting working code until it ran out of steps. Sandbox paths are now
+  absolute.
+- Through the SSH tunnel, a reused idle connection failed between steps
+  ("connection closed before message completed"). The client no longer keeps
+  idle connections to this server.
 
 ## Memory
 
