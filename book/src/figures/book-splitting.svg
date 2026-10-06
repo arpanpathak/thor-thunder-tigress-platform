@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .head { fill: #5B6B7C; font-size: 12px; letter-spacing: 1px; }
+    .line { font-family: "JetBrains Mono", Menlo, monospace; font-size: 13px; fill: #37474F; }
+    .heading { fill: #3B6FD4; font-weight: 600; }
+    .fence { fill: #1E88A8; }
+    .trap { fill: #B7791F; }
+    .msg { fill: #1D2733; font-size: 13px; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .page { fill: #F7F9FB; stroke: #B0BEC5; stroke-width: 1.5; }
+    .codeblock { fill: #F1F4F7; stroke: #1E88A8; stroke-width: 1; }
+    .example { fill: #F4F7FA; stroke: #4E8A16; stroke-width: 2; }
+    .cut { stroke: #3B6FD4; stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .flow { stroke: #1E88A8; stroke-width: 1.8; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    </marker>
+  </defs>
+  <rect width="960" height="430" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Chapter splitting: headings inside code blocks are text</text>
+
+  <text x="40" y="70" class="head">CHAPTER MARKDOWN</text>
+  <text x="560" y="70" class="head">EXAMPLES</text>
+
+  <rect x="40" y="82" width="440" height="300" rx="8" class="page"/>
+  <text x="60" y="110" class="line heading"># 13 An LRU cache</text>
+  <text x="60" y="134" class="line">Intro text.</text>
+  <line x1="44" y1="152" x2="476" y2="152" class="cut"/>
+  <text x="60" y="176" class="line heading">## 13.1 What an LRU cache does</text>
+  <text x="60" y="200" class="line">It evicts.</text>
+  <rect x="56" y="212" width="408" height="84" rx="6" class="codeblock"/>
+  <text x="68" y="234" class="line fence">```bash</text>
+  <text x="68" y="258" class="line trap"># not a heading</text>
+  <text x="68" y="282" class="line fence">```</text>
+  <line x1="44" y1="312" x2="476" y2="312" class="cut"/>
+  <text x="60" y="336" class="line heading">## Summary</text>
+  <text x="60" y="360" class="line">We built one.</text>
+
+  <text x="300" y="250" class="note" style="fill:#B7791F">inside_code_block = true</text>
+
+  <!-- Examples -->
+  <rect x="560" y="92" width="370" height="64" rx="10" class="example"/>
+  <text x="578" y="118" class="msg">Introduce "An LRU cache".</text>
+  <text x="578" y="140" class="note">response: Intro text.</text>
+  <path class="flow" d="M482,122 L556,122" marker-end="url(#arrow)"/>
+
+  <rect x="560" y="170" width="370" height="130" rx="10" class="example"/>
+  <text x="578" y="196" class="msg">Explain "What an LRU cache does"</text>
+  <text x="578" y="216" class="msg">from "An LRU cache".</text>
+  <text x="578" y="242" class="note">response: It evicts, plus the whole</text>
+  <text x="578" y="260" class="note">code block, # line included</text>
+  <path class="flow" d="M482,232 L556,232" marker-end="url(#arrow)"/>
+
+  <rect x="560" y="314" width="370" height="64" rx="10" class="example"/>
+  <text x="578" y="340" class="msg">Explain "Summary" from "An LRU cache".</text>
+  <text x="578" y="362" class="note">response: We built one.</text>
+  <path class="flow" d="M482,346 L556,346" marker-end="url(#arrow)"/>
+
+  <text x="40" y="412" class="note">Section numbers such as 13.1 are stripped from headings. A section over 12,000 characters is cut again at ###.</text>
+</svg>

@@ -4,9 +4,11 @@
 
 # The platform
 
-- [Architecture](ch01-architecture.md)
+- [High-level design](ch01-architecture.md)
 - [The checker: spark](ch02-spark.md)
-- [Training data](ch03-training-data.md)
+- [The training data](ch03-training-data.md)
+- [Low-level design: the data generator](ch04-data-generator.md)
+- [Low-level design: the review server](ch05-review-server.md)
 
 # The Jetson Thor
 
@@ -24,3 +26,5 @@
 - [Evaluation design (planned)](ch13-evaluation-design.md)
 - [Reports (planned)](ch14-reports.md)
 - [Workspace agent (planned, paused)](ch15-workspace-agent.md)
+
+[Appendix: commands and files](appendix-commands.md)

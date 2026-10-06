@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" width="960" height="560">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { stroke: #B7791F; stroke-dasharray: 7 5; }
+    .source { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
+    .future { stroke: #B7791F; stroke-width: 2; fill: none; stroke-dasharray: 7 5; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-planned" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#B7791F"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="560" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Components and data flow</text>
+
+  <!-- Sources as cylinders -->
+  <g>
+    <path class="source" d="M40,92 a85,12 0 0 1 170,0 v48 a85,12 0 0 1 -170,0 z"/>
+    <ellipse cx="125" cy="92" rx="85" ry="12" fill="#F4F7FA" stroke="#3B6FD4" stroke-width="2"/>
+    <text x="125" y="125" class="name" text-anchor="middle">Chat export</text>
+    <text x="125" y="143" class="note" text-anchor="middle">384 conversations</text>
+  </g>
+  <g>
+    <path class="source" d="M40,202 a85,12 0 0 1 170,0 v48 a85,12 0 0 1 -170,0 z"/>
+    <ellipse cx="125" cy="202" rx="85" ry="12" fill="#F4F7FA" stroke="#3B6FD4" stroke-width="2"/>
+    <text x="125" y="235" class="name" text-anchor="middle">Curated sets</text>
+    <text x="125" y="253" class="note" text-anchor="middle">55 + 74 pairs, 37 DPO</text>
+  </g>
+  <g>
+    <path class="source" d="M40,312 a85,12 0 0 1 170,0 v48 a85,12 0 0 1 -170,0 z"/>
+    <ellipse cx="125" cy="312" rx="85" ry="12" fill="#F4F7FA" stroke="#3B6FD4" stroke-width="2"/>
+    <text x="125" y="345" class="name" text-anchor="middle">Book repository</text>
+    <text x="125" y="363" class="note" text-anchor="middle">chapters and code files</text>
+  </g>
+
+  <!-- Arrows into the generator -->
+  <path class="flow" d="M212,120 C244,120 238,204 268,204" marker-end="url(#arrow)"/>
+  <path class="flow" d="M212,228 L268,228" marker-end="url(#arrow)"/>
+  <path class="flow" d="M212,340 C244,340 238,252 268,252" marker-end="url(#arrow)"/>
+
+  <!-- Generator -->
+  <rect x="270" y="180" width="200" height="96" rx="10" class="box built"/>
+  <text x="370" y="212" class="name mono" text-anchor="middle">thor-hammer-trainer</text>
+  <text x="370" y="234" class="note" text-anchor="middle">data generator, Rust</text>
+  <text x="370" y="254" class="note" text-anchor="middle">pairs, splits, filters</text>
+
+  <!-- train.jsonl document -->
+  <path class="flow" d="M472,228 L512,228" marker-end="url(#arrow)"/>
+  <path d="M514,186 h108 l22,22 v66 h-130 z" fill="#F7F9FB" stroke="#4E8A16" stroke-width="2"/>
+  <path d="M622,186 v22 h22" fill="none" stroke="#4E8A16" stroke-width="2"/>
+  <text x="579" y="230" class="name mono" text-anchor="middle">train.jsonl</text>
+  <text x="579" y="250" class="note" text-anchor="middle">3,165 examples</text>
+  <text x="579" y="266" class="note" text-anchor="middle">1.76M tokens</text>
+
+  <!-- Review page -->
+  <path class="flow" d="M579,276 L579,328" marker-end="url(#arrow)"/>
+  <rect x="494" y="330" width="170" height="74" rx="10" class="box built"/>
+  <text x="579" y="360" class="name" text-anchor="middle">Review page</text>
+  <text x="579" y="381" class="note" text-anchor="middle">reading, slop flags</text>
+
+  <!-- Planned training and serving column -->
+  <path class="future" d="M646,214 C690,214 690,112 722,112" marker-end="url(#arrow-planned)"/>
+  <rect x="724" y="80" width="210" height="64" rx="10" class="box planned"/>
+  <text x="829" y="107" class="name" text-anchor="middle">QLoRA training</text>
+  <text x="829" y="127" class="note" text-anchor="middle">Unsloth + TRL on the Thor GPU</text>
+
+  <path class="future" d="M829,146 L829,176" marker-end="url(#arrow-planned)"/>
+  <rect x="724" y="178" width="210" height="64" rx="10" class="box planned"/>
+  <text x="829" y="205" class="name" text-anchor="middle">Merge and quantize</text>
+  <text x="829" y="225" class="note" text-anchor="middle">LoRA folded into base weights</text>
+
+  <path class="future" d="M829,244 L829,274" marker-end="url(#arrow-planned)"/>
+  <rect x="724" y="276" width="210" height="64" rx="10" class="box planned"/>
+  <text x="829" y="303" class="name" text-anchor="middle">TensorRT-LLM engine</text>
+  <text x="829" y="323" class="note" text-anchor="middle">built for sm_110</text>
+
+  <path class="future" d="M829,342 L829,372" marker-end="url(#arrow-planned)"/>
+  <rect x="724" y="374" width="210" height="64" rx="10" class="box planned"/>
+  <text x="829" y="401" class="name mono" text-anchor="middle">trtllm-serve</text>
+  <text x="829" y="421" class="note" text-anchor="middle">OpenAI-style HTTP on localhost</text>
+
+  <!-- Human evaluation -->
+  <path class="future" d="M722,420 C640,420 600,470 532,470" marker-end="url(#arrow-planned)"/>
+  <rect x="300" y="436" width="230" height="70" rx="10" class="box planned"/>
+  <text x="415" y="465" class="name" text-anchor="middle">Human evaluation</text>
+  <text x="415" y="486" class="note" text-anchor="middle">base vs fine-tuned, blind A/B</text>
+
+  <!-- Feedback loop -->
+  <path class="future" d="M330,434 C300,380 330,320 352,280" marker-end="url(#arrow-planned)"/>
+  <text x="150" y="414" class="note">verdicts select data</text>
+  <text x="150" y="430" class="note">for the next round</text>
+
+  <!-- Legend -->
+  <rect x="30" y="522" width="26" height="16" rx="3" class="box built"/>
+  <text x="64" y="535" class="note">built and run on real data</text>
+  <rect x="250" y="522" width="26" height="16" rx="3" class="box planned"/>
+  <text x="284" y="535" class="note">designed, not built yet</text>
+  <line x1="470" y1="530" x2="500" y2="530" class="flow" marker-end="url(#arrow)"/>
+  <text x="510" y="535" class="note">data flow</text>
+</svg>

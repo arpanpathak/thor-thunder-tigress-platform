@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; font-size: 12px; }
+    .box { fill: #F4F7FA; stroke: #3B6FD4; stroke-width: 2; }
+    .machine { fill: none; stroke: #B0BEC5; stroke-width: 1.5; stroke-dasharray: 8 6; }
+    .file { fill: #F7F9FB; stroke: #4E8A16; stroke-width: 2; }
+    .request { stroke: #1E88A8; stroke-width: 1.8; fill: none; }
+    .response { stroke: #4E8A16; stroke-width: 1.8; fill: none; }
+    .blocked { stroke: #C62828; stroke-width: 2; fill: none; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
+      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#4E8A16"/>
+    </marker>
+  </defs>
+  <rect width="960" height="400" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Review server: routes and loopback boundary</text>
+
+  <rect x="20" y="56" width="720" height="320" rx="14" class="machine"/>
+  <text x="36" y="78" class="note">this Thor, 127.0.0.1</text>
+
+  <!-- Browser -->
+  <rect x="50" y="100" width="250" height="250" rx="10" class="box"/>
+  <text x="175" y="128" class="name" text-anchor="middle">Browser: review.html</text>
+  <text x="70" y="160" class="note">parse 3,165 JSON lines</text>
+  <text x="70" y="184" class="note">search and source filter</text>
+  <text x="70" y="208" class="note">20 examples per page</text>
+  <text x="70" y="232" class="note">highlight emails, phone</text>
+  <text x="70" y="248" class="note">numbers, keys, passwords</text>
+  <text x="70" y="272" class="note">flag as AI slop, with a note</text>
+  <text x="70" y="296" class="note" style="fill:#4E8A16">all text set with textContent:</text>
+  <text x="70" y="314" class="note" style="fill:#4E8A16">HTML in the data is not executed</text>
+
+  <!-- Server -->
+  <rect x="440" y="100" width="260" height="130" rx="10" class="box"/>
+  <text x="570" y="128" class="name" text-anchor="middle">review (Rust, std only)</text>
+  <text x="460" y="158" class="mono" style="fill:#1D2733">GET  / /train.jsonl /slop.jsonl</text>
+  <text x="460" y="180" class="mono" style="fill:#1D2733">GET  /flags   POST /flags</text>
+  <text x="460" y="202" class="mono" style="fill:#1D2733">anything else → 404</text>
+
+  <path class="request" d="M302,150 L436,150" marker-end="url(#arrow)"/>
+  <text x="320" y="142" class="note">request</text>
+  <path class="response" d="M436,200 L302,200" marker-end="url(#arrow-green)"/>
+  <text x="320" y="222" class="note">response</text>
+
+  <!-- File -->
+  <path d="M500,270 h120 l20,20 v60 h-140 z" class="file"/>
+  <text x="570" y="314" class="mono" text-anchor="middle" style="fill:#1D2733">data/ and labels/</text>
+  <text x="570" y="334" class="note" text-anchor="middle">read per request</text>
+  <path class="request" d="M570,232 L570,266" marker-end="url(#arrow)"/>
+
+  <!-- Other machines -->
+  <rect x="790" y="140" width="150" height="80" rx="10" fill="#F4F7FA" stroke="#C62828" stroke-width="2"/>
+  <text x="865" y="172" class="name" text-anchor="middle">Other machine</text>
+  <text x="865" y="194" class="note" text-anchor="middle">on the network</text>
+  <path class="blocked" d="M788,180 L746,180"/>
+  <path class="blocked" d="M760,166 L774,194 M774,166 L760,194"/>
+  <text x="790" y="248" class="note">cannot connect: the</text>
+  <text x="790" y="264" class="note">socket binds 127.0.0.1</text>
+</svg>

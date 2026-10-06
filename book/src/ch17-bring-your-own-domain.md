@@ -199,7 +199,7 @@ Then open `https://voltforge.tech/thor-tigress-cub/` in a browser:
 
 <figure>
 <img src="figures/cub-hosted.png" alt="The chat page served from a different address than the Thor, answering 'Say hello in exactly five words' in 0.7 seconds">
-<figcaption><b>Figure 8.1</b> The GitHub Pages copy, tested from another address against the real Thor: 9 tokens at 50.5 tok/s, 0.7 s.</figcaption>
+<figcaption><b>Figure 10.1</b> The GitHub Pages copy, tested from another address against the real Thor: 9 tokens at 50.5 tok/s, 0.7 s.</figcaption>
 </figure>
 
 Without a key it shows the invite screen; with one, the model chip names
@@ -209,7 +209,7 @@ Nemotron and replies stream as on the Thor's own address. The About page at
 
 <figure>
 <img src="figures/cub-about.png" alt="The About page in the dark theme: the cub, the headline 'A 30B model on a desk-sized Thor', and the facts strip">
-<figcaption><b>Figure 8.2</b> The About page, for people who arrive from a shared link.</figcaption>
+<figcaption><b>Figure 10.2</b> The About page, for people who arrive from a shared link.</figcaption>
 </figure>
 
 ## Updating the site

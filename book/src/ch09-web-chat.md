@@ -35,7 +35,7 @@ This chapter covers
 
 <figure>
 <img src="figures/cub-welcome.png" alt="The chat page in its light theme: the cub in the middle, a greeting, and four suggested prompts">
-<figcaption><b>Figure 6.1</b> The first screen, in the light Cub theme.</figcaption>
+<figcaption><b>Figure 8.1</b> The first screen, in the light Cub theme.</figcaption>
 </figure>
 
 A new conversation opens on the cub, a greeting that names the model the
@@ -57,7 +57,7 @@ The header holds, from left to right:
 
 <figure>
 <img src="figures/cub-conversation.png" alt="A conversation in the dark theme: a question, a folded 'thought' line, an answer with a highlighted Rust code block, a stats line, and a reply in progress shown as three dots">
-<figcaption><b>Figure 6.2</b> A reply with folded reasoning, highlighted code and the stats line, and the next reply starting.</figcaption>
+<figcaption><b>Figure 8.2</b> A reply with folded reasoning, highlighted code and the stats line, and the next reply starting.</figcaption>
 </figure>
 
 Replies stream in as Nemotron writes them. Until the first word arrives, the
@@ -107,7 +107,7 @@ the sources before trusting a detail.
 
 <figure>
 <img src="figures/cub-invite.png" alt="The invite screen: the cub, 'The cub is invite-only for now', a box to paste an access key, and a link to ask for one">
-<figcaption><b>Figure 6.3</b> What someone without a key sees.</figcaption>
+<figcaption><b>Figure 8.3</b> What someone without a key sees.</figcaption>
 </figure>
 
 When the server refuses the page (no key, or an old one), the page says so
@@ -119,7 +119,7 @@ in Settings.
 
 <figure>
 <img class="phone" src="figures/cub-phone.png" alt="The chat page on a phone in the dark theme">
-<figcaption><b>Figure 6.4</b> The same page on a 390-pixel-wide phone.</figcaption>
+<figcaption><b>Figure 8.4</b> The same page on a 390-pixel-wide phone.</figcaption>
 </figure>
 
 On narrow screens the name and model chip step aside so the switches and the

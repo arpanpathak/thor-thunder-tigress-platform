@@ -1,6 +1,6 @@
 # Workspace agent (planned, paused)
 
-The web chat can search the web today (chapter 6). The next step was a
+The web chat can search the web today (chapter "Web chat: Thor Tigress Cub"). The next step was a
 workspace: each user gets a folder on the Thor, and Nemotron works in it as an
 agent, reading and writing files and running commands such as `cargo build`,
 from the browser instead of a terminal IDE. It is paused; this chapter records

@@ -199,11 +199,6 @@ Two bugs that made it look like it was overthinking:
 
 ## Memory
 
-<figure>
-<img src="figures/thor-memory.svg" alt="128 GB of unified memory shared by the CPU and GPU, about 115 GB usable for training, with reported peak memory for QLoRA 27B, full fine-tune 4B and LoRA 9B, and 273 GB/s bandwidth">
-<figcaption><b>Figure 5.1</b> The Thor's memory and what training methods need.</figcaption>
-</figure>
-
-The CPU and GPU share 128 GB. The web chat (chapter 6) keeps Nemotron loaded:
+The CPU and GPU share 128 GB. The web chat (chapter "Web chat: Thor Tigress Cub") keeps Nemotron loaded:
 about 58 GB at 4 people × 1M context. Stop it before loading a second large
 model or training: `systemctl --user stop thor-chat`.

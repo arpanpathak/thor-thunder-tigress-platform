@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .label { fill: #1D2733; font-size: 13px; }
+    .inside { fill: #1D2733; font-size: 13px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+  </style>
+  <rect width="900" height="300" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Training set composition by source</text>
+
+  <!-- Tokens: 800 px for 1,757,394 tokens -->
+  <text x="50" y="74" class="label">Tokens (1.76M)</text>
+  <rect x="50" y="84" width="536.7" height="40" fill="#C9D9F7"/>
+  <rect x="586.7" y="84" width="188.8" height="40" fill="#D3E8BC"/>
+  <rect x="775.5" y="84" width="61.1" height="40" fill="#F6CDBE"/>
+  <rect x="836.6" y="84" width="7.1" height="40" fill="#F3D9A4"/>
+  <rect x="843.7" y="84" width="6.3" height="40" fill="#B6E3E7"/>
+  <text x="62" y="109" class="inside">chat 1,178,903 (67%)</text>
+  <text x="598" y="109" class="inside">book 414,747 (24%)</text>
+  <text x="781" y="109" class="inside">code</text>
+
+  <!-- Examples: 800 px for 3,165 examples -->
+  <text x="50" y="164" class="label">Examples (3,165)</text>
+  <rect x="50" y="174" width="560.6" height="40" fill="#C9D9F7"/>
+  <rect x="610.6" y="174" width="174.4" height="40" fill="#D3E8BC"/>
+  <rect x="785" y="174" width="32.4" height="40" fill="#F6CDBE"/>
+  <rect x="817.4" y="174" width="13.9" height="40" fill="#F3D9A4"/>
+  <rect x="831.3" y="174" width="18.7" height="40" fill="#B6E3E7"/>
+  <text x="62" y="199" class="inside">chat 2,218 (70%)</text>
+  <text x="622" y="199" class="inside">book 690 (22%)</text>
+
+  <path d="M840,218 L840,240 L782,240" stroke="#B7791F" stroke-width="1.5" fill="none"/>
+  <text x="774" y="245" class="label" text-anchor="end" style="fill:#B7791F">curated: readability 55 (yellow), clever_vs_readable 74 (cyan)</text>
+  <text x="774" y="263" class="note" text-anchor="end">29,480 tokens (1.7%); repeated about 5 times per epoch in the training plan</text>
+  <text x="50" y="290" class="note">code: 128 examples, 134,264 tokens (8%). Token counts are estimates at four characters per token.</text>
+</svg>
