@@ -15,6 +15,11 @@ thor-hammer-trainer data            # build data/train.jsonl and data/stats.md
 | Open-source books and docs (35 sources) | 9,978 |
 | **Total** | **13,114** (about 6.5M tokens) |
 
+<figure>
+<img src="figures/chat-pairing.svg" alt="Chat pairing: four messages become two pairs and one example; thinking and tool_use blocks are dropped">
+<figcaption><b>Figure 3.1</b> How the chat export becomes training pairs.</figcaption>
+</figure>
+
 - **Book and doc sections are passages:** plain text with no made-up question.
   Questions get written later by a teacher model (`lasso`).
 - **Licences:** only MIT, Apache-2.0, BSD, CC BY and CC0. One restrictive
