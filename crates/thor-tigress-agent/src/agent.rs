@@ -48,7 +48,9 @@ struct Round {
     calls: Vec<ToolCall>,
 }
 
-/// Answers one chat request, writing an event stream to `browser`.
+/// Answers one chat request. A request that does not ask for streaming, and
+/// has web search off, is passed to the model server and answered as plain
+/// JSON; otherwise an event stream is written to `browser`.
 pub fn chat(browser: &mut TcpStream, body: &[u8], upstreams: &Upstreams) -> Result<(), AgentError> {
     let mut request: Value = serde_json::from_slice(body)?;
     let web = request
@@ -56,6 +58,17 @@ pub fn chat(browser: &mut TcpStream, body: &[u8], upstreams: &Upstreams) -> Resu
         .and_then(|fields| fields.remove("thor_web_search"))
         .and_then(|value| value.as_bool())
         .unwrap_or(false);
+    let streamed = request.get("stream").and_then(Value::as_bool).unwrap_or(false);
+    if !web && !streamed {
+        let response = http::call(
+            &upstreams.model,
+            "POST",
+            "/v1/chat/completions",
+            upstreams.authorization.as_deref(),
+            Some(&serde_json::to_vec(&request)?),
+        )?;
+        return http::relay(browser, response);
+    }
     request["stream"] = Value::Bool(true);
     http::start_events(browser)?;
     let outcome = match web {

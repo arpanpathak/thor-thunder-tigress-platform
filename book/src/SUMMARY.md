@@ -13,6 +13,7 @@
 - [Access and syncing](ch07-thor-access.md)
 - [Local models](ch08-local-models.md)
 - [Web chat](ch09-web-chat.md)
+- [Bring your own agent](ch16-bring-your-own-agent.md)
 - [Security](ch10-security.md)
 
 # Plans

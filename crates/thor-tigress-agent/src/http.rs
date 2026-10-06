@@ -22,7 +22,8 @@ pub struct Request {
     pub method: String,
     /// The path without the query string.
     pub path: String,
-    /// The `Authorization` header, if any.
+    /// The `Authorization` header, if any; an `x-api-key` header (Anthropic
+    /// clients) is turned into `Bearer <key>`.
     pub authorization: Option<String>,
     /// The body.
     pub body: Vec<u8>,
@@ -57,6 +58,7 @@ pub fn read_request(stream: &TcpStream) -> Result<Request, AgentError> {
                     .map_err(|_| AgentError::BadRequest("bad content-length".to_string()))?
             }
             "authorization" => authorization = Some(value.trim().to_string()),
+            "x-api-key" => authorization = Some(format!("Bearer {}", value.trim())),
             _ => {}
         }
     }
@@ -105,6 +107,8 @@ pub fn send_event(stream: &mut TcpStream, data: &str) -> Result<(), AgentError> 
 pub struct UpstreamResponse {
     /// The numeric status, such as 200.
     pub status: u16,
+    /// The `Content-Type` header, or `application/json` when there is none.
+    pub content_type: String,
     /// The body.
     pub body: Box<dyn BufRead + Send>,
 }
@@ -148,6 +152,7 @@ pub fn call(
         .and_then(|code| code.parse().ok())
         .ok_or_else(|| AgentError::Upstream(format!("{address}: no status line")))?;
     let mut chunked = false;
+    let mut content_type = "application/json".to_string();
     loop {
         let mut header = String::new();
         reader.read_line(&mut header)?;
@@ -156,6 +161,9 @@ pub fn call(
         }
         let lowered = header.to_ascii_lowercase();
         chunked |= lowered.starts_with("transfer-encoding:") && lowered.contains("chunked");
+        if let Some(value) = lowered.strip_prefix("content-type:") {
+            content_type = value.trim().to_string();
+        }
     }
     let body: Box<dyn BufRead + Send> = match chunked {
         true => Box::new(BufReader::new(Dechunk {
@@ -165,7 +173,23 @@ pub fn call(
         })),
         false => Box::new(reader),
     };
-    Ok(UpstreamResponse { status, body })
+    Ok(UpstreamResponse {
+        status,
+        content_type,
+        body,
+    })
+}
+
+/// Writes an upstream response to `stream` as it arrives: status, content
+/// type and body, streamed or not.
+pub fn relay(stream: &mut TcpStream, mut response: UpstreamResponse) -> Result<(), AgentError> {
+    write!(
+        stream,
+        "HTTP/1.1 {} Upstream\r\nContent-Type: {}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n",
+        response.status, response.content_type
+    )?;
+    std::io::copy(&mut response.body, stream)?;
+    Ok(stream.flush()?)
 }
 
 /// Removes HTTP chunked transfer encoding from a body as it is read.

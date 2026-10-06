@@ -5,7 +5,7 @@ What the public chat exposes, tested on the Thor:
 | Reachable through the tunnel | Without the key |
 |---|---|
 | the page (`/`) and `/health` | open, nothing sensitive |
-| chat, completion, tokenize, embedding, slots, props, metrics | refused (401) |
+| chat, completion, Anthropic messages, tokenize, embedding, slots, props, metrics | refused (401) |
 | anything else on the Thor (SSH, files, other ports) | not exposed |
 
 ## Keep it that way

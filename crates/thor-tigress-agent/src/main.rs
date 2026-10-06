@@ -7,7 +7,8 @@
 //!
 //! It serves the chat page, checks the access key, passes model calls to
 //! `llama-server`, and, when the page turns web search on, lets the model call
-//! `web_search` backed by SearXNG. One thread per connection.
+//! `web_search` backed by SearXNG. `/v1/messages` (Anthropic's API, used by
+//! Claude Code) goes to `llama-server` unchanged. One thread per connection.
 
 mod agent;
 mod error;
@@ -137,6 +138,16 @@ fn handle(mut stream: TcpStream, config: &Config) -> Result<(), AgentError> {
             http::respond(&mut stream, status, "application/json", body.as_bytes())
         }
         ("POST", "/v1/chat/completions") => agent::chat(&mut stream, &request.body, &config.upstreams),
+        ("POST", path @ ("/v1/messages" | "/v1/messages/count_tokens")) => {
+            let response = http::call(
+                &config.upstreams.model,
+                "POST",
+                path,
+                config.upstreams.authorization.as_deref(),
+                Some(&request.body),
+            )?;
+            http::relay(&mut stream, response)
+        }
         _ => http::respond(&mut stream, "404 Not Found", "text/plain", b"not found"),
     }
 }
