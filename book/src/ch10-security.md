@@ -19,8 +19,9 @@ public address on 2026-10-05:
 | llama-server's own `/tokenize`, `/slots`, `/props`, `/metrics` | `404` | `404`, not passed through |
 | anything else on the Thor | not reachable | not reachable |
 
-`voltforge.tech/thor-tigress-cub` is a redirect at Namecheap to the `.ts.net`
-address; Namecheap never sees a key or a message. The `.ts.net` name resolves
+`https://voltforge.tech/thor-tigress-cub` is a one-file forwarding page on
+GitHub Pages, served over HTTPS, that sends the browser to the `.ts.net`
+address; GitHub never sees a key or a message. The `.ts.net` name resolves
 to Tailscale's Funnel relays, not to your home: the home IP address is not
 published anywhere (chapter "Bring your own domain" lists every address).
 The Thor serves a fixed list of files (the page, the About page, the art);

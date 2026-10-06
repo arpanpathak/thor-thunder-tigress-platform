@@ -8,9 +8,9 @@ and can show its reasoning. It is one HTML file in front of one small Rust
 server, and everything it calls runs on the Thor.
 
 The Thor serves the page itself, at `https://<thor>.<tailnet>.ts.net`
-through Tailscale Funnel. `voltforge.tech/thor-tigress-cub` is a short
-address that redirects there (chapter "Bring your own domain"); there is no
-other copy of the page.
+through Tailscale Funnel. `https://voltforge.tech/thor-tigress-cub` is a
+short address whose one-file page on GitHub Pages sends the browser there
+(chapter "Bring your own domain"); there is no other copy of the chat.
 
 <div class="covers">
 
@@ -154,7 +154,7 @@ nowhere else. Another browser or device starts empty.
 ## How it fits together
 
 ```text
-             voltforge.tech/thor-tigress-cub (Namecheap: redirect only)
+             voltforge.tech/thor-tigress-cub (GitHub Pages: a forwarding page only)
                           │
 browser ─► https://<thor>.<tailnet>.ts.net ─► Tailscale Funnel ─► thor-tigress-agent :8080
                                                                      ├─► llama-server :8079 (Nemotron)

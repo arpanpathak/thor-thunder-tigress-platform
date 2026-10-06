@@ -184,11 +184,12 @@ Who can open it:
 
 ### voltforge.tech/thor-tigress-cub
 
-A URL Redirect record at Namecheap (unmasked, 302) sends `voltforge.tech` to
-`https://arpanpathak.taildb9a39.ts.net`. The Thor serves the chat at `/` and
-`/thor-tigress-cub/`, so the redirect works with or without the path. No
-proxy, no port forward, no copy of the page. Reasoning, every IP address and
-the exact steps: the book, chapter "Bring your own domain".
+`https://voltforge.tech/thor-tigress-cub` is a one-file forwarding page on
+GitHub Pages (repository `arpanpathak/voltforge.tech`) that sends the browser
+to `https://arpanpathak.taildb9a39.ts.net/`. HTTPS on both hops, no proxy, no
+port forward, no copy of the UI. Namecheap's own URL redirect was tried first
+and dropped: it only works over plain HTTP. Reasoning, every IP address and
+the steps: the book, chapter "Bring your own domain".
 
 ## Platform tools on the Thor
 
