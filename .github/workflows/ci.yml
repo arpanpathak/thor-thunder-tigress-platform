@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["book/**", "**.md"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain from rust-toolchain.toml
+        run: rustup show && rustup component add llvm-tools-preview
+
+      - uses: taiki-e/install-action@cargo-llvm-cov
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy, warnings as errors
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests and coverage, per crate
+        run: python3 tools/badges/badges.py badges-out
+
+      - name: Publish badges
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: tools/badges/publish.sh badges-out
+
+      - name: Fail when a test or a rule failed
+        run: python3 -c "import json,sys; s=json.load(open('badges-out/summary.json')); sys.exit(0 if s['all_passed'] and s['rules']['problems'] == 0 else 1)"
