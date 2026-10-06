@@ -4,9 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Thor Tigress Cub</title>
-<!-- Where the model server is. Empty: the server that serves this page (the Thor).
-     The copy on voltforge.tech sets the Thor's public address here. -->
-<meta name="thor-api" content="">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
 <script>try { const t = JSON.parse(localStorage.getItem("theme")); if (t && t !== "system") document.documentElement.dataset.theme = t; } catch {}</script>
 <style>
@@ -365,7 +362,7 @@
   <span class="brand"><svg viewBox="70 40 300 300" aria-hidden="true"><use href="#cub-art"/></svg><span class="name">Thor Tigress Cub</span></span>
   <span class="model-chip"><span id="status" class="dot" title="server status"></span><span id="model">connecting…</span></span>
   <span class="spacer"></span>
-  <a id="about" class="about" href="about.html" hidden>About</a>
+  <a id="about" class="about" href="/about.html">About</a>
   <label class="pill" title="Let the model search the web before answering"><input id="web" type="checkbox">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Web</label>
   <label class="pill" title="Let the model reason before answering (slower, often better)"><input id="think" type="checkbox">
@@ -416,7 +413,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-const API = document.querySelector('meta[name="thor-api"]').content;
+const API = "/";
 const store = {
   get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
@@ -875,7 +872,6 @@ $("settings").addEventListener("close", () => {
   connect();
 });
 
-$("about").hidden = !API;
 render();
 connect();
 input.focus();

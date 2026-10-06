@@ -32,7 +32,7 @@ and "Bring your own domain" are its manual.
 | Speed | about 53 tokens/s per reply; first token 0.2 s on a short prompt |
 | At once | four replies; 57.8 GB of GPU memory with all four at 1M context |
 | Machine | Jetson AGX Thor developer kit, 128 GB unified memory, 273 GB/s |
-| Addresses | `voltforge.tech/thor-tigress-cub/` (page), the Thor's `.ts.net` address (API) |
+| Addresses | `voltforge.tech/thor-tigress-cub` redirects to the Thor's `.ts.net` address, which serves the chat and the API |
 
 ## Repositories
 

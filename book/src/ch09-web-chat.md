@@ -7,15 +7,10 @@ Nemotron 3 Nano on the Jetson AGX Thor, can search the web before it answers,
 and can show its reasoning. It is one HTML file in front of one small Rust
 server, and everything it calls runs on the Thor.
 
-It can be opened in two places:
-
-| Address | Served by | Use |
-|---|---|---|
-| `https://<thor>.<tailnet>.ts.net` | the Thor itself, through Tailscale Funnel | always works while the Thor is up |
-| `https://voltforge.tech/thor-tigress-cub/` | GitHub Pages; calls the Thor's address for every reply | the address to share (chapter "Bring your own domain") |
-
-Both show the same page and talk to the same model. The second is only a copy
-of the page; it holds no data and no keys.
+The Thor serves the page itself, at `https://<thor>.<tailnet>.ts.net`
+through Tailscale Funnel. `voltforge.tech/thor-tigress-cub` is a short
+address that redirects there (chapter "Bring your own domain"); there is no
+other copy of the page.
 
 <div class="covers">
 
@@ -125,6 +120,19 @@ in Settings.
 On narrow screens the name and model chip step aside so the switches and the
 message box keep their room.
 
+### About page
+
+<figure>
+<img src="figures/cub-about.png" alt="The About page in the dark theme: the cub, the headline 'A 30B model on a desk-sized Thor', the buttons Open the chat and Use it from your agent, and the facts strip">
+<figcaption><b>Figure 8.5</b> The About page at <code>/about.html</code>, for people who arrive from a shared link.</figcaption>
+</figure>
+
+`/about.html` explains the project to someone who hasn't seen it: the model
+and machine, the measured numbers, what the chat and the API can do, how a
+reply travels, how to get access, and a short FAQ. Its badge turns to "The
+Thor is online" when `/health` answers. The **About** link in the chat's
+header opens it.
+
 ### Settings
 
 | Setting | Effect |
@@ -146,8 +154,8 @@ nowhere else. Another browser or device starts empty.
 ## How it fits together
 
 ```text
-             voltforge.tech/thor-tigress-cub (GitHub Pages: the page only)
-                          │ every request goes to ↓
+             voltforge.tech/thor-tigress-cub (Namecheap: redirect only)
+                          │
 browser ─► https://<thor>.<tailnet>.ts.net ─► Tailscale Funnel ─► thor-tigress-agent :8080
                                                                      ├─► llama-server :8079 (Nemotron)
                                                                      └─► SearXNG :8888 (web search)
@@ -169,15 +177,17 @@ connection:
 
 | Request | Answer |
 |---|---|
-| `GET /`, `GET /health` | the page; `{"status":"ok"}` (no key needed) |
+| `GET /`, `/thor-tigress-cub/` | the page (no key needed) |
+| `GET /about.html`, `/cub.svg`, `/cub.png` | the About page and the art; a fixed list, nothing else in the folder is served |
+| `GET /health` | `{"status":"ok"}` (no key needed) |
 | `GET /v1/models` | the served model, from llama-server |
 | `POST /v1/chat/completions` | streamed through; with `thor_web_search: true`, the search loop; without `stream: true`, plain JSON |
 | `POST /v1/messages` | Anthropic's API, for Claude Code (chapter "Bring your own agent") |
-| `OPTIONS *` | CORS preflight, so the GitHub Pages copy may call the Thor |
+| `OPTIONS *` | CORS preflight, so pages and tools on other sites may call the API with a key |
 
 Every response carries `Access-Control-Allow-Origin: *`. That is safe here
 because access depends on a key the caller must send, not on cookies another
-site could borrow.
+site could borrow (chapter "Security").
 
 ## Start it on the Thor
 
@@ -251,9 +261,6 @@ ssh thor 'cd ~/Projects/thor-thunder-tigress-platform &&
   do sleep 2; done &&
   systemctl --user restart thor-tigress-agent'
 ```
-
-The GitHub Pages copy is rebuilt with `jetson-thor/site/build.sh` (chapter
-"Bring your own domain").
 
 ## When something is wrong
 

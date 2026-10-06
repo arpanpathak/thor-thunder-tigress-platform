@@ -19,15 +19,17 @@ public address on 2026-10-05:
 | llama-server's own `/tokenize`, `/slots`, `/props`, `/metrics` | `404` | `404`, not passed through |
 | anything else on the Thor | not reachable | not reachable |
 
-The copy of the page on GitHub Pages (`voltforge.tech/thor-tigress-cub/`)
-holds no secrets: it is the same HTML file with the Thor's public address
-filled in. Your home IP address is not published anywhere; GitHub serves the
-page and Tailscale relays the requests.
+`voltforge.tech/thor-tigress-cub` is a redirect at Namecheap to the `.ts.net`
+address; Namecheap never sees a key or a message. The `.ts.net` name resolves
+to Tailscale's Funnel relays, not to your home: the home IP address is not
+published anywhere (chapter "Bring your own domain" lists every address).
+The Thor serves a fixed list of files (the page, the About page, the art);
+`serve.sh` and everything else in the folder answers `404`.
 
 ## Why `Access-Control-Allow-Origin: *` is safe here
 
-Every response from `thor-tigress-agent` lets any site read it, so the GitHub
-Pages copy can call the Thor. Browsers only attach credentials they hold on
+Every response from `thor-tigress-agent` lets any site read it, so pages and
+tools hosted elsewhere can call the API. Browsers only attach credentials they hold on
 their own, such as cookies, and this server uses none. The key travels in a
 header that a page must set itself, so a site can only call the model with a
 key it already has. A leaked key is the risk; CORS doesn't add one.

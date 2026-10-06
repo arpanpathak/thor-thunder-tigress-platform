@@ -2,100 +2,110 @@
 
 # Bring your own domain
 
-The Thor is reachable at a Tailscale address such as
-`https://arpanpathak.taildb9a39.ts.net`. It works, but it is long and says
-nothing. This chapter puts the chat at an address you own:
-**`https://voltforge.tech/thor-tigress-cub/`**, with a domain bought from
-Namecheap, without opening a port at home and without any service in between
-other than GitHub Pages and Tailscale.
+The Thor Tigress Cub runs on the Thor and is reachable at its Tailscale
+address, `https://arpanpathak.taildb9a39.ts.net`. That address is long and
+says nothing. This chapter makes **`voltforge.tech/thor-tigress-cub`**, a
+domain bought from Namecheap, open the same chat, with a redirect at Namecheap
+and nothing else: no proxy in between, no port opened at home, no copy of the
+page anywhere else.
 
 <div class="covers">
 
 This chapter covers
 
-- why a custom domain can't point at the Thor directly, and the design that works
-- moving the domain's DNS to Namecheap and pointing it at GitHub Pages
-- the `voltforge.tech` repository and the build script that fills it
-- checking every step, and what to do when one fails
+- what happens between typing an address and seeing the chat
+- the four ways to put a domain in front of the Thor, and why a redirect was chosen
+- every IP address involved, where it comes from, and which ones must not be used
+- the exact Namecheap steps, how to check each, and how to undo them
 
 </div>
 
-## The idea
+## From an address to the chat
 
-Tailscale Funnel only serves names under `.ts.net`; a domain of your own can't
-be attached to it. So the domain serves the **page**, and the page calls the
-**Thor** for every reply:
+Three things happen when someone types `voltforge.tech/thor-tigress-cub`:
 
-```text
-voltforge.tech/thor-tigress-cub/      GitHub Pages: the page and the art
-        │
-        │ the page's script calls
-        ▼
-arpanpathak.taildb9a39.ts.net/v1/…    Tailscale Funnel
-        ▼
-thor-tigress-agent ─► llama-server ─► Nemotron, on the Thor
-```
+1. **Lookup.** The browser asks DNS for the IP address of `voltforge.tech`.
+   The answer comes from the domain's *nameservers*, the servers the registrar
+   lists as responsible for it. Their *records* map names to addresses: an
+   `A` record gives an IPv4 address, an `AAAA` record an IPv6 one.
+2. **Connection.** The browser connects to that IP address and, for HTTPS,
+   checks that the server holds a certificate for `voltforge.tech`.
+3. **Answer.** The server returns a page, or a redirect: "this is now at
+   another address", which the browser follows.
 
-| Part | Holds | Costs |
-|---|---|---|
-| Namecheap | the domain and, from now on, its DNS records | the domain |
-| GitHub Pages | the page, the About page, the art; no data, no keys | free |
-| Tailscale Funnel | the HTTPS address of the Thor | free |
-| The Thor | the model, the search engine, the key check | electricity |
+The Thor's chat is published by Tailscale Funnel. Funnel only answers for the
+name it was given, `arpanpathak.taildb9a39.ts.net`: it holds a certificate for
+that name and routes traffic by it. Pointing `voltforge.tech`'s records at
+Funnel's addresses would reach Funnel, which would not know the name and
+would refuse it. So a domain can't be attached to the Thor directly. Something
+has to answer for `voltforge.tech` first.
 
-The address bar shows `voltforge.tech` the whole time, because the page never
-moves; only its requests go to the Thor. Your home IP address is never
-published: GitHub serves the page, Tailscale relays the requests.
+## Four ways, and the choice
 
-The other ways to do it, and why they were not picked:
+| Way | Who answers for `voltforge.tech` | Address bar | Home IP | Cost | What can go wrong |
+|---|---|---|---|---|---|
+| **Redirect at Namecheap** (chosen) | Namecheap's redirect service, which only says "go to the `.ts.net` address" | changes to `.ts.net` | hidden | none | Namecheap's redirect service is down: the short address stops working; the `.ts.net` one keeps working |
+| Copy of the page on GitHub Pages | GitHub's servers, holding a copy of the page that calls the Thor | stays `voltforge.tech` | hidden | none | two copies of the page to keep in step; the UI no longer comes from the Thor |
+| Port forward on the router, Caddy on the Thor | the Thor itself | stays `voltforge.tech` | **public** | none | every internet host can reach port 443 at home; needs a public IPv4, which shared (CGNAT) connections don't have |
+| Rented server with Caddy, over Tailscale | the rented server, passing everything to the Thor | stays `voltforge.tech` | hidden | ~$4–6 a month | one more machine to patch; it sees all traffic in clear text |
 
-| Way | Address bar | Why not |
-|---|---|---|
-| Namecheap URL redirect to the `.ts.net` address | changes to `.ts.net` | the domain is only a shortcut |
-| Port forward on the router, Caddy on the Thor | `voltforge.tech` | publishes the home IP; needs a public IPv4, which many home connections don't have |
-| A small rented server with Caddy, over Tailscale to the Thor | `voltforge.tech` | about $4–6 a month, and one more machine to keep updated |
-| **GitHub Pages for the page, Funnel for the API** | **`voltforge.tech`** | chosen: free, nothing exposed at home |
+Why the redirect:
 
-## What the page needs from the Thor
+- **Nothing stands between visitors and the Thor.** After the redirect, the
+  browser talks to the Thor through Funnel exactly as it does today. Namecheap
+  sees only the first request, which carries no key and no message.
+- **Nothing is exposed at home.** No router port is opened; the home IP stays
+  unpublished. Port forwarding would put the Thor's whole HTTPS stack in front
+  of every scanner on the internet, and a home IP, once published, can't be
+  taken back.
+- **Nothing new to run or patch.** No proxy, no second server, no second
+  copy of the UI.
+- **Fully reversible.** Deleting one record at Namecheap undoes it.
 
-Two things make the split work, both already in this repository:
+The cost is the address bar: it shows `arpanpathak.taildb9a39.ts.net` after
+the jump. People share and bookmark `voltforge.tech/thor-tigress-cub`, which
+keeps working as long as the redirect does.
 
-1. **The page knows where the Thor is.** `jetson-thor/web/index.html`
-   reads its server address from a tag:
+## Every IP address in this story
 
-   ```html
-   <meta name="thor-api" content="">
-   ```
+| Address | Owner (from its network registration) | What it is | Use it? |
+|---|---|---|---|
+| `172.67.173.34`, `104.21.72.4`, `2606:4700:3037::ac43:ad22`, `2606:4700:3036::6815:4804` | Cloudflare (AS13335) | left over from when Cloudflare ran the domain's DNS; they answered with "error 1033", a Cloudflare tunnel with nothing behind it | **no: delete these records** |
+| `185.199.108.153` to `185.199.111.153`, `2606:50c0:8000::153` to `2606:50c0:8003::153` | Fastly (AS54113), which delivers GitHub Pages | GitHub Pages' published addresses, proposed for the GitHub Pages copy | **no: not used** |
+| Namecheap's redirect servers | Namecheap | created by Namecheap when a URL Redirect record exists; you never type them | yes, implicitly |
+| `208.111.35.209`, `208.111.34.11`, `2607:f740:0:3f::3cc`, `2607:f740:0:3f::2f0` | NetActuate (AS36236), hosting Tailscale's Funnel relays | what `arpanpathak.taildb9a39.ts.net` resolves to; Funnel relays the connection to the Thor | yes; the redirect's destination |
+| `100.84.254.65` | Tailscale (private range 100.64.0.0/10) | the Thor's address inside the tailnet | only on your own devices |
+| `192.168.0.189` | none; private home range | the Thor on the home Ethernet | only at home |
 
-   Empty means "the server this page came from", which is right on the Thor.
-   The build script below fills in the Thor's public address for the copy on
-   GitHub Pages.
-
-2. **The Thor accepts requests from another site.** Browsers block a page on
-   `voltforge.tech` from reading answers from `…ts.net` unless the server
-   allows it (CORS). `thor-tigress-agent` answers the browser's preflight
-   (`OPTIONS`) and adds `Access-Control-Allow-Origin: *` to every response.
-   That is safe here because every model call needs the access key in a
-   header; a site can't use a visitor's key without having it.
-
-Check the second from any machine:
+The ownership column comes from public routing registrations, which anyone can
+query:
 
 ```bash
-curl -si -X OPTIONS https://arpanpathak.taildb9a39.ts.net/v1/chat/completions \
-  -H "Origin: https://voltforge.tech" -H "Access-Control-Request-Method: POST" | grep -i access-control
+curl -s https://ipinfo.io/172.67.173.34/org      # AS13335 Cloudflare, Inc.
+curl -s https://ipinfo.io/185.199.108.153/org    # AS54113 Fastly, Inc.
+curl -s https://ipinfo.io/208.111.35.209/org     # AS36236 NetActuate, Inc
 ```
 
-It prints the four `access-control-…` headers.
+The home connection's public IP appears nowhere in this table, and nothing in
+this setup publishes it.
 
-## Step 1: give the domain's DNS back to Namecheap
+## What the Thor serves
 
-voltforge.tech currently uses another provider's nameservers. Records added in
-Namecheap's Advanced DNS do nothing until Namecheap answers for the domain.
+`thor-tigress-agent` answers the same page at several paths, so the redirect
+works whether or not Namecheap keeps the path:
 
-1. Sign in at namecheap.com → **Domain List** → **Manage** next to
-   `voltforge.tech`.
-2. **Nameservers** → choose **Namecheap BasicDNS** → the green tick to save.
-3. Wait. Usually under an hour, at most 48 hours.
+| Path | Answer |
+|---|---|
+| `/`, `/thor-tigress-cub`, `/thor-tigress-cub/` | the chat |
+| `/about.html` (also under `/thor-tigress-cub/`) | the About page: what it is, the numbers, how to get access |
+| `/cub.svg`, `/cub.png` | the art; the PNG is the preview when the link is shared |
+| `/health` | `{"status":"ok"}` |
+| anything else outside `/v1/` | `404`; only these files are served, never the rest of the folder |
+
+## Step 1: Namecheap answers for the domain
+
+Namecheap → **Domain List** → **Manage** next to `voltforge.tech` →
+**Nameservers** → **Namecheap BasicDNS** → save. Done on 2026-10-05.
 
 Check:
 
@@ -103,141 +113,79 @@ Check:
 curl -s "https://dns.google/resolve?name=voltforge.tech&type=NS" | python3 -m json.tool | grep data
 ```
 
-Done when it lists `dns1.registrar-servers.com` and `dns2.registrar-servers.com`.
+It lists `dns1.registrar-servers.com` and `dns2.registrar-servers.com`.
 
-## Step 2: point the domain at GitHub Pages
+## Step 2: delete the old records
 
-In Namecheap: **Manage** → **Advanced DNS** → **Host Records**. Delete the
-parking records Namecheap adds by default (a `CNAME` for `www` to
-`parkingpage.namecheap.com` and a `URL Redirect` for `@`), then add:
+**Manage** → **Advanced DNS** → **Host Records**. Delete:
 
-| Type | Host | Value |
+- every `A` record with `172.67.173.34` or `104.21.72.4`
+- every `AAAA` record starting with `2606:4700:`
+- any record for host `www` pointing at Cloudflare or a parking page
+
+Keep the `TXT` record `v=spf1 include:spf.efwd.registrar-servers.com ~all`:
+it belongs to Namecheap's email forwarding, not to the website.
+
+## Step 3: add the redirect
+
+**Advanced DNS** → **Add New Record** → **URL Redirect Record**:
+
+| Field | Value | Why |
 |---|---|---|
-| A Record | `@` | `185.199.108.153` |
-| A Record | `@` | `185.199.109.153` |
-| A Record | `@` | `185.199.110.153` |
-| A Record | `@` | `185.199.111.153` |
-| AAAA Record | `@` | `2606:50c0:8000::153` |
-| AAAA Record | `@` | `2606:50c0:8001::153` |
-| AAAA Record | `@` | `2606:50c0:8002::153` |
-| AAAA Record | `@` | `2606:50c0:8003::153` |
-| CNAME Record | `www` | `arpanpathak.github.io.` |
+| Host | `@` | the bare domain, `voltforge.tech` |
+| Value | `https://arpanpathak.taildb9a39.ts.net` | the Thor; it serves the chat at `/` and at `/thor-tigress-cub/` |
+| Type | **Unmasked**, **302 (temporary)** | see below |
 
-These are GitHub Pages' published addresses. Leave TTL on Automatic.
+Add a second one with Host `www` and the same value, so `www.voltforge.tech`
+works too.
 
-## Step 3: prove to GitHub that the domain is yours
+- **Unmasked, not masked.** A masked redirect keeps `voltforge.tech` in the
+  address bar by loading the Thor inside a frame of a Namecheap page. Browsers
+  then treat the chat as a third-party frame: its saved key and conversations
+  are kept apart or blocked, and visitors can't see which site is really
+  asking for their key.
+- **302, not 301.** Browsers remember a 301 ("moved permanently") and stop
+  asking Namecheap. If the redirect ever changes, people who visited before
+  keep going to the old place. A 302 is asked again each time; the cost is
+  one quick request.
 
-This stops anyone else from claiming `voltforge.tech` on GitHub Pages if your
-site is ever switched off.
+## Step 4: check it
 
-1. GitHub → your picture → **Settings** → **Pages** → **Add a domain** →
-   `voltforge.tech`.
-2. GitHub shows a TXT record: host `_github-pages-challenge-arpanpathak`, and
-   a value. Add it in Namecheap's Advanced DNS as a **TXT Record** with that
-   host and value.
-3. Back on GitHub, **Verify**. It can take a few minutes.
-
-## Step 4: the `voltforge.tech` repository
-
-The site lives in its own repository, so the domain doesn't touch your
-portfolio at `arpanpathak.github.io` or this book's address. Its content is
-generated:
+DNS changes at Namecheap usually apply within 30 minutes.
 
 ```bash
-cd ~/Projects
-gh repo create arpanpathak/voltforge.tech --public --description "voltforge.tech: Thor Tigress Cub and more"
-gh repo clone arpanpathak/voltforge.tech
-~/Projects/thor-thunder-tigress-platform/jetson-thor/site/build.sh ~/Projects/voltforge.tech
-cd ~/Projects/voltforge.tech
-git add -A && git commit -m "Thor Tigress Cub at /thor-tigress-cub/" && git push -u origin main
+curl -sI http://voltforge.tech/thor-tigress-cub  | grep -iE "^HTTP|^location"
+curl -sI https://voltforge.tech/thor-tigress-cub | grep -iE "^HTTP|^location"
+curl -s  https://arpanpathak.taildb9a39.ts.net/health
 ```
 
-`build.sh` writes:
+The first two answer `302` with a `location:` on the `.ts.net` address. The
+third prints `{"status":"ok"}`. Then open `voltforge.tech/thor-tigress-cub` in
+a browser: it lands on the chat, with the invite screen when there is no key.
 
-| File | What |
+## What changes for visitors
+
+| Before | After |
 |---|---|
-| `CNAME` | `voltforge.tech`; tells GitHub Pages the domain |
-| `index.html` | forwards `voltforge.tech/` to `/thor-tigress-cub/` |
-| `thor-tigress-cub/index.html` | the chat page, with `thor-api` set to the Thor's public address |
-| `thor-tigress-cub/about.html` | the About page: what it is, the numbers, how to get access |
-| `thor-tigress-cub/cub.svg`, `cub.png` | the art; the PNG is the preview image when the link is shared |
+| share `https://arpanpathak.taildb9a39.ts.net` | share `voltforge.tech/thor-tigress-cub` |
+| | the address bar shows the `.ts.net` address once the chat opens |
+| key and conversations saved for the `.ts.net` address | the same; they are saved for the address that serves the page |
 
-`THOR_API=https://other.address/ ./build.sh DIR` builds for a different
-server.
+## Undo or change it later
 
-Turn on Pages for it:
-
-```bash
-gh api -X POST repos/arpanpathak/voltforge.tech/pages -f "source[branch]=main" -f "source[path]=/"
-gh api -X PUT  repos/arpanpathak/voltforge.tech/pages -f cname=voltforge.tech
-```
-
-Or in the browser: the repository → **Settings** → **Pages** → Source
-**Deploy from a branch**, `main`, `/ (root)` → Custom domain `voltforge.tech`
-→ **Save**.
-
-## Step 5: HTTPS
-
-GitHub requests a certificate for `voltforge.tech` once the DNS from step 2
-answers. That takes from a few minutes to an hour. Then:
-
-```bash
-gh api -X PUT repos/arpanpathak/voltforge.tech/pages -F https_enforced=true
-```
-
-or tick **Enforce HTTPS** on the Pages settings page.
-
-## Check it
-
-```bash
-curl -sI https://voltforge.tech/ | head -3                     # 200, the forwarding page
-curl -s  https://voltforge.tech/thor-tigress-cub/ | grep -o '<meta name="thor-api"[^>]*>'
-curl -s  https://arpanpathak.taildb9a39.ts.net/health          # {"status":"ok"}
-```
-
-Then open `https://voltforge.tech/thor-tigress-cub/` in a browser:
-
-<figure>
-<img src="figures/cub-hosted.png" alt="The chat page served from a different address than the Thor, answering 'Say hello in exactly five words' in 0.7 seconds">
-<figcaption><b>Figure 10.1</b> The GitHub Pages copy, tested from another address against the real Thor: 9 tokens at 50.5 tok/s, 0.7 s.</figcaption>
-</figure>
-
-Without a key it shows the invite screen; with one, the model chip names
-Nemotron and replies stream as on the Thor's own address. The About page at
-`/thor-tigress-cub/about.html` turns its badge to "The Thor is online" when
-`/health` answers.
-
-<figure>
-<img src="figures/cub-about.png" alt="The About page in the dark theme: the cub, the headline 'A 30B model on a desk-sized Thor', and the facts strip">
-<figcaption><b>Figure 10.2</b> The About page, for people who arrive from a shared link.</figcaption>
-</figure>
-
-## Updating the site
-
-The chat page has one source, `jetson-thor/web/index.html`. After changing it:
-
-```bash
-~/Projects/thor-thunder-tigress-platform/jetson-thor/site/build.sh ~/Projects/voltforge.tech
-cd ~/Projects/voltforge.tech && git add -A && git commit -m "Update the chat page" && git push
-```
-
-GitHub Pages publishes within a minute or two. The Thor's own copy needs no
-step: it reads the same file.
+- **Undo:** delete the URL Redirect records. The `.ts.net` address keeps working.
+- **Keep `voltforge.tech` in the address bar later:** replace the redirect
+  with a rented server running Caddy over Tailscale (fourth row of the
+  table). The Thor needs no change: it already serves the chat at
+  `/thor-tigress-cub/`.
 
 ## When a step fails
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| NS check still shows the old nameservers | change not saved, or not spread yet | re-check step 1; wait |
-| `voltforge.tech` shows a Namecheap parking page | parking records still there | delete them (step 2) |
-| GitHub: "Domain's DNS record could not be retrieved" | DNS not spread yet | wait, then **Check again** |
-| "Enforce HTTPS" greyed out | certificate not issued yet | wait up to an hour after DNS works |
-| Page loads, red dot "server not reachable" | the Thor or Funnel is down, or CORS missing | the `/health` and `OPTIONS` checks above |
-| Page loads, browser console says "blocked by CORS policy" | `thor-tigress-agent` older than the CORS change | rebuild and restart it (chapter "Web chat") |
-
-## What else the domain can carry
-
-Each folder in the `voltforge.tech` repository is a path on the domain, so
-other projects can live beside the cub (`voltforge.tech/<name>/`) without new
-DNS records. A subdomain such as `chat.voltforge.tech` would need its own
-repository with its own `CNAME` file and a `CNAME` record in Namecheap.
+| NS check still shows other nameservers | change not saved, or not spread yet | re-check step 1; wait up to 48 hours |
+| `voltforge.tech` shows "error 1033" | the old Cloudflare records are still there | step 2 |
+| `voltforge.tech` shows a Namecheap parking page | parking records still there, or the redirect not added | steps 2 and 3 |
+| `http://` redirects but `https://` fails with a certificate warning | the redirect service has no certificate for the domain | share the `http://` form; the `.ts.net` page itself is always HTTPS |
+| lands on the Thor but shows "not found" | the Thor's server is older than the `/thor-tigress-cub` route | rebuild and restart `thor-tigress-agent` (chapter "Web chat: Thor Tigress Cub") |
+| red dot, "server not reachable" | the Thor or Funnel is down | `curl https://arpanpathak.taildb9a39.ts.net/health` |

@@ -121,7 +121,7 @@ outside scripts), the art (`cub.svg`) and `serve.sh`. `serve.sh install`
 creates two user services that start at boot: `thor-chat` (llama.cpp's
 `llama-server` with Nemotron on `127.0.0.1:8079`) and `thor-tigress-agent`
 (the page, the key check, web search and the API on `127.0.0.1:8080`).
-`site/` builds the copy published at voltforge.tech. Full guide: the book,
+`about.html` and the art are served next to the chat. Full guide: the book,
 chapter "Web chat: Thor Tigress Cub".
 
 | Setting | Value |
@@ -184,11 +184,11 @@ Who can open it:
 
 ### voltforge.tech/thor-tigress-cub
 
-The chat page is also published on GitHub Pages at
-`https://voltforge.tech/thor-tigress-cub/` and calls the Thor's `.ts.net`
-address for every reply (the server allows cross-site calls). Build the site
-with `site/build.sh ~/Projects/voltforge.tech`; DNS and GitHub steps are in the
-book, chapter "Bring your own domain".
+A URL Redirect record at Namecheap (unmasked, 302) sends `voltforge.tech` to
+`https://arpanpathak.taildb9a39.ts.net`. The Thor serves the chat at `/` and
+`/thor-tigress-cub/`, so the redirect works with or without the path. No
+proxy, no port forward, no copy of the page. Reasoning, every IP address and
+the exact steps: the book, chapter "Bring your own domain".
 
 ## Platform tools on the Thor
 

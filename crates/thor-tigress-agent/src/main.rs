@@ -108,6 +108,18 @@ fn serve(config: Config) -> Result<(), AgentError> {
     Ok(())
 }
 
+/// The other files the page uses, by URL path: a fixed list, so no request
+/// can read anything else from the web folder.
+fn static_file(path: &str) -> Option<(&'static str, &'static str)> {
+    let name = path.trim_start_matches("/thor-tigress-cub").trim_start_matches('/');
+    match name {
+        "about.html" => Some(("about.html", "text/html; charset=utf-8")),
+        "cub.svg" => Some(("cub.svg", "image/svg+xml")),
+        "cub.png" => Some(("cub.png", "image/png")),
+        _ => None,
+    }
+}
+
 fn handle(mut stream: TcpStream, config: &Config) -> Result<(), AgentError> {
     let request = http::read_request(&stream)?;
     let needs_key = request.path.starts_with("/v1/");
@@ -122,7 +134,7 @@ fn handle(mut stream: TcpStream, config: &Config) -> Result<(), AgentError> {
             "application/json",
             br#"{"error":{"code":401,"message":"Invalid API Key","type":"authentication_error"}}"#,
         ),
-        ("GET", "/" | "/index.html") => {
+        ("GET", "/" | "/index.html" | "/thor-tigress-cub" | "/thor-tigress-cub/") => {
             let page = fs::read(config.web.join("index.html"))?;
             http::respond(&mut stream, "200 OK", "text/html; charset=utf-8", &page)
         }
@@ -154,6 +166,27 @@ fn handle(mut stream: TcpStream, config: &Config) -> Result<(), AgentError> {
             )?;
             http::relay(&mut stream, response)
         }
-        _ => http::respond(&mut stream, "404 Not Found", "text/plain", b"not found"),
+        (method, path) => match (method, static_file(path)) {
+            ("GET", Some((name, content_type))) => {
+                let body = fs::read(config.web.join(name))?;
+                http::respond(&mut stream, "200 OK", content_type, &body)
+            }
+            _ => http::respond(&mut stream, "404 Not Found", "text/plain", b"not found"),
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::static_file;
+
+    #[test]
+    fn serves_only_the_listed_files() {
+        assert_eq!(static_file("/about.html").map(|(name, _)| name), Some("about.html"));
+        assert_eq!(static_file("/thor-tigress-cub/cub.svg").map(|(name, _)| name), Some("cub.svg"));
+        assert_eq!(static_file("/cub.png").map(|(_, kind)| kind), Some("image/png"));
+        assert_eq!(static_file("/serve.sh"), None);
+        assert_eq!(static_file("/../../.config/thor-chat/api-key"), None);
+        assert_eq!(static_file("/thor-tigress-cub/../serve.sh"), None);
     }
 }

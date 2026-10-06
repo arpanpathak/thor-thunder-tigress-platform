@@ -7,8 +7,8 @@
 <meta name="description" content="Nemotron 3 Nano, a 30-billion-parameter model, running on one NVIDIA Jetson AGX Thor. Chat with it in the browser or point your coding agent at it.">
 <meta property="og:title" content="Thor Tigress Cub">
 <meta property="og:description" content="A 30B model on a Jetson AGX Thor. Chat with it, or point your coding agent at it.">
-<meta property="og:image" content="cub.png">
-<link rel="icon" href="cub.svg" type="image/svg+xml">
+<meta property="og:image" content="/cub.png">
+<link rel="icon" href="/cub.svg" type="image/svg+xml">
 <script>try { const t = localStorage.getItem("cub-theme"); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 <style>
   :root {
@@ -127,7 +127,7 @@
 <body>
 <div class="wrap">
   <nav>
-    <a class="brand" href="./about.html"><img src="cub.svg" alt=""> Thor Tigress Cub</a>
+    <a class="brand" href="/"><img src="/cub.svg" alt=""> Thor Tigress Cub</a>
     <span class="spacer"></span>
     <a class="link optional" href="#agents">For agents</a>
     <a class="link optional" href="#faq">FAQ</a>
@@ -143,11 +143,11 @@
       <p class="lede">Nemotron 3 Nano runs on one NVIDIA Jetson AGX Thor in a home office. Chat with it in your
         browser, or point your own coding agent at it. Same model, same machine, no cloud.</p>
       <div class="actions">
-        <a class="button primary" id="chat-link" href="./">Open the chat →</a>
+        <a class="button primary" id="chat-link" href="/">Open the chat →</a>
         <a class="button" href="#agents">Use it from your agent</a>
       </div>
     </div>
-    <div class="art"><img src="cub.svg" alt="Thor Tigress Cub, a tiger cub in a winged helmet raising a small hammer that throws sparks"></div>
+    <div class="art"><img src="/cub.svg" alt="Thor Tigress Cub, a tiger cub in a winged helmet raising a small hammer that throws sparks"></div>
   </header>
 
   <div class="facts">
@@ -213,7 +213,7 @@ openbatrangs --openai-url https://arpanpathak.taildb9a39.ts.net/v1 \
 
   <section>
     <div class="access">
-      <img src="cub.svg" alt="">
+      <img src="/cub.svg" alt="">
       <div>
         <h2>Invite-only, for now</h2>
         <p>The Thor is one machine with four reply slots, shared by everyone. Access is given to people who ask, for a
@@ -251,7 +251,7 @@ openbatrangs --openai-url https://arpanpathak.taildb9a39.ts.net/v1 \
 </footer>
 
 <script>
-const CHAT = "https://arpanpathak.taildb9a39.ts.net";
+const CHAT = "";
 const root = document.documentElement;
 document.getElementById("theme").addEventListener("click", () => {
   const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
