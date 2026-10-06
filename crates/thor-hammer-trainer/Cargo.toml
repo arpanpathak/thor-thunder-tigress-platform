@@ -16,9 +16,5 @@ name = "thor-hammer-trainer"
 path = "src/main.rs"
 
 [[bin]]
-name = "review"
-path = "src/bin/review.rs"
-
-[[bin]]
 name = "teacher"
 path = "src/bin/teacher.rs"

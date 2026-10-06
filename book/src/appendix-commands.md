@@ -10,8 +10,10 @@ Run these from `/home/jetson/Projects/thor-thunder-tigress-platform`.
 |---|---|
 | Build the training set | `cargo run --release -p thor-hammer-trainer` |
 | Build it into another folder | `cargo run --release -p thor-hammer-trainer -- OUTPUT_DIR` |
-| Open the review page | `cargo run --release -p thor-hammer-trainer --bin review`, then <http://127.0.0.1:8080> |
-| Review another file, port or flags file | `cargo run --release -p thor-hammer-trainer --bin review -- FILE PORT FLAGS` |
+| Open the review page (every dataset) | `cargo run --release -p thor-tigress-reinforcer-frontend`, then <http://127.0.0.1:8787> |
+| Review another file, port or flags file | `cargo run --release -p thor-tigress-reinforcer-frontend -- --port PORT --dataset NAME=FILE,FLAGS` |
+| Check the teacher set | `cargo run --release -p thor-hammer-trainer --bin teacher` |
+| Queue real sections to write from | `cargo run --release -p thor-hammer-trainer --bin teacher -- pick 2` |
 | Run the tests | `cargo test` |
 | Lint | `cargo clippy --all-targets -- -D warnings` |
 | Format | `cargo +nightly fmt` |
@@ -40,8 +42,7 @@ thor-thunder-tigress-platform/
 │           ├── report.rs      stats.md
 │           ├── error.rs       DataError
 │           └── bin/
-│               ├── review.rs    the review server
-│               └── review.html  the review page
+│               └── teacher.rs   checks the teacher set, queues sections
 ├── labels/                   human work, committed
 │   └── slop_flags.jsonl
 ├── data/                     generated, not committed

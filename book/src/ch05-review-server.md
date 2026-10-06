@@ -14,7 +14,14 @@ This chapter covers
 
 </div>
 
-The review server is a binary in `thor-hammer-trainer` (`src/bin/review.rs`, about 400 lines). It uses the standard
+> **Replaced on 2026-10-06.** This chapter records the first review server, a binary in `thor-hammer-trainer`. It
+> was removed once `reinforcer` (crate `thor-tigress-reinforcer-frontend`) took over: one server on port 8787 that
+> shows the training set, the teacher set and the distilled conversations, each with its own flags file, in a dark
+> page where selected text is marked with a slop category in one click. Start it with
+> `cargo run --release -p thor-tigress-reinforcer-frontend` and open <http://127.0.0.1:8787>. The design below is kept
+> because the flag format and the loopback rule it describes are still the ones in use.
+
+The review server was a binary in `thor-hammer-trainer` (`src/bin/review.rs`, about 400 lines). It uses the standard
 library plus serde for flags, and one HTML page with inline JavaScript.
 
 ## 4.1 Routes
