@@ -86,6 +86,36 @@ a look-alike page that asks for their key. The short address has to be HTTPS.
 The cost is the address bar: it shows `arpanpathak.taildb9a39.ts.net` after
 the jump. People share and bookmark `voltforge.tech/thor-tigress-cub`.
 
+### What the jump costs
+
+Opening the short address takes two requests instead of one: the forwarding
+page, then the chat. Measured from yahboom on 2026-10-05:
+
+| Step | Time |
+|---|---|
+| DNS lookup of `voltforge.tech` (cached after the first time) | 0.03 s |
+| GitHub Pages answering with the forwarding page | about 0.1 s |
+| the chat page from the Thor, over Funnel, TLS included | 0.37–0.5 s |
+| **total, short address to chat on screen** | **about 0.5 s** |
+
+The Namecheap redirect felt much slower, for a reason that has nothing to do
+with the Thor. Browsers try HTTPS first, both when a bare address is typed and
+when they remember an "always HTTPS" rule for the domain. Namecheap's redirect
+server never answered on the HTTPS port, so the browser waited for that
+attempt to time out, several seconds, before falling back to plain HTTP and
+following the redirect. With GitHub Pages the HTTPS attempt is answered at
+once, so there is nothing to wait for.
+
+GitHub Pages added one more hop of its own: it answered `/thor-tigress-cub`
+with a redirect to `/thor-tigress-cub/` and only then served the folder's
+`index.html`. The forwarding page is therefore a file, `thor-tigress-cub.html`,
+which GitHub serves at `/thor-tigress-cub` directly.
+
+One jump remains and can't be removed without a proxy: the forwarding page
+has to tell the browser where the Thor is. A rented server passing traffic on
+(the last row of the table above) would hide it, at the price of a machine in
+the middle.
+
 ## Every IP address in this story
 
 | Address | Owner (from its network registration) | What it is | Used? |
@@ -237,6 +267,48 @@ curl -s  https://arpanpathak.taildb9a39.ts.net/health                        # {
 
 Then open `voltforge.tech/thor-tigress-cub` in a browser: it lands on the
 chat, with the invite screen when there is no key.
+
+## After a DNS change: caches
+
+DNS answers carry a time to live (TTL): how long anyone may keep the answer
+before asking again. Namecheap's records for `voltforge.tech` have a TTL of
+1,799 seconds, about 30 minutes. After the switch from the Namecheap redirect
+to GitHub Pages, yahboom kept the old answer, `192.64.119.155`, for that long,
+while Google's public resolver already returned GitHub's addresses. A browser
+using the old answer reaches the old setup, including its slow HTTPS timeout.
+
+Check what your machine uses against what the domain says now:
+
+```bash
+getent hosts voltforge.tech                                   # Linux: your machine's answer
+dscacheutil -q host -a name voltforge.tech                    # macOS: the same
+curl -s "https://dns.google/resolve?name=voltforge.tech&type=A" | python3 -m json.tool | grep data
+```
+
+If they differ, wait for the TTL, or clear the cache:
+
+| Where | Clear the DNS cache |
+|---|---|
+| Linux with systemd-resolved | `resolvectl flush-caches` |
+| macOS | `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder` |
+| Chrome, Edge | `chrome://net-internals/#dns` → **Clear host cache** |
+| Chrome's remembered "always HTTPS" rule | `chrome://net-internals/#hsts` → **Delete domain security policies** → `voltforge.tech` |
+
+A private window or a phone on mobile data shows what a new visitor sees.
+
+## How it was set up, in order
+
+All on 2026-10-05:
+
+| Step | Result |
+|---|---|
+| Cloudflare entries deleted, nameservers set to Namecheap BasicDNS | Namecheap answers for the domain; the old Cloudflare `A` and `AAAA` records were still listed and had to be deleted |
+| URL Redirect record at Namecheap (unmasked, 302) to the `.ts.net` address | worked over HTTP; HTTPS timed out; Namecheap dropped the path, so every address went to the Thor's `/` |
+| `thor-tigress-agent` serves the chat at `/thor-tigress-cub` too, plus the About page and the art | links carrying the path work on the Thor itself |
+| Repository `arpanpathak/voltforge.tech` with the forwarding page; GitHub Pages turned on with the domain | GitHub serves the page as soon as DNS points at it |
+| Redirect records replaced by four `A` records and a `www` `CNAME` for GitHub Pages | Namecheap and Google's resolver return GitHub's addresses |
+| Forwarding page moved from a folder to `thor-tigress-cub.html` | one redirect fewer |
+| HTTPS certificate | requested from GitHub; see step 5 |
 
 ## Undo or change it later
 
