@@ -247,7 +247,10 @@ GitHub Pages if this repository is ever removed.
 ## Step 5: HTTPS
 
 GitHub requests the Let's Encrypt certificate itself once the records from
-step 3 answer, usually within 15 to 60 minutes. Then turn on **Enforce
+step 3 answer, usually within 15 to 60 minutes. If its state still reads
+"none" after about 10 minutes, remove the custom domain on the repository's
+Pages settings, save, and add it again; GitHub records this as two commits
+("Delete CNAME", "Create CNAME") and starts the request. Then turn on **Enforce
 HTTPS**, so `http://voltforge.tech` is upgraded too:
 
 ```bash
@@ -267,6 +270,19 @@ curl -s  https://arpanpathak.taildb9a39.ts.net/health                        # {
 
 Then open `voltforge.tech/thor-tigress-cub` in a browser: it lands on the
 chat, with the invite screen when there is no key.
+
+Measured on 2026-10-05, right after the certificate was approved:
+
+| Request | Result |
+|---|---|
+| `https://voltforge.tech/thor-tigress-cub` | `200`, the forwarding page, in 0.16 s (TLS 0.08 s) |
+| the certificate | `CN = voltforge.tech`, issued by Let's Encrypt, valid until 2027-01-04; GitHub renews it |
+| `http://voltforge.tech/thor-tigress-cub` | `301` to `https://voltforge.tech/thor-tigress-cub` |
+| `https://www.voltforge.tech/thor-tigress-cub` | `301` to `https://voltforge.tech/thor-tigress-cub` |
+| a browser opening `https://voltforge.tech/thor-tigress-cub`, three runs | on the chat at `https://arpanpathak.taildb9a39.ts.net/` in 1.17 s, 1.66 s and 1.17 s, page drawn |
+
+The browser time includes drawing the chat page and running its script, so
+it is longer than the sum of the two requests.
 
 ## After a DNS change: caches
 
@@ -308,7 +324,8 @@ All on 2026-10-05:
 | Repository `arpanpathak/voltforge.tech` with the forwarding page; GitHub Pages turned on with the domain | GitHub serves the page as soon as DNS points at it |
 | Redirect records replaced by four `A` records and a `www` `CNAME` for GitHub Pages | Namecheap and Google's resolver return GitHub's addresses |
 | Forwarding page moved from a folder to `thor-tigress-cub.html` | one redirect fewer |
-| HTTPS certificate | requested from GitHub; see step 5 |
+| HTTPS certificate | not started after 8 minutes; removing and re-adding the domain on the Pages settings started it; approved about a minute later, for `voltforge.tech` and `www.voltforge.tech` |
+| Enforce HTTPS turned on | `http://` answers `301` to the `https://` address |
 
 ## Undo or change it later
 
