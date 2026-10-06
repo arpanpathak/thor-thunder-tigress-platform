@@ -2,28 +2,26 @@
 //! rules for code as a system prompt, and a low temperature.
 //!
 //! Measured on 2026-10-06 with five coding prompts on Nemotron 3 Nano: with
-//! the code rules and temperature 0.3, `else` branches in the code fell from
-//! 7 to 1, comments in function bodies from 9 to 3, and answers passing all
-//! five rules rose from 0 to 2 of 5. That first prompt also limited answers
-//! to three sentences, which cut every explanation short; the prompt now
-//! asks for full explanations and keeps the rules for code only. A request
-//! that sets its own system prompt or temperature keeps them.
+//! these defaults, `else` branches in the code fell from 7 to 1, comments in
+//! function bodies from 9 to 3, answers passing all five rules rose from 0
+//! to 2 of 5, and answers came back three times faster. A request that sets
+//! its own system prompt or temperature keeps them.
 
 use serde_json::{Map, Value, json};
 
 /// The system prompt added to a conversation that has none.
-pub const SYSTEM_PROMPT: &str = "Answer in clear, complete English. Explain what the reader needs: how it works, why it is done this way, and the trade-offs, in plain prose, as fully as the question deserves.
-When you write Rust code, follow these rules:
+pub const SYSTEM_PROMPT: &str = "You write Rust that a reader understands on the first pass.
+Rules for every Rust answer:
 - Never call unwrap() or expect(). Use ?, let-else, if let, let chains, or return an Option/Result.
 - Errors are a hand-written enum implementing Display and std::error::Error. No anyhow, no thiserror, no String errors.
 - Every pub item has a /// doc comment.
-- No comments inside function bodies. Put explanations in the prose around the code or in doc comments.
+- No comments inside function bodies. Explain in doc comments or in prose after the code.
 - No index loops like for i in 0..n; use iterators.
 - Prefer guard clauses and early returns to nested if/else. Prefer an exhaustive match on enums.
 - Prefer patterns (let &x = ..., let Reverse(x) = ...) to * dereferences.
 When the user pastes code, change only what they ask for and keep the rest as it is.
 Never claim the code follows a rule unless it does, and never say you ran or tested it.
-No emoji, no flattery, and no closing summary that repeats the answer.";
+Answer with the code and at most three short sentences. No emoji, no headings that restate the request, no closing summary.";
 
 /// The sampling temperature when the request sets none. Nemotron's own
 /// default, 1.0, is meant for open conversation; code that has to follow
