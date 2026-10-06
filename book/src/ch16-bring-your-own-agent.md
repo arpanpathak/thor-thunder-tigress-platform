@@ -72,8 +72,8 @@ Claude Code speaks the Anthropic API, which llama-server also serves. Two
 commands switch it to the Thor only while they run; plain `claude` keeps using
 your Claude account.
 
-macOS (`~/.zshrc`), or any machine that reaches the Thor through its public
-address:
+Through the public address, on any machine (`~/.zshrc` on macOS,
+`~/.bashrc` on Linux):
 
 ```bash
 THOR_CC='CLAUDE_CONFIG_DIR=$HOME/.claude-thor ANTHROPIC_BASE_URL=https://arpanpathak.taildb9a39.ts.net ANTHROPIC_AUTH_TOKEN=$(cat ~/.config/thor-chat/api-key) ANTHROPIC_MODEL=nemotron ANTHROPIC_DEFAULT_OPUS_MODEL=nemotron ANTHROPIC_DEFAULT_SONNET_MODEL=nemotron ANTHROPIC_DEFAULT_HAIKU_MODEL=nemotron CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000'
@@ -82,10 +82,10 @@ echo "alias claude-thor-think='$THOR_CC claude'" >> ~/.zshrc
 source ~/.zshrc
 ```
 
-On yahboom (`~/.bashrc`, installed there) the same aliases use
-`ANTHROPIC_BASE_URL=http://127.0.0.1:8080`: `thor-model-tunnel` forwards
-port 8080 to `thor-tigress-agent` on the Thor. It must be 8080, not 8079:
-only `thor-tigress-agent` translates the thinking setting.
+On a machine with the SSH tunnel (chapter "Local models"), the same aliases
+can use `ANTHROPIC_BASE_URL=http://127.0.0.1:8080` and skip the public hop.
+It must be 8080, not 8079: only `thor-tigress-agent` translates the thinking
+setting.
 
 | Variable | Why |
 |---|---|
@@ -100,8 +100,8 @@ folder trust again; it doesn't ask you to log in. Two warnings are expected:
 claude.ai connectors are off, and `nemotron` is not in Claude Code's model
 list.
 
-Measured on 2026-10-05 (Claude Code 2.1.290, from yahboom through the public
-address, same prompt: "create a cargo project named dsa with a stack module
+Measured on 2026-10-05 (Claude Code 2.1.290, from a Jetson Orin NX on Linux
+through the public address, same prompt: "create a cargo project named dsa with a stack module
 with unit tests, then run cargo test"):
 
 | | Time | Tokens generated | Result |
@@ -145,7 +145,8 @@ echo 'alias obr="openbatrangs --openai-url https://arpanpathak.taildb9a39.ts.net
 limit of 40. The GPU panel is empty on a Mac, since it reads `tegrastats` or
 `nvidia-smi`. The macOS build is checked on Linux, except for the TLS
 library's C code, which needs Apple's compiler; it has not yet been run on a
-Mac. On the Thor itself and on yahboom, `openbatrangs --thor` is enough
+Mac. On the Thor itself, and on any machine with the SSH tunnel,
+`openbatrangs --thor` is enough
 (chapter "Local models").
 
 ## OpenCode and other OpenAI clients
@@ -179,7 +180,7 @@ Leave out `extra_body` to let it think first.
 ## How it is wired
 
 <figure>
-<img src="figures/agent-wiring.svg" alt="Agents call the .ts.net address through Tailscale Funnel with the key in a header; thor-tigress-agent checks it and passes requests to llama-server. yahboom reaches the same server through an SSH tunnel.">
+<img src="figures/agent-wiring.svg" alt="Agents call the .ts.net address through Tailscale Funnel with the key in a header; thor-tigress-agent checks it and passes requests to llama-server. A machine with SSH access reaches the same server through an SSH tunnel.">
 <figcaption><b>Figure 9.1</b> How agents reach the Thor.</figcaption>
 </figure>
 

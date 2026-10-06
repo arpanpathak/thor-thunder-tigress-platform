@@ -2,7 +2,10 @@
 
 The book has the full guide: https://arpanpathak.github.io/thor-thunder-tigress-platform/ (chapters 4 to 7).
 
-The Thor is `192.168.0.189`, user `arpanpathak`. On yahboom it is just `thor`.
+The Thor is `192.168.0.189`, user `arpanpathak`. On any machine set up as
+below it is just `thor`. "Your machine" in this file means whichever Linux or
+macOS machine you work from; this setup was built and tested from a Jetson
+Orin NX named yahboom.
 
 ## Log in
 
@@ -37,7 +40,7 @@ Copy a file: `scp notes.md thor:` or `scp thor:Projects/x.log .`
 
 ## Keep projects in sync
 
-`thor-sync` (in `~/.local/bin` on yahboom) copies folders to the same place
+`thor-sync` (installed in `~/.local/bin` on your machine) copies folders to the same place
 under the Thor's home, e.g. `~/Projects/openbatrangs` → `~/Projects/openbatrangs`.
 
 ```bash
@@ -51,8 +54,9 @@ thor-sync on / off     # background sync, every change within a few seconds
 On the list now: `thor-thunder-tigress-platform`, `openbatrangs`, `edgechat`.
 Background sync is on. Git history is included, so `git` works on the Thor.
 Skipped: anything `.gitignore` skips, plus `target/`, model files and the
-chat export (edit `~/.config/thor-sync/exclude`). Sync goes one way, yahboom
-to Thor: commit on yahboom, because a commit made on the Thor is overwritten.
+chat export (edit `~/.config/thor-sync/exclude`). Sync goes one way, your
+machine to the Thor: commit on your machine, because a commit made on the Thor
+is overwritten.
 
 ## openBatarangs on the Thor
 
@@ -66,22 +70,23 @@ openbatrangs --read-only "explain this repo"  # no file writes or commands
 openbatrangs doctor                           # check Ollama and the model
 ```
 
-After changing openBatarangs on yahboom, rebuild it on the Thor:
+After changing openBatarangs on your machine, rebuild it on the Thor:
 
 ```bash
 ssh thor 'cd ~/Projects/openbatrangs && ~/.cargo/bin/cargo install --path .'
 ```
 
-On yahboom the same `openbatrangs --thor` works through `thor-model-tunnel`.
+On a machine with the SSH tunnel (book, chapter "Local models") the same
+`openbatrangs --thor` works.
 From any other machine, including macOS: `--openai-url
 https://arpanpathak.taildb9a39.ts.net/v1 --api-key-file
 ~/.config/thor-chat/api-key` (book, chapter "Bring your own agent").
 
 ## Claude Code with Nemotron
 
-`claude-thor` (thinking off) and `claude-thor-think` (thinking on) on yahboom
-(aliases in `~/.bashrc`) run Claude Code against Nemotron through the tunnel to
-`thor-tigress-agent` on port 8080, with their own settings, history and memory
+`claude-thor` (thinking off) and `claude-thor-think` (thinking on) are shell
+aliases that run Claude Code against Nemotron, through the SSH tunnel to
+`thor-tigress-agent` on port 8080 or through the public address, with their own settings, history and memory
 in `~/.claude-thor`. Plain `claude` is unchanged. Measured: thinking on works
 but is slow (207 s for a small crate); thinking off is fast but ignored the
 task. openbatrangs is the better agent here.
@@ -108,7 +113,7 @@ context (1,046,528 tokens for Nemotron 3 Nano) unless `--kv-cache-tokens` caps
 it. Your coding rules are in `~/.config/local-copilot-codebuddy/rules.md` and
 go into every conversation.
 
-To rebuild after changing edgechat on yahboom:
+To rebuild after changing edgechat on your machine:
 
 ```bash
 ssh thor 'bash -lc "cd ~/Projects/edgechat && cargo install --path ."'
@@ -195,7 +200,7 @@ the steps: the book, chapter "Bring your own domain".
 
 `spark`, `thor-hammer-trainer`, `reinforcer` and `lasso` are installed in
 `~/.cargo/bin`. `data/` is synced (see `~/.config/thor-sync/include`).
-Reach the review page from yahboom with
+Reach the review page from your machine with
 `ssh -L 8787:localhost:8787 thor 'bash -lc "cd ~/Projects/thor-thunder-tigress-platform && reinforcer data/train.jsonl 8787"'`
 and open http://localhost:8787.
 
@@ -205,7 +210,7 @@ and `corpus/` (`bash train/fetch_corpus.sh`).
 
 ## Coding agent: OpenCode (removed)
 
-OpenCode was tried on yahboom on 2026-10-05 and removed the same day; its tool
+OpenCode was tried on the Jetson Orin NX dev machine on 2026-10-05 and removed the same day; its tool
 calls with Nemotron often came back as text. The config is kept in the book,
 chapter "Local models". Use openbatrangs (`openbatrangs --thor`) instead.
 

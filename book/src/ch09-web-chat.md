@@ -243,8 +243,9 @@ with GitHub is the next step for this server (chapter "Security").
 ## Change the page or the server
 
 The page is read from disk on every request, so editing
-`jetson-thor/web/index.html` on yahboom is enough: `thor-sync` copies it to the
-Thor and the next page load has it. No restart.
+`jetson-thor/web/index.html` in your clone is enough: `thor-sync` copies it to
+the Thor and the next page load has it. No restart. (Editing it on the Thor
+directly works too.)
 
 A change to `thor-tigress-agent` needs a build and a restart. A restart cuts
 off any reply being written, so wait until none is:

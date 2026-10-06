@@ -92,9 +92,11 @@ Consequences for the design:
 
 ## Machines
 
-| | yahboom | thor |
+| | Development machine | The Thor |
 |---|---|---|
-| Board | Jetson Orin NX 16 GB | Jetson AGX Thor, 128 GB |
-| Role | development, data builds | models, training, shared chat |
+| Used for this book | Jetson Orin NX 16 GB, Ubuntu (named yahboom) | Jetson AGX Thor, 128 GB |
+| Role | editing, data builds, running agents | models, training, shared chat |
+| Could be | any Linux or macOS machine with SSH access to the Thor | |
 
-Code is edited on yahboom and copied to the Thor with `thor-sync` (chapter "Access and syncing").
+Code is edited on the development machine and copied to the Thor with
+`thor-sync` (chapter "Access and syncing").

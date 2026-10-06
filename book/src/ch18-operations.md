@@ -26,7 +26,7 @@ This chapter covers
 | `voltforge.tech` | yes | when bought | domains are public by design |
 | `arpanpathak.taildb9a39.ts.net` | yes | 2026-10-05 07:15 UTC | Funnel's HTTPS certificate for it is in the public Certificate Transparency logs, which list every certificate ever issued |
 | the same name in this book, the README, `about.html`, the `voltforge.tech` repository | yes | 2026-10-05 | written there on purpose, so people can use the API |
-| the access key | **no** | | only on the Thor (`~/.config/thor-chat/api-key`), on yahboom, and in invited people's browsers and key files |
+| the access key | **no** | | only on the Thor (`~/.config/thor-chat/api-key`), on the machines you work from, and in invited people's browsers and key files |
 | the home IP address | **no** | | the `.ts.net` name resolves to Tailscale's Funnel relays, never to the home connection |
 
 Check the certificate record yourself:
@@ -59,18 +59,22 @@ unwanted traffic; it does nothing for a leaked key, which works on any name.
 | `thor-tigress-agent` binary | `~/.cargo/bin/thor-tigress-agent` | `cargo install --path crates/thor-tigress-agent --locked` |
 | llama-server binary | `~/.local/src/llama.cpp/build/bin/llama-server` (built from commit `8216c84`, 2026-10-05) | pull and rebuild llama.cpp |
 | the model | `~/models/gguf/Nemotron-3-Nano-30B-A3B/NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf` | `MODEL=` in the env file |
-| the page, About page, art | `jetson-thor/web/` in this repository | edit on yahboom; `thor-sync` copies it; no restart |
+| the page, About page, art | `jetson-thor/web/` in this repository | edit in your clone; `thor-sync` copies it; no restart |
 | user services at boot without a login | systemd "linger" for the user: `Linger=yes` | `loginctl enable-linger` |
 | Tailscale | system service `tailscaled` (version 1.102.4) | `sudo tailscale up …` |
 | Funnel | kept by `tailscaled` across reboots: `/` → `http://127.0.0.1:8080` | `sudo tailscale funnel --bg 8080` / `… off` |
 
-### On yahboom
+### On each machine you work from
+
+Optional; what the guides in this book set up. Paths are the same on Linux
+and macOS.
 
 | What | Where |
 |---|---|
-| copy of the key | `~/.config/thor-chat/api-key` |
-| tunnel to the Thor (8079, 8888, 8080) | `~/.config/systemd/user/thor-model-tunnel.service`; uses `127.0.0.1`, never the public name |
-| `claude-thor`, `claude-thor-think` | aliases in `~/.bashrc`, through the tunnel |
+| copy of the key | `~/.config/thor-chat/api-key`, mode 600 |
+| SSH tunnel to the Thor (8079, 8888, 8080) | Linux: `~/.config/systemd/user/thor-model-tunnel.service`; any OS: `ssh -fN -L …` (chapter "Local models"); uses `127.0.0.1`, never the public name |
+| `claude-thor`, `claude-thor-think` | aliases in `~/.bashrc` or `~/.zshrc` |
+| openbatrangs | `~/.cargo/bin/openbatrangs` |
 
 ### Domain and GitHub
 
@@ -139,7 +143,7 @@ cat ~/.config/thor-chat/api-key
 
 The old key stops working at once. Then:
 
-1. Copy the new key to yahboom:
+1. Copy the new key to each machine you work from:
    `(umask 077; ssh thor cat .config/thor-chat/api-key > ~/.config/thor-chat/api-key)`.
 2. Send it to the people who should keep access; they paste it on the invite
    screen, and update `~/.config/thor-chat/api-key` for their agents.
@@ -153,7 +157,7 @@ ssh thor 'sudo tailscale funnel --bg 8080 off'
 ```
 
 The public address stops answering within seconds; the Thor, the model and the
-tailnet keep working, so yahboom and your own devices still reach it. To turn
+tailnet keep working, so your own devices still reach it over Tailscale or the SSH tunnel. To turn
 it back on: `sudo tailscale funnel --bg 8080`. Rotate the key before turning it
 back on if the abuse came from a key holder.
 
@@ -184,7 +188,8 @@ curl -s https://<new-address>/health
 The first HTTPS request may take a few seconds while Tailscale gets the new
 certificate. The new name enters the public certificate logs at that moment.
 
-**3. Update every place that names it.** On yahboom:
+**3. Update every place that names it.** On any machine with the two
+repositories cloned (paths below assume `~/Projects`):
 
 ```bash
 OLD=arpanpathak.taildb9a39.ts.net

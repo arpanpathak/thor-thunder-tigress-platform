@@ -21,6 +21,64 @@ edgechat            # pick a model from ~/models
   `~/.config/local-copilot-codebuddy/rules.md` goes into every chat as written.
 - To add a model, put a ChatML `.gguf` file under `~/models/gguf/`.
 
+## SSH tunnel from your machine
+
+Any machine that can `ssh thor` (chapter "Access and syncing") can reach the
+Thor's services without the public address: SSH forwards ports on your
+machine to the same ports on the Thor. This is what the local agents below
+use, and it works the same on Linux, macOS and Windows (OpenSSH).
+
+| Local address | On the Thor |
+|---|---|
+| `127.0.0.1:8079` | llama-server (Nemotron), OpenAI and Anthropic APIs |
+| `127.0.0.1:8080` | `thor-tigress-agent`: the chat page and the API with key check, web search and thinking translation |
+| `127.0.0.1:8888` | SearXNG |
+
+Nothing new is opened on the network: the tunnel rides on your SSH login.
+Machines without SSH access use the public address instead (chapter "Bring
+your own agent").
+
+**Any OS, for the current session:**
+
+```bash
+ssh -fN -o ExitOnForwardFailure=yes \
+  -L 127.0.0.1:8079:127.0.0.1:8079 -L 127.0.0.1:8080:127.0.0.1:8080 -L 127.0.0.1:8888:127.0.0.1:8888 thor
+```
+
+**Linux, kept up across reboots** as a user service,
+`~/.config/systemd/user/thor-model-tunnel.service`:
+
+```ini
+[Unit]
+Description=SSH tunnel to the Thor: Nemotron (8079), SearXNG (8888), front server (8080)
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ssh -o ControlMaster=no -o ControlPath=none -o BatchMode=yes -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:8079:127.0.0.1:8079 -L 127.0.0.1:8888:127.0.0.1:8888 -L 127.0.0.1:8080:127.0.0.1:8080 thor
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+```
+
+```bash
+systemctl --user enable --now thor-model-tunnel
+```
+
+**macOS:** the one-line `ssh -fN …` above, or an alias that opens it when
+needed, as in the OpenCode setup below. A launchd agent would keep it up
+across reboots; that has not been set up or tested here.
+
+Check it:
+
+```bash
+curl -s 127.0.0.1:8079/health    # {"status":"ok"}
+curl -s 127.0.0.1:8080/health    # {"status":"ok"}
+```
+
+Tested on a Jetson Orin NX running Ubuntu (yahboom), with the Linux service.
+
 ## Coding agent: OpenCode
 
 [OpenCode](https://opencode.ai) is a terminal coding agent: it reads and edits
@@ -33,10 +91,9 @@ Thor.
 <figcaption><b>Figure 7.1</b> OpenCode on your machine, the model on the Thor.</figcaption>
 </figure>
 
-The tunnel uses your existing SSH access, so nothing new is opened on the
-network.
+It uses the SSH tunnel from the section above.
 
-OpenCode was set up on yahboom on 2026-10-05 and removed the same day. In the
+OpenCode was tried on a Jetson Orin NX dev machine (yahboom) on 2026-10-05 and removed the same day. In the
 sessions there, Nemotron's tool calls often came back as plain text instead of
 calls, so files it reported as written did not exist, and with a project-level
 `CLAUDE.md` in the folder it refused multi-file work. openbatrangs (below)
@@ -96,33 +153,13 @@ task it spent a whole turn reasoning (11,504 characters) and stopped without
 calling a single tool. With thinking off it goes straight to reading, writing
 and running. The web chat's think toggle is not affected.
 
-The tunnel as a user service that starts at boot and reconnects,
-`~/.config/systemd/user/thor-model-tunnel.service`:
-
-```ini
-[Unit]
-Description=SSH tunnel to the Thor: Nemotron (8079), SearXNG (8888), front server (8080)
-After=network-online.target
-
-[Service]
-ExecStart=/usr/bin/ssh -o ControlMaster=no -o ControlPath=none -o BatchMode=yes -o ServerAliveInterval=30 -o ExitOnForwardFailure=yes -N -L 127.0.0.1:8079:127.0.0.1:8079 -L 127.0.0.1:8888:127.0.0.1:8888 -L 127.0.0.1:8080:127.0.0.1:8080 thor
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-```
-
-```bash
-systemctl --user enable --now thor-model-tunnel
-```
 
 ### Setup on macOS
 
 ```bash
 curl -fsSL https://opencode.ai/install | bash
 mkdir -p ~/.config/opencode ~/.config/thor-chat
-scp <yahboom>:.config/opencode/opencode.json ~/.config/opencode/
+# write ~/.config/opencode/opencode.json as in the Linux setup above
 (umask 077; ssh thor cat .config/thor-chat/api-key > ~/.config/thor-chat/api-key)
 echo 'alias opencode="(nc -z 127.0.0.1 8079 || ssh -fN -L 8079:127.0.0.1:8079 -L 8888:127.0.0.1:8888 thor) && command opencode"' >> ~/.zshrc
 ```
@@ -137,8 +174,7 @@ opencode                           # interactive
 opencode run "add a unit test"     # one task, then exit
 ```
 
-Checks: `systemctl --user status thor-model-tunnel` and
-`curl -s 127.0.0.1:8079/health` (must print `{"status":"ok"}`).
+Check the tunnel: `curl -s 127.0.0.1:8079/health` (must print `{"status":"ok"}`).
 
 Each running session uses one of the Thor's chat slots while it generates.
 After a new access key (`./serve.sh key` on the Thor), copy it again with the
@@ -173,10 +209,12 @@ openbatrangs --thor "create a cargo project named dsa with a stack and a queue, 
 | `--no-think` | thinking off (on by default; reasoning is shown dimmed after 💭) |
 | `--max-steps N` | step limit, default 40 |
 
-The same command works on yahboom through `thor-model-tunnel` (above). Install
-on either machine: `cargo install --path ~/Projects/openbatrangs --locked`.
+The same command works on any machine with the SSH tunnel (above), since
+`--thor` means `127.0.0.1:8079`. Without the tunnel, use the public address
+(chapter "Bring your own agent"). Install anywhere with Rust:
+`cargo install --git https://github.com/arpanpathak/openbatrangs --locked`.
 
-Measured on 2026-10-05, from yahboom, thinking on, task: "a cargo project with
+Measured on 2026-10-05, from a Jetson Orin NX (yahboom) through the SSH tunnel, thinking on, task: "a cargo project with
 a stack, a queue, a singly linked list, binary search and quicksort, each with
 unit tests, then run cargo test and fix anything that fails":
 

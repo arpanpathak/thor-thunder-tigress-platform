@@ -89,7 +89,8 @@ the jump. People share and bookmark `voltforge.tech/thor-tigress-cub`.
 ### What the jump costs
 
 Opening the short address takes two requests instead of one: the forwarding
-page, then the chat. Measured from yahboom on 2026-10-05:
+page, then the chat. Measured on 2026-10-05 from a Linux machine on a home
+connection:
 
 | Step | Time |
 |---|---|
@@ -289,7 +290,7 @@ it is longer than the sum of the two requests.
 DNS answers carry a time to live (TTL): how long anyone may keep the answer
 before asking again. Namecheap's records for `voltforge.tech` have a TTL of
 1,799 seconds, about 30 minutes. After the switch from the Namecheap redirect
-to GitHub Pages, yahboom kept the old answer, `192.64.119.155`, for that long,
+to GitHub Pages, the test machine kept the old answer, `192.64.119.155`, for that long,
 while Google's public resolver already returned GitHub's addresses. A browser
 using the old answer reaches the old setup, including its slow HTTPS timeout.
 
