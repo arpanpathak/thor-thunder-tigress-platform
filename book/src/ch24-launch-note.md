@@ -113,8 +113,8 @@ surface that runs today, and these six are the ones I am building toward.
 </figure>
 
 <figure>
-<img src="figures/cub-models.gif" alt="The chat page at phone width: the home screen naming Nemotron 3 Nano 30B A3B, then its answer with a Rust code block and 50.7 tokens a second; then the home screen naming Qwen3.6 35B A3B NVFP4 and its answer at 64.0 tokens a second.">
-<figcaption><b>Figure 24.10</b> Two models, one question, at phone width: Nemotron 3 Nano at 50.7 tokens a second, and Qwen3.6 35B A3B on TensorRT Edge-LLM at 64.0.</figcaption>
+<img src="figures/cub-models.gif" alt="The chat page at phone width: the home screen naming Nemotron 3 Nano 30B A3B, then Dijkstra's algorithm in Rust at 51.5 tokens a second; then the home screen naming Qwen3.6 35B A3B NVFP4 and its answer at 65.8.">
+<figcaption><b>Figure 24.10</b> Two models, one question, at phone width: Dijkstra's algorithm on an adjacency map, from Nemotron 3 Nano at 51.5 tokens a second and from Qwen3.6 35B A3B on TensorRT Edge-LLM at 65.8.</figcaption>
 </figure>
 
 ## Getting a key
