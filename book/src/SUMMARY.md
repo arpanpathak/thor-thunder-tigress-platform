@@ -26,6 +26,7 @@
 
 - [Training and serving (planned)](ch11-training-and-serving.md)
 - [TensorRT Edge-LLM](ch22-edge-llm.md)
+- [Model comparison](ch23-model-comparison.md)
 - [Human evaluation (planned)](ch12-human-evaluation.md)
 - [Evaluation design (planned)](ch13-evaluation-design.md)
 - [Reports (planned)](ch14-reports.md)

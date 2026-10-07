@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" width="960" height="420" role="img" aria-label="Both models receive the same request with the web_search tool and tool_choice auto. Nemotron 3 Nano on llama-server called the tool in 15 of 18 answers and its calls went to SearXNG. Qwen3.6-35B-A3B on TensorRT Edge-LLM called the tool in 3 of 18 and answered the rest from memory, so SearXNG was never asked.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .nolook { fill: #F7F9FB; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .quiet { stroke: #B7791F; stroke-width: 2; fill: none; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-quiet" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#B7791F"/>
+    </marker>
+  </defs>
+  <rect width="960" height="420" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Web on: the same tool, two decisions</text>
+  <text x="30" y="58" class="note">18 answers per model, thinking off, 2026-10-07</text>
+  <rect x="40" y="160" width="220" height="100" rx="10" class="built box"/>
+  <text x="150" y="192" class="name mono" text-anchor="middle">thor-tigress-agent</text>
+  <text x="150" y="212" class="note" text-anchor="middle">sends the tool definition</text>
+  <text x="150" y="230" class="note" text-anchor="middle">tool_choice: auto</text>
+  <text x="150" y="248" class="note" text-anchor="middle">searches only if a call comes back</text>
+  <rect x="350" y="60" width="240" height="90" rx="10" class="built box"/>
+  <text x="470" y="90" class="name" text-anchor="middle">Nemotron 3 Nano</text>
+  <text x="470" y="110" class="note" text-anchor="middle">llama-server :8079</text>
+  <text x="470" y="130" class="note" text-anchor="middle">called the tool 15 of 18</text>
+  <rect x="350" y="270" width="240" height="90" rx="10" class="built box"/>
+  <text x="470" y="300" class="name" text-anchor="middle">Qwen3.6-35B-A3B</text>
+  <text x="470" y="320" class="note" text-anchor="middle">Edge-LLM :8081</text>
+  <text x="470" y="340" class="note" text-anchor="middle">called the tool 3 of 18</text>
+  <rect x="700" y="60" width="230" height="90" rx="10" class="outside"/>
+  <text x="815" y="90" class="name mono" text-anchor="middle">web_search</text>
+  <text x="815" y="110" class="note" text-anchor="middle">SearXNG :8888</text>
+  <text x="815" y="130" class="note" text-anchor="middle">6 results, snippets</text>
+  <rect x="700" y="270" width="230" height="90" rx="10" class="nolook"/>
+  <text x="815" y="300" class="name" text-anchor="middle">answers from memory</text>
+  <text x="815" y="320" class="note" text-anchor="middle">no tool call this turn</text>
+  <text x="815" y="340" class="note" text-anchor="middle">SearXNG never asked</text>
+  <path class="flow" d="M262,190 C312,190 300,105 348,105" marker-end="url(#arrow)"/>
+  <path class="flow" d="M262,230 C312,230 300,315 348,315" marker-end="url(#arrow)"/>
+  <path class="flow" d="M592,105 L696,105" marker-end="url(#arrow)"/>
+  <path class="quiet" d="M592,315 L696,315" marker-end="url(#arrow-quiet)"/>
+  <text x="304" y="212" class="label" text-anchor="middle">messages + tools</text>
+  <text x="644" y="95" class="label" text-anchor="middle">tool call</text>
+  <text x="644" y="305" class="warn" text-anchor="middle">no tool call</text>
+  <text x="30" y="404" class="note" text-anchor="start">The request is identical for both engines. The engine passes the model's decision through; it does not add or remove tool calls.</text>
+</svg>

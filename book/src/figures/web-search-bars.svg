@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" role="img" aria-label="Answers that called web_search, of three tries each. Nemotron searched for ownership in Rust 2 of 3, median of a slice 1 of 3, weekend project 3 of 3, CUDA 13 3 of 3, Formula 1 champion 3 of 3, RTX 5090 price 3 of 3, 15 of 18 in total. Qwen searched only for CUDA 13, 3 of 3, and 0 for the rest, 3 of 18 in total.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+  </style>
+  <rect width="960" height="440" fill="#FFFFFF"/>
+  <text x="30" y="34" class="title">Answers that called web_search, of three tries each</text>
+  <rect x="30" y="50" width="13" height="13" rx="3" fill="#E4F0D9" stroke="#4E8A16" stroke-width="1.5"/>
+  <text x="50" y="61" class="note" text-anchor="start">Nemotron 3 Nano: 15 of 18</text>
+  <rect x="280" y="50" width="13" height="13" rx="3" fill="#F8E1D9" stroke="#D9542B" stroke-width="1.5"/>
+  <text x="300" y="61" class="note" text-anchor="start">Qwen3.6-35B-A3B: 3 of 18</text>
+  <line x1="300" y1="88" x2="300" y2="380" stroke="#E3E8EE" stroke-width="1"/>
+  <line x1="500" y1="88" x2="500" y2="380" stroke="#E3E8EE" stroke-width="1"/>
+  <line x1="700" y1="88" x2="700" y2="380" stroke="#E3E8EE" stroke-width="1"/>
+  <line x1="900" y1="88" x2="900" y2="380" stroke="#E3E8EE" stroke-width="1"/>
+  <text x="300" y="82" class="note" text-anchor="middle">0</text>
+  <text x="500" y="82" class="note" text-anchor="middle">1</text>
+  <text x="700" y="82" class="note" text-anchor="middle">2</text>
+  <text x="900" y="82" class="note" text-anchor="middle">3</text>
+  <text x="286" y="120" class="note" text-anchor="end">Ownership in Rust</text>
+  <text x="286" y="166" class="note" text-anchor="end">Median of a slice</text>
+  <text x="286" y="212" class="note" text-anchor="end">Raspberry Pi weekend project</text>
+  <text x="286" y="258" class="note" text-anchor="end">What is new in CUDA 13?</text>
+  <text x="286" y="304" class="note" text-anchor="end">2026 Formula 1 champion</text>
+  <text x="286" y="350" class="note" text-anchor="end">RTX 5090 price today</text>
+  <rect x="300" y="101" width="600" height="12" rx="3" fill="#F1F7EA"/>
+  <rect x="300" y="119" width="600" height="12" rx="3" fill="#FBF0EC"/>
+  <rect x="300" y="101" width="400" height="12" rx="3" fill="#E4F0D9" stroke="#4E8A16" stroke-width="1.5"/>
+  <text x="706" y="111" class="num" text-anchor="start">2</text>
+  <text x="306" y="129" class="num" text-anchor="start">0</text>
+  <rect x="300" y="147" width="600" height="12" rx="3" fill="#F1F7EA"/>
+  <rect x="300" y="165" width="600" height="12" rx="3" fill="#FBF0EC"/>
+  <rect x="300" y="147" width="200" height="12" rx="3" fill="#E4F0D9" stroke="#4E8A16" stroke-width="1.5"/>
+  <text x="506" y="157" class="num" text-anchor="start">1</text>
+  <text x="306" y="175" class="num" text-anchor="start">0</text>
+  <rect x="300" y="193" width="600" height="12" rx="3" fill="#F1F7EA"/>
+  <rect x="300" y="211" width="600" height="12" rx="3" fill="#FBF0EC"/>
+  <rect x="300" y="193" width="600" height="12" rx="3" fill="#E4F0D9" stroke="#4E8A16" stroke-width="1.5"/>
+  <text x="906" y="203" class="num" text-anchor="start">3</text>
+  <text x="306" y="221" class="num" text-anchor="start">0</text>
+  <rect x="300" y="239" width="600" height="12" rx="3" fill="#F1F7EA"/>
+  <rect x="300" y="257" width="600" height="12" rx="3" fill="#FBF0EC"/>
+  <rect x="300" y="239" width="600" height="12" rx="3" fill="#E4F0D9" stroke="#4E8A16" stroke-width="1.5"/>
+  <text x="906" y="249" class="num" text-anchor="start">3</text>
+  <rect x="300" y="257" width="600" height="12" rx="3" fill="#F8E1D9" stroke="#D9542B" stroke-width="1.5"/>
+  <text x="906" y="267" class="num" text-anchor="start">3</text>
+  <rect x="300" y="285" width="600" height="12" rx="3" fill="#F1F7EA"/>
+  <rect x="300" y="303" width="600" height="12" rx="3" fill="#FBF0EC"/>
+  <rect x="300" y="285" width="600" height="12" rx="3" fill="#E4F0D9" stroke="#4E8A16" stroke-width="1.5"/>
+  <text x="906" y="295" class="num" text-anchor="start">3</text>
+  <text x="306" y="313" class="num" text-anchor="start">0</text>
+  <rect x="300" y="331" width="600" height="12" rx="3" fill="#F1F7EA"/>
+  <rect x="300" y="349" width="600" height="12" rx="3" fill="#FBF0EC"/>
+  <rect x="300" y="331" width="600" height="12" rx="3" fill="#E4F0D9" stroke="#4E8A16" stroke-width="1.5"/>
+  <text x="906" y="341" class="num" text-anchor="start">3</text>
+  <text x="306" y="359" class="num" text-anchor="start">0</text>
+  <text x="30" y="416" class="note" text-anchor="start">Three runs per prompt, Web on, thinking off, default sampling, 2026-10-07. 15 of 18 against 3 of 18.</text>
+</svg>
