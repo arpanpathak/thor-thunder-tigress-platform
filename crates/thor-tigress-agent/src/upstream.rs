@@ -147,16 +147,21 @@ fn read_response(mut reader: Box<dyn BufRead + Send>, address: &str) -> Outcome<
     else {
         return Err(AgentError::Upstream(format!("{address}: no status line")));
     };
+
     let mut chunked = false;
     let mut content_type = DEFAULT_CONTENT_TYPE.to_string();
+
     loop {
         let mut header = String::new();
         reader.read_line(&mut header)?;
         let header = header.trim().to_ascii_lowercase();
+
         if header.is_empty() {
             break;
         }
+
         chunked |= header.starts_with("transfer-encoding:") && header.contains("chunked");
+
         if let Some(value) = header.strip_prefix("content-type:") {
             content_type = value.trim().to_string();
         }
@@ -194,6 +199,7 @@ impl Dechunk {
         if self.done {
             return Ok(false);
         }
+
         let mut line = String::new();
         let size = match self.inner.read_line(&mut line)? {
             0 => 0,
@@ -211,9 +217,11 @@ impl Read for Dechunk {
         if self.remaining == 0 && !self.next_chunk().map_err(io::Error::other)? {
             return Ok(0);
         }
+
         let wanted = buffer.len().min(self.remaining);
         let read = self.inner.read(&mut buffer[..wanted])?;
         self.remaining -= read;
+
         if self.remaining == 0 {
             self.inner.read_line(&mut String::new())?;
         }

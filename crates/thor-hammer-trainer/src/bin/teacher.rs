@@ -10,6 +10,7 @@ fn main() -> ExitCode {
         Command::Check { source, output } => {
             teacher_build::check(&Paths::new(source, output.clone())).map(|result| {
                 print!("{}", result.summary());
+
                 if !result.all_passed {
                     eprintln!(
                         "teacher: some entries failed; see {}",
@@ -31,6 +32,7 @@ fn main() -> ExitCode {
             Ok(false)
         }
     };
+
     match outcome {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::FAILURE,

@@ -86,6 +86,7 @@ impl Command {
         let Some((first, rest)) = arguments.split_first() else {
             return serve(&[]);
         };
+
         match first.as_str() {
             "serve" => serve(rest),
             "scan" => Command::Scan {
@@ -121,10 +122,12 @@ fn serve(options: &[String]) -> Command {
     let mut port = DEFAULT_PORT.to_string();
     let mut datasets = Vec::new();
     let mut rest = options.iter();
+
     while let Some(option) = rest.next() {
         let Some(value) = rest.next() else {
             return Command::Usage(format!("{option} needs a value"));
         };
+
         match option.as_str() {
             "--port" => port.clone_from(value),
             "--dataset" => match dataset(value) {
@@ -138,6 +141,7 @@ fn serve(options: &[String]) -> Command {
             other => return Command::Usage(format!("unknown option {other}")),
         }
     }
+
     if datasets.is_empty() {
         datasets = DEFAULT_DATASETS
             .iter()

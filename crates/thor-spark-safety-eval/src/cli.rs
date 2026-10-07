@@ -88,6 +88,7 @@ impl Command {
         let Some((command, rest)) = arguments.split_first() else {
             return Err(EvalError::Usage(usage()));
         };
+
         match command.as_str() {
             "rs" => Ok(Command::Rust(paths(rest)?)),
             "text" => Ok(Command::Text(paths(rest)?)),
@@ -123,6 +124,7 @@ fn paths(arguments: &[String]) -> Outcome<Vec<PathBuf>> {
     if arguments.is_empty() {
         return Err(EvalError::Usage(usage()));
     }
+
     Ok(arguments.iter().map(PathBuf::from).collect())
 }
 
@@ -134,12 +136,14 @@ impl ScoreOptions {
         let mut label = None;
         let mut output = None;
         let mut rest = arguments.iter();
+
         while let Some(argument) = rest.next() {
             let mut value = || {
                 rest.next()
                     .cloned()
                     .ok_or_else(|| EvalError::Usage(format!("{argument} needs a value")))
             };
+
             match argument.as_str() {
                 "--field" => field = value()?,
                 "--code-field" => code_field = Some(value()?),
@@ -154,9 +158,11 @@ impl ScoreOptions {
                 path => input = Some(PathBuf::from(path)),
             }
         }
+
         let Some(input) = input else {
             return Err(EvalError::Usage(usage()));
         };
+
         Ok(ScoreOptions {
             output: output.unwrap_or_else(|| input.with_extension("scored.jsonl")),
             label: label.unwrap_or_else(|| stem(&input)),
@@ -182,10 +188,12 @@ fn stem(path: &Path) -> String {
 pub fn rust_files(paths: &[PathBuf]) -> Outcome<Vec<PathBuf>> {
     let mut files = Vec::new();
     let mut pending = paths.to_vec();
+
     while let Some(path) = pending.pop() {
         if path.is_dir() {
             for entry in fs::read_dir(&path).map_err(EvalError::io(&path))? {
                 let entry = entry.map_err(EvalError::io(&path))?.path();
+
                 if !is_skipped(&entry) {
                     pending.push(entry);
                 }
@@ -207,11 +215,14 @@ fn is_skipped(path: &Path) -> bool {
 fn check_rust(paths: &[PathBuf]) -> Outcome<Report> {
     let files = rust_files(paths)?;
     let mut lines = Vec::new();
+
     for file in &files {
         let report = rules::check(&fs::read_to_string(file).map_err(EvalError::io(file))?);
+
         if let Some(error) = &report.parse_error {
             lines.push(format!("{}: does not parse: {error}", file.display()));
         }
+
         for violation in &report.violations {
             lines.push(format!(
                 "{}:{}: {}: {}",
@@ -233,9 +244,11 @@ fn check_rust(paths: &[PathBuf]) -> Outcome<Report> {
 fn check_text(paths: &[PathBuf]) -> Outcome<Report> {
     let mut lines = Vec::new();
     let mut total = 0;
+
     for path in paths {
         let text = fs::read_to_string(path).map_err(EvalError::io(path))?;
         let report = slop::check(&text);
+
         for hit in &report.hits {
             let line = text[..hit.start].matches('\n').count() + 1;
             lines.push(format!(
@@ -279,6 +292,7 @@ fn score_run(options: &ScoreOptions) -> Outcome<Report> {
     let file = fs::File::create(&options.output).map_err(EvalError::io(&options.output))?;
     let mut writer = BufWriter::new(file);
     let mut summary = Summary::default();
+
     for (line, number) in text
         .lines()
         .zip(1..)
@@ -288,6 +302,7 @@ fn score_run(options: &ScoreOptions) -> Outcome<Report> {
         summary.add(&score);
         let spark =
             serde_json::to_value(&score).map_err(EvalError::json(&options.output, number))?;
+
         if let Value::Object(fields) = &mut record {
             fields.insert("spark".to_string(), spark);
             fields.insert(

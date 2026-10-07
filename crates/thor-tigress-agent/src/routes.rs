@@ -110,10 +110,13 @@ fn listed_file(path: &str) -> Option<StaticFile> {
 pub fn answer(client: &mut dyn Write, request: &Request, config: &Config) -> Outcome {
     let route = Route::of(&request.method, &request.path);
     let needs_key = route != Route::Preflight && request.path.starts_with(paths::API);
+
     if needs_key && !config.admits(request.authorization.as_deref()) {
         return response::unauthorized(client);
     }
+
     let upstreams = &config.upstreams;
+
     match route {
         Route::Preflight => response::preflight(client),
         Route::File(file) => send_file(client, &config.web, file),
@@ -173,6 +176,7 @@ mod tests {
             ("POST", "/health", Route::NotFound),
             ("GET", "/v1/embeddings", Route::NotFound),
         ];
+
         for (method, path, route) in table {
             assert_eq!(Route::of(method, path), route, "{method} {path}");
         }

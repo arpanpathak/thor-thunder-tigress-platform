@@ -111,6 +111,7 @@ where
         if let Some(&id) = self.ids.get(name) {
             return Some(id);
         }
+
         let id = Id::try_from(self.names.len()).ok()?;
         self.names.push(name.to_string());
         self.ids.insert(name.to_string(), id);
@@ -159,12 +160,15 @@ impl Index {
         };
         let mut offset = 0;
         let mut line = String::new();
+
         for line_number in 1.. {
             line.clear();
             let read = reader.read_line(&mut line).map_err(ReviewError::io(path))?;
+
             if read == 0 {
                 break;
             }
+
             if !line.trim().is_empty() {
                 let header: Header =
                     serde_json::from_str(&line).map_err(ReviewError::json(path, line_number))?;
@@ -239,6 +243,7 @@ impl Index {
         if !SOURCES_WITH_COLLECTIONS.contains(&self.source_of(entry)) {
             return None;
         }
+
         let (folder, _) = self.origin_of(entry).split_once('/')?;
         (!folder.is_empty()).then_some(folder)
     }
@@ -248,6 +253,7 @@ impl Index {
     #[must_use]
     pub fn collections(&self) -> Vec<CollectionCount> {
         let mut counts: HashMap<(&str, &str), usize> = HashMap::new();
+
         for entry in &self.entries {
             if let Some(folder) = self.collection_of(entry) {
                 *counts.entry((folder, self.source_of(entry))).or_default() += 1;
@@ -274,6 +280,7 @@ impl Index {
     #[must_use]
     pub fn counts(&self) -> Vec<SourceCount> {
         let mut counts: HashMap<&str, usize> = HashMap::new();
+
         for entry in &self.entries {
             *counts.entry(self.source_of(entry)).or_default() += 1;
         }
@@ -337,6 +344,7 @@ impl Index {
                 .get(*position)
                 .is_some_and(|entry| self.keeps(entry, filter, flagged))
         };
+
         match filter.query.as_deref() {
             None => Ok((0..self.entries.len()).filter(kept).collect()),
             Some(query) => Ok(self.containing(query)?.into_iter().filter(kept).collect()),
@@ -350,11 +358,14 @@ impl Index {
         let file = File::open(&self.path).map_err(ReviewError::io(&self.path))?;
         let mut positions = Vec::new();
         let mut position = 0;
+
         for line in BufReader::with_capacity(READ_BUFFER, file).lines() {
             let line = line.map_err(ReviewError::io(&self.path))?.to_lowercase();
+
             if line.trim().is_empty() {
                 continue;
             }
+
             if line.contains(&needle) || line.contains(&escaped) {
                 positions.push(position);
             }

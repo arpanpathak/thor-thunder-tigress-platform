@@ -22,6 +22,7 @@ fn every_crate_in_the_workspace_passes_the_five_rules() -> Outcome {
         files.len(),
         crates.display()
     );
+
     for file in &files {
         let report = rules::check(&fs::read_to_string(file).map_err(EvalError::io(file))?);
         assert_eq!(

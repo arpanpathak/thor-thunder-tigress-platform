@@ -142,11 +142,13 @@ pub fn read_request(stream: &mut dyn Read) -> Outcome<Request> {
     let target = parts.next().unwrap_or_default();
     let (path, query) = target.split_once('?').unwrap_or((target, ""));
     let length = read_content_length(&mut reader)?;
+
     if length > MAX_BODY {
         return Err(ReviewError::BadRequest(format!(
             "body over {MAX_BODY} bytes"
         )));
     }
+
     let mut body = vec![0; length];
     reader.read_exact(&mut body)?;
     Ok(Request {
@@ -160,11 +162,14 @@ pub fn read_request(stream: &mut dyn Read) -> Outcome<Request> {
 /// Reads the headers up to the blank line, returning `Content-Length`.
 fn read_content_length(reader: &mut impl BufRead) -> Outcome<usize> {
     let mut length = 0;
+
     loop {
         let mut line = String::new();
+
         if reader.read_line(&mut line)? == 0 || line.trim().is_empty() {
             return Ok(length);
         }
+
         if let Some((name, value)) = line.split_once(':')
             && name.eq_ignore_ascii_case("content-length")
         {
@@ -192,6 +197,7 @@ fn parse_query(query: &str) -> Vec<Param> {
 fn decode(text: &str) -> String {
     let mut bytes = text.bytes();
     let mut out = Vec::with_capacity(text.len());
+
     while let Some(byte) = bytes.next() {
         match byte {
             b'+' => out.push(b' '),
@@ -199,6 +205,7 @@ fn decode(text: &str) -> String {
             other => out.push(other),
         }
     }
+
     String::from_utf8_lossy(&out).into_owned()
 }
 

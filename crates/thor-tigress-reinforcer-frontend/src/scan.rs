@@ -204,6 +204,7 @@ pub fn run(training: &Path, out: &Path) -> Outcome {
     let suggestions = scan(&index)?;
     jsonl::write_lines(out, &suggestions)?;
     println!("scanned {} records", index.len());
+
     for (rule, count) in counts(&suggestions) {
         println!("  {rule:<24} {count:>6}");
     }
@@ -224,8 +225,10 @@ pub fn run(training: &Path, out: &Path) -> Outcome {
 /// `ReviewError::Io` or `ReviewError::Json` when a record can't be read.
 pub fn scan(index: &Index) -> Outcome<Vec<Suggestion>> {
     let mut suggestions = Vec::new();
+
     for (position, entry) in index.entries().enumerate() {
         let texts: Texts = index.parsed(position)?;
+
         for (field, text) in [
             (Field::Instruction, &texts.instruction),
             (Field::Response, &texts.response),
@@ -262,6 +265,7 @@ fn findings(field: Field, text: &str) -> Vec<Finding> {
         })
         .collect();
     let dashes = text.matches('—').count();
+
     if field == Field::Response && dashes >= EM_DASH_LIMIT {
         found.push(Finding {
             rule: EM_DASH_RULE,
@@ -275,6 +279,7 @@ fn findings(field: Field, text: &str) -> Vec<Finding> {
 /// How many suggestions each rule produced.
 fn counts(suggestions: &[Suggestion]) -> BTreeMap<&str, usize> {
     let mut counts = BTreeMap::new();
+
     for suggestion in suggestions {
         *counts.entry(suggestion.rule.as_str()).or_default() += 1;
     }
@@ -310,6 +315,7 @@ pub fn apply(suggestions: &Path, flags: &Path) -> Outcome {
 /// listing every reason, and saves. Returns how many were added.
 fn apply_to(suggestions: &[Suggestion], store: &mut FlagStore) -> Outcome<usize> {
     let mut reasons: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+
     for suggestion in suggestions {
         reasons
             .entry(&suggestion.id)
@@ -317,10 +323,12 @@ fn apply_to(suggestions: &[Suggestion], store: &mut FlagStore) -> Outcome<usize>
             .push(suggestion.reason());
     }
     let mut added = 0;
+
     for (id, reasons) in reasons {
         if store.get(id).is_some() {
             continue;
         }
+
         store.set(
             id,
             Flag {

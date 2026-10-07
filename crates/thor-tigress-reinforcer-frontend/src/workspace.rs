@@ -77,23 +77,28 @@ impl Workspace {
     pub fn open(specs: &[DatasetSpec]) -> Outcome<Workspace> {
         let mut datasets = Vec::new();
         let mut missing = Vec::new();
+
         for spec in specs {
             if !spec.records.is_file() {
                 missing.push(format!("{} ({})", spec.name, spec.records.display()));
+
                 continue;
             }
+
             let app = App::open(&spec.records, &spec.flags, &spec.removed)?;
             datasets.push(Dataset {
                 name: spec.name.clone(),
                 app,
             });
         }
+
         if datasets.is_empty() {
             return Err(ReviewError::NotFound(format!(
                 "no dataset to show: {}",
                 missing.join(", ")
             )));
         }
+
         Ok(Workspace { datasets, missing })
     }
 

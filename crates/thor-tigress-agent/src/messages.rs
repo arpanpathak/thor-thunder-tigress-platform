@@ -44,6 +44,7 @@ pub fn forward(client: &mut dyn Write, body: &[u8], model: &Endpoint) -> Outcome
 fn prepare(body: &[u8]) -> Outcome<Vec<u8>> {
     let mut request: Value = serde_json::from_slice(body)?;
     let thinking = Thinking::asked_by(&request);
+
     if let Some(fields) = request.as_object_mut()
         && thinking == Thinking::Off
         && !fields.contains_key(TEMPLATE_SETTINGS)

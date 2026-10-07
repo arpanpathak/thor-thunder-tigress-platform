@@ -63,6 +63,7 @@ impl Summary {
             .filter(|block| block.report.parsed)
             .count();
         self.all_rules += usize::from(score.all_rules == Some(true));
+
         for (rule, verdict) in &score.rules {
             let count = self.rules.entry(*rule).or_default();
             count.passed += usize::from(*verdict == Verdict::Pass);
@@ -73,6 +74,7 @@ impl Summary {
         self.em_dash_habit += usize::from(score.slop.em_dashes >= EM_DASH_HABIT);
         self.words += score.slop.words;
         self.false_claims += usize::from(!score.false_claims.is_empty());
+
         for hit in &score.slop.hits {
             *self.categories.entry(hit.category).or_default() += 1;
         }
@@ -158,6 +160,7 @@ fn per_thousand(count: usize, words: usize) -> String {
 /// the even neighbour, the way `{:.0}` formats a float. `denominator` is not zero.
 fn rounded(numerator: usize, denominator: usize) -> usize {
     let quotient = numerator / denominator;
+
     match (numerator % denominator * 2).cmp(&denominator) {
         Ordering::Less => quotient,
         Ordering::Greater => quotient + 1,

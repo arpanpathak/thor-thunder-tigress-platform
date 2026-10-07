@@ -156,8 +156,10 @@ impl Wrapping {
 #[must_use]
 pub fn check(source: &str) -> CodeReport {
     let mut first_error = None;
+
     for wrapping in Wrapping::ALL {
         let wrapped = format!("{}{source}{}", wrapping.prefix(), wrapping.suffix());
+
         match syn::parse_file(&wrapped) {
             Ok(file) => return judge(&file, source, wrapping),
             Err(error) if first_error.is_none() => {
@@ -186,6 +188,7 @@ fn judge(file: &File, source: &str, wrapping: Wrapping) -> CodeReport {
     scan.visit_file(file);
     let whole_file = wrapping == Wrapping::File;
     let mut violations = scan.violations.clone();
+
     if whole_file {
         violations.extend(scan.comments_in_bodies(&comments::find(source)));
     }
@@ -312,6 +315,7 @@ impl ErrorFacts {
             .iter()
             .map(|used| violation(used.line, format!("uses the {} crate", used.value)))
             .collect();
+
         for implementation in self.implementors("Error") {
             if self.structs.contains(&implementation.type_name) {
                 found.push(violation(
@@ -321,6 +325,7 @@ impl ErrorFacts {
             }
         }
         let mut reported = BTreeSet::new();
+
         for returned in &self.returned {
             if let Some(detail) = self.problem(&returned.value)
                 && reported.insert(detail.clone())
@@ -337,6 +342,7 @@ impl ErrorFacts {
             ErrorType::Named(name) => self.aliases.get(name).unwrap_or(error),
             ErrorType::Text(_) | ErrorType::Boxed => error,
         };
+
         match resolved {
             ErrorType::Text(text) => Some(format!("returns Result<_, {text}>")),
             ErrorType::Boxed => Some("returns Result<_, Box<dyn Error>>".to_string()),
@@ -411,10 +417,12 @@ impl Scan {
         if !matches!(visibility, Visibility::Public(_)) {
             return;
         }
+
         self.pub_items += 1;
         let documented = attributes
             .iter()
             .any(|attribute| attribute.path().is_ident("doc"));
+
         if !documented {
             self.report(
                 Rule::PubDocs,
@@ -453,6 +461,7 @@ impl Scan {
         let ReturnType::Type(_, returned) = &signature.output else {
             return;
         };
+
         if let Some(error) = result_error(returned) {
             let line = self.line(signature.span());
             self.errors.returned.push(At { line, value: error });
@@ -475,6 +484,7 @@ impl Scan {
                 });
                 found
             });
+
         if derives {
             let line = attributes
                 .first()
@@ -503,6 +513,7 @@ impl<'ast> Visit<'ast> for Scan {
             _ => return visit::visit_item(self, item),
         };
         self.check_docs(visibility, attributes, &name, item.span());
+
         match item {
             Item::Struct(item) => {
                 self.errors.structs.insert(item.ident.to_string());
@@ -530,6 +541,7 @@ impl<'ast> Visit<'ast> for Scan {
             &format!("fn {}", item.sig.ident),
             item.span(),
         );
+
         if !self.in_trait_impl {
             self.signature(&item.sig);
         }
@@ -539,6 +551,7 @@ impl<'ast> Visit<'ast> for Scan {
 
     fn visit_trait_item_fn(&mut self, item: &'ast syn::TraitItemFn) {
         self.signature(&item.sig);
+
         if let Some(block) = &item.default {
             self.body(block);
         }
@@ -551,6 +564,7 @@ impl<'ast> Visit<'ast> for Scan {
             .as_ref()
             .and_then(|(_, path, _)| path.segments.last())
             .map(|segment| segment.ident.to_string());
+
         if let (Some(trait_name), Some(self_name)) = (trait_name, type_name(&item.self_ty)) {
             let line = self.line(item.span());
             self.errors.impls.push(Implementation {
@@ -593,6 +607,7 @@ impl<'ast> Visit<'ast> for Scan {
         let name = call.method.to_string();
         let banned = (name == "unwrap" && call.args.is_empty())
             || (name == "expect" && call.args.len() == 1);
+
         if banned {
             self.report(Rule::NoUnwrap, call.method.span(), format!(".{name}()"));
         }
@@ -614,6 +629,7 @@ impl<'ast> Visit<'ast> for Scan {
                 finder.visit_block(&node.body);
                 finder.found
             });
+
             if to_len || indexes {
                 let pattern = variable.unwrap_or_else(|| "_".to_string());
                 self.report(
@@ -632,6 +648,7 @@ impl<'ast> Visit<'ast> for Scan {
             .segments
             .last()
             .map(|segment| segment.ident.to_string());
+
         if let Some(name) = last.filter(|name| name == "anyhow" || name == "bail") {
             let line = self.line(mac.span());
             self.errors.crates.push(At {
@@ -639,6 +656,7 @@ impl<'ast> Visit<'ast> for Scan {
                 value: format!("anyhow ({name}!)"),
             });
         }
+
         for argument in &macro_arguments(mac) {
             self.visit_expr(argument);
         }
@@ -722,6 +740,7 @@ fn error_name(ty: &Type) -> Option<String> {
     let Type::Path(path) = ty else {
         return None;
     };
+
     let names: Vec<String> = path
         .path
         .segments
@@ -729,6 +748,7 @@ fn error_name(ty: &Type) -> Option<String> {
         .map(|segment| segment.ident.to_string())
         .collect();
     let (last, before) = names.split_last()?;
+
     match before.last() {
         Some(module) if last == "Error" => Some(format!("{module}::{last}")),
         Some(_) | None => Some(last.clone()),
@@ -742,13 +762,17 @@ fn result_error(ty: &Type) -> Option<ErrorType> {
     let Type::Path(path) = ty else {
         return None;
     };
+
     let last = path.path.segments.last()?;
+
     if last.ident != "Result" {
         return None;
     }
+
     let syn::PathArguments::AngleBracketed(arguments) = &last.arguments else {
         return None;
     };
+
     let types: Vec<&Type> = arguments
         .args
         .iter()
@@ -764,6 +788,7 @@ fn result_error(ty: &Type) -> Option<ErrorType> {
         .rev()
         .nth(1)
         .map(|segment| segment.ident.to_string());
+
     match (types.as_slice(), module.as_deref()) {
         ([_, error], _) => Some(classify(error)),
         ([_], None) => Some(ErrorType::Named("Result".to_string())),

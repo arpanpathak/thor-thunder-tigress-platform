@@ -143,11 +143,14 @@ impl FlagStore {
         let mut flags: Vec<(&str, &Flag)> = self.iter().collect();
         flags.sort_by_key(|(id, _)| *id);
         let mut found: HashMap<String, Phrase> = HashMap::new();
+
         for span in flags.into_iter().flat_map(|(_, flag)| &flag.spans) {
             let text = span.text.trim();
+
             if text.chars().count() < MIN_PHRASE_CHARS {
                 continue;
             }
+
             found
                 .entry(text.to_lowercase())
                 .and_modify(|phrase| phrase.examples += 1)
@@ -179,6 +182,7 @@ impl FlagStore {
             .spans
             .iter()
             .any(|kept| kept.field == span.field && kept.text.eq_ignore_ascii_case(&span.text));
+
         if !present {
             flag.spans.push(span);
         }

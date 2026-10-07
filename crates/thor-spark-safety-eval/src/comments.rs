@@ -30,6 +30,7 @@ struct Cursor<'a> {
 impl Cursor<'_> {
     fn bump(&mut self) -> Option<char> {
         let next = self.rest.next()?;
+
         match next {
             '\n' => {
                 self.line += 1;
@@ -47,6 +48,7 @@ impl Cursor<'_> {
 
     fn line_comment(&mut self, line: usize, column: usize) -> Comment {
         let mut text = String::from("/");
+
         while let Some(next) = self.peek(0).filter(|next| *next != '\n') {
             text.push(next);
             self.bump();
@@ -64,8 +66,10 @@ impl Cursor<'_> {
         let mut text = String::from("/*");
         let mut depth = 1usize;
         self.bump();
+
         while let Some(next) = self.bump() {
             text.push(next);
+
             match (next, self.peek(0)) {
                 ('/', Some('*')) => {
                     depth += 1;
@@ -75,6 +79,7 @@ impl Cursor<'_> {
                 ('*', Some('/')) if depth <= 1 => {
                     text.push('/');
                     self.bump();
+
                     break;
                 }
                 ('*', Some('/')) => {
@@ -109,17 +114,21 @@ impl Cursor<'_> {
 
     fn skip_raw_string(&mut self) {
         let mut hashes = 0usize;
+
         while self.peek(0) == Some('#') {
             hashes += 1;
             self.bump();
         }
         self.bump();
+
         while let Some(next) = self.bump() {
             let closes = next == '"' && (0..hashes).all(|ahead| self.peek(ahead) == Some('#'));
+
             if closes {
                 for _ in 0..hashes {
                     self.bump();
                 }
+
                 return;
             }
         }
@@ -130,6 +139,7 @@ impl Cursor<'_> {
             (Some('\\'), _) => {
                 self.bump();
                 self.bump();
+
                 while let Some(next) = self.bump() {
                     if next == '\'' {
                         return;
@@ -171,12 +181,14 @@ pub fn find(source: &str) -> Vec<Comment> {
         previous: ' ',
     };
     let mut comments = Vec::new();
+
     loop {
         let before = cursor.previous;
         let (line, column) = (cursor.line, cursor.column);
         let Some(current) = cursor.bump() else {
             return comments;
         };
+
         match (current, cursor.peek(0)) {
             ('/', Some('/')) => comments.push(cursor.line_comment(line, column)),
             ('/', Some('*')) => comments.push(cursor.block_comment(line, column)),

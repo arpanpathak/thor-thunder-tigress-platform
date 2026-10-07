@@ -134,6 +134,7 @@ pub fn read(path: &Path) -> Result<HashMap<String, SlopFlag>, DataError> {
         Err(error) => return Err(DataError::io(path)(error)),
     };
     let mut flags_by_id = HashMap::new();
+
     for line in flags_jsonl.lines().filter(|line| !line.trim().is_empty()) {
         let flag: SlopFlag = serde_json::from_str(line)?;
         flags_by_id.insert(flag.id.clone(), flag);
@@ -163,8 +164,10 @@ pub fn separate_flagged(
     let mut kept = Vec::new();
     let mut flagged = Vec::new();
     let mut matched_ids = std::collections::HashSet::new();
+
     for example in examples {
         let id = example.id();
+
         match flags_by_id.get(&id) {
             Some(flag) if !flag.is_reviewed() => {
                 matched_ids.insert(id.clone());

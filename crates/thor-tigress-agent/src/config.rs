@@ -23,12 +23,16 @@ use crate::{
 
 /// Where the server listens unless `--listen` says otherwise.
 const DEFAULT_LISTEN: &str = "127.0.0.1:8080";
+
 /// Where llama-server listens.
 const DEFAULT_MODEL: &str = "127.0.0.1:8079";
+
 /// Where SearXNG listens.
 const DEFAULT_SEARCH: &str = "127.0.0.1:8888";
+
 /// The key file, relative to `$HOME`.
 const KEY_FILE: &str = ".config/thor-chat/api-key";
+
 /// How a key is sent in an `Authorization` header.
 pub const BEARER: &str = "Bearer ";
 
@@ -161,10 +165,12 @@ impl Options {
     fn parse(arguments: impl IntoIterator<Item = String>) -> Outcome<Self> {
         let mut options = Options::default();
         let mut arguments = arguments.into_iter();
+
         while let Some(flag) = arguments.next() {
             let Some(value) = arguments.next() else {
                 return Err(AgentError::Config(format!("{flag} needs a value")));
             };
+
             options.set(&flag, value)?;
         }
         Ok(options)
@@ -180,6 +186,7 @@ impl Options {
             "--key-file" => self.key_file = PathBuf::from(value),
             unknown => return Err(AgentError::Config(format!("unknown option {unknown}"))),
         }
+
         Ok(())
     }
 }

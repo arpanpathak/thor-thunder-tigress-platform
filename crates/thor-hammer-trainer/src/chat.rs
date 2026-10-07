@@ -113,6 +113,7 @@ impl Message {
     /// The text blocks of the message, joined as paragraphs.
     fn visible_text(&self) -> String {
         let mut text = String::new();
+
         for content in &self.content {
             if let Content::Text { text: paragraph } = content {
                 append_paragraph(&mut text, paragraph);
@@ -124,6 +125,7 @@ impl Message {
     /// The extracted text of every attachment, each under its file name.
     fn attachment_text(&self) -> String {
         let mut text = String::new();
+
         for attachment in &self.attachments {
             let labelled = format!(
                 "Attached file `{}`:\n\n{}",
@@ -202,26 +204,33 @@ pub fn examples(
 ) -> Result<Vec<Example>, DataError> {
     let conversations: Vec<Conversation> = serde_json::from_str(chat_export)?;
     let mut examples = Vec::new();
+
     for conversation in conversations {
         let pairs = question_answer_pairs(&conversation.chat_messages);
+
         if conversation.has_safety_flag() {
             skip_reasons.extend(std::iter::repeat_n(SkipReason::SafetyFlag, pairs.len()));
+
             continue;
         }
+
         for (turn, pair) in (1..).zip(pairs) {
             let origin = format!("conversations.json#{}/{turn}", conversation.uuid);
+
             match pair.into_example(origin) {
                 Ok(example) => examples.push(example),
                 Err(reason) => skip_reasons.push(reason),
             }
         }
     }
+
     Ok(examples)
 }
 
 /// Pairs each human question with the assistant answer that follows it.
 fn question_answer_pairs(messages: &[Message]) -> Vec<QuestionAnswer> {
     let mut pairs: Vec<QuestionAnswer> = Vec::new();
+
     for message in messages {
         match (&message.sender, pairs.last_mut()) {
             (Sender::Human, Some(open_pair)) if !open_pair.is_answered() => {
@@ -232,6 +241,7 @@ fn question_answer_pairs(messages: &[Message]) -> Vec<QuestionAnswer> {
             (Sender::Assistant, None) => {}
         }
     }
+
     pairs
 }
 
@@ -250,9 +260,11 @@ pub fn example_from_question_file(markdown: &str, origin: &str) -> Option<Exampl
 /// Appends `paragraph` to `text` after a blank line. Empty paragraphs add nothing.
 fn append_paragraph(text: &mut String, paragraph: &str) {
     let paragraph = paragraph.trim();
+
     if paragraph.is_empty() {
         return;
     }
+
     if !text.is_empty() {
         text.push_str("\n\n");
     }

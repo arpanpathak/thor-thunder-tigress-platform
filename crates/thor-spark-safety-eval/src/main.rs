@@ -11,11 +11,13 @@ const ERROR_STATUS: u8 = 2;
 
 fn main() -> ExitCode {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
+
     match Command::from_args(&arguments).and_then(|command| command.run()) {
         Ok(report) => {
             for line in &report.lines {
                 println!("{line}");
             }
+
             match report.exit {
                 Exit::Clean => ExitCode::SUCCESS,
                 Exit::Problems => ExitCode::FAILURE,

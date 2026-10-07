@@ -228,11 +228,13 @@ pub fn parse(entry: &str, origin: &str) -> Result<Conversation, FormatError> {
         })
         .collect::<Result<Vec<Turn>, FormatError>>()?;
     check_order(&turns)?;
+
     if turns.iter().any(|turn| turn.content.is_empty())
         || rejected.as_ref().is_some_and(String::is_empty)
     {
         return Err(FormatError::EmptySection);
     }
+
     Ok(Conversation {
         source,
         section,
@@ -260,14 +262,17 @@ impl Provenance {
             section: None,
             licence: None,
         };
+
         for (key, value) in parts.filter_map(|part| part.split_once(':')) {
             let value = Some(value.trim().to_string());
+
             match key.trim() {
                 "section" => provenance.section = value,
                 "licence" => provenance.licence = value,
                 _ => {}
             }
         }
+
         provenance
     }
 }
@@ -280,6 +285,7 @@ fn source_and_body(entry: &str) -> Option<(String, &str)> {
 
 fn sections(body: &str) -> Vec<(Heading, String)> {
     let mut sections: Vec<(Heading, Vec<&str>)> = Vec::new();
+
     for line in body.lines() {
         match (Heading::of(line), sections.last_mut()) {
             (Some(heading), _) => sections.push((heading, Vec::new())),
@@ -287,6 +293,7 @@ fn sections(body: &str) -> Vec<(Heading, String)> {
             (None, None) => {}
         }
     }
+
     sections
         .into_iter()
         .map(|(heading, lines)| (heading, lines.join("\n").trim().to_string()))
@@ -297,10 +304,12 @@ fn check_order(turns: &[Turn]) -> Result<(), FormatError> {
     let Some(last) = turns.last() else {
         return Err(FormatError::NoTurns);
     };
+
     let alternates = turns
         .iter()
         .zip([Role::User, Role::Assistant].iter().cycle())
         .all(|(turn, role)| turn.role == *role);
+
     match (alternates, last.role) {
         (false, _) => Err(FormatError::OutOfOrder),
         (true, Role::User) => Err(FormatError::EndsWithUser),

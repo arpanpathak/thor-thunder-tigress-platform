@@ -29,14 +29,17 @@ const COMMENT_END: &str = "-->";
 pub fn examples(readability_set: &str) -> Vec<Example> {
     let without_comments = remove_html_comments(readability_set);
     let mut examples = Vec::new();
+
     for entry in without_comments.split("\n---\n") {
         let Some(instruction_and_response) = entry.trim().strip_prefix("### Instruction") else {
             continue;
         };
+
         let Some((instruction, response)) = instruction_and_response.split_once("### Response")
         else {
             continue;
         };
+
         examples.push(Example {
             instruction: instruction.trim().to_string(),
             response: response.trim().to_string(),
@@ -52,6 +55,7 @@ pub fn examples(readability_set: &str) -> Vec<Example> {
 fn remove_html_comments(markdown: &str) -> String {
     let mut kept = String::new();
     let mut remaining = markdown;
+
     while let Some(comment_start) = remaining.find(COMMENT_START) {
         kept.push_str(&remaining[..comment_start]);
         remaining = match remaining[comment_start..].find(COMMENT_END) {

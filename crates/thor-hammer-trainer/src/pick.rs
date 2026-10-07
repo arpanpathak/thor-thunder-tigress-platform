@@ -107,11 +107,14 @@ pub fn sections(train: &Path, manifest: &Path) -> Result<Vec<Section>, DataError
         .collect();
     let text = fs::read_to_string(train).map_err(DataError::io(train))?;
     let mut sections = Vec::new();
+
     for line in text.lines().filter(|line| !line.trim().is_empty()) {
         let row: Row = serde_json::from_str(line)?;
+
         if row.source != "corpus" && row.source != "book" {
             continue;
         }
+
         let source = row.origin.split('/').next().unwrap_or_default().to_string();
         let licence = match row.source.as_str() {
             "corpus" => licences
@@ -140,24 +143,30 @@ pub fn sections(train: &Path, manifest: &Path) -> Result<Vec<Section>, DataError
 /// `DataError::Io` when the manifest or a folder can't be read.
 pub fn code_sections(root: &Path, manifest: &Path) -> Result<Vec<Section>, DataError> {
     let mut sections = Vec::new();
+
     for row in corpus::read_manifest(manifest)? {
         if row.kind != corpus::CODE_KIND || !row.licence.permits_reuse() {
             continue;
         }
+
         let folder = root.join(&row.name);
         let mut files = Vec::new();
         source_files(&folder, &mut files)?;
         files.sort();
+
         for file in files {
             let Some(language) = language_of(&file) else {
                 continue;
             };
+
             let Ok(text) = fs::read_to_string(&file) else {
                 continue;
             };
+
             if !(MIN_CODE_CHARS..=MAX_CODE_CHARS).contains(&text.chars().count()) {
                 continue;
             }
+
             let relative = file
                 .strip_prefix(root)
                 .unwrap_or(&file)
@@ -188,14 +197,17 @@ fn source_files(folder: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<()
     if !folder.is_dir() {
         return Ok(());
     }
+
     for entry in fs::read_dir(folder)
         .map_err(DataError::io(folder))?
         .filter_map(Result::ok)
     {
         let path = entry.path();
+
         if path.file_name().is_some_and(|name| name == ".git") {
             continue;
         }
+
         if path.is_dir() {
             source_files(&path, files)?;
         } else {
@@ -232,6 +244,7 @@ pub fn pick<'a>(
     used: &HashSet<String>,
 ) -> Vec<&'a Section> {
     let mut by_source: BTreeMap<&str, Vec<&Section>> = BTreeMap::new();
+
     for section in sections
         .iter()
         .filter(|section| is_teachable(section) && !used.contains(&section.id))
@@ -256,6 +269,7 @@ pub fn pick<'a>(
 #[must_use]
 pub fn render_queue(picked: &[&Section]) -> String {
     let mut queue = String::from("# Sections to teach from\n\n");
+
     for section in picked {
         let body = match section.language {
             Some(language) => format!("````{language}\n{}\n````", section.text),

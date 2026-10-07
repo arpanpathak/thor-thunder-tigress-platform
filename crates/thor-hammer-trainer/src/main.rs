@@ -16,6 +16,7 @@ fn main() -> ExitCode {
     let home = std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_default();
+
     match build::build_training_set(&Inputs::under_home(&home), &PathBuf::from(output_dir)) {
         Ok(built) => {
             println!("open corpus:");

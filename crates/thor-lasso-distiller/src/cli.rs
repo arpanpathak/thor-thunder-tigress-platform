@@ -110,6 +110,7 @@ pub fn options(arguments: &[String], key: Option<String>) -> Result<Options, Dis
         dry_run: false,
     };
     let mut rest = arguments.iter();
+
     while let Some(argument) = rest.next() {
         let mut value = || {
             rest.next()
@@ -120,6 +121,7 @@ pub fn options(arguments: &[String], key: Option<String>) -> Result<Options, Dis
             text.parse::<usize>()
                 .map_err(|_| DistillError::Usage(format!("{argument} needs a number, not {text}")))
         };
+
         match argument.as_str() {
             "--train" => options.train = PathBuf::from(value()?),
             "--out" => options.out = PathBuf::from(value()?),
@@ -137,6 +139,7 @@ pub fn options(arguments: &[String], key: Option<String>) -> Result<Options, Dis
             }
         }
     }
+
     Ok(options)
 }
 
@@ -160,6 +163,7 @@ pub fn run(options: &Options, out: &mut impl Write) -> Result<(), DistillError> 
         counts.len()
     )
     .map_err(console)?;
+
     for (book, (talks, turns)) in &counts {
         writeln!(
             out,
@@ -184,6 +188,7 @@ pub fn run(options: &Options, out: &mut impl Write) -> Result<(), DistillError> 
         .into_iter()
         .take(options.limit.unwrap_or(usize::MAX))
         .collect();
+
     if options.dry_run {
         write_prompts(options, &chosen, out)
     } else {
@@ -250,15 +255,18 @@ fn generate(
         .map_err(DistillError::io(&options.out))?;
     let started = Instant::now();
     let (mut kept, mut rejected) = (0usize, 0usize);
+
     for (done, sections) in chosen.iter().enumerate() {
         let conversation = conversations::converse(&options.client, sections)?;
         kept += conversation.turns.len();
         rejected += conversation.rejected.len();
+
         if !conversation.turns.is_empty() {
             let line = conversation.to_json(&options.client.model);
             writeln!(file, "{line}").map_err(DistillError::io(&options.out))?;
         }
         let count = done + 1;
+
         if count % PROGRESS_EVERY == 0 || count == chosen.len() {
             let seconds = started.elapsed().as_secs_f64();
             let line = format!(
@@ -430,6 +438,7 @@ mod tests {
     fn an_unreadable_output_path_is_an_error() -> Result<(), DistillError> {
         let folder = Folder::new("unreadable")?;
         let mut arguments = folder.arguments(&["--dry-run"]);
+
         if let Some(out) = arguments.get_mut(4) {
             *out = folder.path.display().to_string();
         }

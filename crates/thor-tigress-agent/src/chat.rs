@@ -224,12 +224,14 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
     let Value::Object(mut fields) = serde_json::from_slice(body)? else {
         return Err(AgentError::bad_request("the body must be a JSON object"));
     };
+
     let web_search = fields
         .remove(WEB_SEARCH_SWITCH)
         .and_then(|value| value.as_bool())
         .unwrap_or(false);
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
     let model = upstreams.serving(fields.get(MODEL).and_then(Value::as_str));
+
     match Mode::of(web_search, streamed) {
         Mode::Relay => model
             .post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?
@@ -251,6 +253,7 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
 /// the stream always ends with `[DONE]`.
 fn as_events(client: &mut dyn Write, body: &mut dyn FnMut(&mut dyn Write) -> Outcome) -> Outcome {
     response::start_events(client)?;
+
     if let Err(error) = body(client) {
         send_thor(client, &ThorEvent::Error(error.to_string()))?;
     }
@@ -272,9 +275,11 @@ fn search_loop(
     for round_number in 1..=MAX_ROUNDS {
         offer_tools(&mut fields, round_number < MAX_ROUNDS);
         let round = stream_round(client, &fields, model)?;
+
         if round.calls.is_empty() {
             return Ok(());
         }
+
         let results = round
             .calls
             .iter()
@@ -291,17 +296,22 @@ fn nudge_to_search(fields: &mut Fields) {
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return;
     };
+
     let first_is_system = messages
         .first()
         .is_some_and(|message| message.get("role").and_then(Value::as_str) == Some("system"));
+
     if !first_is_system {
         messages.insert(0, json!({ "role": "system", "content": SEARCH_HINT }));
+
         return;
     }
+
     let merged = messages[0]
         .get("content")
         .and_then(Value::as_str)
         .map(|content| format!("{content}\n\n{SEARCH_HINT}"));
+
     if let Some(content) = merged {
         messages[0]["content"] = Value::String(content);
     }
@@ -323,7 +333,9 @@ fn append_round(fields: &mut Fields, round: &Round, results: &[String]) -> Outco
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return Err(AgentError::bad_request("messages must be a list"));
     };
+
     messages.push(serde_json::to_value(round.as_message())?);
+
     for (call, result) in round.calls.iter().zip(results) {
         messages.push(serde_json::to_value(Added::Tool {
             tool_call_id: &call.id,
@@ -345,6 +357,7 @@ fn web_search(client: &mut dyn Write, call: &ToolCall, searxng: &Endpoint) -> Ou
     let Some(query) = call.query() else {
         return Ok("The search needs a non-empty query.".to_string());
     };
+
     let results = search::search(searxng, &query).unwrap_or_default();
     send_thor(
         client,
@@ -369,22 +382,28 @@ fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
 /// Streams one model reply to the client, collecting any tool calls.
 fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
     let response = model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(fields)?)?;
+
     if !response.is_ok() {
         let status = response.status;
+
         return Err(AgentError::Upstream(format!(
             "model server returned {status}: {}",
             response.text()?
         )));
     }
+
     let mut round = Round::default();
+
     for line in response.body.lines() {
         let line = line?;
         let Some(data) = line.strip_prefix(EVENT_PREFIX).map(str::trim) else {
             continue;
         };
+
         if data == DONE {
             break;
         }
+
         round.absorb(serde_json::from_str(data)?);
         response::send_event(client, data)?;
     }
@@ -397,13 +416,16 @@ impl Round {
         let Some(Choice { delta }) = chunk.choices.into_iter().next() else {
             return;
         };
+
         if let Some(text) = delta.content {
             self.content.push_str(&text);
         }
+
         for piece in delta.tool_calls.unwrap_or_default() {
             if piece.index >= MAX_CALLS {
                 continue;
             }
+
             if self.calls.len() <= piece.index {
                 self.calls.resize_with(piece.index + 1, ToolCall::default);
             }
@@ -436,6 +458,7 @@ impl ToolCall {
     /// Appends one streamed piece.
     fn extend(&mut self, piece: CallPiece) {
         self.id.push_str(&piece.id.unwrap_or_default());
+
         if let Some(function) = piece.function {
             self.name.push_str(&function.name.unwrap_or_default());
             self.arguments

@@ -401,6 +401,7 @@ fn item(app: &App, position: usize, length: Length) -> Outcome<Item> {
 /// line is already too long is cut at `limit` characters.
 fn shorten_at_line(text: &str, limit: usize) -> String {
     let head: String = text.chars().take(limit).collect();
+
     match head.rfind('\n') {
         Some(end) if end > 0 => head[..end].to_string(),
         _ => head,
@@ -434,6 +435,7 @@ struct FlagSaved {
 fn set_flag(app: &App, request: &Request) -> Outcome<FlagSaved> {
     let wanted: FlagRequest = body(request, "flag")?;
     let mut store = app.flags()?;
+
     if wanted.flagged {
         store.set(
             &wanted.id,
@@ -482,21 +484,25 @@ struct Occurrence {
 fn flag_matches(app: &App, request: &Request) -> Outcome<Matched> {
     let wanted: MatchRequest = body(request, "flag-matches")?;
     let needle = wanted.text.trim().to_lowercase();
+
     if needle.chars().count() < MIN_PHRASE_CHARS {
         return Err(ReviewError::BadRequest(format!(
             "a phrase needs at least {MIN_PHRASE_CHARS} characters"
         )));
     }
+
     let filter = Filter {
         query: Some(needle.clone()),
         ..Filter::default()
     };
     let mut found = Vec::new();
+
     for position in app.index.matching(&filter, &Ids::new())? {
         let record: RecordText = app.index.parsed(position)?;
         let Some(text) = occurrence(&record.response, &needle) else {
             continue;
         };
+
         let id = app
             .index
             .entry(position)
@@ -625,6 +631,7 @@ mod tests {
             ("POST", "/api/flag-matches", Route::FlagMatches),
             ("GET", "/api/flag", Route::NotFound),
         ];
+
         for (method, path, route) in table {
             assert_eq!(Route::of(method, path), route, "{method} {path}");
         }

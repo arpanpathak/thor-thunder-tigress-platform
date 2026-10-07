@@ -80,11 +80,13 @@ impl Section {
 pub fn examples(chapter_markdown: &str, origin: &str) -> Vec<Example> {
     let chapter = chapter_title(chapter_markdown, origin);
     let mut examples = Vec::new();
+
     for section in sections(chapter_markdown, &SECTION_MARKERS, &chapter) {
         let training_sections = match section.is_too_long() {
             true => sections(&section.body, &SUBSECTION_MARKERS, &section.heading),
             false => vec![section],
         };
+
         for training_section in training_sections.into_iter().filter(Section::has_text) {
             examples.push(Example {
                 instruction: String::new(),
@@ -107,6 +109,7 @@ fn sections(markdown: &str, heading_markers: &[&str], first_heading: &str) -> Ve
     let mut finished = Vec::new();
     let mut current = Section::new(first_heading);
     let mut inside_code_block = false;
+
     for line in markdown.lines() {
         match line_kind(line, heading_markers, inside_code_block) {
             LineKind::CodeFence => {
@@ -130,6 +133,7 @@ fn line_kind<'a>(line: &'a str, heading_markers: &[&str], inside_code_block: boo
     let heading = heading_markers
         .iter()
         .find_map(|marker| line.strip_prefix(marker));
+
     match (is_code_fence, inside_code_block, heading) {
         (true, ..) => LineKind::CodeFence,
         (false, false, Some(heading)) => LineKind::Heading(heading),
@@ -146,6 +150,7 @@ fn chapter_title(chapter_markdown: &str, origin: &str) -> String {
             .find_map(|line| line.strip_prefix(marker))
     };
     let title_line = first_with("# ").or_else(|| first_with("## "));
+
     match title_line {
         Some(title) => strip_numbering(title),
         None => file_stem(origin).replace(['-', '_'], " "),

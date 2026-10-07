@@ -85,12 +85,15 @@ impl Client {
         let mut status = String::new();
         reader.read_line(&mut status).map_err(server)?;
         let mut chunked = false;
+
         loop {
             let mut header = String::new();
             reader.read_line(&mut header).map_err(server)?;
+
             if header.trim().is_empty() {
                 break;
             }
+
             let lowered = header.to_ascii_lowercase();
             chunked |= lowered.starts_with("transfer-encoding:") && lowered.contains("chunked");
         }
@@ -101,6 +104,7 @@ impl Client {
             true => dechunk(&text),
             false => text,
         };
+
         match status.split_whitespace().nth(1) {
             Some("200") => Ok(body),
             _ => Err(DistillError::Server(format!(
@@ -116,11 +120,14 @@ impl Client {
 fn dechunk(text: &str) -> String {
     let mut body = String::new();
     let mut rest = text;
+
     while let Some((size_line, after)) = rest.split_once("\r\n") {
         let size = usize::from_str_radix(size_line.trim(), 16).unwrap_or(0);
+
         if size == 0 {
             break;
         }
+
         body.push_str(after.get(..size).unwrap_or(after));
         rest = after.get(size..).unwrap_or("").trim_start_matches("\r\n");
     }

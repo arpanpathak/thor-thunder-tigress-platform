@@ -60,9 +60,11 @@ fn unmatched_flag_list(unmatched_flags: &[UnmatchedFlag]) -> Vec<String> {
             .to_string(),
         String::new(),
     ];
+
     if unmatched_flags.is_empty() {
         list_lines.push("- none".to_string());
     }
+
     for unmatched in unmatched_flags {
         list_lines.push(format!("- `{}`: {}", unmatched.id, unmatched.note));
     }
@@ -75,6 +77,7 @@ fn source_table(training_set: &[Example]) -> Vec<String> {
         "| Source | Examples | Tokens (estimate) |".to_string(),
         "|---|---|---|".to_string(),
     ];
+
     for source in Source::ALL {
         let from_source: Vec<&Example> = training_set
             .iter()
@@ -101,6 +104,7 @@ fn source_table(training_set: &[Example]) -> Vec<String> {
 /// One line per [`SkipReason`] with its count.
 fn left_out_list(skip_reasons: &[SkipReason]) -> Vec<String> {
     let mut list_lines = vec!["## Left out".to_string(), String::new()];
+
     for reason in SkipReason::ALL {
         let reason_count = skip_reasons
             .iter()
@@ -117,6 +121,7 @@ fn slop_span_list(slop_span_counts: &[(SlopCategory, usize)]) -> Vec<String> {
         "## Slop spans marked by a reviewer".to_string(),
         String::new(),
     ];
+
     for (category, span_count) in slop_span_counts {
         list_lines.push(format!("- {span_count} {}", category.description()));
     }

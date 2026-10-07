@@ -127,15 +127,18 @@ impl Command {
     #[must_use]
     pub fn from_args(arguments: impl IntoIterator<Item = String>) -> Command {
         let mut arguments = arguments.into_iter().peekable();
+
         if arguments.next_if(|first| first == "pick").is_some() {
             let Some(count) = arguments.next().and_then(|count| count.parse().ok()) else {
                 return Command::Usage;
             };
+
             return Command::Pick {
                 count,
                 sources: arguments.collect(),
             };
         }
+
         arguments.next_if(|first| first == "check");
         let source = PathBuf::from(
             arguments
@@ -228,6 +231,7 @@ pub fn queue(paths: &Paths, count: usize, sources: &[String]) -> Result<String, 
     let path = paths.output.join("teacher_queue.md");
     fs::write(&path, pick::render_queue(&picked)).map_err(DataError::io(&path))?;
     let mut per_source: BTreeMap<&str, usize> = BTreeMap::new();
+
     for section in &picked {
         *per_source.entry(section.source.as_str()).or_insert(0) += 1;
     }
@@ -241,6 +245,7 @@ pub fn queue(paths: &Paths, count: usize, sources: &[String]) -> Result<String, 
         path.display(),
         used.len()
     );
+
     for (source, count) in per_source {
         let _ = writeln!(summary, "  {source:<44} {count}");
     }
@@ -299,6 +304,7 @@ pub fn check(paths: &Paths) -> Result<CheckResult, DataError> {
     });
     let scratch = output.join("teacher-scratch");
     let outcomes = check_all(entries.collect(), &scratch)?;
+
     if scratch.exists() {
         fs::remove_dir_all(&scratch).map_err(DataError::io(&scratch))?;
     }
@@ -328,6 +334,7 @@ fn markdown_files(folder: &Path, files: &mut Vec<PathBuf>) -> Result<(), DataErr
         .filter_map(Result::ok)
     {
         let path = entry.path();
+
         if path.is_dir() {
             markdown_files(&path, files)?;
         } else if path.extension().is_some_and(|extension| extension == "md") {
@@ -342,6 +349,7 @@ fn read_entries(source: &Path) -> Result<Vec<Entry>, DataError> {
     markdown_files(source, &mut files)?;
     files.sort();
     let mut entries = Vec::new();
+
     for file in files {
         let markdown = fs::read_to_string(&file).map_err(DataError::io(&file))?;
         let name = file
@@ -376,6 +384,7 @@ fn check_all(entries: Vec<Entry>, scratch: &Path) -> Result<Vec<Outcome>, DataEr
         receiver.into_iter().collect();
     finished.sort_by_key(|&(worker, _)| worker);
     let mut outcomes = Vec::new();
+
     for (_, checked) in finished {
         outcomes.extend(checked?);
     }
@@ -441,6 +450,7 @@ fn preference_line(conversation: &Conversation) -> Option<PreferenceLine<'_>> {
 fn write_jsonl<T: Serialize>(path: &Path, lines: impl Iterator<Item = T>) -> Result<(), DataError> {
     let file = fs::File::create(path).map_err(DataError::io(path))?;
     let mut writer = BufWriter::new(file);
+
     for line in lines {
         serde_json::to_writer(&mut writer, &line)?;
         writer.write_all(b"\n").map_err(DataError::io(path))?;
@@ -482,6 +492,7 @@ fn render_report(outcomes: &[Outcome], sections: &HashMap<String, Section>) -> S
         .count();
     let mut languages: BTreeMap<&str, usize> = BTreeMap::new();
     let mut sources: BTreeMap<&str, usize> = BTreeMap::new();
+
     for (conversation, checked) in &passed {
         for (language, count) in &checked.blocks {
             *languages.entry(language).or_insert(0) += count;
@@ -508,10 +519,12 @@ fn render_report(outcomes: &[Outcome], sections: &HashMap<String, Section>) -> S
         rejected.len(),
     );
     report.push_str("\n## Code blocks built, by language\n\n| Language | Blocks |\n|---|---|\n");
+
     for (language, count) in languages {
         let _ = writeln!(report, "| {language} | {count} |");
     }
     report.push_str("\n## Conversations by source\n\n| Source | Conversations |\n|---|---|\n");
+
     for (source, count) in sources {
         let _ = writeln!(report, "| {source} | {count} |");
     }
@@ -520,9 +533,11 @@ fn render_report(outcomes: &[Outcome], sections: &HashMap<String, Section>) -> S
         .iter()
         .filter(|outcome| outcome.passed().is_none())
         .collect();
+
     if failed.is_empty() {
         report.push_str("- none\n");
     }
+
     for outcome in failed {
         let _ = write!(
             report,

@@ -53,12 +53,14 @@ struct Found {
 /// error; `AgentError::Json` when its answer isn't JSON.
 pub fn search(searxng: &Endpoint, query: &str) -> Outcome<Vec<SearchResult>> {
     let response = searxng.get(&format!("{SEARCH}?q={}&format=json", encode(query)))?;
+
     if !response.is_ok() {
         return Err(AgentError::Upstream(format!(
             "search returned {}",
             response.status
         )));
     }
+
     let answer: Answer = serde_json::from_str(&response.text()?)?;
     Ok(answer
         .results
@@ -98,6 +100,7 @@ pub fn as_tool_text(results: &[SearchResult]) -> String {
     if results.is_empty() {
         return NO_RESULTS.to_string();
     }
+
     let entries: Vec<String> = results
         .iter()
         .zip(1..)

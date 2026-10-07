@@ -253,6 +253,7 @@ fn read_all_examples(
 /// One line saying what a corpus source contributed, or why nothing.
 fn corpus_line(report: &corpus::SourceReport) -> String {
     let name = &report.name;
+
     match &report.outcome {
         corpus::SourceOutcome::Used {
             examples,
@@ -298,12 +299,14 @@ fn book_repository_examples(
     collect_book_files(root, &mut book_files)?;
     book_files.sort();
     let mut examples = Vec::new();
+
     for (path, kind) in book_files {
         let origin = path
             .strip_prefix(root)
             .unwrap_or(&path)
             .display()
             .to_string();
+
         match kind {
             BookFile::Chapter => {
                 examples.extend(book::examples(&corpus::clean(&read_file(&path)?), &origin))
@@ -315,6 +318,7 @@ fn book_repository_examples(
             BookFile::Notes => skip_reasons.push(SkipReason::NotesFile),
         }
     }
+
     Ok(examples)
 }
 
@@ -325,12 +329,14 @@ fn collect_book_files(
 ) -> Result<(), DataError> {
     for entry in fs::read_dir(directory).map_err(DataError::io(directory))? {
         let path = entry.map_err(DataError::io(directory))?.path();
+
         match classify(&path) {
             CorpusFile::Directory => collect_book_files(&path, book_files)?,
             CorpusFile::File(kind) => book_files.push((path, kind)),
             CorpusFile::Ignored => {}
         }
     }
+
     Ok(())
 }
 
@@ -343,6 +349,7 @@ fn classify(path: &Path) -> CorpusFile {
     let is_hidden = name.starts_with('.');
     let is_ignored_directory = IGNORED_DIRECTORIES.contains(&name);
     let is_markdown = path.extension().is_some_and(|extension| extension == "md");
+
     match (
         is_hidden || is_ignored_directory,
         path.is_dir(),
@@ -365,12 +372,14 @@ fn remove_short_and_duplicate(
 ) -> Vec<Example> {
     let mut seen_texts = HashSet::new();
     let mut training_set = Vec::new();
+
     for example in examples {
         match rejection(&example, &mut seen_texts) {
             Some(reason) => skip_reasons.push(reason),
             None => training_set.push(example),
         }
     }
+
     training_set
 }
 
@@ -380,6 +389,7 @@ fn rejection(example: &Example, seen_texts: &mut HashSet<String>) -> Option<Skip
     if example.char_count() < MIN_EXAMPLE_CHARS {
         return Some(SkipReason::TooShort);
     }
+
     let is_first_copy = seen_texts.insert(example.dedup_key());
     (!is_first_copy).then_some(SkipReason::Duplicate)
 }
@@ -387,6 +397,7 @@ fn rejection(example: &Example, seen_texts: &mut HashSet<String>) -> Option<Skip
 /// Writes one JSON object per line.
 fn write_jsonl<Record: Serialize>(path: &Path, records: &[Record]) -> Result<(), DataError> {
     let mut jsonl = String::new();
+
     for record in records {
         jsonl.push_str(&serde_json::to_string(record)?);
         jsonl.push('\n');

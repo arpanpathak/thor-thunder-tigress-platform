@@ -166,6 +166,7 @@ fn command(program: &str, arguments: &[&str], file: &Path, folder: &Path) -> Com
 
 fn plan(block: &Block, folder: &Path) -> Plan {
     let code = block.code.as_str();
+
     match block.language {
         Language::Python => {
             let file = folder.join("example.py");
@@ -189,6 +190,7 @@ fn plan(block: &Block, folder: &Path) -> Plan {
             let file = folder.join("example.cpp");
             let program = folder.join("example-cpp");
             let flags = ["-std=c++20", "-Wall", "-Wextra", "-Werror"];
+
             if code.contains("int main") {
                 let mut build = command("g++", &flags, &file, folder);
                 build.arg("-o").arg(&program);
@@ -273,20 +275,24 @@ pub fn check(block: &Block, scratch: &Path) -> Result<Built, DataError> {
     if block.ignored {
         return Ok(Built::Ignored);
     }
+
     let folder = scratch.join(block.language.name());
     fs::create_dir_all(&folder).map_err(DataError::io(&folder))?;
     let folder = std::path::absolute(&folder).map_err(DataError::io(&folder))?;
     let Plan { file, build, run } = plan(block, &folder);
     fs::write(&file, &block.code).map_err(DataError::io(&file))?;
+
     if let Finished::Failed(output) = run_limited(build, scratch, TEST_LIMIT * 2)? {
         return Ok(Built::BuildFailed(output));
     }
+
     let Some(run) = run else {
         return Ok(Built::Clean {
             tests: 0,
             ran: false,
         });
     };
+
     Ok(Built::after_run(run_limited(run, scratch, TEST_LIMIT)?))
 }
 

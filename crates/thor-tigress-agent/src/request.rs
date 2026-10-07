@@ -61,16 +61,20 @@ pub fn read_request(stream: &mut dyn Read) -> Outcome<Request> {
 
 fn read_headers(reader: &mut dyn BufRead) -> Outcome<Headers> {
     let mut headers = Headers::default();
+
     loop {
         let mut line = String::new();
         reader.read_line(&mut line)?;
         let line = line.trim_end();
+
         if line.is_empty() {
             return Ok(headers);
         }
+
         let Some((name, value)) = line.split_once(':') else {
             continue;
         };
+
         headers.note(&name.trim().to_ascii_lowercase(), value.trim())?;
     }
 }
@@ -97,6 +101,7 @@ fn read_body(reader: &mut dyn Read, length: usize) -> Outcome<Vec<u8>> {
             "body over {MAX_BODY} bytes"
         )));
     }
+
     let mut body = vec![0; length];
     reader.read_exact(&mut body)?;
     Ok(body)

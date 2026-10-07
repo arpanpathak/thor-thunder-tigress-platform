@@ -64,6 +64,7 @@ fn serve(config: Config) -> Outcome<Infallible> {
         }
     );
     let config = Arc::new(config);
+
     loop {
         accept(listener.incoming(), &config);
     }
@@ -90,7 +91,9 @@ fn handle(stream: &mut dyn Connection, config: &Config) {
     let Err(error) = outcome else {
         return;
     };
+
     eprintln!("request failed: {error}");
+
     if let Err(unsent) = response::failure(stream, &error) {
         eprintln!("could not tell the client: {unsent}");
     }

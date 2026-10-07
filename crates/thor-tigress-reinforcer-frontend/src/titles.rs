@@ -47,6 +47,7 @@ pub fn collection_title(folder: &str) -> String {
         "docs" => "Interview Prep Docs",
         _ => "",
     };
+
     match known {
         "" => humanize(folder),
         title => title.to_string(),
@@ -68,6 +69,7 @@ pub fn rule_title(rule: Rule) -> &'static str {
 fn humanize(name: &str) -> String {
     let spaced = name.replace(['-', '_'], " ");
     let mut characters = spaced.chars();
+
     match characters.next() {
         Some(first) => first.to_uppercase().chain(characters).collect(),
         None => String::new(),

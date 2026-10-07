@@ -159,6 +159,7 @@ impl Checked {
         if built != Built::Ignored {
             *self.blocks.entry(language).or_insert(0) += 1;
         }
+
         match built {
             Built::Clean { tests, ran } => {
                 self.tests += tests;
@@ -213,6 +214,7 @@ pub fn spark_objections(text: &str) -> Vec<String> {
 pub fn check(conversation: &Conversation, scratch: &Path) -> Result<Checked, DataError> {
     let mut checked = Checked::default();
     let grounded = conversation.section.is_some();
+
     for (turn, answer_turn) in conversation.answers() {
         for problem in spark_problems(turn, &answer_turn.content) {
             match problem {
@@ -220,6 +222,7 @@ pub fn check(conversation: &Conversation, scratch: &Path) -> Result<Checked, Dat
                 other => checked.problems.push(other),
             }
         }
+
         for block in languages::fenced(&answer_turn.content)
             .into_iter()
             .filter(|block| matches!(block.tag.as_str(), "rust" | "rs"))
@@ -231,6 +234,7 @@ pub fn check(conversation: &Conversation, scratch: &Path) -> Result<Checked, Dat
             };
             checked.record(turn, "rust", built);
         }
+
         for block in languages::blocks(&answer_turn.content) {
             let built = languages::check(&block, scratch)?;
             checked.record(turn, block.language.name(), built);
@@ -358,15 +362,18 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
         &["--crate-type", crate_type, "--emit=metadata", "--out-dir"],
         scratch,
     )?;
+
     if let Finished::Failed(output) = build {
         return Ok(Built::BuildFailed(output));
     }
+
     if !code.contains("#[test]") {
         return Ok(Built::Clean {
             tests: 0,
             ran: false,
         });
     }
+
     let test_binary = scratch.join("example-tests");
     let test_build = clippy(
         &source,
@@ -374,9 +381,11 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
         &["--test", "-A", "dead_code", "-o"],
         &test_binary,
     )?;
+
     if let Finished::Failed(output) = test_build {
         return Ok(Built::BuildFailed(output));
     }
+
     let mut run = Command::new(&test_binary);
     run.arg("--test-threads=1");
     Ok(Built::after_run(run_limited(run, scratch, TEST_LIMIT)?))
@@ -429,11 +438,14 @@ pub(crate) fn run_limited(
         if let Some(status) = child.try_wait().map_err(DataError::io(&program))? {
             break Some(status);
         }
+
         if started.elapsed() > limit {
             child.kill().map_err(DataError::io(&program))?;
             child.wait().map_err(DataError::io(&program))?;
+
             break None;
         }
+
         thread::sleep(POLL);
     };
     let output = fs::read_to_string(&log).map_err(DataError::io(&log))?;

@@ -42,6 +42,7 @@ pub fn suggestions(source: &str, response: &str) -> Suggestions {
     if OWN_SOURCES.contains(&source) {
         return Suggestions::default();
     }
+
     let score = answer::score(response);
     let lines: Vec<&str> = response.lines().collect();
     let slop = score
@@ -54,6 +55,7 @@ pub fn suggestions(source: &str, response: &str) -> Suggestions {
         })
         .collect();
     let mut violations = Vec::new();
+
     for block in score.blocks {
         for violation in block.report.violations {
             let line = (block.line + violation.line)

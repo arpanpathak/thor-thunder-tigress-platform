@@ -259,8 +259,10 @@ static INLINE_CODE: LazyLock<Option<Regex>> = LazyLock::new(|| Regex::new(r"`[^`
 pub fn prose_only(text: &str) -> String {
     let mut bytes = text.as_bytes().to_vec();
     let patterns = [FENCE.as_ref(), INLINE_CODE.as_ref()];
+
     for regex in patterns.into_iter().flatten() {
         let blank_text = String::from_utf8_lossy(&bytes).into_owned();
+
         for found in regex.find_iter(&blank_text) {
             for byte in bytes[found.range()]
                 .iter_mut()

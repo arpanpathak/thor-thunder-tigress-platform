@@ -150,9 +150,11 @@ mod tests {
                 "other",
             ]
         );
+
         for category in SlopCategory::ALL {
             assert_eq!(written(&category)?, format!("\"{}\"", category.name()));
         }
+
         for field in [Field::Instruction, Field::Response] {
             assert_eq!(written(&field)?, format!("\"{}\"", field.name()));
         }

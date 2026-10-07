@@ -125,6 +125,7 @@ impl Passage {
 pub fn read_passages(path: &Path, collections: &[String]) -> Result<Vec<Passage>, DistillError> {
     let text = fs::read_to_string(path).map_err(DistillError::io(path))?;
     let mut passages = Vec::new();
+
     for (index, line) in text
         .lines()
         .enumerate()
@@ -136,9 +137,11 @@ pub fn read_passages(path: &Path, collections: &[String]) -> Result<Vec<Passage>
             source,
         })?;
         let field = |name: &str| record.get(name).and_then(Value::as_str).unwrap_or_default();
+
         if !field("instruction").is_empty() {
             continue;
         }
+
         let passage = Passage {
             origin: field("origin").to_string(),
             text: field("response").to_string(),
@@ -147,6 +150,7 @@ pub fn read_passages(path: &Path, collections: &[String]) -> Result<Vec<Passage>
             || collections
                 .iter()
                 .any(|wanted| wanted == passage.collection());
+
         if wanted && passage.reads_as_answer() {
             passages.push(passage);
         }
@@ -158,6 +162,7 @@ pub fn read_passages(path: &Path, collections: &[String]) -> Result<Vec<Passage>
 /// `turns` sections.
 pub fn plan(passages: Vec<Passage>, turns: usize) -> Vec<Vec<Passage>> {
     let mut chapters: Vec<Vec<Passage>> = Vec::new();
+
     for passage in passages {
         match chapters.last_mut() {
             Some(chapter)
@@ -170,6 +175,7 @@ pub fn plan(passages: Vec<Passage>, turns: usize) -> Vec<Vec<Passage>> {
             _ => chapters.push(vec![passage]),
         }
     }
+
     chapters
         .into_iter()
         .flat_map(|chapter| {
@@ -259,6 +265,7 @@ pub fn check_question(reply: &str) -> Result<String, Rejection> {
     let lowered = unlabelled.to_lowercase();
     let mentioned = SOURCE_WORDS.iter().find(|word| lowered.contains(*word));
     let slop_hit = slop::check(unlabelled).hits.into_iter().next();
+
     match unlabelled {
         "" => Err(Rejection::Empty),
         question if question.lines().count() > 1 => Err(Rejection::NotOneLine),
@@ -332,6 +339,7 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
         key: conversation_key(sections),
         ..Conversation::default()
     };
+
     for passage in sections {
         let asked: Vec<String> = conversation
             .turns
@@ -340,6 +348,7 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
             .collect();
         let prompt = question_prompt(&asked, passage);
         let mut question = None;
+
         for _ in 0..ATTEMPTS {
             let reply = client.complete(&prompt, 80, 0.7)?;
             let verdict = match check_question(&reply) {
@@ -353,9 +362,11 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
                 Ok(checked) if !answers(client, &checked, passage)? => Err(Rejection::NotAnswered),
                 other => other,
             };
+
             match verdict {
                 Ok(checked) => {
                     question = Some(checked);
+
                     break;
                 }
                 Err(reason) => conversation
@@ -363,11 +374,13 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
                     .push((reply.trim().to_string(), reason.to_string())),
             }
         }
+
         match question {
             Some(question) => conversation.turns.push((question, passage.answer())),
             None => break,
         }
     }
+
     Ok(conversation)
 }
 
@@ -402,6 +415,7 @@ fn overlap(first: &str, second: &str) -> f64 {
     };
     let (first, second) = (words(first), words(second));
     let union = first.union(&second).count();
+
     match union {
         0 => 0.0,
         total => first.intersection(&second).count() as f64 / total as f64,
@@ -424,6 +438,7 @@ pub fn conversation_key(sections: &[Passage]) -> String {
 /// How many planned conversations and turns each collection has.
 pub fn plan_counts(planned: &[Vec<Passage>]) -> BTreeMap<String, (usize, usize)> {
     let mut counts: BTreeMap<String, (usize, usize)> = BTreeMap::new();
+
     for conversation in planned {
         if let Some(first) = conversation.first() {
             let entry = counts.entry(first.collection().to_string()).or_default();

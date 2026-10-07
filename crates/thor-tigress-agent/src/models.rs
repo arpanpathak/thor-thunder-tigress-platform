@@ -23,10 +23,13 @@ use crate::{
 /// list isn't JSON.
 pub fn list(client: &mut dyn Write, upstreams: &Upstreams) -> Outcome {
     let answer = upstreams.model.get(paths::MODELS)?;
+
     if upstreams.engines.is_empty() || !answer.is_ok() {
         return answer.relay(client);
     }
+
     let mut list: Value = serde_json::from_str(&answer.text()?)?;
+
     if let Some(data) = list.get_mut("data").and_then(Value::as_array_mut) {
         data.extend(
             upstreams

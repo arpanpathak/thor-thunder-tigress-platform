@@ -55,13 +55,16 @@ fn read_raw_request(stream: &TcpStream) -> Outcome<String> {
     let mut reader = BufReader::new(stream);
     let mut raw = String::new();
     let mut length = 0;
+
     loop {
         let mut line = String::new();
         reader.read_line(&mut line)?;
         raw.push_str(&line);
+
         if line.trim().is_empty() {
             break;
         }
+
         if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
             length = value.trim().parse().unwrap_or(0);
         }
@@ -83,6 +86,7 @@ pub fn json_response(body: &str) -> String {
 /// An `HTTP/1.1 200` event stream carrying `events`, then `[DONE]`.
 pub fn event_stream(events: &[&str]) -> String {
     let mut response = String::from("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n");
+
     for event in events {
         response.push_str("data: ");
         response.push_str(event);
