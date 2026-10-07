@@ -7,7 +7,7 @@ use crate::{
     chat,
     config::Config,
     error::Outcome,
-    messages, paths,
+    messages, models, paths,
     request::Request,
     response::{self, ContentType, Status},
 };
@@ -101,15 +101,15 @@ pub fn answer(client: &mut dyn Write, request: &Request, config: &Config) -> Out
     if needs_key && !config.admits(request.authorization.as_deref()) {
         return response::unauthorized(client);
     }
-    let model = &config.upstreams.model;
+    let upstreams = &config.upstreams;
     match route {
         Route::Preflight => response::preflight(client),
         Route::File(file) => send_file(client, &config.web, file),
         Route::Health => response::respond(client, Status::Ok, ContentType::Json, HEALTHY),
-        Route::Models => model.get(paths::MODELS)?.relay(client),
-        Route::ChatCompletions => chat::answer(client, &request.body, &config.upstreams),
-        Route::Messages => messages::forward(client, &request.body, model),
-        Route::CountTokens => model.post(paths::COUNT_TOKENS, &request.body)?.relay(client),
+        Route::Models => models::list(client, upstreams),
+        Route::ChatCompletions => chat::answer(client, &request.body, upstreams),
+        Route::Messages => messages::forward(client, &request.body, upstreams.serving_body(&request.body)),
+        Route::CountTokens => upstreams.serving_body(&request.body).post(paths::COUNT_TOKENS, &request.body)?.relay(client),
         Route::NotFound => response::respond(client, Status::NotFound, ContentType::Text, b"not found"),
     }
 }
@@ -122,7 +122,11 @@ fn send_file(client: &mut dyn Write, folder: &Path, file: StaticFile) -> Outcome
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{FakeServer, json_response};
+    use crate::{
+        config::Engine,
+        testing::{FakeServer, json_response},
+        upstream::Endpoint,
+    };
 
     fn file(name: &str) -> Route {
         FILES.into_iter().find(|file| file.name == name).map_or(Route::NotFound, Route::File)
@@ -242,6 +246,28 @@ mod tests {
         fs::remove_dir_all(&setup.folder)?;
         assert!(chatted.starts_with("HTTP/1.1 200"), "{chatted}");
         assert!(forwarded.starts_with("HTTP/1.1 200"), "{forwarded}");
+        Ok(())
+    }
+
+    #[test]
+    fn sends_requests_for_an_engine_model_to_that_engine() -> Outcome {
+        let reply = json_response(r#"{"ok":true}"#);
+        let engine = FakeServer::start(vec![reply.clone(), reply.clone(), reply])?;
+        let mut setup = setup(Vec::new(), None)?;
+        setup.config.upstreams.engines.push(Engine { model: "qwen".to_string(), endpoint: Endpoint::new(engine.address(), None) });
+        let answers = [paths::CHAT_COMPLETIONS, paths::MESSAGES, paths::COUNT_TOKENS]
+            .into_iter()
+            .map(|path| {
+                let mut asked = request("POST", path, None);
+                asked.body = br#"{"model":"qwen","messages":[{"role":"user","content":"hi"}]}"#.to_vec();
+                answered(&setup, &asked)
+            })
+            .collect::<Outcome<Vec<String>>>()?;
+        fs::remove_dir_all(&setup.folder)?;
+        let seen = engine.requests()?;
+        assert!(answers.iter().all(|answer| answer.ends_with(r#"{"ok":true}"#)), "{answers:?}");
+        assert!(seen[0].starts_with("POST /v1/chat/completions") && seen[1].starts_with("POST /v1/messages "));
+        assert!(seen[2].starts_with("POST /v1/messages/count_tokens"));
         Ok(())
     }
 

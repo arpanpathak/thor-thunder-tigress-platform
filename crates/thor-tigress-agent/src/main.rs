@@ -20,6 +20,7 @@ mod chat;
 mod config;
 mod error;
 mod messages;
+mod models;
 mod paths;
 mod request;
 mod response;

@@ -7,7 +7,7 @@ pub const HEALTH: &str = "/health";
 pub const CUB: &str = "/thor-tigress-cub";
 /// Everything under this prefix needs the access key.
 pub const API: &str = "/v1/";
-/// OpenAI: the served model.
+/// OpenAI: the served models.
 pub const MODELS: &str = "/v1/models";
 /// OpenAI: chat.
 pub const CHAT_COMPLETIONS: &str = "/v1/chat/completions";

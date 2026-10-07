@@ -2,13 +2,19 @@
 //!
 //! ```text
 //! thor-tigress-agent [--listen 127.0.0.1:8080] [--model 127.0.0.1:8079]
-//!                    [--search 127.0.0.1:8888] [--web DIR] [--key-file FILE]
+//!                    [--engine MODEL=HOST:PORT]... [--search 127.0.0.1:8888]
+//!                    [--web DIR] [--key-file FILE]
 //! ```
+//!
+//! `--engine` names a model another engine serves, such as TensorRT
+//! Edge-LLM; requests for it go there, everything else to `--model`.
 
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+
+use serde::Deserialize;
 
 use crate::{
     error::{AgentError, Outcome},
@@ -26,12 +32,47 @@ const KEY_FILE: &str = ".config/thor-chat/api-key";
 /// How a key is sent in an `Authorization` header.
 pub const BEARER: &str = "Bearer ";
 
-/// The model server and the search engine.
+/// The model servers and the search engine.
 pub struct Upstreams {
-    /// llama-server, called with the access key when there is one.
+    /// llama-server, called with the access key when there is one; it serves
+    /// every model no engine below serves.
     pub model: Endpoint,
+    /// Models served by other engines.
+    pub engines: Vec<Engine>,
     /// SearXNG, called without a key.
     pub search: Endpoint,
+}
+
+/// A model served by another engine, such as TensorRT Edge-LLM.
+#[derive(Debug, Clone)]
+pub struct Engine {
+    /// The model id requests name.
+    pub model: String,
+    /// Where it is served, called without a key: it listens on localhost only.
+    pub endpoint: Endpoint,
+}
+
+impl Upstreams {
+    /// The server for requests naming `model`: the engine serving it, else
+    /// llama-server.
+    #[must_use]
+    pub fn serving(&self, model: Option<&str>) -> &Endpoint {
+        self.engines
+            .iter()
+            .find(|engine| Some(engine.model.as_str()) == model)
+            .map_or(&self.model, |engine| &engine.endpoint)
+    }
+
+    /// The server for the model a JSON request `body` names.
+    #[must_use]
+    pub fn serving_body(&self, body: &[u8]) -> &Endpoint {
+        #[derive(Deserialize)]
+        struct Named {
+            model: Option<String>,
+        }
+        let named: Option<Named> = serde_json::from_slice(body).ok();
+        self.serving(named.and_then(|named| named.model).as_deref())
+    }
 }
 
 /// The settings of a running server.
@@ -63,6 +104,11 @@ impl Config {
             key,
             upstreams: Upstreams {
                 model: Endpoint::new(options.model, authorization),
+                engines: options
+                    .engines
+                    .into_iter()
+                    .map(|(model, address)| Engine { model, endpoint: Endpoint::new(address, None) })
+                    .collect(),
                 search: Endpoint::new(options.search, None),
             },
         })
@@ -86,6 +132,7 @@ impl Config {
 struct Options {
     listen: String,
     model: String,
+    engines: Vec<(String, String)>,
     search: String,
     web: PathBuf,
     key_file: PathBuf,
@@ -97,6 +144,7 @@ impl Default for Options {
         Options {
             listen: DEFAULT_LISTEN.to_string(),
             model: DEFAULT_MODEL.to_string(),
+            engines: Vec::new(),
             search: DEFAULT_SEARCH.to_string(),
             web: PathBuf::from("."),
             key_file: home.join(KEY_FILE),
@@ -121,12 +169,21 @@ impl Options {
         match flag {
             "--listen" => self.listen = value,
             "--model" => self.model = value,
+            "--engine" => self.engines.push(engine(&value)?),
             "--search" => self.search = value,
             "--web" => self.web = PathBuf::from(value),
             "--key-file" => self.key_file = PathBuf::from(value),
             unknown => return Err(AgentError::Config(format!("unknown option {unknown}"))),
         }
         Ok(())
+    }
+}
+
+/// Reads `MODEL=HOST:PORT`.
+fn engine(value: &str) -> Outcome<(String, String)> {
+    match value.split_once('=') {
+        Some((model, address)) if !model.is_empty() && !address.is_empty() => Ok((model.to_string(), address.to_string())),
+        _ => Err(AgentError::Config(format!("--engine {value}: expected MODEL=HOST:PORT"))),
     }
 }
 
@@ -182,6 +239,28 @@ mod tests {
         assert_eq!(config.upstreams.search.address(), "s:2");
         assert_eq!(config.web, PathBuf::from("/srv"));
         Ok(())
+    }
+
+    #[test]
+    fn routes_named_models_to_their_engine() -> Outcome {
+        let config = Config::from_args(args(&["--engine", "qwen=e:1", "--key-file", "/none"]))?;
+        let upstreams = &config.upstreams;
+        assert_eq!(upstreams.serving(Some("qwen")).address(), "e:1");
+        assert_eq!(upstreams.serving(Some("nemotron")).address(), "127.0.0.1:8079");
+        assert_eq!(upstreams.serving(None).address(), "127.0.0.1:8079");
+        assert_eq!(upstreams.serving_body(br#"{"model":"qwen"}"#).address(), "e:1");
+        assert_eq!(upstreams.serving_body(br#"{"messages":[]}"#).address(), "127.0.0.1:8079");
+        assert_eq!(upstreams.serving_body(b"not json").address(), "127.0.0.1:8079");
+        assert_eq!(upstreams.engines[0].endpoint.authorization(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_an_engine_without_a_model_or_address() {
+        for value in ["qwen", "=e:1", "qwen="] {
+            let refused = Config::from_args(args(&["--engine", value]));
+            assert!(refused.is_err_and(|error| error.to_string().ends_with("expected MODEL=HOST:PORT")), "{value}");
+        }
     }
 
     #[test]

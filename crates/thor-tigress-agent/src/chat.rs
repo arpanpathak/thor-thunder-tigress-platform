@@ -35,6 +35,9 @@ const WEB_SEARCH_SWITCH: &str = "thor_web_search";
 /// The request field asking for a streamed answer.
 const STREAM: &str = "stream";
 
+/// The request field naming the model, which picks the engine.
+const MODEL: &str = "model";
+
 /// The request field listing the tools the model may call.
 const TOOLS: &str = "tools";
 
@@ -207,12 +210,13 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
     };
     let web_search = fields.remove(WEB_SEARCH_SWITCH).and_then(|value| value.as_bool()).unwrap_or(false);
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
+    let model = upstreams.serving(fields.get(MODEL).and_then(Value::as_str));
     match Mode::of(web_search, streamed) {
-        Mode::Relay => upstreams.model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?.relay(client),
-        Mode::Stream => as_events(client, &mut |client| stream_round(client, &fields, &upstreams.model).map(drop)),
+        Mode::Relay => model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?.relay(client),
+        Mode::Stream => as_events(client, &mut |client| stream_round(client, &fields, model).map(drop)),
         Mode::Search => {
             fields.insert(STREAM.to_string(), Value::Bool(true));
-            as_events(client, &mut |client| search_loop(client, fields.clone(), upstreams))
+            as_events(client, &mut |client| search_loop(client, fields.clone(), model, &upstreams.search))
         }
     }
 }
@@ -233,17 +237,17 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 
 /// Asks the model, runs the tools it calls, and asks again, until it answers
 /// without a tool call or the rounds run out.
-fn search_loop(client: &mut dyn Write, mut fields: Fields, upstreams: &Upstreams) -> Outcome {
+fn search_loop(client: &mut dyn Write, mut fields: Fields, model: &Endpoint, search: &Endpoint) -> Outcome {
     for round_number in 1..=MAX_ROUNDS {
         offer_tools(&mut fields, round_number < MAX_ROUNDS);
-        let round = stream_round(client, &fields, &upstreams.model)?;
+        let round = stream_round(client, &fields, model)?;
         if round.calls.is_empty() {
             return Ok(());
         }
         let results = round
             .calls
             .iter()
-            .map(|call| run_tool(client, call, &upstreams.search))
+            .map(|call| run_tool(client, call, search))
             .collect::<Outcome<Vec<String>>>()?;
         append_round(&mut fields, &round, &results)?;
     }
@@ -378,6 +382,7 @@ mod tests {
     fn upstreams(model: &FakeServer, search: &FakeServer) -> Upstreams {
         Upstreams {
             model: Endpoint::new(model.address(), None),
+            engines: Vec::new(),
             search: Endpoint::new(search.address(), None),
         }
     }
