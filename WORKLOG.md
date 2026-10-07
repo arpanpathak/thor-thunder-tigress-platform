@@ -102,17 +102,21 @@ there as untracked.
   ceiling. A new section sets out what comes next: the launch, and the agentic
   canvas with roleplay, a therapy room, immigration paperwork, creative
   writing, music and vector graphics.
-- Rewritten a third time, after the note was still overfitted to one model. The
-  opening now leads with the board and the four models it holds, quoting the
-  `thor-tigress-serve list` output from the Thor, and the text says which two
-  are loaded, which command loads a third, and that the picker offers what is
-  loaded. `MODELS_MAX` joins the memory discussion. `cub-architecture.svg`, the
-  system figure in chapters "Web chat: Thor Tigress Cub" and the launch note
-  (Figures 9.6 and 24.1), now draws both engines: the agent routes by model id
-  to llama.cpp at :8079 or TensorRT Edge-LLM at :8081, with two arrows instead
-  of a chain that implied one fed the other. Chapter "Model serving" keeps its
-  figure as the router's own view, with a line saying where the second engine
-  is covered.
+- Rewritten a third time, after the note was still overfitted to one model and
+  led with the engine rather than the product. The opening now shows the thing
+  people use: four screenshots (Paper, Night, a phone, and the invite door), a
+  list of what the page does, and the themes by name. The board and its four
+  models moved down into "What it is made of", where the `thor-tigress-serve
+  list` output from the Thor and `MODELS_MAX` now live. `cub-architecture.svg`,
+  the system figure in chapters "Web chat: Thor Tigress Cub" and the launch note
+  (Figures 9.6 and 24.7), draws both engines: the agent routes by model id to
+  llama.cpp at :8079 or TensorRT Edge-LLM at :8081, with two arrows instead of a
+  chain that implied one fed the other. `keyring-flow.svg` lost the stray red
+  elbow that crossed the whole figure; the 401 now sits in the agent box, with a
+  short red line back to the client. Chapter "Model serving" keeps its figure as
+  the router's own view, with a line saying where the second engine is covered.
+  The release is named `thor-tigress-cub-junior` (Haloom!) in the launch note,
+  the introduction and the About page footer.
 
 ### Deployed to the Thor
 

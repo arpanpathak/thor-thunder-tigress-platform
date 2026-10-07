@@ -13,8 +13,8 @@ stops writing AI slop, in prose and in Rust.
 | `thor-hammer-trainer`: builds the training set | built |
 | `reinforcer`: review page for the training set | built |
 | `lasso`: conversations from books, questions by a teacher model | built; pilot run: 60 conversations |
-| Jetson Thor: SSH, sync, Nemotron 3 Nano served by llama-server | running |
-| Thor Tigress Cub: web chat, web search, API for coding agents | running; a name and email on the invite screen, then a personal key |
+| Jetson Thor: SSH, sync, four models on two engines, served by llama.cpp and TensorRT Edge-LLM | running |
+| Thor Tigress Cub, `thor-tigress-cub-junior` (Haloom!): web chat, web search, model picker, API for coding agents | running; a name and email on the invite screen, then a personal key |
 | `thor-tigress-keyring`: the encrypted registry of who may chat, one key per person | built |
 | Fine-tuning and before/after scoring | planned |
 

@@ -57,10 +57,10 @@ the current default in most toolchains.
 ### Why not just a hash
 
 A hash such as SHA-256 is built to be fast. That is right for checking a file,
-and wrong for a passphrase. A password has far less randomness than a key: a
-human picks from a few thousand words, not from 2^256 values. An attacker who
-has the file can guess passphrases and check each guess with the same fast
-hash, billions of times a second on a graphics card.
+and wrong for a passphrase. A password draws from a small space: a human picks a
+few thousand words, while a key draws from 2^256 values. An attacker who has the
+file can guess passphrases and check each guess with the same fast hash,
+billions of times a second on a graphics card.
 
 Argon2id makes each guess expensive in two ways at once:
 
@@ -81,7 +81,7 @@ The salt is 16 random bytes stored in the file. It does two jobs:
 - **Precomputed tables do not apply.** An attacker cannot prepare answers for
   common passphrases in advance; each new salt forces the work to be redone.
 
-A salt is not a secret. It only has to be unique.
+The salt stays public, and it only has to be unique.
 
 ### The parameters here
 
@@ -92,9 +92,10 @@ A salt is not a secret. It only has to be unique.
 | lanes | 1 | one thread of work; the agent's writes are rare, so this keeps it simple |
 | output | 32 bytes | the key XChaCha20-Poly1305 takes |
 
-These are the Argon2id defaults in the RustCrypto crate. They are a starting
-point, not a claim of optimal security. Raising memory is the usual first move;
-the parameters live in `crates/thor-tigress-keyring/src/crypto.rs` as named
+These are the Argon2id defaults in the RustCrypto crate, and a reasonable
+starting point; they make no claim to be optimal. Raising memory is the usual
+first move; the parameters live in
+`crates/thor-tigress-keyring/src/crypto.rs` as named
 constants, so a change is one line and its consequences are visible.
 
 ## Sealing, and noticing a change
@@ -173,8 +174,8 @@ Every change follows the same three steps:
    old file or the new one, never half of each.
 
 So a crash while approving someone leaves the previous keyring whole. The cost
-is that the whole file is rewritten each time, which is why the registry is
-meant for people (hundreds), not for events (millions).
+is that the whole file is rewritten on every change, which suits a registry of
+hundreds of people; millions of events would outgrow it.
 
 ## The life of a key
 

@@ -1,55 +1,63 @@
 <img class="cub" src="art/cub.svg" alt="The Thor Tigress Cub">
 
-# The cub is open
+# Thor Tigress Cub
 
-I keep a small server on a desk in my apartment, and it has become the most
-interesting thing in the room. It is a Jetson AGX Thor: one board with 128 GB of
-memory shared between its processor and its graphics chip, warm to the touch
-while it works. It runs two engines and holds four models, two of them in
-memory at a time. A conversation can use whichever of them you pick.
+**thor-tigress-cub-junior · Haloom!**
 
-```text
-$ thor-tigress-serve list
-
-Thor: 59.3 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
-
-  key  model                                          state                 size
-  1    Nemotron 3 Nano 30B A3B · Q8_0                 loaded             33.6 GB  default (nemotron)
-  2    Nemotron 3.5 Lightning 30B A3B · Q8_0          on disk            35.0 GB
-  3    Qwen3.6 27B · Q4_K_M                           on disk            16.8 GB
-  4    Qwen3.6 35B A3B NVFP4                          loaded             23.4 GB  TensorRT Edge-LLM · :8081
-```
-
-The two loaded models answer today. `thor-tigress-serve load 2` brings a third
-one into memory when the memory allows, and the page's picker offers it from
-then on. The default, the Nano, answers at about 53 tokens a second and holds a
-million tokens of conversation; Qwen3.6 35B A3B runs on TensorRT Edge-LLM
-instead of llama.cpp, and chapter "Model comparison" sets the two side by side
-on the same questions. The chat page is at
-[`voltforge.tech/thor-tigress-cub`](https://voltforge.tech/thor-tigress-cub),
-and a Tailscale tunnel carries each message from there to the desk and the
-answer back.
-
-Until this week one key opened the door for everybody. Now each person gets a
-key of their own. You leave a name and an email on the invite screen, send me a
-message on [LinkedIn](https://www.linkedin.com/in/arpan-pathak-272341424/) or
-[X](https://x.com/arpanpathak1996), and I approve the request by hand and send
-the key back. No sign-up, no password, nobody in the middle taking notes.
-
-<figure>
-<img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor at :8080, which holds the key, the picker and the APIs and calls SearXNG at :8888. The picker's model id decides the engine: llama.cpp at :8079 for the GGUF models, or TensorRT Edge-LLM at :8081 for Qwen3.6 35B A3B.">
-<figcaption><b>Figure 24.1</b> The road a message takes, from the link to whichever model the picker names, on either engine.</figcaption>
-</figure>
+A chat page for a thirty-billion-parameter model that lives on my desk. You open
+it, type a question, and watch the answer arrive word by word: the reasoning
+folded into a line you can open, code blocks coloured, and the speed written
+underneath. It costs nothing, it asks for no account, and it keeps your
+conversation in your own browser.
 
 <figure>
 <img src="figures/cub-welcome.png" alt="The chat page in its light theme: the cub in the middle, a greeting, and four suggested prompts">
-<figcaption><b>Figure 24.2</b> The first screen, in the light Cub theme.</figcaption>
+<figcaption><b>Figure 24.1</b> The first screen, in Paper.</figcaption>
 </figure>
 
 <figure>
 <img src="figures/cub-conversation.png" alt="A conversation in the dark theme: a question, a folded thought line, an answer with a highlighted Rust code block, a stats line, and a reply in progress">
-<figcaption><b>Figure 24.3</b> A reply, with its reasoning folded away, code highlighted, and the speed written underneath.</figcaption>
+<figcaption><b>Figure 24.2</b> A reply in Night, with its reasoning folded away, code highlighted, and the speed underneath.</figcaption>
 </figure>
+
+<figure>
+<img class="phone" src="figures/cub-phone.png" alt="The chat page on a phone in the dark theme">
+<figcaption><b>Figure 24.3</b> The same page on a 390-pixel-wide phone.</figcaption>
+</figure>
+
+## What it does
+
+- **Answers questions**, in English, Rust, or whatever language you paste at it,
+  and streams the reply as it is written.
+- **Searches the web** when you turn **Web** on, and shows the sources it used.
+- **Thinks first** when you turn **Think** on: the reasoning appears folded
+  above the answer, and you can open it.
+- **Picks a model** from the ones loaded on the board, two at a time. They differ
+  in size, speed and engine, and the picker switches between them.
+- **Works from a coding agent.** The API speaks both OpenAI's and Anthropic's
+  shapes, so tools such as Claude Code, OpenCode and openbatrangs point at it
+  with a base URL and a key.
+- **Wears eleven themes**, from Paper and Night to Solarized, Nord, Dracula, One
+  Dark, Gruvbox, Monokai and Material Deep Ocean, and follows your device's own
+  preference until you choose one.
+- **Fits a phone**, where the composer, the threads and the theme all follow the
+  narrow screen.
+
+<figure>
+<img src="figures/cub-invite.png" alt="The invite screen: the cub, the headline that the cub is invite-only for now, a box to paste an access key, and a link to ask for one">
+<figcaption><b>Figure 24.4</b> The door: what someone without a key meets. The picture predates the name-and-email form and the DM links, which chapter "Web chat: Thor Tigress Cub" describes.</figcaption>
+</figure>
+
+## Asking for a key
+
+One key opens the chat, and each person gets their own. Leave a name and an
+email on the invite screen, then send me a message:
+[LinkedIn](https://www.linkedin.com/in/arpan-pathak-272341424/) or
+[X](https://x.com/arpanpathak1996). I approve the request by hand and send the
+key back. There is no sign-up, no password, and no company in the middle.
+
+Until this week a single key opened the door for everybody. Now a key can be
+given and taken back one person at a time.
 
 ## What the Thor keeps
 
@@ -69,7 +77,7 @@ as it does for every service on the machine.
 
 <figure>
 <img src="figures/what-is-stored.svg" alt="Three columns. Your browser holds the conversations, the settings and your key, cleared with site data. The Thor's memory holds the reply being written and a small prompt cache, gone on restart. The Thor's disk holds the sealed keyring: one record per person with a name, an email, a status and a key, and the service key the servers use between themselves. No message text is written down.">
-<figcaption><b>Figure 24.4</b> The three places anything is held.</figcaption>
+<figcaption><b>Figure 24.5</b> The three places anything is held.</figcaption>
 </figure>
 
 The page sets no cookie of its own, carries no analytics and no advertising, and
@@ -78,8 +86,8 @@ asks for no login.
 ## How a key is checked
 
 <figure>
-<img src="figures/keyring-flow.svg" alt="Browsers and agents send a personal key as a header over HTTPS through Tailscale Funnel. thor-tigress-agent compares it with the active keys in the sealed keyring, in constant time, and forwards the request to llama-server with the service key from api-key, which llama-server checks again. No key, or a revoked one, gets 401 before the model is reached.">
-<figcaption><b>Figure 24.5</b> The two keys, and where each one stops.</figcaption>
+<img src="figures/keyring-flow.svg" alt="A browser or an agent sends a personal key in a header over HTTPS through Tailscale Funnel. On the Thor, thor-tigress-agent compares it with the active keys in the sealed keyring, in constant time, and answers 401 when nothing matches. A match is forwarded to the model server with the service key from api-key, and the model server checks that key again.">
+<figcaption><b>Figure 24.6</b> The two keys, and where each one stops.</figcaption>
 </figure>
 
 1. The invite screen posts a name and an email to `POST /request`, and the
@@ -113,22 +121,49 @@ board. How that pool is cut is a setting. Today it is cut like this:
 | 16 | 262,144 | 24 GiB |
 | 32 | 131,072 | 24 GiB |
 
-The arithmetic is `windows × tokens × 6 KiB`, and memory is the ceiling: ask for
-longer conversations and fewer fit at once, ask for more at once and each one is
-shorter. One conversation can reach a million tokens, about three novels.
-`MODELS_MAX` caps how many models sit in memory at the same time, and both
-`load` and `install` refuse a change that would eat the free-memory reserve.
-How many people hold a key has no limit at all, because a window belongs to a
-reply, not to a person. When every window is busy, the next request waits in the
-queue. Chapter "Memory, context and slots" has the measurements behind the
-table and the flags that cut the pool differently.
+The arithmetic is `windows × tokens × 6 KiB`, and memory is the ceiling:
+ask for longer conversations and fewer fit at once, ask for more at once and
+each one is shorter. One conversation can reach a million tokens, about three
+novels. `MODELS_MAX` caps how many models sit in memory at the same time, and
+both `load` and `install` refuse a change that would eat the free-memory
+reserve. How many people hold a key has no limit at all, because a window
+belongs to a reply. When every window is busy, the next request waits in the
+queue. Chapter "Memory, context and slots" has the measurements behind the table
+and the flags that cut the pool differently.
 
 There is no daily allowance and no per-person quota. Someone with a key can keep
 the board occupied for as long as they keep asking, and the answer to that is a
-revoked key rather than a rate limiter. The board also runs warm while it works,
-which in a cold room is a small consolation.
+revoked key. The board also runs warm while it works, which in a cold room is a
+small consolation.
 
 ## What it is made of
+
+The board is a Jetson AGX Thor: one small machine with 128 GB of memory shared
+between its processor and its graphics chip. It runs two engines and holds four
+models, and `thor-tigress-serve list` prints them:
+
+```text
+$ thor-tigress-serve list
+
+Thor: 59.3 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
+
+  key  model                                          state                 size
+  1    Nemotron 3 Nano 30B A3B · Q8_0                 loaded             33.6 GB  default (nemotron)
+  2    Nemotron 3.5 Lightning 30B A3B · Q8_0          on disk            35.0 GB
+  3    Qwen3.6 27B · Q4_K_M                           on disk            16.8 GB
+  4    Qwen3.6 35B A3B NVFP4                          loaded             23.4 GB  TensorRT Edge-LLM · :8081
+```
+
+Two of them answer today. `thor-tigress-serve load 2` brings a third into memory
+when the memory allows, and the picker offers it from then on. The default, the
+Nano, answers at about 53 tokens a second and holds a million tokens of
+conversation; Qwen3.6 35B A3B runs on TensorRT Edge-LLM instead of llama.cpp,
+and chapter "Model comparison" sets the two side by side on the same questions.
+
+<figure>
+<img src="figures/cub-architecture.svg" alt="A browser or agent opens voltforge.tech, whose forwarding page sends it to the .ts.net address. Every request goes through Tailscale Funnel to thor-tigress-agent on the Thor at :8080, which holds the key, the model picker and the APIs, and calls SearXNG at :8888 for web search. The picker's model id decides which engine runs the reply: the llama.cpp router at :8079 for the GGUF models, or TensorRT Edge-LLM at :8081 for Qwen3.6 35B A3B in NVFP4.">
+<figcaption><b>Figure 24.7</b> How a message reaches a model, on either engine. Chapter "Web chat: Thor Tigress Cub" draws the same road with more detail.</figcaption>
+</figure>
 
 | Piece | What it does | Listens on |
 |---|---|---|
@@ -168,7 +203,7 @@ through running the whole thing yourself, on this board or another one.
 
 ## What comes next
 
-The launch is close, and the cub is the first piece of it.
+The launch is close, and this cub is the first piece of it.
 
 Next comes an agentic canvas: a sandbox where a model works on a canvas instead
 of a chat box, with tools it may reach for. The uses I am building toward:
@@ -200,16 +235,6 @@ canvas is amber.
 - The windows serve the page and every coding agent together.
 - There is one board. It can be busy, offline, or out of memory, and when it is
   down the forwarding page still loads.
-
-## Getting a key
-
-Leave a name and an email on the invite screen, then send a message:
-
-- [DM on LinkedIn](https://www.linkedin.com/in/arpan-pathak-272341424/)
-- [DM on X](https://x.com/arpanpathak1996)
-
-The key that comes back is 48 characters long, sent once, and worth keeping
-private.
 
 ## Elsewhere in this book
 
