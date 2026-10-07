@@ -32,6 +32,13 @@ const MAX_CALLS: usize = 8;
 /// The page's switch for web search; removed before the model sees the request.
 const WEB_SEARCH_SWITCH: &str = "thor_web_search";
 
+/// The line added under the switch, so a model that would answer from memory
+/// still reaches for the tool when the answer may have moved.
+const SEARCH_HINT: &str = concat!(
+    "When web search is available, use the web_search tool for anything about ",
+    "current events, releases, prices, or facts you are not certain of."
+);
+
 /// The request field asking for a streamed answer.
 const STREAM: &str = "stream";
 
@@ -216,6 +223,7 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
         Mode::Stream => as_events(client, &mut |client| stream_round(client, &fields, model).map(drop)),
         Mode::Search => {
             fields.insert(STREAM.to_string(), Value::Bool(true));
+            nudge_to_search(&mut fields);
             as_events(client, &mut |client| search_loop(client, fields.clone(), model, &upstreams.search))
         }
     }
@@ -252,6 +260,23 @@ fn search_loop(client: &mut dyn Write, mut fields: Fields, model: &Endpoint, sea
         append_round(&mut fields, &round, &results)?;
     }
     Ok(())
+}
+
+/// Adds [`SEARCH_HINT`] to the conversation, merging it into an existing
+/// system message so the request keeps a single system turn.
+fn nudge_to_search(fields: &mut Fields) {
+    let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
+        return;
+    };
+    let first_is_system = messages.first().is_some_and(|message| message.get("role").and_then(Value::as_str) == Some("system"));
+    if !first_is_system {
+        messages.insert(0, json!({ "role": "system", "content": SEARCH_HINT }));
+        return;
+    }
+    let merged = messages[0].get("content").and_then(Value::as_str).map(|content| format!("{content}\n\n{SEARCH_HINT}"));
+    if let Some(content) = merged {
+        messages[0]["content"] = Value::String(content);
+    }
 }
 
 fn offer_tools(fields: &mut Fields, offered: bool) {
@@ -423,6 +448,40 @@ mod tests {
     }
 
     #[test]
+    fn a_search_request_gains_a_system_hint() {
+        let mut fields = Fields::new();
+        fields.insert(MESSAGES.to_string(), json!([{ "role": "user", "content": "news?" }]));
+        nudge_to_search(&mut fields);
+        assert_eq!(fields[MESSAGES], json!([{ "role": "system", "content": SEARCH_HINT }, { "role": "user", "content": "news?" }]));
+    }
+
+    #[test]
+    fn the_hint_merges_into_an_existing_system_message() {
+        let mut fields = Fields::new();
+        fields.insert(MESSAGES.to_string(), json!([{ "role": "system", "content": "Be brief." }, { "role": "user", "content": "hi" }]));
+        nudge_to_search(&mut fields);
+        assert_eq!(fields[MESSAGES][0]["content"], json!(format!("Be brief.\n\n{SEARCH_HINT}")));
+        assert_eq!(fields[MESSAGES].as_array().map(Vec::len), Some(2));
+    }
+
+    #[test]
+    fn the_hint_is_skipped_without_a_message_list() {
+        let mut fields = Fields::new();
+        fields.insert(STREAM.to_string(), Value::Bool(true));
+        nudge_to_search(&mut fields);
+        assert!(!fields.contains_key(MESSAGES));
+    }
+
+    #[test]
+    fn a_system_message_that_is_not_text_is_left_alone() {
+        let messages = json!([{ "role": "system", "content": [{ "type": "text", "text": "hi" }] }]);
+        let mut fields = Fields::new();
+        fields.insert(MESSAGES.to_string(), messages.clone());
+        nudge_to_search(&mut fields);
+        assert_eq!(fields[MESSAGES], messages);
+    }
+
+    #[test]
     fn assembles_a_tool_call_streamed_in_pieces() -> Outcome {
         let mut round = Round::default();
         round.absorb(chunk(r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"a1","function":{"name":"web_search","arguments":"{\"que"}}]}}]}"#)?);
@@ -486,6 +545,20 @@ mod tests {
         let mut client = Vec::new();
         answer(&mut client, br#"{"messages":[],"stream":true}"#, &upstreams(&model, &search))?;
         assert_eq!(events(&client), [token, DONE]);
+        assert!(!model.requests()?[0].contains(SEARCH_HINT));
+        Ok(())
+    }
+
+    #[test]
+    fn a_web_search_request_tells_the_model_to_search() -> Outcome {
+        let call = call_event("web_search", r#"{"query":"rust"}"#);
+        let reply = r#"{"choices":[{"delta":{"content":"ok"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
+        let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
+        let request = br#"{"messages":[{"role":"user","content":"news?"}],"thor_web_search":true}"#;
+        answer(&mut Vec::new(), request, &upstreams(&model, &search))?;
+        let seen = model.requests()?;
+        assert!(seen[0].contains(SEARCH_HINT) && seen[0].contains(r#""role":"system""#));
         Ok(())
     }
 
