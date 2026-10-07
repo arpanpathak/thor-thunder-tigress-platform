@@ -2,15 +2,15 @@
 
 # Model serving
 
-One command manages the models on the Thor: `thor-tigress-serve`. It shows
-the models in a numbered list. You type a key and what to do with it: load,
-unload, or download.
+`thor-tigress-serve` manages the models on the Thor. It lists them, loads and
+unloads a specific one, and finds and downloads the newest ones from
+Hugging Face.
 
 <div class="covers">
 
 This chapter covers
 
-- the list, and the three actions
+- the commands
 - trying a new model from Hugging Face, start to finish
 - the checks that keep the chat from running out of memory
 - settings, and changing the default model
@@ -20,60 +20,67 @@ This chapter covers
 
 </div>
 
-## The list
+## The commands
 
 On the Thor (`ssh thor`):
 
-```text
-$ thor-tigress-serve
+| Command | What it does |
+|---|---|
+| `thor-tigress-serve list` | the models on this Thor, each with a key |
+| `thor-tigress-serve list-latest` | the newest chat models on Hugging Face that fit, each with a key |
+| `thor-tigress-serve load KEY\|NAME` | load a model from `list` |
+| `thor-tigress-serve unload KEY\|NAME` | unload it |
+| `thor-tigress-serve download KEY\|REPO` | download a model from `list-latest` |
 
-Thor: 59.4 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
+`NAME` is the model's id, as `list` shows it without the spacing (for
+example `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0`). `REPO` is the Hugging
+Face repository (for example `unsloth/LFM2.5-VL-3B-GGUF`).
+
+```text
+$ thor-tigress-serve list
+
+Thor: 59.3 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
 
   key  model                                          state                 size
   1    Nemotron 3 Nano 30B A3B · Q8_0                 loaded             33.6 GB  default (nemotron)
   2    Nemotron 3.5 Lightning 30B A3B · Q8_0          on disk            35.0 GB
   3    Qwen3.6 27B · Q4_K_M                           on disk            16.8 GB
-
-Type a key and an action: "2 load", "1 unload", "5 download". Enter alone quits.
->
 ```
 
-| State | Meaning | Actions |
+| State | Meaning | Command |
 |---|---|---|
 | `loaded` | in memory; the web chat's picker offers it | `unload` |
 | `on disk` | a GGUF file under `~/models/gguf/`, not in memory, not offered by the chat | `load` |
-| `on Hugging Face` | shown by `thor-tigress-serve list-latest`; not downloaded yet | `download` |
+| `on Hugging Face` | shown by `list-latest`; not downloaded yet | `download` |
 
 The default model (the Nano) is always key 1. Every GGUF under
 `~/models/gguf/` shows up without any setup, so Nemotron 3.5 Lightning is
-one `2 load` away. It was unloaded on 2026-10-06 because its answers were
-disappointing.
+`thor-tigress-serve load 2`. It was unloaded on 2026-10-06 because its
+answers were disappointing.
 
-`l`, `u` and `d` work as short forms. After each action the list is shown
-again; Enter alone quits.
+Keys follow the list, so a key can change when a model is loaded or added.
+Names don't change.
 
 ## Try a new model, start to finish
 
-This is the run of 2026-10-06, with the smallest model in the list, to test
-the command. The model was deleted afterwards.
+This is the run of 2026-10-06 with the smallest model in `list-latest`.
+The model was deleted afterwards.
 
-**1. See what is new.** `list-latest` adds the newest chat models from the
+**1. See what is new.** `list-latest` lists the newest chat models from the
 unsloth and ggml-org GGUF collections on Hugging Face:
 
 ```text
 $ thor-tigress-serve list-latest
 asking Hugging Face for the newest models…
+  key  model                                          state                 size
+  1    Clef · Q8_0                                    on Hugging Face    28.7 GB  2026-10-02 · apache-2.0 · ggml-org/Clef-GGUF
+  2    Clef Flash · Q8_0                              on Hugging Face     9.7 GB  2026-10-02 · apache-2.0 · ggml-org/Clef-Flash-GGUF
   …
-  4    Clef · Q8_0                                    on Hugging Face    28.7 GB  2026-10-02 · apache-2.0 · ggml-org/Clef-GGUF
-  5    Clef Flash · Q8_0                              on Hugging Face     9.7 GB  2026-10-02 · apache-2.0 · ggml-org/Clef-Flash-GGUF
-  …
-  9    GLM 4.5 Air · Q4_K_M                           on Hugging Face    63.6 GB  2026-08-25 · mit · ggml-org/GLM-4.5-Air-GGUF
-  …
-  12   LFM2.5 VL 3B · Q8_0                            on Hugging Face     2.9 GB  2026-08-12 · other · unsloth/LFM2.5-VL-3B-GGUF
+  9    LFM2.5 VL 3B · Q8_0                            on Hugging Face     2.9 GB  2026-08-12 · other · unsloth/LFM2.5-VL-3B-GGUF
 ```
 
 Each line shows the date the GGUF was published, the licence and the
-repository. The list is already filtered:
+repository. The list is filtered:
 
 - **Chat models only.** Embedding, image and video models are left out.
 - **Architectures this llama.cpp can run.** They are read from
@@ -84,32 +91,35 @@ repository. The list is already filtered:
   A model that fits only without the Nano says "fits only after unloading
   the default".
 
-**2. Download.** `12 download` saves it to
-`~/models/gguf/LFM2.5-VL-3B/` with curl. An interrupted download resumes
-when you run the same action again. The Thor downloads at about 69 MB/s.
+The list is saved to `~/.cache/thor-tigress-serve/latest.json`, so the keys
+in `download` refer to the last `list-latest`.
+
+**2. Download.** The file goes to `~/models/gguf/LFM2.5-VL-3B/`. An
+interrupted download resumes when you run the same command again. The Thor
+downloads at about 69 MB/s.
 
 ```text
-> 12 download
+$ thor-tigress-serve download 9
 downloading LFM2.5-VL-3B-Q8_0.gguf into /home/arpanpathak/models/gguf/LFM2.5-VL-3B
-downloaded 2.9 GB; it is now on disk, type its key and load to try it
+downloaded 2.9 GB; see thor-tigress-serve list, then load it
 ```
 
-**3. Load.** It is now `on disk`, with a new key:
+**3. Load.** It is now `on disk`:
 
 ```text
-> 2 load
+$ thor-tigress-serve load LFM2.5-VL-3B-Q8_0
 loaded in 2 s; sending one token to commit its memory
-ready: 54.8 GB free
+ready: 54.6 GB free
 ```
 
 The web chat's picker offers it from now on, and so does the API under its
-id (`LFM2.5-VL-3B-Q8_0`). A reply through the agent ran at 70 tok/s.
+id. A reply through the agent ran at 70 tok/s.
 
 **4. Unload.** It leaves memory and the chat's list, and is `on disk` again:
 
 ```text
-> 1 unload
-unloaded: 4.6 GB freed, 59.4 GB free
+$ thor-tigress-serve unload 2
+unloaded: 4.6 GB freed, 59.2 GB free
 off the chat page's list; still on disk
 ```
 
@@ -117,8 +127,9 @@ off the chat page's list; still on disk
 
 ## The checks
 
-Running out of memory takes the whole chat down (see "What went wrong once"
-below), so `load` checks before and while it loads:
+Running out of memory takes the whole chat down: the kernel stops
+`thor-chat`, and every model with it. So `load` checks before and while it
+loads:
 
 | Check | When | Measured on 2026-10-06 |
 |---|---|---|
@@ -138,9 +149,11 @@ Nano, everyone's default. `thor-tigress-serve` refuses instead.
 Unloading the default asks first:
 
 ```text
-> 1 unload
+$ thor-tigress-serve unload 1
 This is the default model: the chat stops answering until it is loaded again. Unload? [y/N]
 ```
+
+Without a terminal to answer, the answer is no.
 
 These checks can't catch everything. A model given a long context can still
 grow past the limit later, when a long conversation fills it. Models loaded
@@ -345,15 +358,3 @@ commit in chapter "Operations".
 | `thor-chat … oom-kill` in the journal | memory ran out; the router and all models restart | load fewer or smaller models |
 | the first reply from a model takes 15 to 30 s | someone asked for a listed model that wasn't loaded, so it loaded first | normal |
 | `the model server said: …` | `thor-chat` isn't running or is restarting | `systemctl --user status thor-chat` |
-
-## What went wrong once
-
-On 2026-10-06, Lightning was first tried with the Nano's settings (4 × 1M)
-next to the live Nano. Both loaded and memory still looked fine. On the first
-reply it ran out, and the kernel's OOM killer stopped `thor-chat`. systemd
-restarted it on a script that loaded both at 4 × 1M again, so it kept
-failing. The chat was down from 20:49 to 20:52.
-
-The checks in `load` (the memory floor, the one-token warm-up, refusing
-instead of evicting) and the small default context for models loaded from
-disk come from that.

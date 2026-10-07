@@ -60,7 +60,7 @@
   <rect x="740" y="160" width="190" height="80" rx="10" class="idle"/>
   <text x="835.0" y="186" class="name" text-anchor="middle">Nemotron 3.5 Lightning</text>
   <text x="835.0" y="206" class="note" text-anchor="middle">on disk · not loaded</text>
-  <text x="835.0" y="223" class="note" text-anchor="middle">thor-tigress-serve: 2 load</text>
+  <text x="835.0" y="223" class="note" text-anchor="middle">thor-tigress-serve load 2</text>
   <rect x="740" y="260" width="190" height="80" rx="10" class="idle"/>
   <text x="835.0" y="286" class="name" text-anchor="middle">a model you load</text>
   <text x="835.0" y="306" class="note" text-anchor="middle">from ~/models/gguf</text>

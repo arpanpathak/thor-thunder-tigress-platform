@@ -144,11 +144,14 @@ highlighted code with copy, twelve themes and an optional system prompt in
 Settings (none by default).
 
 ```bash
-thor-tigress-serve               # the models on the Thor; type "2 load", "1 unload"
-thor-tigress-serve list-latest   # plus the newest models on Hugging Face; type "5 download"
-thor-tigress-serve logs          # follow both logs
-thor-tigress-serve key           # new access key; the page asks for it once
-thor-tigress-serve uninstall     # stop and remove both services
+thor-tigress-serve list               # the models on the Thor, each with a key
+thor-tigress-serve list-latest        # the newest chat models on Hugging Face that fit
+thor-tigress-serve load KEY|NAME      # load a model from list
+thor-tigress-serve unload KEY|NAME    # unload it
+thor-tigress-serve download KEY|REPO  # download a model from list-latest
+thor-tigress-serve logs               # follow both logs
+thor-tigress-serve key                # new access key; the page asks for it once
+thor-tigress-serve uninstall          # stop and remove both services
 ```
 
 The first time, run it from the repository:

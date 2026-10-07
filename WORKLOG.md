@@ -18,7 +18,25 @@ there as untracked.
 
 ## 2026-10-06
 
-### Model serving: one command (thor-tigress-serve)
+### thor-tigress-serve: subcommands instead of a prompt
+
+- The prompt ("2 load") is replaced by `list`, `list-latest`,
+  `load KEY|NAME`, `unload KEY|NAME` and `download KEY|REPO`. `list-latest`
+  saves its list to `~/.cache/thor-tigress-serve/latest.json`, so `download`
+  keys refer to the last `list-latest`. Every subcommand was tested on the
+  Thor, including a download, load and unload of LFM2.5-VL-3B (deleted
+  again).
+- The book's "What went wrong once" section was removed at the user's
+  request.
+- **Engines (researched, nothing installed):** TensorRT-LLM isn't supported
+  on Jetson. TensorRT Edge-LLM supports Jetson Thor (JetPack 7.x, CUDA 13),
+  and its supported-models page lists Nemotron 3 Nano 30B-A3B NVFP4 and
+  Nemotron 3.5 Lightning 30B-A3B NVFP4. v0.11.0 (2026-09-29) has aarch64
+  wheels and an experimental OpenAI-compatible server. Installing it and
+  building engines is a long GPU job on the shared Thor, so it waits for the
+  user's go-ahead.
+
+### Model serving: thor-tigress-serve replaces serve.sh
 
 - `serve.sh` is replaced by `jetson-thor/model-serving/thor-tigress-serve`,
   one Python file using only the standard library, symlinked into

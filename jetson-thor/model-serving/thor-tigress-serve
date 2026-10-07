@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """Serves models and the chat page on the Jetson Thor, on localhost only.
 
-  thor-tigress-serve               the models on this Thor; pick one to load or unload
-  thor-tigress-serve list-latest   the same, plus the newest chat models on Hugging Face
-                                   that fit; pick one to download
-  thor-tigress-serve install       run the model server and the chat page as services
-  thor-tigress-serve uninstall     stop and remove both services
-  thor-tigress-serve key           create a new access key
-  thor-tigress-serve logs          follow both logs
+Models:
+  thor-tigress-serve list                  the models on this Thor, each with a key
+  thor-tigress-serve list-latest           the newest chat models on Hugging Face that
+                                           fit, each with a key
+  thor-tigress-serve load KEY|NAME         load a model from "list"
+  thor-tigress-serve unload KEY|NAME       unload it
+  thor-tigress-serve download KEY|REPO     download a model from "list-latest"
 
-In the list, type a key and an action: "2 load", "1 unload", "5 download".
+Services:
+  thor-tigress-serve install               run the model server and the chat page as
+                                           services, started at boot
+  thor-tigress-serve uninstall             stop and remove both services
+  thor-tigress-serve key                   create a new access key
+  thor-tigress-serve logs                  follow both logs
 
 The services run "thor-tigress-serve run" (llama-server in router mode on
 :8079) and "thor-tigress-serve agent" (thor-tigress-agent: the page and API
@@ -40,6 +45,7 @@ MODELS_DIR = HOME / "models" / "gguf"
 HERE = Path(__file__).resolve().parent
 WEB = HERE.parent / "web"
 UNITS = HOME / ".config" / "systemd" / "user"
+LATEST = HOME / ".cache" / "thor-tigress-serve" / "latest.json"
 LLAMA = HOME / ".local" / "src" / "llama.cpp"
 
 DEFAULTS = {
@@ -295,7 +301,7 @@ def show(rows, values):
     print(f"  {'key':<4} {'model':<46} {'state':<16} {'size':>9}  ")
     for key, row in enumerate(rows, 1):
         print(f"  {key:<4} {label(row['id'])[:46]:<46} {row['state']:<16} {gb(row['size']):>9}  {row['note']}")
-    print('\nType a key and an action: "2 load", "1 unload", "5 download". Enter alone quits.')
+    print()
 
 
 def room_for(size, values, router):
@@ -313,6 +319,8 @@ def room_for(size, values, router):
 def load(row, values, router):
     """Lists the model if it is only on disk, loads it, and commits its memory with one token.
     Memory on the Thor is committed on first use, so the first reply is watched too."""
+    if row["state"] in ("loaded", "loading"):
+        return print("already loaded")
     reason = room_for(row["size"], values, router)
     if reason:
         return print(f"not loaded: {reason}")
@@ -344,8 +352,13 @@ def load(row, values, router):
 def unload(row, values, router):
     """Frees a model's memory. A model added from disk also leaves the list, so
     the chat page stops offering it; it shows as "on disk" again."""
+    if row["state"] == "on disk":
+        return print("not loaded")
     if row["id"] == model_id(values["MODEL"]):
-        answer = input("This is the default model: the chat stops answering until it is loaded again. Unload? [y/N] ")
+        try:
+            answer = input("This is the default model: the chat stops answering until it is loaded again. Unload? [y/N] ")
+        except EOFError:
+            answer = ""
         if answer.strip().lower() != "y":
             return
     before = free_gb()
@@ -371,38 +384,51 @@ def download(row, values, router):
         url = f"https://huggingface.co/{pick['repo']}/resolve/main/{file}"
         if subprocess.run(["curl", "-L", "-C", "-", "--fail", "--progress-bar", "-o", str(target), url]).returncode:
             return print("download failed; run the same action again to resume")
-    print(f"downloaded {gb(pick['size'])}; it is now on disk, type its key and load to try it")
+    print(f"downloaded {gb(pick['size'])}; see thor-tigress-serve list, then load it")
 
 
-ACTIONS = {"load": load, "l": load, "unload": unload, "u": unload, "download": download, "d": download}
+def find(rows, wanted, command):
+    """The row a key ("2") or a name (id, alias or repository) points to."""
+    if wanted.isdigit() and 1 <= int(wanted) <= len(rows):
+        return rows[int(wanted) - 1]
+    for row in rows:
+        names = {row["id"].lower(), row.get("pick", {}).get("repo", "").lower()}
+        if wanted.lower() in names:
+            return row
+    sys.exit(f"no model {wanted!r}; see thor-tigress-serve {command}")
 
 
-def pick_loop(values, with_latest):
+def list_here(values):
+    show(entries(values, Router(values)), values)
+
+
+def list_latest(values):
+    rows = downloadable(values)
+    LATEST.parent.mkdir(parents=True, exist_ok=True)
+    LATEST.write_text(json.dumps(rows))
+    show(rows, values)
+
+
+def act(action, values, wanted, command):
     router = Router(values)
-    online = downloadable(values) if with_latest else []
-    while True:
-        here = entries(values, router)
-        names = {row["id"].lower() for row in here}
-        rows = here + [row for row in online if row["id"].lower() not in names]
-        show(rows, values)
-        try:
-            words = input("> ").split()
-        except EOFError:
-            return
-        if not words:
-            return
-        if len(words) != 2 or not words[0].isdigit() or words[1] not in ACTIONS or not 1 <= int(words[0]) <= len(rows):
-            print('expected a key and load, unload or download, like "2 load"')
-            continue
-        row = rows[int(words[0]) - 1]
-        action = ACTIONS[words[1]]
-        if (action is download) != (row["state"] == "on Hugging Face"):
-            print("download is for models on Hugging Face; load and unload are for the rest")
-            continue
-        try:
-            action(row, values, router)
-        except (urllib.error.URLError, TimeoutError) as error:
-            print(f"the model server said: {error}")
+    try:
+        action(find(entries(values, router), wanted, command), values, router)
+    except (urllib.error.URLError, TimeoutError) as error:
+        sys.exit(f"the model server said: {error}")
+
+
+def load_command(values, wanted):
+    act(load, values, wanted, "list")
+
+
+def unload_command(values, wanted):
+    act(unload, values, wanted, "list")
+
+
+def download_command(values, wanted):
+    if not LATEST.exists():
+        sys.exit("run thor-tigress-serve list-latest first")
+    download(find(json.loads(LATEST.read_text()), wanted, "list-latest"), values, None)
 
 
 # ---- services ----
@@ -475,19 +501,21 @@ def logs(values):
 
 
 COMMANDS = {
-    "list-latest": lambda values: pick_loop(values, True),
+    "list": list_here, "list-latest": list_latest,
     "install": install, "uninstall": uninstall, "key": key, "logs": logs, "run": run, "agent": agent,
 }
+COMMANDS_WITH_NAME = {"load": load_command, "unload": unload_command, "download": download_command}
 
 
 def main():
     values = settings()
-    command = sys.argv[1] if len(sys.argv) > 1 else ""
-    if command in ("-h", "--help", "help") or (command and command not in COMMANDS):
-        return print(__doc__)
-    if not command:
-        return pick_loop(values, False)
-    return COMMANDS[command](values)
+    command, *rest = sys.argv[1:] or ["help"]
+    if command in COMMANDS and not rest:
+        return COMMANDS[command](values)
+    if command in COMMANDS_WITH_NAME and len(rest) == 1:
+        return COMMANDS_WITH_NAME[command](values, rest[0])
+    print(__doc__)
+    return None if command in ("help", "-h", "--help") else sys.exit(2)
 
 
 if __name__ == "__main__":
