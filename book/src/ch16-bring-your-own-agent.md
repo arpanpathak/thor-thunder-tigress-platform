@@ -37,11 +37,10 @@ translates it: a `/v1/messages` request that doesn't ask for thinking gets
 
 ## Get a key
 
-Ask on the [invite screen](https://voltforge.tech/thor-tigress-cub/): give a
-name and an email, then send a message on [LinkedIn](https://www.linkedin.com/in/arpan-pathak-272341424/)
-or [X](https://x.com/arpanpathak1996). The author approves by hand and sends
-back a key of your own. A key can be withdrawn at any time, after which
-requests get `401`; no other key is affected.
+Keys are given by the author for a limited time. Ask
+[arpanpathak on GitHub](https://github.com/arpanpathak) and say what you want
+to use it for. A key can be changed or withdrawn at any time, after which
+requests get `401`.
 
 Save it where the tools below look for it:
 

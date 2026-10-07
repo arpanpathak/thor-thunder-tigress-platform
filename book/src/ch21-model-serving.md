@@ -212,7 +212,7 @@ the repository: `jetson-thor/model-serving/thor-tigress-serve install`.
 
 <figure>
 <img src="figures/model-router.svg" alt="Clients send requests with a model name to thor-tigress-agent on port 8080, which passes them to the llama-server router on 8079. The router sends each request to the model process with that name or alias.">
-<figcaption><b>Figure 7.1</b> How the router sends a request to the model process with that name or alias. The second engine, TensorRT Edge-LLM on :8081, has its own chapter.</figcaption>
+<figcaption><b>Figure 7.1</b> How a request reaches a model.</figcaption>
 </figure>
 
 | Part | What it is |

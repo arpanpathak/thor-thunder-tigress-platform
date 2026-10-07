@@ -13,9 +13,8 @@ stops writing AI slop, in prose and in Rust.
 | `thor-hammer-trainer`: builds the training set | built |
 | `reinforcer`: review page for the training set | built |
 | `lasso`: conversations from books, questions by a teacher model | built; pilot run: 60 conversations |
-| Jetson Thor: SSH, sync, four models on two engines, served by llama.cpp and TensorRT Edge-LLM | running |
-| Thor Tigress Cub, `thor-tigress-cub-junior` (Haloom!): web chat, web search, model picker, API for coding agents | running; a name and email on the invite screen, then a personal key |
-| `thor-tigress-keyring`: the encrypted registry of who may chat, one key per person | built |
+| Jetson Thor: SSH, sync, Nemotron 3 Nano served by llama-server | running |
+| Thor Tigress Cub: shared web chat, web search, API for coding agents | running, invite-only |
 | Fine-tuning and before/after scoring | planned |
 
 ## Meet the cub
@@ -25,9 +24,7 @@ stops writing AI slop, in prose and in Rust.
 The tigress on the cover is the project. The cub is the part people talk to:
 the chat page and API that put Nemotron 3 Nano on the Thor in front of anyone
 with an invite. Chapters "Web chat: Thor Tigress Cub", "Bring your own agent"
-and "Bring your own domain" are its manual. What it keeps, and what it does
-not, is the [launch note](ch24-launch-note.md); the keys and the cryptography
-behind them are in [Keys, and the cryptography under them](ch25-keyring-crypto.md).
+and "Bring your own domain" are its manual.
 
 | | |
 |---|---|

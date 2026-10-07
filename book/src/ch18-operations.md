@@ -26,9 +26,7 @@ This chapter covers
 | `voltforge.tech` | yes | when bought | domains are public by design |
 | `arpanpathak.taildb9a39.ts.net` | yes | 2026-10-05 07:15 UTC | Funnel's HTTPS certificate for it is in the public Certificate Transparency logs, which list every certificate ever issued |
 | the same name in this book, the README, `about.html`, the `voltforge.tech` repository | yes | 2026-10-05 | written there on purpose, so people can use the API |
-| the personal keys | **no** | | in the encrypted keyring on the Thor, and in each person's own browser or agent |
-| the keyring passphrase | **no** | | `~/.config/thor-chat/keyring-passphrase` (mode 600) on the Thor, and in the agent's memory |
-| the service key | **no** | | `~/.config/thor-chat/api-key` (mode 600) on the Thor and on the machines you work from |
+| the access key | **no** | | only on the Thor (`~/.config/thor-chat/api-key`), on the machines you work from, and in invited people's browsers and key files |
 | the home IP address | **no** | | the `.ts.net` name resolves to Tailscale's Funnel relays, never to the home connection |
 
 Check the certificate record yourself:
@@ -53,8 +51,7 @@ unwanted traffic; it does nothing for a leaked key, which works on any name.
 
 | What | Where | Change it with |
 |---|---|---|
-| keyring: who may chat, one key each | `~/.config/thor-chat/keyring`, mode 600; its passphrase in `keyring-passphrase` | `thor-tigress-serve keyring requests`, `approve EMAIL`, `revoke EMAIL`, `revoke-all`; no restart |
-| service key (agent ↔ llama-server) | `~/.config/thor-chat/api-key`, mode 600 | `thor-tigress-serve key`, then restart both services |
+| access key | `~/.config/thor-chat/api-key`, mode 600 | `thor-tigress-serve key`, then restart both services |
 | service settings (`MODEL`, `USERS`, `CONTEXT`, `MODELS_MAX`, `MIN_FREE_GB`, ports) | `~/.config/thor-chat/env`; empty now, so defaults apply | edit, then `thor-tigress-serve install` |
 | the model command | `~/.local/bin/thor-tigress-serve` → `jetson-thor/model-serving/thor-tigress-serve` | written by `thor-tigress-serve install` |
 | llama-server service | `~/.config/systemd/user/thor-chat.service` → `jetson-thor/model-serving/thor-tigress-serve run` | written by `thor-tigress-serve install` |
@@ -139,33 +136,23 @@ curl -s https://arpanpathak.taildb9a39.ts.net/health  # the same, from outside
 
 ### The key leaked
 
-Signs: someone uninvited is chatting, or a personal key was pasted somewhere
-public. Whose key it is decides the command.
+Signs: someone uninvited is chatting, or the key was pasted somewhere public.
 
 ```bash
 ssh thor
-thor-tigress-serve keyring keys          # who is active; the keys are masked
-thor-tigress-serve keyring revoke KEY    # one leaked key: end that person
-thor-tigress-serve keyring revoke-all    # every active key, at once
-```
-
-The agent re-reads the file when the keyring changes, so the next request is
-refused: no restart, and a reply in progress is not cut off. The records stay,
-so the people who should keep access are approved again with `approve EMAIL`,
-and each is sent a new key.
-
-If what leaked was the **service key**, the one the agent sends to
-llama-server, rotate it and restart both services:
-
-```bash
 thor-tigress-serve key
 systemctl --user restart thor-chat thor-tigress-agent
 cat ~/.config/thor-chat/api-key
 ```
 
-Then copy the new service key to each machine you work from:
-`(umask 077; ssh thor cat .config/thor-chat/api-key > ~/.config/thor-chat/api-key)`.
-Personal keys are unaffected by that rotation.
+The old key stops working at once. Then:
+
+1. Copy the new key to each machine you work from:
+   `(umask 077; ssh thor cat .config/thor-chat/api-key > ~/.config/thor-chat/api-key)`.
+2. Send it to the people who should keep access; they paste it on the invite
+   screen, and update `~/.config/thor-chat/api-key` for their agents.
+3. The restart cuts replies in progress; do it when the slots are idle if
+   there's time (chapter "Web chat: Thor Tigress Cub").
 
 ### Abuse: stop everything now
 
@@ -292,16 +279,15 @@ Not fixed yet; each needs a decision or work.
 
 | # | Gap | Risk | Now | Fix |
 |---|---|---|---|---|
-| 1 | ~~One shared key~~ | fixed on 2026-10-07: `thor-tigress-keyring` keeps one key per person, and `revoke` / `revoke-all` take access back one at a time or all at once | | |
+| 1 | One shared key | a leak means rotating for everyone; no way to cut off one person | rotate by hand | GitHub sign-in with personal keys (planned server) |
 | 2 | No limits per person | one key holder can keep all four slots busy | none | per-person token allowance and a fair queue (planned server) |
-| 3 | No record of who used what | abuse can't be traced to a person | the keyring says who may, not who did; `journalctl` shows requests, not people | per-person accounting (planned server) |
+| 3 | No record of who used what | abuse can't be traced to a person | `journalctl` shows requests, not people | per-person accounting (planned server) |
 | 4 | Domain not verified on GitHub | if the `voltforge.tech` repository or its Pages site is removed while DNS still points at GitHub, someone else could claim the domain on GitHub Pages | DNS points at GitHub; repository exists | add the `TXT` record from "Bring your own domain", step 4 |
 | 5 | The Tailscale name is written in five places | a rename needs the update in the runbook above | documented `sed` commands | one config value that the page, the About page and the forwarding page are built from |
-| 6 | The service key shown in a chat earlier (2026-10-05) may still be the current `api-key` | it may be in that chat's history, and the agent still accepts it as the operator key | not rotated | rotate the service key ("The key leaked"); personal keys are separate |
+| 6 | The key shown in a chat earlier (2026-10-05) is still the current key | it may be in that chat's history | not rotated | rotate it ("The key leaked") |
 | 7 | No monitoring | nobody is told when the Thor or Funnel goes down | people notice | an external check of `/health` every few minutes that sends a message on failure |
 | 8 | Cold-boot time not measured | unknown downtime after a power cut | | reboot once, time power-on to `/health` |
 | 9 | Accounts behind the domain | whoever gets into the Namecheap or GitHub account can redirect visitors | depends on those accounts | two-factor authentication on both, checked |
 | 10 | When the Thor is down, `voltforge.tech` still forwards | visitors land on a browser error instead of a message | | the forwarding page checks `/health` first and shows "the Thor is offline" |
 | 11 | Updates are manual | old llama.cpp or Tailscale with known bugs | the table above | a monthly reminder, or unattended upgrades for Tailscale |
 | 12 | ~~The key is compared with a plain string comparison~~ | fixed on 2026-10-06: `thor-tigress-agent` compares keys in constant time (`config::same_secret`) | | |
-| 13 | The invite form (`POST /request`) is open and unmetered | anyone can fill the waiting list, and each request costs an Argon2id run | approval is by hand, so the list is the only damage | a rate limit on that one route |
