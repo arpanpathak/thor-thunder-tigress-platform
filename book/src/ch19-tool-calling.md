@@ -354,8 +354,19 @@ The modules, and what each holds:
 | the first Web round | `tool_choice: "required"` is sent; later rounds are not |
 | the fetch tool over a fake web | the read event, the text, and the numbered pages |
 
-Results, times and refusals from a real run on the Thor get recorded here when
-that run happens.
+Measured on the Thor, 2026-10-07 (Nemotron 3 Nano, thinking off):
+
+- A request to search for the latest Rust news called `web_search` three times,
+  each with `time_range: "week"`, and got six results each; the first was
+  `Announcing Rust 1.99.0` at `blog.rust-lang.org`.
+- A request to read `https://blog.rust-lang.org/releases/latest/` called
+  `fetch_page_content_recursive`, followed that page's own link to
+  `/2026/10/01/Rust-1.99.0/`, and answered "Rust 1.99.0", naming the page.
+
+Both tools are live on the Thor; the refusal cases (private addresses, redirect
+loops, non-text types) are covered by the unit tests above, not by a live run.
+How often each model answers a fresh question correctly, and what the forced
+first round costs in seconds, are the next measurements.
 
 ## Not in this design
 

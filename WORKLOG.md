@@ -54,9 +54,20 @@ there as untracked.
   --workspace --all-targets -D warnings` clean; `spark rs crates` finds 0
   problems in 81 files; the agent runs 126 tests. `mdbook build book` is clean,
   all 49 figure references resolve, and every SVG parses.
-- Still open: the end-to-end runs on the Thor against real sites (the numbers go
-  into chapter "Tool calling" and chapter "Model comparison"); rule 8, the
-  fetch line in the journal, is not written yet; no cache.
+- Deployed to the Thor, 2026-10-07 10:08 PDT: backed up the old binary
+  (`~/.cargo/bin/thor-tigress-agent.bak-2026-10-07-websearch`), ran
+  `cargo install --locked --force --path crates/thor-tigress-agent` on the Thor
+  (15 s), restarted `thor-tigress-agent`, and `/health` answered
+  `{"status":"ok"}`. Two real Web-on requests then ran. The first searched three
+  times with `time_range: "week"` and got six results each, the first
+  `Announcing Rust 1.99.0` at `blog.rust-lang.org`. The second read
+  `https://blog.rust-lang.org/releases/latest/`, followed that page's own link to
+  `/2026/10/01/Rust-1.99.0/`, and answered "Rust 1.99.0" naming the page. The
+  refusal cases are covered by the unit tests, not by a live run.
+- Rollback if needed: the `.bak` binary, or `cargo install` the previous commit.
+- Still open: rule 8, the fetch line in the journal, is not written yet; no
+  cache; no measurement yet of how often each model answers a fresh question
+  correctly with the forced first round.
 
 ### Per-person keys: thor-tigress-keyring, and the registration form
 
