@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" role="img" aria-label="Conversations, settings and the key live in your browser. The Thor only holds the conversation it is answering, in memory, and one encrypted file with a name, an email, a status and a key per person. Message text is never written down.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" role="img" aria-label="Three columns. Your browser holds the conversations, the settings and your key, cleared with site data. The Thor's memory holds the reply being written and a small prompt cache, gone on restart. The Thor's disk holds the sealed keyring: one record per person with a name, an email, a status and a key, and the service key the servers use between themselves. No message text is written down.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
@@ -17,54 +17,42 @@
     .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
     .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
   </style>
-  <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
-    </marker>
-  </defs>
-  <rect width="960" height="430" fill="#FFFFFF"/>
-  <text x="30" y="34" class="title">What is stored, and where</text>
+  <rect width="960" height="400" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">What is stored, and where</text>
+  <line x1="30" y1="56" x2="930" y2="56" stroke="#D5DCE4" stroke-width="1"/>
 
-  <rect x="30" y="56" width="282" height="300" rx="10" class="outside"/>
-  <text x="46" y="82" class="name">Your browser</text>
-  <rect x="46" y="96" width="250" height="52" rx="8" class="box built"/>
-  <text x="58" y="118" class="note">conversations: every message,</text>
-  <text x="58" y="136" class="note">code block and thought</text>
-  <rect x="46" y="158" width="250" height="52" rx="8" class="box built"/>
-  <text x="58" y="180" class="note">settings: theme, model,</text>
-  <text x="58" y="198" class="note">system prompt, Think and Web</text>
-  <rect x="46" y="220" width="250" height="52" rx="8" class="box built"/>
-  <text x="58" y="242" class="note">the key you were given</text>
-  <text x="58" y="260" class="note">(local storage, that address only)</text>
-  <text x="46" y="300" class="note">Clearing site data deletes all of it.</text>
-  <text x="46" y="318" class="note">Another browser or device starts empty.</text>
-  <text x="46" y="342" class="label">Nothing here leaves the device on its own.</text>
+  <text x="170" y="88" class="name" text-anchor="middle">Your browser</text>
+  <rect x="30" y="104" width="280" height="74" rx="10" class="outside"/>
+  <text x="170" y="132" class="name" text-anchor="middle">conversations</text>
+  <text x="170" y="154" class="note" text-anchor="middle">every message and thought</text>
+  <rect x="30" y="190" width="280" height="74" rx="10" class="outside"/>
+  <text x="170" y="218" class="name" text-anchor="middle">settings</text>
+  <text x="170" y="240" class="note" text-anchor="middle">theme, model, system prompt</text>
+  <rect x="30" y="276" width="280" height="74" rx="10" class="outside"/>
+  <text x="170" y="304" class="name" text-anchor="middle">your key</text>
+  <text x="170" y="326" class="note" text-anchor="middle">kept in local storage</text>
 
-  <rect x="339" y="56" width="282" height="300" rx="10" class="outside"/>
-  <text x="355" y="82" class="name">The Thor's memory</text>
-  <rect x="355" y="96" width="250" height="90" rx="8" class="box built"/>
-  <text x="367" y="118" class="note">the conversation just read,</text>
-  <text x="367" y="136" class="note">kept in the slot's prompt cache</text>
-  <text x="367" y="158" class="note">so the next message on that slot</text>
-  <text x="367" y="176" class="note">is not read twice</text>
-  <text x="355" y="216" class="note">Gone when llama-server restarts.</text>
-  <text x="355" y="234" class="note">Four slots share one copy of the model.</text>
-  <text x="355" y="268" class="label">Read to answer, not written down.</text>
+  <text x="480" y="88" class="name" text-anchor="middle">The Thor's memory</text>
+  <rect x="340" y="104" width="280" height="74" rx="10" class="box built"/>
+  <text x="480" y="132" class="name" text-anchor="middle">in memory only</text>
+  <text x="480" y="154" class="note" text-anchor="middle">the reply being written</text>
+  <rect x="340" y="190" width="280" height="74" rx="10" class="box built"/>
+  <text x="480" y="218" class="name" text-anchor="middle">the prompt cache</text>
+  <text x="480" y="240" class="note" text-anchor="middle">so a slot reads it once</text>
+  <rect x="340" y="276" width="280" height="74" rx="10" class="box built"/>
+  <text x="480" y="304" class="name" text-anchor="middle">gone on restart</text>
+  <text x="480" y="326" class="note" text-anchor="middle">read to answer, not saved</text>
 
-  <rect x="648" y="56" width="282" height="300" rx="10" class="outside"/>
-  <text x="664" y="82" class="name">The Thor's disk</text>
-  <rect x="664" y="96" width="250" height="104" rx="8" class="box built"/>
-  <text x="676" y="118" class="mono note">~/.config/thor-chat/keyring</text>
-  <text x="676" y="140" class="note">one sealed record per person:</text>
-  <text x="676" y="158" class="note">name, email, status, key, time</text>
-  <text x="676" y="180" class="note">sealed with Argon2id + XChaCha20</text>
-  <text x="664" y="226" class="note">Also on disk: the one key llama-server</text>
-  <text x="664" y="244" class="note">and this server use between themselves.</text>
-  <text x="664" y="278" class="label">No message text is ever written here.</text>
+  <text x="790" y="88" class="name" text-anchor="middle">The Thor's disk</text>
+  <rect x="650" y="104" width="280" height="74" rx="10" class="box built"/>
+  <text x="790" y="132" class="name" text-anchor="middle">the sealed keyring</text>
+  <text x="790" y="154" class="note mono" text-anchor="middle">~/.config/thor-chat/keyring</text>
+  <rect x="650" y="190" width="280" height="74" rx="10" class="box built"/>
+  <text x="790" y="218" class="name" text-anchor="middle">one record per person</text>
+  <text x="790" y="240" class="note" text-anchor="middle">name, email, status, key</text>
+  <rect x="650" y="276" width="280" height="74" rx="10" class="box built"/>
+  <text x="790" y="304" class="name" text-anchor="middle">the service key</text>
+  <text x="790" y="326" class="note" text-anchor="middle">the servers' own key</text>
 
-  <path class="flow" d="M312,150 L337,150" marker-end="url(#arrow)"/>
-  <path class="flow" d="M621,150 L646,150" marker-end="url(#arrow)"/>
-  <text x="480" y="392" class="num" text-anchor="middle">Every message sends the whole history again. None of it is written down on the Thor.</text>
-  <line x1="30" y1="372" x2="930" y2="372" stroke="#D5DCE4" stroke-width="1"/>
-  <text x="480" y="416" class="warn" text-anchor="middle">Not collected at all: cookies from other sites, analytics, advertising, a third-party login.</text>
+  <text x="480" y="384" class="num" text-anchor="middle">Every message sends the whole history; none of it is written down on the Thor.</text>
 </svg>

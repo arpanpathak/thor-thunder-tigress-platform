@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" width="960" height="440" role="img" aria-label="Sealing: the records and the magic line go into XChaCha20-Poly1305 with a 32-byte key and a fresh 24-byte nonce, and come out as ciphertext with a 16-byte tag. Opening: only the same key, nonce and additional data return the records; a changed byte or another key fails the tag and is refused.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" width="960" height="350" role="img" aria-label="The records and the magic line go into XChaCha20-Poly1305 with one key and a fresh nonce, and come out as ciphertext with a 16-byte tag that catches any change. Opening needs the same key, nonce and magic line; a wrong passphrase and a changed file fail the same way, on purpose.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
@@ -10,6 +10,7 @@
     .mono { font-family: "JetBrains Mono", Menlo, monospace; }
     .box { fill: #F4F7FA; stroke-width: 2; }
     .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
     .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
     .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
     .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
@@ -20,55 +21,39 @@
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
       <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
-    </marker>
   </defs>
-  <rect width="960" height="440" fill="#FFFFFF"/>
-  <text x="30" y="34" class="title">Encrypt and authenticate in one step: XChaCha20-Poly1305</text>
+  <rect width="960" height="350" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Encrypt and authenticate in one step</text>
 
-  <rect x="26" y="54" width="908" height="164" rx="10" class="zone"/>
-  <text x="40" y="76" class="zonelabel">sealing (a write)</text>
-  <rect x="40" y="88" width="230" height="52" rx="8" class="outside"/>
-  <text x="54" y="110" class="name">the records</text>
-  <text x="54" y="130" class="note">plaintext JSON, name to key</text>
-  <rect x="40" y="152" width="230" height="52" rx="8" class="outside"/>
-  <text x="54" y="174" class="name">additional data</text>
-  <text x="54" y="194" class="note">the magic line, not encrypted</text>
-  <path class="flow" d="M270,114 L328,140" marker-end="url(#arrow)"/>
-  <path class="flow" d="M270,178 L328,158" marker-end="url(#arrow)"/>
-  <rect x="330" y="92" width="200" height="108" rx="10" class="box built"/>
-  <text x="430" y="118" class="name" text-anchor="middle">XChaCha20-Poly1305</text>
-  <text x="430" y="140" class="note" text-anchor="middle">key: 32 bytes,</text>
-  <text x="430" y="158" class="note" text-anchor="middle">the Argon2id output</text>
-  <text x="430" y="180" class="note" text-anchor="middle">nonce: 24 bytes, drawn fresh</text>
-  <text x="430" y="196" class="note" text-anchor="middle">for every single write</text>
-  <path class="flow" d="M530,146 L588,146" marker-end="url(#arrow)"/>
-  <rect x="590" y="92" width="310" height="108" rx="8" class="box built"/>
-  <text x="745" y="120" class="name" text-anchor="middle">ciphertext, then a tag</text>
-  <text x="745" y="142" class="note" text-anchor="middle">the records cannot be read, and</text>
-  <text x="745" y="160" class="note" text-anchor="middle">any change is caught by the tag</text>
-  <text x="745" y="184" class="label" text-anchor="middle">ciphertext + 16-byte tag go in the file</text>
+  <rect x="30" y="80" width="210" height="96" rx="10" class="outside"/>
+  <text x="135" y="112" class="name" text-anchor="middle">the records</text>
+  <text x="135" y="136" class="note" text-anchor="middle">plus the magic line</text>
+  <text x="135" y="154" class="note" text-anchor="middle">as associated data</text>
 
-  <rect x="26" y="232" width="908" height="150" rx="10" class="zone"/>
-  <text x="40" y="254" class="zonelabel">opening (a read)</text>
-  <rect x="40" y="266" width="200" height="60" rx="8" class="box built"/>
-  <text x="140" y="290" class="name" text-anchor="middle">ciphertext + tag</text>
-  <text x="140" y="310" class="note" text-anchor="middle">from the file</text>
-  <rect x="280" y="266" width="200" height="60" rx="8" class="box built"/>
-  <text x="380" y="290" class="name" text-anchor="middle">same key + nonce</text>
-  <text x="380" y="310" class="note" text-anchor="middle">from the passphrase and the file</text>
-  <path class="flow" d="M240,296 L278,296" marker-end="url(#arrow)"/>
-  <path class="flow" d="M480,296 L528,296" marker-end="url(#arrow)"/>
-  <rect x="530" y="266" width="180" height="60" rx="8" class="box built"/>
-  <text x="620" y="290" class="name" text-anchor="middle">the records</text>
-  <text x="620" y="310" class="note" text-anchor="middle">tag matched</text>
+  <rect x="345" y="80" width="240" height="96" rx="10" class="box built"/>
+  <text x="465" y="112" class="name" text-anchor="middle">XChaCha20-Poly1305</text>
+  <text x="465" y="136" class="note" text-anchor="middle">one key, one nonce</text>
+  <text x="465" y="154" class="note" text-anchor="middle">a fresh nonce per write</text>
 
-  <rect x="740" y="266" width="180" height="60" rx="8" class="outside"/>
-  <text x="830" y="288" class="note" text-anchor="middle">another key, a changed byte,</text>
-  <text x="830" y="306" class="note" text-anchor="middle">or another magic line</text>
-  <path class="deny" d="M740,296 L712,296" marker-end="url(#arrow-deny)"/>
-  <text x="626" y="352" class="warn" text-anchor="middle">tag does not match: nothing is returned</text>
-  <text x="30" y="404" class="note" text-anchor="start">A wrong passphrase and a changed file fail the same way, on purpose: the tool says "wrong passphrase, or the file was changed" and cannot tell them apart.</text>
-  <text x="30" y="426" class="note" text-anchor="start">A nonce is not a secret, but it must never repeat under one key. Every write draws a fresh random one, so no two writes share it.</text>
+  <rect x="680" y="80" width="250" height="96" rx="10" class="box built"/>
+  <text x="805" y="112" class="name" text-anchor="middle">ciphertext + tag</text>
+  <text x="805" y="136" class="note" text-anchor="middle">unreadable, and</text>
+  <text x="805" y="154" class="note" text-anchor="middle">any change is caught</text>
+
+  <path class="flow" d="M240,128 L333,128" marker-end="url(#arrow)"/>
+  <path class="flow" d="M585,128 L668,128" marker-end="url(#arrow)"/>
+
+  <line x1="30" y1="196" x2="930" y2="196" stroke="#D5DCE4" stroke-width="1"/>
+
+  <rect x="30" y="216" width="420" height="96" rx="10" class="box built"/>
+  <text x="240" y="248" class="name" text-anchor="middle">Opening again</text>
+  <text x="240" y="272" class="note" text-anchor="middle">same key, same nonce, same magic line</text>
+  <text x="240" y="292" class="note" text-anchor="middle">or nothing comes back at all</text>
+
+  <rect x="480" y="216" width="450" height="96" rx="10" class="outside"/>
+  <text x="705" y="248" class="name" text-anchor="middle">One message for two mistakes</text>
+  <text x="705" y="272" class="note" text-anchor="middle">a wrong passphrase and a changed file</text>
+  <text x="705" y="292" class="note" text-anchor="middle">fail the same way, on purpose</text>
+
+  <text x="30" y="336" class="warn">A nonce is not secret, but it must never repeat under one key.</text>
 </svg>

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" width="960" height="340" role="img" aria-label="A form request makes a requested record; approve mints a key and makes it active; revoke takes it away; approve again brings it back. revoke-all stops every active key with one command. The chat server reloads the file when it changes, so no restart is needed.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320" width="960" height="320" role="img" aria-label="A request makes a requested record; approve mints a key and makes it active; revoke takes the key away and keeps the record. revoke-all stops every active key at once with one command. The agent re-reads the file when it changes, so no restart is needed.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
@@ -25,42 +25,29 @@
       <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
     </marker>
   </defs>
-  <rect width="960" height="340" fill="#FFFFFF"/>
-  <text x="30" y="34" class="title">The life of a key</text>
+  <rect width="960" height="320" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">The life of a key</text>
 
-  <rect x="60" y="58" width="250" height="46" rx="8" class="outside"/>
-  <text x="76" y="80" class="name">the invite form</text>
-  <text x="76" y="98" class="note">posts a name and an email to /request</text>
-  <path class="flow" d="M185,104 L185,138" marker-end="url(#arrow)"/>
+  <rect x="60" y="110" width="220" height="96" rx="10" class="box built"/>
+  <text x="170" y="142" class="name" text-anchor="middle">requested</text>
+  <text x="170" y="166" class="note" text-anchor="middle">waiting, no key yet</text>
 
-  <rect x="70" y="140" width="210" height="76" rx="8" class="planned"/>
-  <text x="175" y="168" class="name" text-anchor="middle">requested</text>
-  <text x="175" y="190" class="note" text-anchor="middle">waiting; no key yet</text>
+  <rect x="370" y="110" width="220" height="96" rx="10" class="box built"/>
+  <text x="480" y="142" class="name" text-anchor="middle">active</text>
+  <text x="480" y="166" class="note" text-anchor="middle">the chat lets it in</text>
 
-  <rect x="375" y="140" width="210" height="76" rx="8" class="box built"/>
-  <text x="480" y="168" class="name" text-anchor="middle">active</text>
-  <text x="480" y="190" class="note" text-anchor="middle">the chat lets this key in</text>
+  <rect x="680" y="110" width="220" height="96" rx="10" class="box built"/>
+  <text x="790" y="142" class="name" text-anchor="middle">revoked</text>
+  <text x="790" y="166" class="note" text-anchor="middle">key erased,</text>
+  <text x="790" y="184" class="note" text-anchor="middle">record kept</text>
 
-  <rect x="680" y="140" width="210" height="76" rx="8" class="planned"/>
-  <text x="785" y="168" class="name" text-anchor="middle">revoked</text>
-  <text x="785" y="190" class="note" text-anchor="middle">record kept, key erased</text>
+  <text x="320" y="100" class="label" text-anchor="middle">approve EMAIL</text>
+  <path class="flow" d="M280,158 L358,158" marker-end="url(#arrow)"/>
+  <text x="630" y="100" class="label" text-anchor="middle">revoke EMAIL|KEY</text>
+  <path class="flow" d="M590,158 L668,158" marker-end="url(#arrow)"/>
 
-  <path class="flow" d="M280,168 L373,168" marker-end="url(#arrow)"/>
-  <text x="326" y="150" class="label" text-anchor="middle">approve EMAIL</text>
-  <text x="326" y="212" class="note" text-anchor="middle">24 random bytes,</text>
-  <text x="326" y="228" class="note" text-anchor="middle">printed as 48 hex digits</text>
+  <path class="deny" d="M480,206 L480,238" marker-end="url(#arrow-deny)"/>
+  <text x="480" y="262" class="warn" text-anchor="middle">revoke-all: every active key at once</text>
 
-  <path class="flow" d="M585,168 L678,168" marker-end="url(#arrow)"/>
-  <text x="631" y="150" class="label" text-anchor="middle">revoke EMAIL|KEY</text>
-
-  <path class="flow" d="M785,216 L785,258 L480,258 L480,218" marker-end="url(#arrow)"/>
-  <text x="640" y="278" class="note" text-anchor="middle">approve again: brings the same person back</text>
-
-  <path class="deny" d="M480,216 L480,296 L785,296 L785,218" marker-end="url(#arrow-deny)"/>
-  <text x="300" y="316" class="warn" text-anchor="start">revoke-all: every active key stops at once, one command, no restart</text>
-
-  <rect x="60" y="238" width="250" height="66" rx="8" class="outside"/>
-  <text x="76" y="262" class="note">The chat server reads the file</text>
-  <text x="76" y="280" class="note">when it changes, so a revoke</text>
-  <text x="76" y="298" class="note">takes effect on the next request.</text>
+  <text x="30" y="302" class="note">The agent re-reads the file when it changes: no restart.</text>
 </svg>

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" role="img" aria-label="For every earlier token the model keeps a key and a value. The query of the token being written is compared with every key before it, and the matching values are mixed into the next token. The KV cache is those keys and values, and it grows with the conversation.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" role="img" aria-label="Every earlier token has a key and a value. The query of the token being written is compared with every key before it, and the matching values decide the next token. The keys and values kept are the KV cache, so memory grows with the conversation. This model is a hybrid: only 6 of its 52 layers use attention this way.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
@@ -10,7 +10,7 @@
     .mono { font-family: "JetBrains Mono", Menlo, monospace; }
     .box { fill: #F4F7FA; stroke-width: 2; }
     .built { stroke: #4E8A16; }
-    .accent { fill: #E8F4FF; stroke: #1E88A8; stroke-width: 2; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
     .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
     .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
     .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
@@ -21,61 +21,49 @@
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
       <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
     </marker>
-    <marker id="arrow-both" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
-      <path d="M10,0 L0,5 L10,10 Z" fill="#1E88A8"/>
-    </marker>
   </defs>
   <rect width="960" height="430" fill="#FFFFFF"/>
-  <text x="30" y="34" class="title">What KV means: a key and a value per token</text>
+  <text x="30" y="36" class="title">What KV means: a key and a value per token</text>
 
-  <rect x="30" y="54" width="290" height="42" rx="8" class="accent"/>
-  <text x="44" y="72" class="name">Query</text>
-  <text x="44" y="90" class="note">what the model is looking for now</text>
-  <rect x="335" y="54" width="290" height="42" rx="8" class="outside"/>
-  <text x="349" y="72" class="name">Key</text>
-  <text x="349" y="90" class="note">what each earlier token offers</text>
-  <rect x="640" y="54" width="290" height="42" rx="8" class="outside"/>
-  <text x="654" y="72" class="name">Value</text>
-  <text x="654" y="90" class="note">what each earlier token contributes</text>
+  <rect x="30" y="64" width="290" height="48" rx="8" class="outside"/>
+  <text x="175" y="94" class="note" text-anchor="middle">Query: what it wants now</text>
+  <rect x="335" y="64" width="290" height="48" rx="8" class="outside"/>
+  <text x="480" y="94" class="note" text-anchor="middle">Key: what each token offers</text>
+  <rect x="640" y="64" width="290" height="48" rx="8" class="outside"/>
+  <text x="785" y="94" class="note" text-anchor="middle">Value: what each token gives</text>
 
-  <text x="30" y="132" class="note" text-anchor="start">every earlier token</text>
-  <rect x="30" y="142" width="96" height="38" rx="6" class="box built"/><text x="78" y="166" class="mono note" text-anchor="middle">t1</text>
-  <rect x="140" y="142" width="96" height="38" rx="6" class="box built"/><text x="188" y="166" class="mono note" text-anchor="middle">t2</text>
-  <rect x="250" y="142" width="96" height="38" rx="6" class="box built"/><text x="298" y="166" class="mono note" text-anchor="middle">t3</text>
-  <rect x="360" y="142" width="96" height="38" rx="6" class="box built"/><text x="408" y="166" class="mono note" text-anchor="middle">t4</text>
-  <rect x="470" y="142" width="96" height="38" rx="6" class="box built"/><text x="518" y="166" class="mono note" text-anchor="middle">t5</text>
-  <rect x="580" y="142" width="96" height="38" rx="6" class="box built"/><text x="628" y="166" class="mono note" text-anchor="middle">t6</text>
+  <text x="30" y="140" class="label">every earlier token</text>
+  <rect x="30" y="150" width="86" height="36" rx="6" class="box built"/><text x="73" y="173" class="note mono" text-anchor="middle">t1</text>
+  <rect x="136" y="150" width="86" height="36" rx="6" class="box built"/><text x="179" y="173" class="note mono" text-anchor="middle">t2</text>
+  <rect x="242" y="150" width="86" height="36" rx="6" class="box built"/><text x="285" y="173" class="note mono" text-anchor="middle">t3</text>
+  <rect x="348" y="150" width="86" height="36" rx="6" class="box built"/><text x="391" y="173" class="note mono" text-anchor="middle">t4</text>
+  <rect x="454" y="150" width="86" height="36" rx="6" class="box built"/><text x="497" y="173" class="note mono" text-anchor="middle">t5</text>
+  <rect x="560" y="150" width="86" height="36" rx="6" class="box built"/><text x="603" y="173" class="note mono" text-anchor="middle">t6</text>
 
-  <rect x="30" y="190" width="96" height="34" rx="6" class="outside"/><text x="78" y="212" class="note" text-anchor="middle">K V</text>
-  <rect x="140" y="190" width="96" height="34" rx="6" class="outside"/><text x="188" y="212" class="note" text-anchor="middle">K V</text>
-  <rect x="250" y="190" width="96" height="34" rx="6" class="outside"/><text x="298" y="212" class="note" text-anchor="middle">K V</text>
-  <rect x="360" y="190" width="96" height="34" rx="6" class="outside"/><text x="408" y="212" class="note" text-anchor="middle">K V</text>
-  <rect x="470" y="190" width="96" height="34" rx="6" class="outside"/><text x="518" y="212" class="note" text-anchor="middle">K V</text>
-  <rect x="580" y="190" width="96" height="34" rx="6" class="outside"/><text x="628" y="212" class="note" text-anchor="middle">K V</text>
-  <text x="78" y="244" class="label" text-anchor="middle">kept</text>
-  <text x="628" y="244" class="label" text-anchor="middle">kept</text>
+  <rect x="30" y="200" width="86" height="34" rx="6" class="outside"/><text x="73" y="222" class="note" text-anchor="middle">K V</text>
+  <rect x="136" y="200" width="86" height="34" rx="6" class="outside"/><text x="179" y="222" class="note" text-anchor="middle">K V</text>
+  <rect x="242" y="200" width="86" height="34" rx="6" class="outside"/><text x="285" y="222" class="note" text-anchor="middle">K V</text>
+  <rect x="348" y="200" width="86" height="34" rx="6" class="outside"/><text x="391" y="222" class="note" text-anchor="middle">K V</text>
+  <rect x="454" y="200" width="86" height="34" rx="6" class="outside"/><text x="497" y="222" class="note" text-anchor="middle">K V</text>
+  <rect x="560" y="200" width="86" height="34" rx="6" class="outside"/><text x="603" y="222" class="note" text-anchor="middle">K V</text>
 
-  <path class="flow" d="M676,159 L132,159" marker-start="url(#arrow-both)" marker-end="url(#arrow-both)"/>
-  <text x="404" y="130" class="num" text-anchor="middle">the query is compared with every key before it</text>
+  <rect x="700" y="150" width="230" height="84" rx="10" class="box built"/>
+  <text x="815" y="180" class="name" text-anchor="middle">the token being written</text>
+  <text x="815" y="202" class="note" text-anchor="middle">its query reads every</text>
+  <text x="815" y="220" class="note" text-anchor="middle">key before it</text>
 
-  <rect x="716" y="54" width="214" height="70" rx="8" class="accent"/>
-  <text x="730" y="78" class="name">the token being written</text>
-  <text x="730" y="98" class="note">its query asks: which keys</text>
-  <text x="730" y="116" class="note">matter for what comes next?</text>
+  <rect x="700" y="270" width="230" height="84" rx="10" class="box built"/>
+  <text x="815" y="300" class="name" text-anchor="middle">the next token</text>
+  <text x="815" y="322" class="note" text-anchor="middle">the matching values</text>
+  <text x="815" y="340" class="note" text-anchor="middle">decide the word</text>
 
-  <rect x="716" y="190" width="214" height="70" rx="8" class="box built"/>
-  <text x="730" y="214" class="name">the next token</text>
-  <text x="730" y="234" class="note">the matching values, mixed,</text>
-  <text x="730" y="252" class="note">decide the word that follows</text>
-  <path class="flow" d="M823,124 L823,188" marker-end="url(#arrow)"/>
+  <path class="flow" d="M698,192 L650,192" marker-end="url(#arrow)"/>
 
-  <rect x="30" y="276" width="900" height="56" rx="8" class="outside"/>
-  <text x="46" y="300" class="name">The KV cache</text>
-  <text x="46" y="322" class="note">those keys and values, kept so they are not recomputed. Memory and reading time both grow with the conversation: 6 KiB per token for this model, 6 GiB at a million.</text>
+  <rect x="30" y="276" width="640" height="84" rx="10" class="outside"/>
+  <text x="350" y="306" class="name" text-anchor="middle">The KV cache</text>
+  <text x="350" y="328" class="note" text-anchor="middle">those keys and values, kept so they are not recomputed</text>
+  <text x="350" y="346" class="note" text-anchor="middle">memory grows with the conversation, one entry per token</text>
 
-  <line x1="30" y1="348" x2="930" y2="348" stroke="#D5DCE4" stroke-width="1"/>
-  <text x="30" y="372" class="note" text-anchor="start">The sliding-window trick: the browser sends only the last N messages instead of everything, so the window lasts longer at the cost of forgetting the start.</text>
-  <text x="30" y="396" class="warn" text-anchor="start">This model is a hybrid: only 6 of its 52 layers use attention this way. The rest keep one fixed-size state, which is why a million tokens fit on the Thor.</text>
-  <text x="30" y="420" class="note" text-anchor="start">Measured costs and the memory arithmetic: chapter "Memory, context and slots".</text>
+  <text x="30" y="392" class="warn">This model is a hybrid: only 6 of its 52 layers use attention this way.</text>
+  <text x="30" y="416" class="note">The rest keep a fixed state, which is why a million tokens fit on the Thor.</text>
 </svg>
