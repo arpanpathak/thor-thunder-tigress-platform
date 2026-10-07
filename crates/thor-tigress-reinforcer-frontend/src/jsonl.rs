@@ -38,6 +38,7 @@ pub fn read_lines<T: DeserializeOwned>(path: &Path) -> Outcome<Vec<T>> {
 /// `ReviewError::Io` when the folder or file can't be written.
 pub fn write_lines<T: Serialize>(path: &Path, items: &[T]) -> Outcome {
     let mut text = String::new();
+
     for item in items {
         let line = serde_json::to_string(item).map_err(ReviewError::unserializable)?;
         text.push_str(&line);
