@@ -18,7 +18,7 @@
     .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
   </style>
   <rect width="960" height="410" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">The context window is the desk the model works at</text>
+  <text x="30" y="36" class="title">Everything one reply may hold</text>
 
   <rect x="30" y="70" width="560" height="260" rx="14" class="zone"/>
   <text x="46" y="94" class="zonelabel">one reply's window</text>

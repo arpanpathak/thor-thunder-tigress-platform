@@ -10,7 +10,7 @@ and the four cryptographic ideas it stands on.
 This chapter covers
 
 - why one shared key was replaced, and what the registry looks like
-- Argon2id: why a passphrase is stretched, not hashed
+- Argon2id: why a passphrase is stretched into a key
 - XChaCha20-Poly1305: encryption that also notices a change
 - the habits that matter as much as the algorithms: a fresh nonce, a
   constant-time compare, wiping memory, writing the file whole
@@ -51,7 +51,7 @@ the current default in most toolchains.
 
 <figure>
 <img src="figures/passphrase-to-key.svg" alt="Argon2id turns a passphrase, a random salt and fixed parameters (19 MiB, 2 passes, 1 lane) into a 32-byte key. A plain hash lets a GPU try billions of guesses a second; Argon2id makes each guess hold 19 MiB and take a moment.">
-<figcaption><b>Figure 25.2</b> A passphrase becomes a key. Slow and memory-hungry is the feature, not a cost.</figcaption>
+<figcaption><b>Figure 25.2</b> A passphrase becomes a key. Each guess at the passphrase costs a moment and 19 MiB of memory.</figcaption>
 </figure>
 
 ### Why not just a hash

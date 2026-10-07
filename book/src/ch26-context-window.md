@@ -1,132 +1,103 @@
-# What the context window is
+<img class="cub" src="art/cub.svg" alt="The Thor Tigress Cub">
 
-People meet the phrase before they meet the idea, usually in a table:
-"1M-token context". This chapter explains what a context window actually is,
-why it is finite, and what part of it is the **KV cache**. It stays away from
-the arithmetic; the measured numbers are in the chapter
-[Memory, context and slots](ch20-memory-and-context.md).
+# What a context window is
+
+Chapter "Memory, context and slots" has the arithmetic: 6 KiB of keys and values
+per token, 24 GiB for four slots at a million tokens, and about 1,050 tokens a
+second spent reading a prompt. This chapter is the same subject without the
+arithmetic: what fills one window, why the model reads everything again for each
+message, and what happens when a conversation reaches the end of it.
 
 <div class="covers">
 
 This chapter covers
 
-- the context window as one fixed budget per reply, not a memory
-- why every message sends the whole conversation again
-- what a token is, and what fills the window fastest
-- what KV means, and why it grows with the conversation
-- what happens when the window is full, and the four ways to live within it
+- the five things that fill one reply's window
+- why the model holds nothing between requests
+- keys and values, the part that grows with the conversation
+- what a full window does, and the four ways to work within it
 
 </div>
 
-## The desk, not a memory
+## One budget per reply
 
 <figure>
-<img src="figures/context-window.svg" alt="The context window holds the system prompt, the whole conversation so far, any pasted text, and the reply being written, up to 1,048,576 tokens. The model keeps no memory between requests, so the browser re-sends the whole history. Four slots run four replies at once, each with its own window. A request longer than the window is refused.">
-<figcaption><b>Figure 26.1</b> The window is a desk the model works at, cleared between requests.</figcaption>
+<img src="figures/context-window.svg" alt="One reply's window holds the system prompt, the whole conversation so far, anything pasted in, and the reply being written, up to 1,048,576 tokens. The model keeps nothing between requests, so the browser re-sends everything. Four slots run four replies at once, each with its own window, and a request longer than the window is refused.">
+<figcaption><b>Figure 26.1</b> Everything one reply may hold.</figcaption>
 </figure>
 
-A **token** is a piece of a word: about four characters of English, a little
-less for code. The **context window** is the most tokens one reply may hold. It
-is a budget, and everything competes for it:
+A token is a piece of a word: about four characters of English, a little less
+for code. One reply may hold 1,048,576 of them. Everything in the table counts
+against that number.
 
 | Fills the window | Counts as |
 |---|---|
 | the system prompt, if the page sets one | tokens at the start of every request |
 | every earlier message in the conversation | tokens, whole, every time |
 | anything pasted: a log, a file, an error | tokens, in full |
-| the reasoning, when **Think** is on | tokens, kept in the history after the answer |
-| the reply being written | tokens, one at a time, as it is generated |
+| the reasoning, while **Think** is on | tokens, kept in the history after the answer |
+| the reply being written | one token at a time, as it is generated |
 
-Nothing else fits. When the total reaches the limit, there is no room for the
-next token.
+## Every message reads the conversation again
 
-## Why it is "one shot"
+The model holds nothing between requests. The browser keeps the conversation and
+sends the whole of it with every message; the server reads from the start. On a
+long conversation, that reading is where the pause before the first word comes
+from.
 
-A language model does not remember your last message. It has no diary and no
-session. Each request is the first request as far as the model is concerned.
+A slot keeps the conversation it read last, which llama-server calls the prompt
+cache. If the same conversation comes back to the same slot, the part already
+read is not read again. The cache lives in memory and goes away when the server
+restarts.
 
-So the browser does the remembering: it keeps the conversation and, with every
-message, sends the **whole history** again. The server reads from the start
-each time. That is also why the first word can take a moment on a long
-conversation: the model is reading, not thinking.
-
-The one shortcut is the **prompt cache**. A slot keeps the conversation it read
-last. If the same conversation comes back to the same slot, the part already
-read is not read again. It saves time; it is not memory. The cache is in
-memory, and it is gone when the server restarts.
-
-## Why the window is finite
-
-A model that could look back at any number of tokens would still have to pay
-for them, twice: in memory and in time.
-
-### KV, in plain words
-
-When the model writes the next word, each of its attention layers compares that
-word with the words before it. To answer "which earlier words matter now?", the
-layer keeps two small vectors for every earlier token:
-
-- a **key**, what that token offers, and
-- a **value**, what that token contributes.
+## The part that grows: keys and values
 
 <figure>
-<img src="figures/kv-cache.svg" alt="For every earlier token the model keeps a key and a value. The query of the token being written is compared with every key before it, and the matching values are mixed into the next token. The KV cache is those keys and values, and it grows with the conversation.">
-<figcaption><b>Figure 26.2</b> A key and a value per token, kept so they are not recomputed. This is the KV cache.</figcaption>
+<img src="figures/kv-cache.svg" alt="Every earlier token has a key and a value. The query of the token being written is compared with every key before it, and the matching values decide the next token. The keys and values kept are the KV cache, so memory grows with the conversation. This model is a hybrid: only 6 of its 52 layers use attention this way.">
+<figcaption><b>Figure 26.2</b> The keys and values the model keeps for the tokens it has already read.</figcaption>
 </figure>
 
-Those keys and values, kept instead of recomputed, are the **KV cache**. It
-grows with the conversation, one entry per token, per attention layer. Long
-conversations are not just slower to read; they take memory that could have
-been another slot.
+To write the next token, the attention layers compare it with every token before
+it. Each earlier token leaves two short vectors behind, a **key** and a
+**value**, and keeping them instead of recomputing them is the **KV cache**. It
+grows with the conversation, one entry per token per attention layer. The sum is
+in chapter "Memory, context and slots": 6 KiB per token, 6 GiB per slot at a
+million tokens, 24 GiB across four slots.
 
-The full arithmetic is in [Memory, context and slots](ch20-memory-and-context.md):
+Nemotron 3 Nano is a hybrid. Six of its 52 layers work by attention; the rest
+carry one state of fixed size, however long the conversation runs. A model built
+from attention layers alone would need about 128 GiB for a single million-token
+conversation — Llama 3 8B is the example in that chapter — and the Thor has 128
+GB in total.
 
-- This model keeps about **6 KiB per token**, so a million tokens is about
-  **6 GiB per slot**.
-- It is unusual because only **6 of its 52 layers** use attention this way. The
-  rest keep one fixed-size state, however long the conversation. That hybrid
-  design is the reason a million tokens fits on a 128 GB machine at all.
+## Reading time before the first word
 
-### Time
+Measured on the Thor on 2026-10-06, reading runs at about **1,050 to 1,100
+tokens per second**:
 
-Reading time is the second bill. Before it writes anything, the model reads the
-whole window. Measured on the Thor: about **1,050 to 1,100 tokens per second**.
-A 100,000-token conversation is about a minute and a half before the first
-word; a million tokens would be about sixteen. The prompt cache is what makes a
-live conversation feel quick.
+| Conversation | Wait before the first word |
+|---|---|
+| 10,000 tokens | about 9 s (measured) |
+| 100,000 tokens | about 1.5 minutes |
+| 1,048,576 tokens | about 16 minutes, and likely more, since reading slows as the context grows |
 
-## What fills it fast
+## When the window is full
 
-- **A pasted file.** A stack trace, a log, a whole source file. This is the
-  fastest way to fill a window, and the model reads all of it.
-- **Thinking.** With **Think** on, the reasoning is generated and then kept in
-  the history, so it is paid for at every later message.
-- **A long conversation.** Even without pastes, every reply stays in the
-  history, and the history is sent whole each time.
+The server refuses the request. Nothing is cut short and nothing is dropped
+quietly; the page shows the error. Four ways out:
 
-## When it is full
+1. Start a new conversation with **+**. The old one stays in the browser.
+2. Paste less: name the file and the line instead of the whole file.
+3. Turn **Think** off for routine questions, so the reasoning does not stay in
+   the history.
+4. Raise `CONTEXT`, which memory pays for: `USERS × CONTEXT × 6 KiB`.
 
-The server refuses the request; it does not silently truncate and it does not
-guess. A conversation that has grown past `CONTEXT` simply fails, and the page
-shows the error. The fixes, in the order to try them:
+Some clients have a fifth: a sliding window, where the browser sends only the
+last messages. That trades the start of the conversation for room at the end.
 
-1. **Start a new conversation** with **+**. Keep the old one in the browser if
-   you still want it; the new one has a fresh window.
-2. **Paste less.** Point at the file and the line instead of pasting all of it.
-3. **Turn Think off** for routine questions, so reasoning is not added to the
-   history.
-4. **Raise `CONTEXT`** if you run the server, remembering that memory is
-   `USERS × CONTEXT × 6 KiB`: a longer window means fewer slots at the same
-   total memory, or more memory.
+## Four slots
 
-A fifth option exists on some clients, not on this one yet: a **sliding
-window**, where the browser sends only the last N messages. It buys a longer
-conversation at the cost of forgetting its start.
-
-## Four slots, one machine
-
-The window is per reply, not per person. Four replies run at once, each with
-its own window, sharing one copy of the model weights. When all four are busy,
-the next request waits in a queue. So the sentence to keep in mind is not
-"four people" but "four replies at the same instant"; the window is what one of
-those replies may hold.
+The window belongs to a reply. Four replies run at the same moment, each with
+its own window, all sharing one copy of the model. A fifth request waits in the
+queue. On this machine the four are shared by the page and by every agent using
+the API.

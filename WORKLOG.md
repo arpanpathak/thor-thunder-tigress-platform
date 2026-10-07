@@ -84,6 +84,14 @@ there as untracked.
   chapter's "Get a key", and the About page's invite section.
 - Verified: `mdbook build book` clean; 35 SVGs parse as XML; every figure
   reference resolves.
+- Rewritten after review, same day. The launch note now opens with the cub art
+  and carries the path figure, the welcome and conversation screenshots, the
+  storage figure, and the tooling: the services and ports, the four files under
+  `~/.config/thor-chat/`, the commands, and the crate list. The context-window
+  chapter is shorter, keeps the arithmetic in chapter "Memory, context and
+  slots" where the measurements are, and drops the desk metaphor from the
+  figure title. Phrasing that read as filler ("checked against the code, not
+  taken on trust", "the feature, not a cost") is gone.
 
 ### Deployed to the Thor
 
