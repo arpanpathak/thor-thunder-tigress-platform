@@ -7,3 +7,4 @@ corpus/
 CLAUDE.md
 attic/
 labels/
+__pycache__/
