@@ -97,6 +97,16 @@ surface that runs today, and these six are the ones I am building toward.
 <figcaption><b>Video 24.1</b> The page in use: a Rust answer streaming in, then a question with Web on.</figcaption>
 </figure>
 
+<figure>
+<img src="figures/cub-demo-deep-ocean.gif" alt="The chat page in Material Deep Ocean: the question typed in, the answer streaming with a highlighted code block, and the stats line when it finishes.">
+<figcaption><b>Figure 24.7</b> The same demo as a GIF, in Material Deep Ocean. 400 frames, the most a LinkedIn post animates.</figcaption>
+</figure>
+
+<figure>
+<img src="figures/cub-themes.gif" alt="The same conversation in 11 themes in turn: Material Deep Ocean, One Dark, Dracula, Nord, Monokai, Solarized Dark, Gruvbox Dark, Night, Paper, GitHub Light and Solarized Light.">
+<figcaption><b>Figure 24.8</b> One conversation, 11 themes.</figcaption>
+</figure>
+
 ## Getting a key
 
 Each person gets a personal key of their own. Leave a name and an email on the
@@ -108,7 +118,7 @@ company in the middle.
 
 <figure>
 <img src="figures/cub-invite.png" alt="The invite screen: the cub, the headline that the cub is invite-only for now, a box to paste an access key, and a link to ask for a key">
-<figcaption><b>Figure 24.7</b> The door: what someone without a key meets. The picture predates the name-and-email form and the DM links, which chapter "Web chat: Thor Tigress Cub" describes.</figcaption>
+<figcaption><b>Figure 24.9</b> The door: what someone without a key meets. The picture predates the name-and-email form and the DM links, which chapter "Web chat: Thor Tigress Cub" describes.</figcaption>
 </figure>
 
 Until recently a single shared key opened the door for everybody. Now each key
@@ -127,7 +137,7 @@ three things:
 
 <figure>
 <img src="figures/what-is-stored.svg" alt="3 columns. Your browser holds the conversations, the settings and your key, cleared with site data. The board's memory holds the reply being written and a small prompt cache, gone on restart. The board's disk holds the sealed keyring: 1 record per person with a name, an email, a status and a key, and the service key the servers use between themselves. No message text is written down.">
-<figcaption><b>Figure 24.8</b> The 3 places anything is held.</figcaption>
+<figcaption><b>Figure 24.10</b> The 3 places anything is held.</figcaption>
 </figure>
 
 The chat server writes one file, the keyring, and a keyring record has no field
@@ -141,7 +151,7 @@ advertising, and asks for no login.
 
 <figure>
 <img src="figures/keyring-flow.svg" alt="A browser or an agent sends a personal key in a header over HTTPS through Tailscale Funnel. On the board, thor-tigress-agent compares it with the active keys in the sealed keyring, in constant time, and answers 401 when nothing matches. A match is forwarded to the model server with the service key from api-key, and the model server checks that key again.">
-<figcaption><b>Figure 24.9</b> The 2 keys, and where each key stops.</figcaption>
+<figcaption><b>Figure 24.11</b> The 2 keys, and where each key stops.</figcaption>
 </figure>
 
 1. The browser, or an agent, sends the personal key in an
@@ -206,7 +216,7 @@ Thor: 59.3 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
 
 <figure>
 <img src="figures/cub-architecture.svg" alt="A browser or agent opens voltforge.tech, whose forwarding page sends it to the .ts.net address. Every request then goes through Tailscale Funnel to thor-tigress-agent on the Thor at :8080, which holds the key, the model picker and the APIs, and calls SearXNG at :8888 for web search. The picker's model id decides which engine runs the reply: the llama.cpp router at :8079 for the GGUF models, or TensorRT Edge-LLM at :8081 for Qwen3.6 35B A3B in NVFP4.">
-<figcaption><b>Figure 24.10</b> How a message reaches a model, on either engine.</figcaption>
+<figcaption><b>Figure 24.12</b> How a message reaches a model, on either engine.</figcaption>
 </figure>
 
 | Piece | What it does | Listens on |
