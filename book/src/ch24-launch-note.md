@@ -4,14 +4,10 @@
 
 **thor-tigress-cub-junior · Haloom!**
 
-I live in a studio apartment in Seattle, and the heating has never been generous.
-Last autumn I cleared a corner of the desk for a Jetson AGX Thor: a single
-board, 128 GB of memory shared between its processor and its graphics chip,
-about the size of a hardback book. It answers at fifty-odd tokens a second. While it works
-it runs warm, and I did briefly hope it would take the edge off the cold. It
-does not; the room still needs the radiator. 5 of these boards now run as a
-cluster, which is how capacity grows here: another board, another set of windows,
-the same page.
+I live in a studio apartment in Seattle. The Thor sits in the corner, it gives
+off heat, and it barely warms the place. What it does is answer: a
+30-billion-parameter model on 1 board, at about 53 tokens a second. 5 of these
+boards run as a cluster, so capacity grows 1 board at a time.
 
 The page is at [`voltforge.tech/thor-tigress-cub`](https://voltforge.tech/thor-tigress-cub).
 You open it, type a question, and watch the answer arrive word by word: the
@@ -21,47 +17,47 @@ conversation stays in your own browser.
 
 ## What it becomes
 
-The launch is close, and this is where it goes next: an **agentic canvas**, a
-sandbox where a model works on a surface instead of in a chat box, with tools it
-may reach for.
+The launch is close, and this is where it goes next: an **agentic canvas
+sandbox playground**, where a model works on a canvas with tools it may reach
+for.
 
 <figure>
-<img src="figures/vision-canvas.svg" alt="Six planned rooms of the agentic canvas: roleplay with characters who remember the scene; a therapy room with a calm listener and nothing written down on the server; immigration with forms and covering letters checked against the rules; creative writing with story bibles, drafts and revisions side by side; music with a timeline the model can add notes to and play back; and vector graphics with drawing commands it can run and then look at.">
-<figcaption><b>Figure 24.1</b> The canvas: six rooms, all planned, all on the same board.</figcaption>
+<img src="figures/vision-canvas.svg" alt="6 planned uses of the agentic canvas: roleplay with characters who remember the scene; a therapist with a calm listener and nothing written down on the server; immigration with forms and covering letters checked against the rules; creative story writing with story bibles, drafts and revisions side by side; music generation with a timeline the model can add notes to and play back; and vector graphics with drawing commands it can run and then look at.">
+<figcaption><b>Figure 24.1</b> The canvas, and the 6 uses it is being built for. All 6 are planned.</figcaption>
 </figure>
 
 | | |
 |---|---|
 | roleplay | characters who remember the scene, with the scene kept on the canvas |
-| a therapy room | a calm listener, with nothing written down on the server |
+| a therapist | a calm listener, with nothing written down on the server |
 | immigration | forms and covering letters drafted with you and checked against the rules |
-| creative writing | story bibles, drafts and revisions standing side by side |
-| music | a timeline the model can add notes to and play back |
+| creative story writing | story bibles, drafts and revisions standing side by side |
+| music generation | a timeline the model can add notes to and play back |
 | vector graphics | drawing commands it can run and then look at |
 
 The book marks what exists in green and what is planned in amber. The canvas is
 amber, and it is the reason the rest of this chapter exists: the chat is the
-first surface, and these six are the ones I am building toward.
+surface that runs today, and these 6 are the ones I am building toward.
 
 ## What the chat does today
 
 - **Answers and streams.** Ask in English, Rust, or whatever language you paste
   at it, and the reply arrives as it is written.
 - **Searches the web** when you turn **Web** on, and lists the sources it used.
-- **Thinks first** when you turn **Think** on: the reasoning appears folded above
+- **Reasons before it answers** when you turn **Think** on: the reasoning appears folded above
   the answer, and you can open it.
 - **Picks a model** from the ones loaded, 2 at a time, across 2 engines.
-- **Works from a coding agent.** The API speaks both OpenAI's and Anthropic's
+- **Works from a coding agent.** The API speaks the OpenAI and Anthropic
   shapes, so Claude Code, OpenCode and openbatrangs point at it with a base URL
   and a key.
 - **Wears 11 themes**, from Paper and Night to Solarized, Nord, Dracula, One
   Dark, Gruvbox, Monokai and Material Deep Ocean, and follows your device until
-  you choose one.
+  you pick a theme.
 - **Fits a phone**, composer, threads and all.
 
 <figure>
 <img src="figures/cub-welcome.png" alt="The chat page in its light theme: the cub in the middle, a greeting, and 4 suggested prompts">
-<figcaption><b>Figure 24.2</b> The first screen, in Paper.</figcaption>
+<figcaption><b>Figure 24.2</b> The opening screen, in Paper.</figcaption>
 </figure>
 
 <figure>
@@ -70,7 +66,7 @@ first surface, and these six are the ones I am building toward.
 </figure>
 
 <figure>
-<img src="figures/cub-phone.png" alt="The chat page on a phone in the dark theme">
+<img class="phone" src="figures/cub-phone.png" alt="The chat page on a phone in the dark theme">
 <figcaption><b>Figure 24.4</b> The same page on a 390-pixel-wide phone.</figcaption>
 </figure>
 
@@ -98,19 +94,19 @@ first surface, and these six are the ones I am building toward.
 
 ## Asking for a key
 
-One key opens the chat, and each person gets their own. Leave a name and an
-email on the invite screen, then send me a message:
+Each person gets a key of their own. Leave a name and an email on the invite
+screen, then send me a message:
 [LinkedIn](https://www.linkedin.com/in/arpan-pathak-272341424/) or
 [X](https://x.com/arpanpathak1996). I approve the request by hand and send the
 key back. There is no sign-up, no password, and no company in the middle.
 
 <figure>
-<img src="figures/cub-invite.png" alt="The invite screen: the cub, the headline that the cub is invite-only for now, a box to paste an access key, and a link to ask for one">
+<img src="figures/cub-invite.png" alt="The invite screen: the cub, the headline that the cub is invite-only for now, a box to paste an access key, and a link to ask for a key">
 <figcaption><b>Figure 24.5</b> The door: what someone without a key meets. The picture predates the name-and-email form and the DM links, which chapter "Web chat: Thor Tigress Cub" describes.</figcaption>
 </figure>
 
-Until this week a single key opened the door for everybody. Now a key can be
-given and taken back one person at a time.
+Until this week 1 shared key opened the door for everybody. Now a key can
+be given and taken back 1 person at a time.
 
 ## What the board keeps
 
@@ -121,15 +117,15 @@ The conversation belongs to your browser, and it stays there. The board holds
 |---|---|---|
 | your browser | the conversation, the settings, your key | you clear site data or press **+** |
 | the board's memory | the conversation a window is answering, so the next message on it is not read twice | the model process restarts or unloads |
-| the board's disk | one encrypted file: the name, email, status and key from the invite screen | the record is deleted |
+| the board's disk | 1 encrypted file: the name, email, status and key from the invite screen | the record is deleted |
 
-The chat server writes one file, the keyring, and a keyring record has no field
+The chat server writes 1 file, the keyring, and a keyring record has no field
 for a message (`crates/thor-tigress-keyring/src/store.rs`). Once an answer is
 sent, the request is gone; the operating system keeps its usual short journal,
 as it does for every service on the machine.
 
 <figure>
-<img src="figures/what-is-stored.svg" alt="Three columns. Your browser holds the conversations, the settings and your key, cleared with site data. The board's memory holds the reply being written and a small prompt cache, gone on restart. The board's disk holds the sealed keyring: one record per person with a name, an email, a status and a key, and the service key the servers use between themselves. No message text is written down.">
+<img src="figures/what-is-stored.svg" alt="3 columns. Your browser holds the conversations, the settings and your key, cleared with site data. The board's memory holds the reply being written and a small prompt cache, gone on restart. The board's disk holds the sealed keyring: 1 record per person with a name, an email, a status and a key, and the service key the servers use between themselves. No message text is written down.">
 <figcaption><b>Figure 24.6</b> The 3 places anything is held.</figcaption>
 </figure>
 
@@ -140,7 +136,7 @@ asks for no login.
 
 <figure>
 <img src="figures/keyring-flow.svg" alt="A browser or an agent sends a personal key in a header over HTTPS through Tailscale Funnel. On the board, thor-tigress-agent compares it with the active keys in the sealed keyring, in constant time, and answers 401 when nothing matches. A match is forwarded to the model server with the service key from api-key, and the model server checks that key again.">
-<figcaption><b>Figure 24.7</b> The 2 keys, and where each one stops.</figcaption>
+<figcaption><b>Figure 24.7</b> The 2 keys, and where each key stops.</figcaption>
 </figure>
 
 1. The invite screen posts a name and an email to `POST /request`, and the
@@ -154,18 +150,18 @@ asks for no login.
    keyring, in constant time. A key that matches nothing leaves with `401`
    before a model is reached.
 5. A request that matches travels to the model you picked under the service key,
-   and the model server checks that one again. Personal keys never go that far.
+   and the model server checks the service key again. Personal keys never go that far.
 
 The keyring itself is sealed with Argon2id and XChaCha20-Poly1305. Chapter
-"Keys, and the cryptography under them" opens the file and explains both
+"Keys, and the cryptography under them" opens the file and explains the 2
 algorithms, along with the 4 things they cannot protect.
 
 ## How many people it can serve
 
 A loaded model keeps its weights and a pool of windows. The default model takes
-33.6 GB of weights and about 24 GiB for 4 million-token windows; with both
+33.6 GB of weights and about 24 GiB for 4 million-token windows; with 2 models
 loaded, the chat measured 57.8 GB while it was serving, against 128 GB on the
-board. How that pool is cut is a setting. On one board it is cut like this:
+board. How that pool is cut is a setting. On 1 board it is cut like this:
 
 | Windows open at once | Tokens each | Pool |
 |---|---|---|
@@ -176,19 +172,19 @@ board. How that pool is cut is a setting. On one board it is cut like this:
 
 The arithmetic is `windows × tokens × 6 KiB`, and memory is the ceiling: ask for
 longer conversations and fewer fit at once, ask for more at once and each is
-shorter. One conversation can reach a million tokens, about 3 novels. How
-many people hold a key has no limit at all, because a window belongs to a reply.
-When every window is busy, the next request waits in the queue.
+shorter. 1 conversation can reach 1 million tokens, about 3 novels. How many
+people hold a key has no limit at all, because a window belongs to a reply. When
+every window is busy, the next request waits in the queue.
 
-Beyond a single board, the cluster is the answer. 5 boards run here, each with its
-own windows and its own loaded models, which is how the chat grows: another
-board, another set of windows, the same page in front of it. Chapter "Memory,
-context and slots" has the measurements behind the table.
+Beyond 1 board, the cluster is the answer. 5 boards run here, each with its own
+windows and its own loaded models, which is how the chat grows: another board,
+another set of windows, the same page in front of it. Chapter "Memory, context
+and slots" has the measurements behind the table.
 
 There is no daily allowance and no per-person quota. Someone with a key can keep
 a board occupied for as long as they keep asking, and the answer to that is a
-revoked key. The boards run warm while they work, which in a cold studio is a
-small consolation and no substitute for the radiator.
+revoked key. The boards run warm while they work, which in Seattle is a small
+consolation.
 
 ## What it is made of
 
@@ -206,22 +202,21 @@ Thor: 59.3 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
   4    Qwen3.6 35B A3B NVFP4                          loaded             23.4 GB  TensorRT Edge-LLM · :8081
 ```
 
-2 of them answer today. `thor-tigress-serve load 2` brings a third into memory
+2 of them answer today. `thor-tigress-serve load 2` brings 1 more into memory
 when the memory allows, and the picker offers it from then on. The default, the
-Nano, answers at about 53 tokens a second and holds a million tokens of
-conversation; Qwen3.6 35B A3B runs on TensorRT Edge-LLM instead of llama.cpp,
-and chapter "Model comparison" sets the two of them side by side on the same
-questions.
+Nano, answers at about 53 tokens a second and holds 1 million tokens of
+conversation; Qwen3.6 35B A3B runs on TensorRT Edge-LLM in place of llama.cpp,
+and chapter "Model comparison" sets them side by side on the same questions.
 
 <figure>
 <img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor, which calls llama-server and SearXNG on localhost.">
-<figcaption><b>Figure 24.8</b> How a message reaches a model. Chapter "Web chat: Thor Tigress Cub" draws the same road, and chapter "TensorRT Edge-LLM" adds the second engine.</figcaption>
+<figcaption><b>Figure 24.8</b> How a message reaches a model. Chapter "Web chat: Thor Tigress Cub" draws the same road, and chapter "TensorRT Edge-LLM" adds the Edge-LLM engine.</figcaption>
 </figure>
 
 | Piece | What it does | Listens on |
 |---|---|---|
-| `llama-server`, router mode | one process per loaded GGUF model: the Nano, Lightning and Qwen 27B | `127.0.0.1:8079` |
-| TensorRT Edge-LLM | a second engine, for Qwen3.6 35B A3B in NVFP4 and its successors | `127.0.0.1:8081` |
+| `llama-server`, router mode | 1 process per loaded GGUF model: the Nano, Lightning and Qwen 27B | `127.0.0.1:8079` |
+| TensorRT Edge-LLM | the Edge-LLM engine, for Qwen3.6 35B A3B in NVFP4 and its successors | `127.0.0.1:8081` |
 | `thor-tigress-agent` | the page, the model picker, the OpenAI and Anthropic APIs, the keys, the invite form | `127.0.0.1:8080` |
 | SearXNG | web search, when **Web** is on | `127.0.0.1:8888` |
 | Tailscale Funnel | HTTPS from the internet to port 8080, and to nothing else | public |
@@ -236,7 +231,7 @@ On a board, everything lives under `~/.config/thor-chat/`:
 | `keyring` | who may chat, sealed |
 | `keyring-passphrase` | what opens the keyring |
 
-One command, `thor-tigress-serve`, manages all of it:
+1 command, `thor-tigress-serve`, manages all of it:
 
 | Task | Command |
 |---|---|
@@ -252,7 +247,7 @@ the prose and code checker, `thor-hammer-trainer` for the training set,
 `thor-tigress-reinforcer-frontend` for the review page, and
 `thor-lasso-distiller` for conversations drawn out of books. Chapters "Model
 serving", "TensorRT Edge-LLM" and "Operations: recovery and hardening" walk
-through running the whole thing yourself, on this board or another one.
+through running the whole thing yourself, on this board or another.
 
 ## Where this promise stops
 
@@ -263,7 +258,7 @@ through running the whole thing yourself, on this board or another one.
 - The invite form is open, and it can be filled with junk. A person approves
   each request by hand, so junk collects in the waiting list and goes no
   further. Every request also costs a board an Argon2id run.
-- A key is a password. Anyone holding one chats as the person it was sent to,
+- A key is a password. Anyone holding 1 chats as the person it was sent to,
   until the key is revoked.
 - The windows serve the page and every coding agent together.
 - The chat is a beta. It can be busy, offline, or out of memory, and when it is
