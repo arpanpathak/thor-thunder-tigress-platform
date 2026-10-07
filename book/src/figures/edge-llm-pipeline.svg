@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 275" width="960" height="275" role="img" aria-label="Planned pipeline: NVIDIA's NVFP4 checkpoint from Hugging Face, exported to ONNX with tensorrt-edgellm-export, built into a TensorRT engine on the Thor with llm_build, served by the experimental OpenAI-compatible server on port 8081, and measured against llama.cpp with the same prompts.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .idle { fill: #FFFFFF; stroke: #8A99AB; stroke-width: 2; stroke-dasharray: 6 5; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="275" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">From checkpoint to measured engine (planned)</text>
+  <rect x="30" y="80" width="165" height="110" rx="10" class="planned"/>
+  <text x="112.5" y="106" class="name" text-anchor="middle">1. Checkpoint</text>
+  <text x="112.5" y="126" class="note" text-anchor="middle">NVIDIA NVFP4</text>
+  <text x="112.5" y="143" class="note" text-anchor="middle">on Hugging Face</text>
+  <text x="112.5" y="160" class="note" text-anchor="middle">19.3 GB</text>
+  <path class="flow" d="M195,135 L216,135" marker-end="url(#arrow)"/>
+  <rect x="218" y="80" width="165" height="110" rx="10" class="planned"/>
+  <text x="300.5" y="106" class="name" text-anchor="middle">2. Export</text>
+  <text x="300.5" y="126" class="note" text-anchor="middle">tensorrt-edgellm-</text>
+  <text x="300.5" y="143" class="note" text-anchor="middle">export → ONNX</text>
+  <text x="300.5" y="160" class="note" text-anchor="middle">PyTorch container</text>
+  <path class="flow" d="M383,135 L404,135" marker-end="url(#arrow)"/>
+  <rect x="406" y="80" width="165" height="110" rx="10" class="planned"/>
+  <text x="488.5" y="106" class="name" text-anchor="middle">3. Build</text>
+  <text x="488.5" y="126" class="note" text-anchor="middle">llm_build on the</text>
+  <text x="488.5" y="143" class="note" text-anchor="middle">Thor's GPU</text>
+  <text x="488.5" y="160" class="note" text-anchor="middle">time: to measure</text>
+  <path class="flow" d="M571,135 L592,135" marker-end="url(#arrow)"/>
+  <rect x="594" y="80" width="165" height="110" rx="10" class="planned"/>
+  <text x="676.5" y="106" class="name" text-anchor="middle">4. Serve</text>
+  <text x="676.5" y="126" class="note" text-anchor="middle">experimental</text>
+  <text x="676.5" y="143" class="note" text-anchor="middle">OpenAI server</text>
+  <text x="676.5" y="160" class="note" text-anchor="middle">port 8081</text>
+  <path class="flow" d="M759,135 L780,135" marker-end="url(#arrow)"/>
+  <rect x="782" y="80" width="165" height="110" rx="10" class="planned"/>
+  <text x="864.5" y="106" class="name" text-anchor="middle">5. Measure</text>
+  <text x="864.5" y="126" class="note" text-anchor="middle">same prompts as</text>
+  <text x="864.5" y="143" class="note" text-anchor="middle">llama.cpp: speed,</text>
+  <text x="864.5" y="160" class="note" text-anchor="middle">memory, spark</text>
+  <text x="30" y="230" class="note">Step 1 skips quantization: NVIDIA publishes the NVFP4 checkpoint. A model without one adds tensorrt-edgellm-quantize before step 2.</text>
+  <text x="30" y="250" class="note">Step 3 must run on the Thor: an engine is compiled for the exact GPU that runs it.</text>
+</svg>

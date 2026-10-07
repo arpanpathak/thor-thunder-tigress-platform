@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" width="960" height="460" role="img" aria-label="Planned design: thor-tigress-agent on 8080 routes each request by model id to either the running llama.cpp router on 8079, serving GGUF files, or a planned TensorRT Edge-LLM server on 8081, serving TensorRT engines built on the Thor. thor-tigress-serve manages both.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .idle { fill: #FFFFFF; stroke: #8A99AB; stroke-width: 2; stroke-dasharray: 6 5; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="460" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Two engines behind one agent (planned)</text>
+  <rect x="30" y="170" width="160" height="80" rx="10" class="outside"/>
+  <text x="110.0" y="196" class="name" text-anchor="middle">Web chat, agents</text>
+  <text x="110.0" y="216" class="note" text-anchor="middle">model: id or alias</text>
+  <rect x="240" y="160" width="190" height="100" rx="10" class="box built"/>
+  <text x="335.0" y="186" class="name" text-anchor="middle">thor-tigress-agent</text>
+  <text x="335.0" y="206" class="note" text-anchor="middle">:8080</text>
+  <text x="335.0" y="223" class="note" text-anchor="middle">today: one upstream</text>
+  <text x="335.0" y="240" class="note" text-anchor="middle">planned: route by model</text>
+  <path class="flow" d="M190,210 L238,210" marker-end="url(#arrow)"/>
+  <rect x="500" y="70" width="210" height="110" rx="10" class="box built"/>
+  <text x="605.0" y="96" class="name" text-anchor="middle">llama.cpp router</text>
+  <text x="605.0" y="116" class="note" text-anchor="middle">:8079 · GGUF</text>
+  <text x="605.0" y="133" class="note" text-anchor="middle">Nemotron 3 Nano Q8_0</text>
+  <text x="605.0" y="150" class="note" text-anchor="middle">today's engine</text>
+  <rect x="500" y="240" width="210" height="110" rx="10" class="planned"/>
+  <text x="605.0" y="266" class="name" text-anchor="middle">Edge-LLM server</text>
+  <text x="605.0" y="286" class="note" text-anchor="middle">:8081 · TensorRT engine</text>
+  <text x="605.0" y="303" class="note" text-anchor="middle">Nemotron 3 Nano NVFP4</text>
+  <text x="605.0" y="320" class="note" text-anchor="middle">experimental, single rank</text>
+  <path class="flow" d="M430,195 L455,195 Q465,195 465,185 L465,135 Q465,125 475,125 L498,125" marker-end="url(#arrow)"/>
+  <path class="flow" d="M430,225 L455,225 Q465,225 465,235 L465,285 Q465,295 475,295 L498,295" marker-end="url(#arrow)"/>
+  <rect x="760" y="240" width="170" height="110" rx="10" class="planned"/>
+  <text x="845.0" y="266" class="name" text-anchor="middle">engine files</text>
+  <text x="845.0" y="286" class="note" text-anchor="middle">~/models/edge-llm/</text>
+  <text x="845.0" y="303" class="note" text-anchor="middle">built on the Thor</text>
+  <text x="845.0" y="320" class="note" text-anchor="middle">for sm_110 only</text>
+  <path class="flow" d="M760,295 L712,295" marker-end="url(#arrow)"/>
+  <rect x="760" y="70" width="170" height="110" rx="10" class="box built"/>
+  <text x="845.0" y="96" class="name" text-anchor="middle">GGUF files</text>
+  <text x="845.0" y="116" class="note" text-anchor="middle">~/models/gguf/</text>
+  <text x="845.0" y="133" class="note" text-anchor="middle">downloaded as is</text>
+  <path class="flow" d="M760,125 L712,125" marker-end="url(#arrow)"/>
+  <rect x="240" y="330" width="190" height="80" rx="10" class="planned"/>
+  <text x="335.0" y="356" class="name" text-anchor="middle">thor-tigress-serve</text>
+  <text x="335.0" y="376" class="note" text-anchor="middle">planned: an engine</text>
+  <text x="335.0" y="393" class="note" text-anchor="middle">column and --engine</text>
+  <path class="flow" d="M430,370 L465,370 Q475,370 475,360 L475,330 Q475,320 485,320 L498,320" marker-end="url(#arrow)"/>
+  <text x="30" y="440" class="note">Green: running today. Dashed amber: planned. Both engines share the Thor's 122.8 GB, so the memory checks in thor-tigress-serve cover both.</text>
+</svg>
