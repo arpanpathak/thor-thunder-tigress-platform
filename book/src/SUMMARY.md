@@ -16,6 +16,7 @@
 - [Model serving](ch21-model-serving.md)
 - [Local models](ch08-local-models.md)
 - [Web chat: Thor Tigress Cub](ch09-web-chat.md)
+- [Tool calling](ch19-tool-calling.md)
 - [Bring your own agent](ch16-bring-your-own-agent.md)
 - [Bring your own domain](ch17-bring-your-own-domain.md)
 - [Security](ch10-security.md)
@@ -30,7 +31,6 @@
 - [Human evaluation (planned)](ch12-human-evaluation.md)
 - [Evaluation design (planned)](ch13-evaluation-design.md)
 - [Reports (planned)](ch14-reports.md)
-- [Tool calling (planned)](ch19-tool-calling.md)
 - [Workspace agent (planned, paused)](ch15-workspace-agent.md)
 
 # Launch and reference

@@ -1,32 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" width="960" height="500" role="img" aria-label="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron calls web_search, which queries SearXNG and search engines, or the planned fetch_page, which passes a safety gate before reading one public page. After at most three rounds the model must answer.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 500" width="960" height="500" role="img" aria-label="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron or Qwen calls web_search, which asks SearXNG and the search engines for recent results with dates, or calls fetch_page_content_recursive, which checks that every hop is a public https address and reads a page and its own links. After at most four rounds the model has to answer.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
     .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
     .note { fill: #5B6B7C; font-size: 12px; }
     .label { fill: #1E88A8; font-size: 12px; }
-    .warn { fill: #D9542B; font-size: 12px; }
-    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
     .mono { font-family: "JetBrains Mono", Menlo, monospace; }
     .box { fill: #F4F7FA; stroke-width: 2; }
     .built { stroke: #4E8A16; }
-    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
     .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
     .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
     .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
     .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
-    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
   </style>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
       <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
-    </marker>
   </defs>
   <rect width="960" height="500" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">Tool calling in the chat: today and planned</text>
+  <text x="30" y="36" class="title">Tool calling in the chat: search and read</text>
   <rect x="30" y="160" width="150" height="80" rx="10" class="outside"/>
   <text x="105" y="196" class="name" text-anchor="middle">Browser</text>
   <text x="105" y="216" class="note" text-anchor="middle">Web switch on</text>
@@ -34,13 +27,12 @@
   <text x="234" y="76" class="zonelabel">Jetson AGX Thor</text>
   <rect x="250" y="150" width="200" height="100" rx="10" class="box built"/>
   <text x="350" y="180" class="name mono" text-anchor="middle">thor-tigress-agent</text>
-  <text x="350" y="198" class="note" text-anchor="middle">runs the loop: up to</text>
-  <text x="350" y="216" class="note" text-anchor="middle">3 rounds of tools,</text>
-  <text x="350" y="232" class="note" text-anchor="middle">then an answer</text>
+  <text x="350" y="198" class="note" text-anchor="middle">up to four rounds;</text>
+  <text x="350" y="216" class="note" text-anchor="middle">the first requires a tool</text>
   <path class="flow" d="M180,200 L248,200" marker-end="url(#arrow)"/>
   <rect x="520" y="80" width="180" height="80" rx="10" class="box built"/>
   <text x="610" y="108" class="name mono" text-anchor="middle">llama-server</text>
-  <text x="610" y="127" class="note" text-anchor="middle">Nemotron decides:</text>
+  <text x="610" y="127" class="note" text-anchor="middle">Nemotron or Qwen:</text>
   <text x="610" y="144" class="note" text-anchor="middle">a tool call or an answer</text>
   <path class="flow" d="M350,150 L350.0,120.0 Q350,110 360.0,110.0 L518,110" marker-end="url(#arrow)"/>
   <text x="434" y="102" class="label" text-anchor="middle">messages + tools</text>
@@ -49,23 +41,26 @@
   <rect x="520" y="290" width="180" height="80" rx="10" class="box built"/>
   <text x="610" y="318" class="name mono" text-anchor="middle">web_search</text>
   <text x="610" y="337" class="note" text-anchor="middle">SearXNG :8888</text>
-  <text x="610" y="354" class="note" text-anchor="middle">6 results, snippets</text>
+  <text x="610" y="354" class="note" text-anchor="middle">6 results, with dates</text>
   <path class="flow" d="M400,250 L400.0,320.0 Q400,330 410.0,330.0 L518,330" marker-end="url(#arrow)"/>
-  <rect x="250" y="390" width="200" height="70" rx="10" class="planned"/>
-  <text x="350" y="422" class="name mono" text-anchor="middle">fetch_page</text>
-  <text x="350" y="440" class="note" text-anchor="middle">planned: one page as text</text>
-  <path class="flow" d="M300,250 L300,388" marker-end="url(#arrow)"/>
-  <rect x="510" y="390" width="196" height="70" rx="10" class="planned"/>
-  <text x="608" y="422" class="name" text-anchor="middle">Safety gate</text>
-  <text x="608" y="440" class="note" text-anchor="middle">planned: public HTTPS only</text>
-  <path class="flow" d="M450,425 L508,425" marker-end="url(#arrow)"/>
+  <rect x="250" y="380" width="220" height="80" rx="10" class="box built"/>
+  <text x="360" y="404" class="mono" font-size="12" font-weight="600" fill="#1D2733" text-anchor="middle">fetch_page_content_</text>
+  <text x="360" y="420" class="mono" font-size="12" font-weight="600" fill="#1D2733" text-anchor="middle">recursive</text>
+  <text x="360" y="440" class="note" text-anchor="middle">a page and its own links</text>
+  <path class="flow" d="M300,250 L300,378" marker-end="url(#arrow)"/>
+  <rect x="510" y="380" width="200" height="80" rx="10" class="box built"/>
+  <text x="610" y="408" class="name" text-anchor="middle">Address checks</text>
+  <text x="610" y="427" class="note" text-anchor="middle">public https only</text>
+  <text x="610" y="444" class="note" text-anchor="middle">every hop, one lookup</text>
+  <path class="flow" d="M470,420 L508,420" marker-end="url(#arrow)"/>
   <rect x="760" y="290" width="170" height="80" rx="10" class="outside"/>
   <text x="845" y="318" class="name" text-anchor="middle">Search engines</text>
   <text x="845" y="337" class="note" text-anchor="middle">DuckDuckGo, Google</text>
   <text x="845" y="354" class="note" text-anchor="middle">(Brave suspended)</text>
   <path class="flow" d="M700,330 L758,330" marker-end="url(#arrow)"/>
-  <rect x="760" y="390" width="170" height="70" rx="10" class="outside"/>
-  <text x="845" y="422" class="name" text-anchor="middle">The internet</text>
-  <text x="845" y="440" class="note" text-anchor="middle">the page itself</text>
-  <path class="flow" d="M706,425 L758,425" marker-end="url(#arrow)"/>
+  <rect x="760" y="380" width="170" height="80" rx="10" class="outside"/>
+  <text x="845" y="412" class="name" text-anchor="middle">The internet</text>
+  <text x="845" y="431" class="note" text-anchor="middle">the cited page,</text>
+  <text x="845" y="448" class="note" text-anchor="middle">then its links</text>
+  <path class="flow" d="M710,420 L758,420" marker-end="url(#arrow)"/>
 </svg>

@@ -29,6 +29,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     error::{AgentError, Outcome},
+    http::{HttpWeb, Web},
     upstream::Endpoint,
 };
 
@@ -59,6 +60,8 @@ pub struct Upstreams {
     pub engines: Vec<Engine>,
     /// SearXNG, called without a key.
     pub search: Endpoint,
+    /// The web, for the fetch tool: one HTTPS client with the address checks.
+    pub web: Box<dyn Web>,
 }
 
 /// A model served by another engine, such as TensorRT Edge-LLM.
@@ -225,6 +228,7 @@ impl Config {
                     })
                     .collect(),
                 search: Endpoint::new(options.search, None),
+                web: Box::new(HttpWeb::new()),
             },
         })
     }

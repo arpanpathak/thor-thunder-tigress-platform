@@ -48,7 +48,7 @@ git submodule update --init          # in an existing clone
 | `thor-hammer-trainer` | `thor-hammer-trainer` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-hammer-trainer-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-hammer-trainer-tests.svg" alt="tests" height="24"> | Builds `data/train.jsonl` from books, docs, a chat export and hand-written pairs, with licence checks, clean-up, deduplication and a per-source token cap |
 | `thor-tigress-reinforcer-frontend` | `reinforcer` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-reinforcer-frontend-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-reinforcer-frontend-tests.svg" alt="tests" height="24"> | Review page for the training set: syntax-highlighted code, rule-breaking lines tagged, slop phrases suggested, a phrase marked once found everywhere |
 | `thor-lasso-distiller` | `lasso` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-lasso-distiller-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-lasso-distiller-tests.svg" alt="tests" height="24"> | Asks a teacher model, served by `trtllm-serve`, for the question each book section answers, and builds conversations whose answers are the book text |
-| `thor-tigress-agent` | `thor-tigress-agent` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-agent-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-agent-tests.svg" alt="tests" height="24"> | The Thor Tigress Cub's server: the chat page, the personal keys in the keyring, the registration form, web search and the API, in front of llama-server |
+| `thor-tigress-agent` | `thor-tigress-agent` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-agent-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-agent-tests.svg" alt="tests" height="24"> | The Thor Tigress Cub's server: the chat page, the personal keys in the keyring, the registration form, web search with recency, page reading, and the API, in front of llama-server |
 | `thor-tigress-keyring` | `thor-tigress-keyring` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-keyring-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-keyring-tests.svg" alt="tests" height="24"> | The encrypted registry of who may use the chat and the key each was given: a name, an email, a status and a key per person, sealed with a passphrase (Argon2id, then XChaCha20-Poly1305) and queried over SSH |
 
 The five Rust rules, checked by `spark` and kept by every crate here:
@@ -61,6 +61,25 @@ The five Rust rules, checked by `spark` and kept by every crate here:
 
 `cargo test` runs `spark` on this repository's own source, so a crate that
 breaks a rule fails the build.
+
+## Web search, and reading what it finds
+
+With the chat's **Web** switch on, `thor-tigress-agent` runs a tool loop for the
+chosen model:
+
+- **`web_search`** asks SearXNG for titles, addresses, dates and snippets, with
+  an optional `time_range` (`day`, `week`, `month`, `year`) for jobs and other
+  recent postings.
+- **`fetch_page_content_recursive`** opens one address a search returned, or one
+  the user wrote, follows that page's own links up to two hops, and returns the
+  text: six pages at most, 12,000 characters a page, 24,000 in all.
+
+The first round of a Web-on answer carries `tool_choice: "required"`, so both
+Nemotron and Qwen look before they answer; later rounds are the model's choice.
+The fetch runs behind the rules of the book's
+["Tool calling"](book/src/ch19-tool-calling.md) chapter: `https` and public
+addresses only, one lookup and one connection, at most three redirects, no
+cookies, `Authorization` or referrer, and page text labelled as untrusted.
 
 ## Quick start
 

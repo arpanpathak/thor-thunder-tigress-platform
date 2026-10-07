@@ -99,14 +99,17 @@ browser.
 
 ### Web
 
-With **Web** on, the server gives Nemotron a `web_search` tool. The model
-decides whether to search; each search goes to SearXNG on the Thor, which
-queries several search engines and returns titles, links and snippets. The
-model gets up to three rounds of searching, then has to answer. The page lists every
-query and source above the answer under "searched: …".
+With **Web** on, the server gives the model two tools. The first round requires
+a tool call, so the model looks before it answers; each search goes to SearXNG
+on the Thor, which queries several search engines and returns titles, links,
+dates and snippets, filtered to a range when the model asks for one (`day`,
+`week`, `month` or `year`). The model then reads what it needs: up to four
+rounds, with `fetch_page_content_recursive` to open a cited page and the links
+on that page's own site. The page lists every query and source above the answer
+under "searched: …", and every page read under "read: …".
 
-Search hands the model **snippets only**; it does not open the pages. Check
-the sources before trusting a detail.
+Search alone hands the model **snippets only**. The fetch tool opens the page,
+up to six per answer; check the sources before trusting a detail.
 
 ### Invite screen
 
@@ -323,7 +326,7 @@ ssh thor 'cd ~/Projects/thor-thunder-tigress-platform &&
 | Invite screen with a key pasted | the key was changed | `cat ~/.config/thor-chat/api-key` on the Thor |
 | Replies slower than ~53 tok/s | other people are chatting; four replies share the memory bandwidth | `thor-tigress-serve models`, then `curl "127.0.0.1:8079/slots?model=nemotron"` on the Thor (add `-H "Authorization: Bearer $K"`) |
 | A long wait before anything | all four slots busy, or a long conversation being read | the same |
-| "searched" missing with Web on | the model chose not to search, or SearXNG is down | `systemctl --user status searxng` |
+| "searched" missing with Web on | the first search failed, or SearXNG is down | `systemctl --user status searxng` |
 | Error under a reply | the message from the server, shown as is | `thor-tigress-serve logs` |
 
 ## Not done yet
@@ -331,6 +334,7 @@ ssh thor 'cd ~/Projects/thor-thunder-tigress-platform &&
 - No per-person limits, quotas or accounting; a revocation is the only brake.
 - The registration form is open and can be spammed; the waiting list is the
   only damage, but each request costs an Argon2id run.
-- Search reads snippets, not pages; reading pages is designed in chapter
-  "Tool calling (planned)".
+- Search reads snippets; the fetch tool reads pages, two hops into a cited
+  site's own links (chapter "Tool calling"). Both are on with Web, within their
+  limits.
 - Conversations stay in one browser; there is no account to sync them.

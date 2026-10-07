@@ -60,7 +60,7 @@ mod tests {
     use super::*;
     use crate::{
         config::Engine,
-        testing::{FakeServer, json_response},
+        testing::{FakeServer, FakeWeb, json_response},
     };
 
     fn upstreams(model: &FakeServer, engines: &[String]) -> Upstreams {
@@ -74,6 +74,7 @@ mod tests {
                 })
                 .collect(),
             search: Endpoint::new(model.address(), None),
+            web: Box::new(FakeWeb::default()),
         }
     }
 

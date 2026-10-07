@@ -17,6 +17,10 @@ pub enum AgentError {
     BadRequest(String),
     /// The model server or the search engine answered with an error.
     Upstream(String),
+    /// Downloading a page, or turning it into text, failed.
+    Fetch(String),
+    /// A page was not read because a security rule refused it.
+    Refused(String),
     /// The encrypted keyring could not be read or written.
     Keyring(String),
     /// The command line or a setting is wrong.
@@ -37,6 +41,8 @@ impl fmt::Display for AgentError {
             AgentError::Json(error) => write!(formatter, "json: {error}"),
             AgentError::BadRequest(message) => write!(formatter, "bad request: {message}"),
             AgentError::Upstream(message) => write!(formatter, "upstream: {message}"),
+            AgentError::Fetch(message) => write!(formatter, "fetch: {message}"),
+            AgentError::Refused(message) => write!(formatter, "refused: {message}"),
             AgentError::Keyring(message) => write!(formatter, "keyring: {message}"),
             AgentError::Config(message) => write!(formatter, "config: {message}"),
         }
@@ -50,6 +56,8 @@ impl std::error::Error for AgentError {
             AgentError::Json(error) => Some(error),
             AgentError::BadRequest(_)
             | AgentError::Upstream(_)
+            | AgentError::Fetch(_)
+            | AgentError::Refused(_)
             | AgentError::Keyring(_)
             | AgentError::Config(_) => None,
         }
@@ -104,6 +112,8 @@ mod tests {
             AgentError::from(io::Error::other("disk")),
             AgentError::bad_request("no body"),
             AgentError::Upstream("502".to_string()),
+            AgentError::Fetch("page".to_string()),
+            AgentError::Refused("loopback".to_string()),
             AgentError::Keyring("wrong passphrase".to_string()),
             AgentError::Config("--listen needs a value".to_string()),
         ];
@@ -114,6 +124,8 @@ mod tests {
                 "i/o: disk",
                 "bad request: no body",
                 "upstream: 502",
+                "fetch: page",
+                "refused: loopback",
                 "keyring: wrong passphrase",
                 "config: --listen needs a value"
             ]

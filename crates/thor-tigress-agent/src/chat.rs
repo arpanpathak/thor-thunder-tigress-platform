@@ -3,23 +3,31 @@
 //!
 //! ```text
 //!   client ── request ──► server ── stream ──► llama-server
-//!      ▲                    │  tool call: web_search("…")
+//!      ▲                    │  tool call: web_search("…", time_range)
+//!      │                    │             fetch_page_content_recursive(url)
 //!      │                    ▼
-//!      │                SearXNG ── results ──► back to the model, next round
-//!      └──── every token, plus a {"thor":{"search":…}} event per search
+//!      │        SearXNG ── results ──► the model, next round
+//!      │        a page  ── text ──────►
+//!      └──── every token, plus a {"thor":{"search":…}} or {"thor":{"read":…}} event
 //! ```
+//!
+//! The first round is sent with `tool_choice: "required"`, so both models look
+//! something up before they answer; later rounds go back to `auto`.
 
 use std::io::{BufRead, Write};
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 
 use crate::{
+    address::Url,
     config::Upstreams,
     error::{AgentError, Outcome},
+    fetch::{self, Allowed},
+    http::Web,
     paths,
     response::{self, DONE, EVENT_PREFIX},
-    search::{self, SearchResult},
+    search::{self, SearchResult, TimeRange},
     upstream::Endpoint,
 };
 
@@ -32,11 +40,14 @@ const MAX_CALLS: usize = 8;
 /// The page's switch for web search; removed before the model sees the request.
 const WEB_SEARCH_SWITCH: &str = "thor_web_search";
 
-/// The line added under the switch, so a model that would answer from memory
-/// still reaches for the tool when the answer may have moved.
+/// The line added under the switch. It names the tools so a model that would
+/// answer from memory still reaches for one, and says what `time_range` is for.
 const SEARCH_HINT: &str = concat!(
-    "When web search is available, use the web_search tool for anything about ",
-    "current events, releases, prices, or facts you are not certain of."
+    "Web search is available. Use the web_search tool for current events, jobs, ",
+    "prices, releases, or facts you are not certain of; set its time_range to day, ",
+    "week, month or year when the answer depends on what is recent. Use the ",
+    "fetch_page_content_recursive tool to read a page from the results when the ",
+    "snippet is not enough."
 );
 
 /// The request field asking for a streamed answer.
@@ -47,6 +58,12 @@ const MODEL: &str = "model";
 
 /// The request field listing the tools the model may call.
 const TOOLS: &str = "tools";
+
+/// The request field forcing or allowing a tool call.
+const TOOL_CHOICE: &str = "tool_choice";
+
+/// The `tool_choice` value that makes the model call a tool.
+const REQUIRED: &str = "required";
 
 /// The request field holding the conversation.
 const MESSAGES: &str = "messages";
@@ -80,15 +97,18 @@ impl Mode {
 enum Tool {
     /// Search the web through SearXNG.
     WebSearch,
+    /// Read a page, and its same-site links, as text.
+    FetchPage,
 }
 
 impl Tool {
     /// Every tool, in the order the model is told about them.
-    const ALL: [Tool; 1] = [Tool::WebSearch];
+    const ALL: [Tool; 2] = [Tool::WebSearch, Tool::FetchPage];
 
     fn name(self) -> &'static str {
         match self {
             Tool::WebSearch => "web_search",
+            Tool::FetchPage => "fetch_page_content_recursive",
         }
     }
 
@@ -100,16 +120,41 @@ impl Tool {
     fn definition(self) -> Value {
         let (description, parameters) = match self {
             Tool::WebSearch => (
-                "Search the web. Returns titles, addresses and short snippets of the top results.",
+                "Search the web. Returns titles, addresses, dates and short snippets of the top results. Set time_range to day, week, month or year when the answer depends on what is recent, such as jobs or other new postings.",
                 json!({
                     "type": "object",
-                    "properties": { "query": { "type": "string", "description": "What to search for" } },
+                    "properties": {
+                        "query": { "type": "string", "description": "What to search for" },
+                        "time_range": { "type": "string", "enum": ["day", "week", "month", "year"], "description": "Keep results no older than this" }
+                    },
                     "required": ["query"],
+                }),
+            ),
+            Tool::FetchPage => (
+                "Read a web page as plain text, following the page's own links up to two hops, so the answer can use the page itself and not only a snippet. Only an https address from this answer's search results, or one the user wrote, can be opened.",
+                json!({
+                    "type": "object",
+                    "properties": { "url": { "type": "string", "description": "An https address from this answer's search results" } },
+                    "required": ["url"],
                 }),
             ),
         };
         json!({ "type": "function", "function": { "name": self.name(), "description": description, "parameters": parameters } })
     }
+}
+
+/// The arguments of one `web_search` call.
+#[derive(Deserialize)]
+struct SearchArguments {
+    query: String,
+    #[serde(default)]
+    time_range: Option<String>,
+}
+
+/// The arguments of one `fetch_page_content_recursive` call.
+#[derive(Deserialize)]
+struct FetchArguments {
+    url: String,
 }
 
 /// One streamed chunk from llama-server, as far as this server reads it.
@@ -203,6 +248,8 @@ enum ThorEvent<'a> {
         query: &'a str,
         results: Vec<Source<'a>>,
     },
+    /// A page was read: its address and title.
+    Read { url: &'a str, title: &'a str },
     /// Something failed after the stream started.
     Error(String),
 }
@@ -243,7 +290,7 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
             fields.insert(STREAM.to_string(), Value::Bool(true));
             nudge_to_search(&mut fields);
             as_events(client, &mut |client| {
-                search_loop(client, fields.clone(), model, &upstreams.search)
+                search_loop(client, fields.clone(), upstreams, model)
             })
         }
     }
@@ -266,14 +313,20 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 
 /// Asks the model, runs the tools it calls, and asks again, until it answers
 /// without a tool call or the rounds run out.
+///
+/// The first round requires a call, so both models look something up before
+/// they answer; later rounds leave the choice to the model.
 fn search_loop(
     client: &mut dyn Write,
     mut fields: Fields,
+    upstreams: &Upstreams,
     model: &Endpoint,
-    search: &Endpoint,
 ) -> Outcome {
+    let mut allowed = Allowed::from_text(&user_text(&fields));
+
     for round_number in 1..=MAX_ROUNDS {
         offer_tools(&mut fields, round_number < MAX_ROUNDS);
+        require_tool(&mut fields, round_number == 1);
         let round = stream_round(client, &fields, model)?;
 
         if round.calls.is_empty() {
@@ -283,11 +336,28 @@ fn search_loop(
         let results = round
             .calls
             .iter()
-            .map(|call| run_tool(client, call, search))
+            .map(|call| run_tool(client, call, upstreams, &mut allowed))
             .collect::<Outcome<Vec<String>>>()?;
         append_round(&mut fields, &round, &results)?;
     }
     Ok(())
+}
+
+/// The text of the user's own messages: one of the two places a fetchable
+/// address may come from, the other being a search result.
+fn user_text(fields: &Fields) -> String {
+    fields
+        .get(MESSAGES)
+        .and_then(Value::as_array)
+        .map(|messages| {
+            messages
+                .iter()
+                .filter(|message| message.get("role").and_then(Value::as_str) == Some("user"))
+                .filter_map(|message| message.get("content").and_then(Value::as_str))
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default()
 }
 
 /// Adds [`SEARCH_HINT`] to the conversation, merging it into an existing
@@ -328,6 +398,16 @@ fn offer_tools(fields: &mut Fields, offered: bool) {
     }
 }
 
+/// Sets `tool_choice: "required"` on the first round, and clears it after, so
+/// the model has to call a tool once and then chooses for itself.
+fn require_tool(fields: &mut Fields, required: bool) {
+    if required {
+        fields.insert(TOOL_CHOICE.to_string(), Value::String(REQUIRED.to_string()));
+    } else {
+        fields.remove(TOOL_CHOICE);
+    }
+}
+
 /// Adds the model's tool calls and their results to the conversation.
 fn append_round(fields: &mut Fields, round: &Round, results: &[String]) -> Outcome {
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
@@ -346,27 +426,71 @@ fn append_round(fields: &mut Fields, round: &Round, results: &[String]) -> Outco
 }
 
 /// Runs one tool call; its result is text for the model.
-fn run_tool(client: &mut dyn Write, call: &ToolCall, searxng: &Endpoint) -> Outcome<String> {
+fn run_tool(
+    client: &mut dyn Write,
+    call: &ToolCall,
+    upstreams: &Upstreams,
+    allowed: &mut Allowed,
+) -> Outcome<String> {
     match Tool::named(&call.name) {
-        Some(Tool::WebSearch) => web_search(client, call, searxng),
+        Some(Tool::WebSearch) => web_search(client, call, &upstreams.search, allowed),
+        Some(Tool::FetchPage) => fetch_page(client, call, &*upstreams.web, allowed),
         None => Ok(format!("Unknown tool {}.", call.name)),
     }
 }
 
-fn web_search(client: &mut dyn Write, call: &ToolCall, searxng: &Endpoint) -> Outcome<String> {
-    let Some(query) = call.query() else {
+/// A search, with the recency it asked for; its sources also become the
+/// addresses this answer may read a page from.
+fn web_search(
+    client: &mut dyn Write,
+    call: &ToolCall,
+    searxng: &Endpoint,
+    allowed: &mut Allowed,
+) -> Outcome<String> {
+    let Some((query, range)) = call.search_arguments() else {
         return Ok("The search needs a non-empty query.".to_string());
     };
 
-    let results = search::search(searxng, &query).unwrap_or_default();
-    send_thor(
-        client,
-        &ThorEvent::Search {
-            query: &query,
-            results: sources(&results),
-        },
-    )?;
+    let results = search::search(searxng, &query, range).unwrap_or_default();
+    for result in &results {
+        allowed.add_url(&result.url);
+    }
+    let event = ThorEvent::Search {
+        query: &query,
+        results: sources(&results),
+    };
+    send_thor(client, &event)?;
     Ok(search::as_tool_text(&results))
+}
+
+/// Reads one page and its same-site links. Rule 1 of the fetch design is
+/// enforced inside [`fetch::read_recursive`], and every page read is sent to
+/// the page so the answer can list its sources.
+fn fetch_page(
+    client: &mut dyn Write,
+    call: &ToolCall,
+    web: &dyn Web,
+    allowed: &Allowed,
+) -> Outcome<String> {
+    let Some(raw) = call.url_argument() else {
+        return Ok("The fetch needs an address.".to_string());
+    };
+    let url = match Url::parse(&raw) {
+        Ok(url) => url,
+        Err(error) => return Ok(error.to_string()),
+    };
+    let report = match fetch::read_recursive(web, &url, allowed) {
+        Ok(report) => report,
+        Err(error) => return Ok(format!("Could not read the page: {error}")),
+    };
+    for page in &report.pages {
+        let event = ThorEvent::Read {
+            url: &page.url,
+            title: &page.title,
+        };
+        send_thor(client, &event)?;
+    }
+    Ok(report.text)
 }
 
 fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
@@ -466,28 +590,47 @@ impl ToolCall {
         }
     }
 
-    /// The `query` argument, trimmed; `None` when missing or empty.
-    fn query(&self) -> Option<String> {
-        #[derive(Deserialize)]
-        struct Arguments {
-            query: String,
-        }
-        let arguments: Arguments = serde_json::from_str(&self.arguments).ok()?;
+    /// The arguments of this call, parsed.
+    fn arguments<T: DeserializeOwned>(&self) -> Option<T> {
+        serde_json::from_str(&self.arguments).ok()
+    }
+
+    /// The `query` and `time_range` of a search, trimmed; `None` when the
+    /// query is missing or empty. An unknown range is treated as none.
+    fn search_arguments(&self) -> Option<(String, Option<TimeRange>)> {
+        let arguments: SearchArguments = self.arguments()?;
         let query = arguments.query.trim();
-        (!query.is_empty()).then(|| query.to_string())
+        (!query.is_empty()).then(|| {
+            (
+                query.to_string(),
+                arguments.time_range.as_deref().and_then(TimeRange::of),
+            )
+        })
+    }
+
+    /// The `url` of a fetch, trimmed; `None` when missing or empty.
+    fn url_argument(&self) -> Option<String> {
+        let arguments: FetchArguments = self.arguments()?;
+        let url = arguments.url.trim();
+        (!url.is_empty()).then(|| url.to_string())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{FakeServer, event_stream, json_response};
+    use crate::testing::{FakeServer, FakeWeb, event_stream, json_response};
 
     fn upstreams(model: &FakeServer, search: &FakeServer) -> Upstreams {
+        upstreams_with(model, search, FakeWeb::default())
+    }
+
+    fn upstreams_with(model: &FakeServer, search: &FakeServer, web: FakeWeb) -> Upstreams {
         Upstreams {
             model: Endpoint::new(model.address(), None),
             engines: Vec::new(),
             search: Endpoint::new(search.address(), None),
+            web: Box::new(web),
         }
     }
 
@@ -522,10 +665,24 @@ mod tests {
     #[test]
     fn tools_are_found_by_name() {
         assert_eq!(Tool::named("web_search"), Some(Tool::WebSearch));
+        assert_eq!(
+            Tool::named("fetch_page_content_recursive"),
+            Some(Tool::FetchPage)
+        );
         assert_eq!(Tool::named("fetch_page"), None);
+        assert_eq!(Tool::ALL.len(), 2);
         assert_eq!(
             Tool::WebSearch.definition()["function"]["name"],
             "web_search"
+        );
+        assert_eq!(
+            Tool::FetchPage.definition()["function"]["name"],
+            "fetch_page_content_recursive"
+        );
+        assert_eq!(
+            Tool::WebSearch.definition()["function"]["parameters"]["properties"]["time_range"]["enum"]
+                [0],
+            "day"
         );
     }
 
@@ -583,7 +740,10 @@ mod tests {
         round.absorb(chunk(r#"{"choices":[],"timings":{}}"#)?);
         assert_eq!(round.content, "ok");
         assert_eq!(round.calls.len(), 1);
-        assert_eq!(round.calls[0].query().as_deref(), Some("rust"));
+        assert_eq!(
+            round.calls[0].search_arguments(),
+            Some(("rust".to_string(), None))
+        );
         Ok(())
     }
 
@@ -598,18 +758,34 @@ mod tests {
     }
 
     #[test]
-    fn a_query_must_be_present_and_non_empty() {
+    fn a_tool_call_must_carry_its_argument() {
         let call = |arguments: &str| ToolCall {
             arguments: arguments.to_string(),
             ..ToolCall::default()
         };
         assert_eq!(
-            call(r#"{"query":"  rust  "}"#).query().as_deref(),
-            Some("rust")
+            call(r#"{"query":"  rust  "}"#).search_arguments(),
+            Some(("rust".to_string(), None))
         );
-        assert_eq!(call(r#"{"query":"  "}"#).query(), None);
-        assert_eq!(call(r#"{"q":"rust"}"#).query(), None);
-        assert_eq!(call("not json").query(), None);
+        assert_eq!(
+            call(r#"{"query":"jobs","time_range":"week"}"#).search_arguments(),
+            Some(("jobs".to_string(), Some(TimeRange::Week)))
+        );
+        assert_eq!(
+            call(r#"{"query":"jobs","time_range":"forever"}"#).search_arguments(),
+            Some(("jobs".to_string(), None))
+        );
+        assert_eq!(call(r#"{"query":"  "}"#).search_arguments(), None);
+        assert_eq!(call(r#"{"q":"rust"}"#).search_arguments(), None);
+        assert_eq!(call("not json").search_arguments(), None);
+        assert_eq!(
+            call(r#"{"url":" https://example.com/ "}"#)
+                .url_argument()
+                .as_deref(),
+            Some("https://example.com/")
+        );
+        assert_eq!(call(r#"{"url":"  "}"#).url_argument(), None);
+        assert_eq!(call("[]").url_argument(), None);
     }
 
     #[test]
@@ -750,6 +926,199 @@ mod tests {
             outcome.is_err_and(
                 |error| error.to_string() == "bad request: the body must be a JSON object"
             )
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_first_round_requires_a_tool() {
+        let mut fields = Fields::new();
+        require_tool(&mut fields, true);
+        assert_eq!(fields[TOOL_CHOICE], json!("required"));
+        require_tool(&mut fields, false);
+        assert!(!fields.contains_key(TOOL_CHOICE));
+    }
+
+    #[test]
+    fn the_user_text_is_only_the_users_messages() {
+        let messages = json!({
+            "messages": [
+                { "role": "system", "content": "hint" },
+                { "role": "user", "content": "read https://user.example/doc" },
+                { "role": "assistant", "content": "sure" },
+                { "role": "user", "content": [{ "type": "text" }] }
+            ]
+        });
+        let fields = messages.as_object().cloned().unwrap_or_default();
+        assert_eq!(user_text(&fields), "read https://user.example/doc");
+        assert_eq!(user_text(&Fields::new()), "");
+    }
+
+    fn fetched(content_type: &str, body: &str) -> crate::http::Fetched {
+        crate::http::Fetched {
+            status: 200,
+            content_type: content_type.to_string(),
+            location: None,
+            body: body.to_string(),
+        }
+    }
+
+    #[test]
+    fn searches_then_answers_with_a_forced_first_round_and_recency() -> Outcome {
+        let call = call_event("web_search", r#"{"query":"rust","time_range":"day"}"#);
+        let reply = r#"{"choices":[{"delta":{"content":"Rust 1.99"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
+        let search = FakeServer::start(vec![json_response(
+            r#"{"results":[{"title":"Rust","url":"https://r","content":"new","publishedDate":"2026-10-06"}]}"#,
+        )])?;
+        let mut client = Vec::new();
+        let request = br#"{"messages":[{"role":"user","content":"news?"}],"thor_web_search":true}"#;
+        answer(&mut client, request, &upstreams(&model, &search))?;
+        let seen = model.requests()?;
+        assert!(seen[0].contains(r#""tools""#) && seen[0].contains(r#""stream":true"#));
+        assert!(
+            seen[0].contains(r#""tool_choice":"required""#),
+            "{}",
+            seen[0]
+        );
+        assert!(!seen[1].contains(r#""tool_choice""#));
+        assert!(seen[1].contains(r#""role":"tool""#) && seen[1].contains("[1] Rust"));
+        assert!(seen[1].contains("published: 2026-10-06"), "{}", seen[1]);
+        assert!(search.requests()?[0].contains("time_range=day"));
+        let sent = events(&client);
+        assert_eq!(sent.first(), Some(&call));
+        assert!(sent.contains(&r#"{"thor":{"search":{"query":"rust","results":[{"title":"Rust","url":"https://r"}]}}}"#.to_string()));
+        assert_eq!(sent.last().map(String::as_str), Some(DONE));
+        Ok(())
+    }
+
+    #[test]
+    fn reads_a_cited_page_with_the_fetch_tool() -> Outcome {
+        let search_call = call_event("web_search", r#"{"query":"rust"}"#);
+        let fetch_call = call_event(
+            "fetch_page_content_recursive",
+            r#"{"url":"https://docs.example/guide"}"#,
+        );
+        let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+        let model = FakeServer::start(vec![
+            event_stream(&[&search_call]),
+            event_stream(&[&fetch_call]),
+            event_stream(&[reply]),
+        ])?;
+        let search = FakeServer::start(vec![json_response(
+            r#"{"results":[{"title":"Guide","url":"https://docs.example/guide","content":"see"}]}"#,
+        )])?;
+        let web = FakeWeb::new(vec![(
+            "https://docs.example/guide",
+            fetched("text/html", "<title>Guide</title><p>the answer</p>"),
+        )]);
+        let mut client = Vec::new();
+        let request = br#"{"messages":[{"role":"user","content":"how?"}],"thor_web_search":true}"#;
+        answer(&mut client, request, &upstreams_with(&model, &search, web))?;
+        let seen = model.requests()?;
+        assert!(seen[2].contains("the answer"), "{}", seen[2]);
+        let sent = events(&client);
+        assert!(
+            sent.contains(
+                &json!({ "thor": { "read": { "url": "https://docs.example/guide", "title": "Guide" } } })
+                    .to_string()
+            ),
+            "{sent:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn an_address_the_user_wrote_may_be_read() -> Outcome {
+        let fetch_call = call_event(
+            "fetch_page_content_recursive",
+            r#"{"url":"https://user.example/doc"}"#,
+        );
+        let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&fetch_call]), event_stream(&[reply])])?;
+        let web = FakeWeb::new(vec![(
+            "https://user.example/doc",
+            fetched("text/plain", "hello from the page"),
+        )]);
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"read https://user.example/doc"}],"thor_web_search":true}"#,
+            &upstreams_with(&model, &idle()?, web),
+        )?;
+        assert!(model.requests()?[1].contains("hello from the page"));
+        Ok(())
+    }
+
+    #[test]
+    fn an_address_that_was_not_seen_is_refused() -> Outcome {
+        let fetch_call = call_event(
+            "fetch_page_content_recursive",
+            r#"{"url":"https://evil.example/"}"#,
+        );
+        let reply = r#"{"choices":[{"delta":{"content":"ok"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&fetch_call]), event_stream(&[reply])])?;
+        let web = FakeWeb::new(vec![(
+            "https://evil.example/",
+            fetched("text/html", "secret"),
+        )]);
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"hi"}],"thor_web_search":true}"#,
+            &upstreams_with(&model, &idle()?, web),
+        )?;
+        let seen = model.requests()?;
+        assert!(
+            seen[1].contains("not in this answer's search results"),
+            "{}",
+            seen[1]
+        );
+        assert!(!seen[1].contains("secret"));
+        Ok(())
+    }
+
+    #[test]
+    fn a_page_that_cannot_be_read_is_reported() -> Outcome {
+        let fetch_call = call_event(
+            "fetch_page_content_recursive",
+            r#"{"url":"https://gone.example/"}"#,
+        );
+        let reply = r#"{"choices":[{"delta":{"content":"ok"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&fetch_call]), event_stream(&[reply])])?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"read https://gone.example/"}],"thor_web_search":true}"#,
+            &upstreams(&model, &idle()?),
+        )?;
+        let seen = model.requests()?;
+        assert!(seen[1].contains("Could not read the page"), "{}", seen[1]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_fetch_without_an_address_or_with_a_bad_one_says_so() -> Outcome {
+        let model = FakeServer::start(vec![
+            event_stream(&[&call_event("fetch_page_content_recursive", "{}")]),
+            event_stream(&[&call_event(
+                "fetch_page_content_recursive",
+                r#"{"url":"ftp://example.com"}"#,
+            )]),
+            event_stream(&[r#"{"choices":[{"delta":{"content":"ok"}}]}"#]),
+        ])?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"hi"}],"thor_web_search":true}"#,
+            &upstreams(&model, &idle()?),
+        )?;
+        let seen = model.requests()?;
+        assert!(
+            seen[2].contains("The fetch needs an address."),
+            "{}",
+            seen[2]
+        );
+        assert!(
+            seen[2].contains("refused: ftp://example.com: only https addresses may be read"),
+            "{}",
+            seen[2]
         );
         Ok(())
     }

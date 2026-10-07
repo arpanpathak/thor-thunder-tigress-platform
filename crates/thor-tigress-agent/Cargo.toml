@@ -5,10 +5,16 @@ edition = "2024"
 description = "Front server for the Thor chat: serves the page, checks the access key, and lets the model search the web through SearXNG."
 
 [dependencies]
+html2text = "0.16.7"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thor-tigress-keyring = { path = "../thor-tigress-keyring" }
+ureq = { version = "3.4.2", default-features = false, features = ["rustls", "gzip"] }
 zeroize = "1.9.1"
+
+[dev-dependencies]
+rcgen = "0.13.2"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 
 [[bin]]
 name = "thor-tigress-agent"

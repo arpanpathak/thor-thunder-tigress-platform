@@ -12,13 +12,18 @@
 //! | [`request`], [`response`] | reading requests, writing answers |
 //! | [`routes`] | which request goes where |
 //! | [`chat`], [`messages`], [`search`] | the model and search work |
+//! | [`address`], [`fetch`], [`html`], [`http`] | reading a cited page and its links |
 //! | [`upstream`] | calling llama-server and SearXNG |
 
 #![forbid(unsafe_code)]
 
+mod address;
 mod chat;
 mod config;
 mod error;
+mod fetch;
+mod html;
+mod http;
 mod messages;
 mod models;
 mod paths;

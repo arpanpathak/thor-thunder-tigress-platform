@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" width="1000" height="520" role="img" aria-label="fetch_page_content_recursive reads the cited page at depth 0, then up to three of its own links at depth 1, then their links at depth 2, but no further. It follows only links on the cited page's own site, and a panel lists the limits: 6 pages in all, 2 hops deep, 12,000 characters a page, 24,000 in all, 10 seconds and 2 MB a page, https text pages only.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .box { fill: #F4F7FA; stroke: #4E8A16; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .panel { fill: #F7F9FB; stroke: #8A99AB; stroke-width: 1.5; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="520" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Reading the cited page, and the links on it</text>
+  <rect x="40" y="60" width="700" height="420" rx="14" class="zone"/>
+  <text x="54" y="80" class="zonelabel">the page's own site, and nothing outside it</text>
+  <rect x="70" y="220" width="170" height="90" rx="10" class="box"/>
+  <text x="155" y="256" class="name" text-anchor="middle">cited page</text>
+  <text x="155" y="276" class="note" text-anchor="middle">depth 0 · title, text</text>
+  <rect x="310" y="110" width="170" height="90" rx="10" class="box"/>
+  <text x="395" y="146" class="name" text-anchor="middle">a link on it</text>
+  <text x="395" y="166" class="note" text-anchor="middle">depth 1</text>
+  <rect x="310" y="330" width="170" height="90" rx="10" class="box"/>
+  <text x="395" y="366" class="name" text-anchor="middle">a link on it</text>
+  <text x="395" y="386" class="note" text-anchor="middle">depth 1</text>
+  <rect x="560" y="60" width="170" height="90" rx="10" class="box"/>
+  <text x="645" y="96" class="name" text-anchor="middle">another link</text>
+  <text x="645" y="116" class="note" text-anchor="middle">depth 2 · no further</text>
+  <rect x="560" y="190" width="170" height="90" rx="10" class="box"/>
+  <text x="645" y="226" class="name" text-anchor="middle">another link</text>
+  <text x="645" y="246" class="note" text-anchor="middle">depth 2 · no further</text>
+  <rect x="560" y="380" width="170" height="90" rx="10" class="box"/>
+  <text x="645" y="416" class="name" text-anchor="middle">another link</text>
+  <text x="645" y="436" class="note" text-anchor="middle">depth 2 · no further</text>
+  <path class="flow" d="M240,240 L275,240 Q285,240 285,230 L285,165 Q285,155 295,155 L308,155" marker-end="url(#arrow)"/>
+  <path class="flow" d="M240,290 L275,290 Q285,290 285,300 L285,365 Q285,375 295,375 L308,375" marker-end="url(#arrow)"/>
+  <path class="flow" d="M480,140 L520,140 Q530,140 530,130 L530,115 Q530,105 540,105 L558,105" marker-end="url(#arrow)"/>
+  <path class="flow" d="M480,170 L520,170 Q530,170 530,180 L530,225 Q530,235 540,235 L558,235" marker-end="url(#arrow)"/>
+  <path class="flow" d="M480,375 L520,375 Q530,375 530,385 L530,415 Q530,425 540,425 L558,425" marker-end="url(#arrow)"/>
+  <rect x="770" y="80" width="200" height="380" rx="12" class="panel"/>
+  <text x="870" y="112" class="name" text-anchor="middle">Limits, per answer</text>
+  <text x="870" y="150" class="note" text-anchor="middle">6 pages in all</text>
+  <text x="870" y="182" class="note" text-anchor="middle">2 hops deep</text>
+  <text x="870" y="214" class="note" text-anchor="middle">12,000 characters a page</text>
+  <text x="870" y="246" class="note" text-anchor="middle">24,000 characters in all</text>
+  <text x="870" y="278" class="note" text-anchor="middle">10 seconds a page</text>
+  <text x="870" y="310" class="note" text-anchor="middle">2 MB a page</text>
+  <text x="870" y="342" class="note" text-anchor="middle">https text pages only</text>
+  <text x="870" y="392" class="note" text-anchor="middle">a page that fails is</text>
+  <text x="870" y="410" class="note" text-anchor="middle">left out of the answer</text>
+</svg>

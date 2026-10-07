@@ -18,6 +18,46 @@ there as untracked.
 
 ## 2026-10-07
 
+### Web search made useful for both models, and reading the pages
+
+- `web_search` gained an optional `time_range` (`day`, `week`, `month`, `year`,
+  plus `today`, `7d`, `30d`, `12m`), passed to SearXNG as its own parameter, and
+  now keeps SearXNG's `publishedDate` in the text the model reads. The tool
+  description and the Web-on system line ask for a range when the answer depends
+  on what is recent, so the chat can find jobs and new postings.
+- The first round of a **Web**-on answer is sent with
+  `tool_choice: "required"`. This is the guaranteed fix chapter "Model
+  comparison" identified (Nemotron searched 15 of 18, Qwen 3 of 18): both models
+  now have to look once before they answer, and later rounds return to `auto`.
+- New tool `fetch_page_content_recursive`. One cited address, then the links on
+  that page's own site, two hops deep and six pages at most; each page cut to
+  12,000 characters, 24,000 in all. It fixes the measured cuda-oxide case where
+  the model saw snippets only.
+- New modules, each one job: `address.rs` (https address type, the public-address
+  table, one lookup), `html.rs` (HTML to text, title, same-site links),
+  `http.rs` (the `Web` trait, ureq with a pinned resolver, limits, fixed
+  headers), `fetch.rs` (rule 1 for links, the crawl, redirects, the untrusted
+  label). `chat.rs` gained the second tool, the allowed-host set built from the
+  user's message and from each search, and a `read:` event. `search.rs`,
+  `config.rs`, `testing.rs` and the chat page were updated with it.
+- New dependencies, asked for first: `ureq` (rustls) and `html2text`; tests add
+  `rcgen` and `rustls` to serve a real TLS page with a self-signed certificate,
+  so the client is tested over a handshake rather than a mock.
+- The safety rules of chapter "Tool calling" are implemented and tested: private,
+  loopback, link-local, shared, multicast and reserved ranges (including
+  `::ffff:127.0.0.1`, `64:ff9b::/96`, `100.64.0.0/10`), one lookup and one
+  connection, three redirects by hand, relative `Location`s resolved against the
+  page, 2 MB and 10 s per page, text types only, no cookies, `Authorization` or
+  referrer. Rule 1 for links is tightened: the start address must come from a
+  search result or the user's message, and links must stay on that page's site.
+- Verified on yahboom, 2026-10-07: `cargo test --workspace` passes; `clippy
+  --workspace --all-targets -D warnings` clean; `spark rs crates` finds 0
+  problems in 81 files; the agent runs 126 tests. `mdbook build book` is clean,
+  all 49 figure references resolve, and every SVG parses.
+- Still open: the end-to-end runs on the Thor against real sites (the numbers go
+  into chapter "Tool calling" and chapter "Model comparison"); rule 8, the
+  fetch line in the journal, is not written yet; no cache.
+
 ### Per-person keys: thor-tigress-keyring, and the registration form
 
 - New crate `thor-tigress-keyring` (library and binary). One encrypted file,

@@ -667,6 +667,21 @@ function renderMessage(message) {
       details.append(list);
       body.append(part("sources", details));
     }
+    if (message.reads && message.reads.length) {
+      const details = element("details", "sources");
+      details.append(element("summary", "", `read: ${message.reads.map((read) => `“${read.title}”`).join(", ")}`));
+      const list = element("ol");
+      message.reads.forEach((read) => {
+        const item = element("li");
+        const anchor = element("a", "", read.url);
+        anchor.href = /^https?:\/\//.test(read.url) ? read.url : "#";
+        anchor.target = "_blank"; anchor.rel = "noreferrer";
+        item.append(anchor);
+        list.append(item);
+      });
+      details.append(list);
+      body.append(part("read", details));
+    }
     if (message.reasoning) {
       const details = element("details", "thinking");
       details.append(element("summary", "", message.thinkingDone ? "thought" : "thinking…"), element("div", "text", message.reasoning));
@@ -909,6 +924,7 @@ async function send(text) {
         const chunk = JSON.parse(payload);
         if (chunk.thor) {
           if (chunk.thor.search) (reply.searches = reply.searches || []).push(chunk.thor.search);
+          if (chunk.thor.read) (reply.reads = reply.reads || []).push(chunk.thor.read);
           if (chunk.thor.error) reply.error = chunk.thor.error;
           continue;
         }

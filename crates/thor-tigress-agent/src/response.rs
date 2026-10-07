@@ -122,7 +122,9 @@ pub fn failure(stream: &mut dyn Write, error: &AgentError) -> Outcome {
     let status = match error {
         AgentError::BadRequest(_) | AgentError::Json(_) => Status::BadRequest,
         AgentError::Keyring(_) => Status::ServerError,
-        AgentError::Upstream(_) => Status::BadGateway,
+        AgentError::Upstream(_) | AgentError::Fetch(_) | AgentError::Refused(_) => {
+            Status::BadGateway
+        }
         AgentError::Io(_) | AgentError::Config(_) => return Ok(()),
     };
     let body = json!({ "error": { "message": error.to_string() } }).to_string();
@@ -260,12 +262,19 @@ mod tests {
                 &AgentError::Upstream("127.0.0.1:8079: refused".to_string()),
             )
         })?;
+        let refused = written(|out| {
+            failure(
+                out,
+                &AgentError::Refused("127.0.0.1: not public".to_string()),
+            )
+        })?;
         let gone = written(|out| failure(out, &AgentError::from(std::io::Error::other("reset"))))?;
         assert!(bad.starts_with("HTTP/1.1 400 Bad Request"));
         assert!(
             bad.ends_with(r#"{"error":{"message":"bad request: the body must be a JSON object"}}"#)
         );
         assert!(gateway.starts_with("HTTP/1.1 502 Bad Gateway"));
+        assert!(refused.starts_with("HTTP/1.1 502 Bad Gateway"));
         assert_eq!(gone, "");
         Ok(())
     }

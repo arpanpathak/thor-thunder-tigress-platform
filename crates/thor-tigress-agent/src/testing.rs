@@ -8,7 +8,11 @@ use std::{
     thread,
 };
 
-use crate::error::Outcome;
+use crate::{
+    address::Url,
+    error::{AgentError, Outcome},
+    http::{Fetched, Web},
+};
 
 /// A server on `127.0.0.1` at a free port, serving canned responses in order.
 pub struct FakeServer {
@@ -106,5 +110,32 @@ impl Write for Gone {
 
     fn flush(&mut self) -> std::io::Result<()> {
         Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+    }
+}
+
+/// A stand-in for the real web: canned pages, keyed by address.
+#[derive(Debug, Default)]
+pub struct FakeWeb {
+    pages: std::collections::HashMap<String, Fetched>,
+}
+
+impl FakeWeb {
+    /// A fake holding `pages`, each keyed by its address text.
+    #[must_use]
+    pub fn new(pages: Vec<(&str, Fetched)>) -> Self {
+        let mut fake = FakeWeb::default();
+        for (url, page) in pages {
+            fake.pages.insert((*url).to_string(), page);
+        }
+        fake
+    }
+}
+
+impl Web for FakeWeb {
+    fn get(&self, url: &Url) -> Outcome<Fetched> {
+        self.pages
+            .get(&url.as_string())
+            .cloned()
+            .ok_or_else(|| AgentError::Fetch(format!("{}: not in the fake", url.as_string())))
     }
 }

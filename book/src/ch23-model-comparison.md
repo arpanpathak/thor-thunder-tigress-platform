@@ -103,8 +103,8 @@ Nemotron, Web on, one search:
 Qwen wrote a confident answer about a world two years out of date; the card has
 been on sale since before this chapter. Nemotron admitted its cutoff. Neither
 gave the price, because Nemotron searched and then did not use what it found
-well. That is a second problem with its own fix (the planned `fetch_page` tool in
-chapter "Tool calling (planned)", and a task that checks whether the answer used
+well. That is a second problem with its own fix (the `fetch_page_content_recursive`
+tool in chapter "Tool calling", and a task that checks whether the answer used
 its sources). The first problem is here: a model that does not search cannot be
 right about today, and the reader cannot tell from the answer that no search
 happened.
@@ -136,7 +136,8 @@ The fix that is guaranteed is `tool_choice: "required"` on the first round. That
 takes the decision away from the model: every Web-on answer would search,
 including "explain ownership in Rust". The trade is a search on every turn, with
 its latency, for a search on the turns that need one. The project did not take
-it.
+it on the day of this measurement. It took it the next day; the section below
+records what changed.
 
 ## It is the model, not the server
 
@@ -169,6 +170,29 @@ one.
   release after the training cutoff, a score from yesterday. A model that answers
   it without searching fails it, whatever its speed.
 
+## What changed after this measurement
+
+On 2026-10-07 the agent took the guaranteed fix and added the tool the chapter
+above was missing. Three changes, all in `thor-tigress-agent`:
+
+- the first round of a **Web**-on answer carries `tool_choice: "required"`, so
+  both models have to look before they answer. Later rounds return to `auto`;
+- `web_search` gained an optional `time_range` (`day`, `week`, `month`, `year`)
+  and now keeps SearXNG's `publishedDate`, so a search can ask for what is
+  recent rather than for what is popular;
+- the new tool `fetch_page_content_recursive` opens a cited page and the links
+  on that page's own site (chapter "Tool calling"), so a snippet is no longer
+  the end of what the model can read.
+
+The counts in this chapter were made before those changes, against the old
+binary, and they still describe the two models' own willingness to search. What
+they no longer describe is the chat's behaviour, which is now the same on the
+first round for both models. The three questions worth re-measuring on the Thor
+are: how often each model answers a fresh question correctly with the fix on,
+what the extra search costs in seconds per answer, and how often a fetched page
+changed the answer. Those runs are listed in chapter "Tool calling", and the
+numbers go there when they happen.
+
 ## Not measured
 
 - thinking on, and a temperature below the default
@@ -180,8 +204,8 @@ one.
 
 - `crates/thor-tigress-agent/src/chat.rs`: `Mode::Search`, `offer_tools`,
   `search_loop` and the `SEARCH_HINT` line
-- chapter "Tool calling (planned)": the loop, `web_search`, and the planned
-  `fetch_page`
+- chapter "Tool calling": the loop, `web_search` with `time_range`, and
+  `fetch_page_content_recursive`
 - chapter "TensorRT Edge-LLM": the two engines, and Qwen's speed and Rust-task
   numbers
 - the runs: six prompts, three times each, both models, on the Thor, 2026-10-07

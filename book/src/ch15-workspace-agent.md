@@ -20,7 +20,7 @@ what was decided so it can resume without starting over.
 
 | Part | Plan |
 |---|---|
-| Tools | `list_files`, `read_file`, `write_file`, `run_command`, `web_search`, `fetch_page` |
+| Tools | `list_files`, `read_file`, `write_file`, `run_command`, `web_search`, `fetch_page_content_recursive` |
 | Commands | run in a container per workspace, as a non-root user, with only that workspace mounted, CPU, memory, process and time limits, and **no network** |
 | Page fetching | done by the agent, not the container; refuses private, loopback, link-local, Tailscale (100.64.0.0/10) and other local addresses, so no one can reach the home network through it |
 | Page | a file panel beside the chat; tool calls shown as they run |
@@ -31,9 +31,10 @@ what was decided so it can resume without starting over.
   Podman (no sudo for daily use), or one-time sudo to set up a service that
   starts containers. Adding the user to the `docker` group is ruled out: it
   gives root to anything running as that user.
-- `fetch_page` comes first, on its own: it improves search answers (the model
-  currently sees snippets only) and has no sandbox to build. Its design and
-  safety rules are in chapter "Tool calling (planned)".
+- `fetch_page_content_recursive` comes first, on its own: it improves search
+  answers (the model otherwise sees snippets only) and has no sandbox to build.
+  It is built and tested in `thor-tigress-agent` for the chat; its design and
+  safety rules are in chapter "Tool calling".
 
 ## Not decided
 
