@@ -166,6 +166,51 @@ and the number of slots, as for every number in this book.
 - and its server handles thinking and tool calls (below) for 24 hours
   without a restart.
 
+## A clean-code model in the chat
+
+The second use of Edge-LLM: a model picked for writing clean code, offered in
+the Thor Tigress Cub's model picker next to the Nano.
+
+**Candidates.** Models on Edge-LLM's supported list with an NVFP4 checkpoint
+published by NVIDIA (sizes from the Hugging Face file listings):
+
+| Model | Kind | Checkpoint | Size | Speed estimate |
+|---|---|---|---|---|
+| Qwen3.8-27B | dense, 27.3B | `nvidia/Qwen3.8-27B-NVFP4` | 21.9 GB | about 8 tok/s by the formula; Edge-LLM ran its predecessor Qwen3.6-27B at 52.33 tok/s output throughput in MLPerf, a batched workload |
+| Qwen3.6-35B-A3B | mixture of experts, 34.7B total, 3B active | `nvidia/Qwen3.6-35B-A3B-NVFP4` | 23.4 GB | about 90 tok/s by the formula |
+
+Qwen3-Coder-Next, the coding model in chapter "Model serving", isn't on
+Edge-LLM's list, so it stays a llama.cpp candidate.
+
+**How the winner is picked.** Clean code is measured, not judged by eye:
+
+| Measure | Tool | Pass mark |
+|---|---|---|
+| the five Rust rules | spark, on the answers to the same 20 Rust tasks | higher than the Nano's score on the same tasks |
+| compiles | `cargo build` on each answer, as `teacher` does | higher than the Nano's rate |
+| tests pass | the tests in each task | higher than the Nano's rate |
+| no false claims | spark's false-claim check | lower than the Nano's rate |
+| speed | tok/s through the agent, one reply | at least 30 tok/s, to keep the chat usable |
+
+The baseline is the Nano's numbers on the same tasks, measured the same day.
+A coding model alone isn't enough: in the earlier baseline (chapter "The
+checker: spark"), Qwen2.5-Coder-7B on TensorRT-LLM followed all five rules in
+4% of its answers.
+
+**In the chat.** The winner gets an engine of its own on the Edge-LLM
+server and appears in the picker as one more model. The agent sends requests
+for it to `:8081` and everything else to `:8079` (figure 16.1). Memory: the
+Nano takes 57.8 GB, so about 50 GB is left with 8 GB kept free. A 22 to 23
+GB checkpoint plus its context fits, at a context to be measured.
+
+**Steps,** each needing a GPU time window on the Thor:
+
+1. Build both candidates' engines (pipeline above).
+2. Run the 20 Rust tasks through each, and through the Nano.
+3. Score them with spark, `cargo build` and the tests.
+4. Serve the winner on `:8081`, add the agent's routing, and add it to the
+   picker.
+
 ## Open questions and risks
 
 | Question | Why it matters | How to find out |
