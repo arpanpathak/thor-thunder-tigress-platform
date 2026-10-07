@@ -76,6 +76,12 @@ chosen model:
 
 The first round of a Web-on answer carries `tool_choice: "required"`, so both
 Nemotron and Qwen look before they answer; later rounds are the model's choice.
+Four tool rounds run at most, a repeat of a call already made is not run again,
+and a final round without tools makes the model write the answer, so a tool call
+never appears in the reply. A call the model writes as text
+(`<tool_call><function=web_search>…`) is filtered out of the stream and run
+like a structured one.
+
 The fetch runs behind the rules of the book's
 ["Tool calling"](book/src/ch19-tool-calling.md) chapter: `https` and public
 addresses only, one lookup and one connection, at most three redirects, no

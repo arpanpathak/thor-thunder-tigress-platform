@@ -12,7 +12,9 @@
 //! ```
 //!
 //! The first round is sent with `tool_choice: "required"`, so both models look
-//! something up before they answer; later rounds go back to `auto`.
+//! something up before they answer; later rounds go back to `auto`. A model that
+//! writes a call into the text instead of into `tool_calls` is understood too:
+//! [`crate::tooltext`] takes it out of the answer and hands it to the loop.
 
 use std::io::{BufRead, Write};
 
@@ -28,10 +30,12 @@ use crate::{
     paths,
     response::{self, DONE, EVENT_PREFIX},
     search::{self, SearchResult, TimeRange},
+    tooltext::Sieve,
     upstream::Endpoint,
 };
 
-/// Rounds per answer; the last one gets no tools, so the model has to answer.
+/// Tool rounds per answer; after them the model gets one round without tools,
+/// so it has to answer.
 const MAX_ROUNDS: usize = 4;
 
 /// Tool calls kept per round; more are ignored.
@@ -48,6 +52,13 @@ const SEARCH_HINT: &str = concat!(
     "week, month or year when the answer depends on what is recent. Use the ",
     "fetch_page_content_recursive tool to read a page from the results when the ",
     "snippet is not enough."
+);
+
+/// The line added before the last round, when the model must stop calling
+/// tools and write the answer.
+const ANSWER_NUDGE: &str = concat!(
+    "The tool rounds are over. Answer the user's question now, in plain text, ",
+    "using what the tool results above say. Do not write a tool call."
 );
 
 /// The request field asking for a streamed answer.
@@ -312,10 +323,14 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 }
 
 /// Asks the model, runs the tools it calls, and asks again, until it answers
-/// without a tool call or the rounds run out.
+/// without a tool call or the tool rounds run out. A model that still wants a
+/// tool after [`MAX_ROUNDS`] gets one last round with no tools, so the answer is
+/// always plain text and never a leaked tool call.
 ///
 /// The first round requires a call, so both models look something up before
-/// they answer; later rounds leave the choice to the model.
+/// they answer; later rounds leave the choice to the model. A call that repeats
+/// one already run is answered with a nudge instead of run again, so a model
+/// that loops cannot loop forever.
 fn search_loop(
     client: &mut dyn Write,
     mut fields: Fields,
@@ -323,9 +338,10 @@ fn search_loop(
     model: &Endpoint,
 ) -> Outcome {
     let mut allowed = Allowed::from_text(&user_text(&fields));
+    let mut ran: Vec<String> = Vec::new();
 
     for round_number in 1..=MAX_ROUNDS {
-        offer_tools(&mut fields, round_number < MAX_ROUNDS);
+        offer_tools(&mut fields, true);
         require_tool(&mut fields, round_number == 1);
         let round = stream_round(client, &fields, model)?;
 
@@ -336,9 +352,31 @@ fn search_loop(
         let results = round
             .calls
             .iter()
-            .map(|call| run_tool(client, call, upstreams, &mut allowed))
+            .map(|call| {
+                let signature = format!("{}\u{1}{}", call.name, call.arguments);
+                if ran.contains(&signature) {
+                    return Ok(
+                        "That tool call already ran in this answer. Use its result.".to_string()
+                    );
+                }
+                ran.push(signature);
+                run_tool(client, call, upstreams, &mut allowed)
+            })
             .collect::<Outcome<Vec<String>>>()?;
         append_round(&mut fields, &round, &results)?;
+    }
+
+    offer_tools(&mut fields, false);
+    require_tool(&mut fields, false);
+    append_system(&mut fields, ANSWER_NUDGE);
+    let final_round = stream_round(client, &fields, model)?;
+    if final_round.content.trim().is_empty() {
+        let note = "The tool rounds are over and the model did not write an answer. \
+                    The results above are what the tools returned.";
+        response::send_event(
+            client,
+            &json!({ "choices": [{ "delta": { "content": note } }] }).to_string(),
+        )?;
     }
     Ok(())
 }
@@ -363,6 +401,12 @@ fn user_text(fields: &Fields) -> String {
 /// Adds [`SEARCH_HINT`] to the conversation, merging it into an existing
 /// system message so the request keeps a single system turn.
 fn nudge_to_search(fields: &mut Fields) {
+    append_system(fields, SEARCH_HINT);
+}
+
+/// Adds `line` to the conversation's one system message, making it when there
+/// is none, so the request never grows a second system turn.
+fn append_system(fields: &mut Fields, line: &str) {
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return;
     };
@@ -372,7 +416,7 @@ fn nudge_to_search(fields: &mut Fields) {
         .is_some_and(|message| message.get("role").and_then(Value::as_str) == Some("system"));
 
     if !first_is_system {
-        messages.insert(0, json!({ "role": "system", "content": SEARCH_HINT }));
+        messages.insert(0, json!({ "role": "system", "content": line }));
 
         return;
     }
@@ -380,7 +424,7 @@ fn nudge_to_search(fields: &mut Fields) {
     let merged = messages[0]
         .get("content")
         .and_then(Value::as_str)
-        .map(|content| format!("{content}\n\n{SEARCH_HINT}"));
+        .map(|content| format!("{content}\n\n{line}"));
 
     if let Some(content) = merged {
         messages[0]["content"] = Value::String(content);
@@ -503,7 +547,9 @@ fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
         .collect()
 }
 
-/// Streams one model reply to the client, collecting any tool calls.
+/// Streams one model reply to the client, collecting any tool calls. A call the
+/// model writes into the text is taken out by [`Sieve`] and runs like a
+/// structured one, and the reader never sees the tags.
 fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
     let response = model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(fields)?)?;
 
@@ -517,6 +563,7 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
     }
 
     let mut round = Round::default();
+    let mut sieve = Sieve::new();
 
     for line in response.body.lines() {
         let line = line?;
@@ -528,10 +575,68 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
             break;
         }
 
-        round.absorb(serde_json::from_str(data)?);
-        response::send_event(client, data)?;
+        let mut value: Value = serde_json::from_str(data)?;
+        if let Some(event) = forward(&mut value, data, &mut sieve) {
+            response::send_event(client, &event)?;
+        }
+        round.absorb(serde_json::from_value(value)?);
+    }
+
+    let tail = sieve.finish();
+    if !tail.is_empty() {
+        round.content.push_str(&tail);
+        response::send_event(
+            client,
+            &json!({ "choices": [{ "delta": { "content": tail } }] }).to_string(),
+        )?;
+    }
+    for (number, call) in sieve.take_calls().into_iter().enumerate() {
+        round.calls.push(ToolCall {
+            id: format!("text-{number}"),
+            name: call.name,
+            arguments: call.arguments,
+        });
     }
     Ok(round)
+}
+
+/// Rewrites one chunk so only the visible part of its text is forwarded, and
+/// returns the event to send. A chunk with no text, or with text that holds no
+/// tool-call tag, is forwarded unchanged.
+fn forward(value: &mut Value, data: &str, sieve: &mut Sieve) -> Option<String> {
+    let Some(text) = value
+        .pointer("/choices/0/delta/content")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+    else {
+        return Some(data.to_string());
+    };
+
+    let was_open = sieve.is_open();
+    let visible = sieve.push(&text);
+    if !was_open && visible == text {
+        return Some(data.to_string());
+    }
+    if let Some(slot) = value.pointer_mut("/choices/0/delta/content") {
+        *slot = Value::String(visible.clone());
+    }
+    if visible.is_empty() && !carries_more(value) {
+        return None;
+    }
+    Some(value.to_string())
+}
+
+/// Whether a chunk carries something besides its text: more tool-call pieces,
+/// reasoning, or the finish reason.
+fn carries_more(value: &Value) -> bool {
+    let delta = value
+        .pointer("/choices/0/delta")
+        .and_then(Value::as_object)
+        .is_some_and(|object| object.keys().any(|key| key != "content"));
+    let finish = value
+        .pointer("/choices/0/finish_reason")
+        .is_some_and(|reason| !reason.is_null());
+    delta || finish
 }
 
 impl Round {
@@ -879,19 +984,85 @@ mod tests {
     }
 
     #[test]
-    fn the_last_round_has_no_tools() -> Outcome {
+    fn every_tool_round_has_tools_and_one_last_round_does_not() -> Outcome {
         let call = call_event("other", "{}");
-        let model = FakeServer::start(vec![event_stream(&[&call]); MAX_ROUNDS])?;
+        let reply = r#"{"choices":[{"delta":{"content":"final answer"}}]}"#;
+        let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
+        responses.push(event_stream(&[reply]));
+        let model = FakeServer::start(responses)?;
         answer(
             &mut Vec::new(),
             br#"{"messages":[],"thor_web_search":true}"#,
             &upstreams(&model, &idle()?),
         )?;
         let seen = model.requests()?;
-        assert_eq!(seen.len(), MAX_ROUNDS);
-        assert!(seen[MAX_ROUNDS - 2].contains(r#""tools""#));
-        assert!(!seen[MAX_ROUNDS - 1].contains(r#""tools""#));
+        assert_eq!(seen.len(), MAX_ROUNDS + 1);
+        assert!(
+            seen[..MAX_ROUNDS]
+                .iter()
+                .all(|request| request.contains(r#""tools""#))
+        );
+        assert!(!seen[MAX_ROUNDS].contains(r#""tools""#));
+        assert!(seen[MAX_ROUNDS].contains("Answer the user's question now"));
         assert!(seen[1].contains("Unknown tool other."));
+        assert!(seen[2].contains("already ran"), "{}", seen[2]);
+        Ok(())
+    }
+
+    #[test]
+    fn a_call_written_as_text_runs_and_is_not_shown() -> Outcome {
+        let text = "<tool_call>\n<function=web_search>\n<parameter=query>\nrust jobs\n</parameter>\n</function>\n</tool_call>";
+        let call = json!({ "choices": [{ "delta": { "content": text } }] }).to_string();
+        let reply = r#"{"choices":[{"delta":{"content":"Here is the answer"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
+        let search = FakeServer::start(vec![json_response(
+            r#"{"results":[{"title":"A job","url":"https://jobs.example/1","content":"hiring"}]}"#,
+        )])?;
+        let mut client = Vec::new();
+        answer(
+            &mut client,
+            br#"{"messages":[{"role":"user","content":"jobs?"}],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+        let seen = model.requests()?;
+        assert!(seen[1].contains("[1] A job"), "{}", seen[1]);
+        assert!(search.requests()?[0].contains("q=rust+jobs"));
+        let sent = events(&client);
+        assert!(
+            !sent.iter().any(|event| event.contains("<tool_call")),
+            "{sent:?}"
+        );
+        assert!(
+            sent.iter()
+                .any(|event| event.contains("Here is the answer")),
+            "{sent:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_call_on_the_answer_round_is_stripped() -> Outcome {
+        let call = call_event("other", "{}");
+        let leaked = json!({ "choices": [{ "delta": { "content": "<tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
+        let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
+        responses.push(event_stream(&[&leaked]));
+        let model = FakeServer::start(responses)?;
+        let mut client = Vec::new();
+        answer(
+            &mut client,
+            br#"{"messages":[],"thor_web_search":true}"#,
+            &upstreams(&model, &idle()?),
+        )?;
+        let sent = events(&client);
+        assert!(
+            !sent.iter().any(|event| event.contains("<tool_call")),
+            "{sent:?}"
+        );
+        assert!(
+            sent.iter()
+                .any(|event| event.contains("did not write an answer")),
+            "{sent:?}"
+        );
         Ok(())
     }
 

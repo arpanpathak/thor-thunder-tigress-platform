@@ -69,6 +69,31 @@ there as untracked.
   cache; no measurement yet of how often each model answers a fresh question
   correctly with the forced first round.
 
+### Leaked tool calls: `tooltext.rs`, and a real answer round
+
+- Report from a live answer: the reply was a raw
+  `<tool_call><function=fetch_page_content_recursive>…</function></tool_call>`
+  block, and no tool ran. Cause: `search_loop` offered tools only while
+  `round_number < MAX_ROUNDS`, so the fourth request had no `tools`. A model that
+  still wanted one wrote the call into `content`, and the loop forwarded it
+  verbatim.
+- Fix, in three parts. New module `tooltext.rs`: a streaming filter (`Sieve`)
+  that holds back anything that could be a tool-call tag, parses a complete
+  block in Nemotron's XML form or the JSON form, and returns it to the loop as if
+  it had arrived in `tool_calls`. The tags never reach the page, and a tag split
+  across two chunks comes out whole.
+- `chat.rs`: tools are now offered on all four tool rounds; a fifth round runs
+  without tools and with one line telling the model to answer, so the reply is
+  always plain text. A repeat of a call already run is not run again; the model
+  is told and asked to use what it has. The answer round's own text is filtered
+  too, and a short fallback is sent when nothing else arrived.
+- Tests: 137 in the agent now, including a call written as text (run, tags not
+  shown), a call split across chunks, a repeated call, and a call leaked on the
+  answer round. Chapter "Tool calling" gained "Calls written as text" and the
+  test rows; the README section was updated.
+- Deployed to the Thor again, 2026-10-07: rebuilt and reinstalled, service
+  restarted, `/health` ok.
+
 ### Per-person keys: thor-tigress-keyring, and the registration form
 
 - New crate `thor-tigress-keyring` (library and binary). One encrypted file,

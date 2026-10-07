@@ -13,6 +13,7 @@
 //! | [`routes`] | which request goes where |
 //! | [`chat`], [`messages`], [`search`] | the model and search work |
 //! | [`address`], [`fetch`], [`html`], [`http`] | reading a cited page and its links |
+//! | [`tooltext`] | tool calls the model writes as text |
 //! | [`upstream`] | calling llama-server and SearXNG |
 
 #![forbid(unsafe_code)]
@@ -33,6 +34,7 @@ mod routes;
 mod search;
 #[cfg(test)]
 mod testing;
+mod tooltext;
 mod upstream;
 
 use std::{

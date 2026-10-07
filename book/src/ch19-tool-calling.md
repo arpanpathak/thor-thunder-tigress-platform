@@ -45,10 +45,45 @@ This chapter covers
    arguments as JSON, for example `{"query": "rust jobs", "time_range": "week"}`.
 4. `thor-tigress-agent` runs the tool, adds its result to the conversation as a
    `tool` message, and asks the model again.
-5. Steps 3 and 4 repeat at most four times. The fifth request is sent without
-   tools, so the model has to answer with what it has.
-6. Every token is streamed to the page as it is written, and each tool use is
+5. A call that repeats one already run is not run again; the model is told so and
+   asked to use what it has. That is what stops a model looping on the same
+   search.
+6. Steps 3 to 5 repeat at most four times. The tools are offered on every one of
+   those rounds. A fifth request is sent without tools, with a line telling the
+   model to answer now, so the reader always gets plain text.
+7. Every token is streamed to the page as it is written, and each tool use is
    sent as an event the page lists under "searched: …" or "read: …".
+
+### Calls written as text
+
+Some engines write the call into the answer instead of into the `tool_calls`
+field, in the model's own format:
+
+```text
+<tool_call>
+<function=web_search>
+<parameter=query>
+rust jobs
+</parameter>
+<parameter=time_range>
+week
+</parameter>
+</function>
+</tool_call>
+```
+
+Left alone, that text is what the reader sees. `tooltext.rs` filters the stream
+instead. It holds back anything that could be a tool-call tag, parses a complete
+block in either the XML form above or the JSON form
+(`{"name": …, "arguments": …}`), and returns it to the loop as if the engine had
+sent it in `tool_calls`. The tags never reach the page, a tag split across two
+chunks is held back until it is complete, and a call the model writes on the
+answer round is dropped rather than shown.
+
+This also closes a hole rule 6 leaves open. A page could carry a hidden
+`<tool_call>` and the model could echo it; the call is run, but only under the
+same rule 1 that a structured call follows, so it can reach no address the answer
+has not already seen, and `web_search` can reach only localhost.
 
 The model never runs anything itself. It can only ask, and the server decides
 what a request is allowed to do. That makes the server the place where every
@@ -334,7 +369,8 @@ The modules, and what each holds:
 | `html.rs` | HTML to text, the title, the same-site links, the cuts |
 | `http.rs` | the `Web` trait, the ureq client, the limits, the fixed headers |
 | `fetch.rs` | rule 1, the crawl, redirects, the limits per answer, the untrusted label |
-| `chat.rs` | the two tool definitions, the loop, `tool_choice: "required"`, the events |
+| `tooltext.rs` | tool calls written as text: the filter, the XML and JSON parsers |
+| `chat.rs` | the two tool definitions, the loop, `tool_choice: "required"`, the answer round, the events |
 
 ## Tests
 
@@ -353,6 +389,10 @@ The modules, and what each holds:
 | the search with `time_range: "day"` | `time_range=day` reaches SearXNG |
 | the first Web round | `tool_choice: "required"` is sent; later rounds are not |
 | the fetch tool over a fake web | the read event, the text, and the numbered pages |
+| a call written as text | run like a structured one; the tags never reach the page |
+| a call split across chunks | held back until complete, then parsed |
+| a repeated call | not run twice; the model is told and asked to answer |
+| the answer round | no tools; a call leaked there is stripped, and a fallback is sent when nothing else arrived |
 
 Measured on the Thor, 2026-10-07 (Nemotron 3 Nano, thinking off):
 
