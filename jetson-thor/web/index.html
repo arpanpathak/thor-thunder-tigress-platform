@@ -831,13 +831,14 @@ async function send(text) {
 
   const history = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content)).map(({ role, content }) => ({ role, content }));
   if (settings.system.trim()) history.unshift({ role: "system", content: settings.system.trim() });
-  const body = { model: chosenModel(), messages: history, stream: true,
+  const body = { model: chosenModel(), messages: history, stream: true, stream_options: { include_usage: true },
     chat_template_kwargs: { enable_thinking: $("think").checked }, thor_web_search: $("web").checked };
   if (settings.temperature !== "" && !Number.isNaN(Number(settings.temperature))) body.temperature = Number(settings.temperature);
 
   controller = new AbortController();
   const started = performance.now();
   let firstToken = 0;
+  let lastToken = 0;
   try {
     const response = await fetch(`${API}v1/chat/completions`, {
       method: "POST", headers: headers(), body: JSON.stringify(body), signal: controller.signal,
@@ -847,6 +848,7 @@ async function send(text) {
     const decoder = new TextDecoder();
     let buffer = "";
     let timings = null;
+    let usage = null;
     let frame = 0;
     for (;;) {
       const { value, done } = await reader.read();
@@ -865,18 +867,19 @@ async function send(text) {
           continue;
         }
         const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta || {};
-        if ((delta.content || delta.reasoning_content) && !firstToken) firstToken = performance.now();
+        if (delta.content || delta.reasoning_content) {
+          lastToken = performance.now();
+          if (!firstToken) firstToken = lastToken;
+        }
         if (delta.reasoning_content) reply.reasoning += delta.reasoning_content;
         if (delta.content) { reply.content += delta.content; reply.thinkingDone = true; }
         if (chunk.timings) timings = chunk.timings;
+        if (chunk.usage) usage = chunk.usage;
       }
       if (!frame) frame = requestAnimationFrame(() => { frame = 0; updateLast(); });
     }
     reply.thinkingDone = true;
-    const seconds = ((performance.now() - started) / 1000).toFixed(1);
-    reply.stats = timings
-      ? `${timings.predicted_n} tokens · ${timings.predicted_per_second.toFixed(1)} tok/s · first token ${(timings.prompt_ms / 1000).toFixed(1)}s · ${seconds}s`
-      : `${seconds}s${firstToken ? ` · first token ${((firstToken - started) / 1000).toFixed(1)}s` : ""}`;
+    reply.stats = statsLine({ timings, usage, started, firstToken, lastToken });
   } catch (error) {
     if (error.name === "AbortError") reply.stats = "stopped";
     else reply.error = error.message;
@@ -887,6 +890,25 @@ async function send(text) {
     updateLast();
     save();
   }
+}
+
+// llama-server reports its own timings; other engines report only usage, so
+// their speed is measured here, from the first token to the last.
+function statsLine({ timings, usage, started, firstToken, lastToken }) {
+  const seconds = (ms) => `${(ms / 1000).toFixed(1)}s`;
+  const total = seconds(performance.now() - started);
+  if (timings) {
+    return [`${timings.predicted_n} tokens`, `${timings.predicted_per_second.toFixed(1)} tok/s`,
+      `first token ${seconds(timings.prompt_ms)}`, total].join(" · ");
+  }
+  const parts = [];
+  if (usage) {
+    parts.push(`${usage.completion_tokens} tokens`);
+    const streaming = (lastToken - firstToken) / 1000;
+    if (streaming > 0 && usage.completion_tokens > 1) parts.push(`${((usage.completion_tokens - 1) / streaming).toFixed(1)} tok/s`);
+  }
+  if (firstToken) parts.push(`first token ${seconds(firstToken - started)}`);
+  return [...parts, total].join(" · ");
 }
 
 function setBusy(busy) {

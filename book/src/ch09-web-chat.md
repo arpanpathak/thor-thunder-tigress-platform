@@ -76,6 +76,13 @@ Under each finished reply, the stats line reports what the server measured:
 | `first token 0.2s` | time spent reading your conversation before the first word |
 | `1.4s` | the whole reply, as your browser saw it |
 
+These come from llama-server's own timings. TensorRT Edge-LLM (the Qwen
+model) reports only the token count, so for it the page measures the speed
+itself: the tokens after the first, divided by the time from the first token
+to the last, and the first token's time as the browser saw it. Measured on
+2026-10-06: "281 tokens · 79.4 tok/s · first token 0.1s · 3.6s". With **Web**
+on, the count is for the last round, the answer after the searches.
+
 Esc stops a reply; the part already written stays.
 
 ### Think
