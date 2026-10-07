@@ -28,9 +28,15 @@ there as untracked.
   (press, 150 ms hold, release): before any fix it didn't open; with either
   fix it opened. No Chrome or Safari on either machine, so those weren't
   tested directly. The page is sent with `Cache-Control: no-store`.
-- **Lightning unloaded** at the user's request (disappointing answers). It
-  stays listed (`load-on-startup = false`) and loads when picked.
-  Memory available: 60.3 GB.
+- **Lightning switched off** at the user's request (disappointing answers):
+  unloaded, then `LIGHTNING=none` added to `~/.config/thor-chat/env` on the
+  Thor and `./serve.sh reload`, so it is off the list too. The Nano stayed
+  loaded. Memory available: 60.2 GB. The file stays in `~/models/gguf/`.
+- **Chat page code:** `updateLast` now patches the streaming message by
+  named parts (`data-part`); only the thinking panel is patched in place,
+  the rest is replaced. The picker code lost its fake `"model"` entry
+  (`showServer`, `showModels`, `chosenModel`). Tested with real pointer
+  input, with one model and with two.
 - **serve.sh moved** to `jetson-thor/model-serving/serve.sh`. The Thor's two
   unit files were repointed with `sed` + `daemon-reload`, without a restart.
   The old copy on the Thor was deleted by hand (thor-sync never deletes).

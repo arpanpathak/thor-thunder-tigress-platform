@@ -624,6 +624,11 @@ function markdown(parent, text) {
 }
 
 // ---- thread ----
+function part(name, node) {
+  node.dataset.part = name;
+  return node;
+}
+
 function renderMessage(message) {
   const wrap = element("div", `msg ${message.role}`);
   const body = element("div", "body");
@@ -649,25 +654,25 @@ function renderMessage(message) {
         list.append(item);
       });
       details.append(list);
-      body.append(details);
+      body.append(part("sources", details));
     }
     if (message.reasoning) {
       const details = element("details", "thinking");
       details.append(element("summary", "", message.thinkingDone ? "thought" : "thinking…"), element("div", "text", message.reasoning));
-      body.append(details);
+      body.append(part("thinking", details));
     }
     if (message.streaming && !message.content && !message.reasoning) {
       const dots = element("div", "dots");
       dots.append(element("i"), element("i"), element("i"), element("span", "", $("web").checked ? "searching and thinking…" : "thinking…"));
-      body.append(dots);
+      body.append(part("dots", dots));
     } else {
       const content = element("div");
       markdown(content, message.content || "");
       if (message.streaming) content.classList.add("cursor");
-      body.append(content);
+      body.append(part("content", content));
     }
-    if (message.error) body.append(element("div", "error", message.error));
-    if (message.stats) body.append(element("div", "stats", message.stats));
+    if (message.error) body.append(part("error", element("div", "error", message.error)));
+    if (message.stats) body.append(part("stats", element("div", "stats", message.stats)));
   }
   wrap.append(body);
   return wrap;
@@ -728,61 +733,86 @@ function nearBottom() {
   return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 120;
 }
 
+// Parts that can be patched in place, so they never leave the page while a
+// reply streams: a click on a node that was detached, even briefly, is lost.
+const PATCHERS = {
+  thinking(old, fresh) {
+    old.querySelector("summary").textContent = fresh.querySelector("summary").textContent;
+    old.querySelector(".text").textContent = fresh.querySelector(".text").textContent;
+  },
+};
+
+function patchMessage(node, message) {
+  const body = node.querySelector(".body");
+  const old = new Map([...body.children].map((child) => [child.dataset.part, child]));
+  const next = [...renderMessage(message).querySelector(".body").children].map((fresh) => {
+    const kept = old.get(fresh.dataset.part);
+    const patch = PATCHERS[fresh.dataset.part];
+    if (!kept || !patch) return fresh;
+    patch(kept, fresh);
+    return kept;
+  });
+  [...body.children].filter((child) => !next.includes(child)).forEach((child) => child.remove());
+  let cursor = body.firstChild;
+  next.forEach((child) => {
+    if (child === cursor) cursor = cursor.nextSibling;
+    else body.insertBefore(child, cursor);
+  });
+}
+
 function updateLast() {
   const stick = nearBottom();
-  const thread = $("thread");
-  const last = thread.lastElementChild;
-  const fresh = renderMessage(messages[messages.length - 1]);
-  // The thinking panel must never leave the page while the answer streams:
-  // a browser drops a click whose press landed on a node that was detached,
-  // even for a moment. So it stays put and only what is around it changes.
-  const kept = last && last.querySelector("details.thinking");
-  const drawn = fresh.querySelector("details.thinking");
-  if (kept && drawn) {
-    const [keptSummary, drawnSummary] = [kept.querySelector("summary"), drawn.querySelector("summary")];
-    if (keptSummary.textContent !== drawnSummary.textContent) keptSummary.textContent = drawnSummary.textContent;
-    const [keptText, drawnText] = [kept.querySelector(".text"), drawn.querySelector(".text")];
-    if (keptText.textContent !== drawnText.textContent) keptText.textContent = drawnText.textContent;
-    const children = [...drawn.parentElement.children];
-    const at = children.indexOf(drawn);
-    [...kept.parentElement.children].filter((child) => child !== kept).forEach((child) => child.remove());
-    kept.before(...children.slice(0, at));
-    kept.after(...children.slice(at + 1));
-  } else if (last) last.replaceWith(fresh); else thread.append(fresh);
+  const last = $("thread").lastElementChild;
+  const message = messages[messages.length - 1];
+  if (last && last.classList.contains("assistant")) patchMessage(last, message);
+  else $("thread").append(renderMessage(message));
   if (stick) $("scroller").scrollTop = $("scroller").scrollHeight;
 }
 
 function save() { store.set("messages", messages.map(({ streaming, ...rest }) => rest)); }
 
 // ---- server ----
+function modelLabel(id) {
+  return id.split("/").pop().replace(/\.gguf$/, "").replace(/^NVIDIA-/, "").replace(/-(Q\d\w*)$/i, " · $1").replace(/-/g, " ");
+}
+
+function showServer(state, text) {
+  $("status").className = `dot ${state}`;
+  $("model").replaceChildren(element("option", "", text));
+  $("model").disabled = true;
+}
+
+function showModels() {
+  const picker = $("model");
+  picker.replaceChildren(...models.map((id) => {
+    const option = element("option", "", modelLabel(id));
+    option.value = id;
+    return option;
+  }));
+  const saved = store.get("model", "");
+  picker.value = models.includes(saved) ? saved : models[0];
+  picker.disabled = models.length < 2;
+  modelName = modelLabel(picker.value);
+  $("status").className = "dot ok";
+}
+
+function chosenModel() {
+  return models.includes($("model").value) ? $("model").value : undefined;
+}
+
 async function connect() {
   try {
     const response = await fetch(`${API}v1/models`, { headers: headers() });
-    if (response.status === 401) { $("status").className = "dot bad"; $("model").replaceChildren(element("option", "", "access key needed")); needsKey = true; render(); return; }
-    needsKey = false;
-    const data = await response.json();
+    needsKey = response.status === 401;
+    const data = needsKey ? {} : await response.json();
     models = (data.data || []).map((model) => model.id);
-    if (!models.length) models = ["model"];
-    const chosen = models.includes(store.get("model", "")) ? store.get("model", "") : models[0];
-    $("model").replaceChildren(...models.map((id) => {
-      const option = element("option", "", modelLabel(id));
-      option.value = id;
-      return option;
-    }));
-    $("model").value = chosen;
-    $("model").disabled = models.length < 2;
-    modelName = modelLabel(chosen);
-    $("status").className = "dot ok";
-    document.title = "Thor Tigress Cub";
+    if (needsKey) showServer("bad", "access key needed");
+    else if (models.length) showModels();
+    else showServer("bad", "no model served");
     render();
   } catch {
-    $("status").className = "dot bad";
-    $("model").replaceChildren(element("option", "", "server not reachable"));
+    showServer("bad", "server not reachable");
   }
-}
-
-function modelLabel(id) {
-  return id.split("/").pop().replace(/\.gguf$/, "").replace(/^NVIDIA-/, "").replace(/-(Q\d\w*)$/i, " · $1").replace(/-/g, " ");
 }
 
 $("model").addEventListener("change", () => {
@@ -801,8 +831,8 @@ async function send(text) {
 
   const history = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content)).map(({ role, content }) => ({ role, content }));
   if (settings.system.trim()) history.unshift({ role: "system", content: settings.system.trim() });
-  const body = { model: models.length ? $("model").value : undefined, messages: history, stream: true, chat_template_kwargs: { enable_thinking: $("think").checked },
-    thor_web_search: $("web").checked };
+  const body = { model: chosenModel(), messages: history, stream: true,
+    chat_template_kwargs: { enable_thinking: $("think").checked }, thor_web_search: $("web").checked };
   if (settings.temperature !== "" && !Number.isNaN(Number(settings.temperature))) body.temperature = Number(settings.temperature);
 
   controller = new AbortController();

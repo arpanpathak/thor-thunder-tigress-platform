@@ -133,11 +133,11 @@ chapter "Web chat: Thor Tigress Cub".
 
 | Setting | Value |
 |---|---|
-| Models | Nemotron 3 Nano 30B-A3B Q8_0, loaded; Nemotron 3.5 Lightning 30B-A3B Q8_0, listed in the picker, loaded only when picked |
-| People at once | Nano 4 (`USERS`); Lightning 1 (`LIGHTNING_USERS`) |
-| Context per person | Nano 1,048,576 tokens (`CONTEXT`); Lightning 262,144 (`LIGHTNING_CONTEXT`) |
-| Measured | Nano 53 tok/s, first token 0.2 s; Lightning 52.5 tok/s |
-| Model names | `nemotron` / `nemotron-think` (Nano), `lightning`; others refused |
+| Model | Nemotron 3 Nano 30B-A3B Q8_0 (Nemotron 3.5 Lightning is set up but switched off: `LIGHTNING=none`) |
+| People at once | 4 (`USERS`) |
+| Context per person | 1,048,576 tokens (`CONTEXT`) |
+| Measured | 53 tok/s, first token 0.2 s |
+| Model names | `nemotron` / `nemotron-think`, or the full id; others refused |
 
 Change settings in `~/.config/thor-chat/env` (e.g. `USERS=8`), then
 `./serve.sh install`. The page has Web and Think switches, a stop key (Esc),

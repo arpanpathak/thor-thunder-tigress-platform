@@ -2,8 +2,9 @@
 
 # Model serving
 
-The Thor serves Nemotron 3 Nano, with Nemotron 3.5 Lightning listed as a
-second option that is loaded only when someone asks for it. This chapter shows how to see what is loaded, take a model out of
+The Thor serves Nemotron 3 Nano. Nemotron 3.5 Lightning is set up as a
+second model but switched off (`LIGHTNING=none`), so it is neither loaded
+nor listed. This chapter shows how to see what is loaded, take a model out of
 memory, put it back, try a model nobody has run here before, and make a new
 model the default. It also lists the models worth trying as of October 2026,
 with their sizes and whether they fit.
@@ -76,11 +77,12 @@ The models listed today:
 | Id | Aliases | At start | Slots × context | Memory when loaded |
 |---|---|---|---|---|
 | `NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0` | `nemotron`, `nemotron-think`, its file path | loaded | 4 × 1,048,576 | 57.8 GB |
-| `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0` | `lightning` | not loaded (`load-on-startup = false`) | 1 × 262,144 | 35.4 GB |
+| `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0` | `lightning` | switched off: `LIGHTNING=none` in `~/.config/thor-chat/env` | 1 × 262,144 | 35.4 GB |
 
-Lightning was taken out of memory on 2026-10-06 because its answers were
-disappointing. It stays in the list: picking it in the web chat, or
-`./serve.sh load lightning`, loads it in about 13 seconds.
+Lightning was taken out of memory and off the list on 2026-10-06 because its
+answers were disappointing. The file stays in `~/models/gguf/`. To bring it
+back, delete the `LIGHTNING=none` line, run `./serve.sh reload`, and it is
+listed again; picking it loads it in about 13 seconds.
 
 ## The five commands
 
@@ -89,8 +91,10 @@ disappointing. It stays in the list: picking it in the web chat, or
 ```text
 $ ./serve.sh models
 NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0              loaded                   /home/arpanpathak/models/gguf/Nemotron-3-Nano-30B-A3B/NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf, nemotron, nemotron-think
-NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0       unloaded                 lightning
 ```
+
+The `unload`, `load` and `reload` examples below were run while Lightning
+was still listed.
 
 The states are `loaded`, `loading`, `unloaded`, `sleeping`, and
 `unloaded (failed, exit N)` when the model's process died. The cause of a
@@ -361,6 +365,9 @@ new model under the old name.
 echo 'LIGHTNING=none' >> ~/.config/thor-chat/env
 ./serve.sh reload        # unloads Lightning and drops it from the list
 ```
+
+This is the Thor's setting since 2026-10-06. The web chat then lists one
+model, and its picker is greyed out.
 
 A missing file has the same effect. To bring it back, delete the line and
 `reload`, then `./serve.sh load lightning`.

@@ -3,7 +3,7 @@
 # Web chat: Thor Tigress Cub
 
 The Thor Tigress Cub is the browser face of the Thor: a chat page that talks to
-Nemotron 3 Nano or Nemotron 3.5 Lightning on the Jetson AGX Thor, can search
+Nemotron 3 Nano on the Jetson AGX Thor, can search
 the web before it answers,
 and can show its reasoning. It is one HTML file in front of one small Rust
 server, and everything it calls runs on the Thor.
@@ -165,7 +165,7 @@ nowhere else. Another browser or device starts empty.
 |---|---|---|
 | `jetson-thor/web/index.html` | this repository | the whole page: markup, styles, the cub, the script; no build step |
 | `thor-tigress-agent` | `crates/thor-tigress-agent` | serves the page, checks the key, runs the web-search loop, passes `/v1/*` to llama-server |
-| `llama-server` | `~/.local/src/llama.cpp` on the Thor | router mode: Nemotron 3 Nano 30B-A3B Q8_0 (four replies at a time, 1M tokens each) and Nemotron 3.5 Lightning 30B-A3B Q8_0 (one reply, 256K tokens) |
+| `llama-server` | `~/.local/src/llama.cpp` on the Thor | router mode: Nemotron 3 Nano 30B-A3B Q8_0, four replies at a time, 1M tokens each; more models can be added (chapter "Model serving") |
 | SearXNG | `~/.local/src/searxng`, user service `searxng` | meta search engine with JSON output |
 | Tailscale Funnel | the Thor | HTTPS at a `.ts.net` address; no ports open on the home router |
 
@@ -225,7 +225,7 @@ chapter "Model serving".
 | Model id (what the picker shows) | Also answers to | At start | Replies at once | Tokens per reply |
 |---|---|---|---|---|
 | `NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0` | `nemotron`, `nemotron-think`, the GGUF path | loaded | 4 | 1,048,576 |
-| `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0` | `lightning` | not loaded; picking it loads it (about 13 s) | 1 | 262,144 |
+| `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0` | `lightning` | switched off (`LIGHTNING=none`): not listed, not loaded | 1 | 262,144 |
 
 Any other name is refused with `400`, and so is a request without `model`.
 Before router mode the name was ignored.
@@ -238,8 +238,9 @@ Measured on 2026-10-06, both loaded:
 | short reply through the agent | 48.0 tok/s | 49.1 tok/s |
 
 Both models were loaded 32 seconds after a restart, with 26 GB of memory
-still available. Lightning has since been unloaded (its answers were
-disappointing) and no longer loads at start.
+still available. Lightning has since been switched off (its answers were
+disappointing): it is out of memory and off the list, so the picker shows the
+Nano alone, greyed out.
 
 Lightning gets one reply at 256K tokens because both models at four replies
 of 1M tokens do not fit in the Thor's 122 GB. That was tried: memory ran out

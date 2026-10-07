@@ -101,7 +101,7 @@ Built on a Jetson Orin NX 16 GB; training targets a Jetson AGX Thor 128 GB
 [thor-sync](https://github.com/arpanpathak/thor-sync).
 
 Model serving on the Thor (llama.cpp's llama-server in router mode, Nemotron 3
-Nano loaded, Nemotron 3.5 Lightning listed) is run by
+Nano loaded; Nemotron 3.5 Lightning set up but switched off) is run by
 [`jetson-thor/model-serving/serve.sh`](jetson-thor/model-serving/serve.sh):
 `./serve.sh models`, `memory`, `load NAME`, `unload NAME`, `reload`. How to
 try a new model, the memory budget and models worth trying are in the book,
