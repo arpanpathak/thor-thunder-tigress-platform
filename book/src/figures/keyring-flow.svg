@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" role="img" aria-label="Browsers and agents send a personal key as Authorization: Bearer over HTTPS through Tailscale Funnel. thor-tigress-agent compares it, in constant time, with the active keys in the encrypted keyring and with the operator's single key, and answers 401 when it is wrong. A match is forwarded to llama-server with the agent's own key, which checks again.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="430" fill="#FFFFFF"/>
+  <text x="30" y="34" class="title">How a personal key is checked</text>
+
+  <rect x="24" y="66" width="210" height="74" rx="10" class="outside"/>
+  <text x="129" y="92" class="name" text-anchor="middle">Browser</text>
+  <text x="129" y="112" class="note" text-anchor="middle">personal key in local storage,</text>
+  <text x="129" y="130" class="note" text-anchor="middle">pasted on the invite screen</text>
+
+  <rect x="24" y="164" width="210" height="74" rx="10" class="outside"/>
+  <text x="129" y="190" class="name" text-anchor="middle">Agents</text>
+  <text x="129" y="210" class="note" text-anchor="middle">a key file, or an environment</text>
+  <text x="129" y="228" class="note" text-anchor="middle">variable</text>
+
+  <rect x="292" y="124" width="176" height="80" rx="10" class="outside"/>
+  <text x="380" y="152" class="name" text-anchor="middle">Tailscale Funnel</text>
+  <text x="380" y="172" class="note" text-anchor="middle">HTTPS: the header is</text>
+  <text x="380" y="190" class="note" text-anchor="middle">encrypted in transit</text>
+  <path class="flow" d="M234,100 L264,100 Q274,100 274,110 L274,148 Q274,158 284,158 L290,158" marker-end="url(#arrow)"/>
+  <path class="flow" d="M234,200 L264,200 Q274,200 274,190 L274,172 Q274,162 284,162 L290,162" marker-end="url(#arrow)"/>
+  <text x="380" y="232" class="label" text-anchor="middle">Authorization: Bearer &lt;personal key&gt;</text>
+  <text x="380" y="250" class="label" text-anchor="middle">or x-api-key: &lt;personal key&gt;</text>
+
+  <rect x="536" y="44" width="400" height="328" rx="14" class="zone"/>
+  <text x="550" y="66" class="zonelabel">Jetson AGX Thor</text>
+
+  <rect x="556" y="78" width="360" height="62" rx="10" class="box built"/>
+  <text x="736" y="102" class="mono name" text-anchor="middle">~/.config/thor-chat/keyring</text>
+  <text x="736" y="122" class="note" text-anchor="middle">sealed; the active keys, read on change</text>
+
+  <rect x="556" y="162" width="196" height="98" rx="10" class="box built"/>
+  <text x="654" y="188" class="name mono" text-anchor="middle">thor-tigress-agent</text>
+  <text x="654" y="208" class="note" text-anchor="middle">compares the header with</text>
+  <text x="654" y="226" class="note" text-anchor="middle">the active keys, in constant</text>
+  <text x="654" y="244" class="note" text-anchor="middle">time; also the operator key</text>
+
+  <rect x="772" y="162" width="144" height="98" rx="10" class="box built"/>
+  <text x="844" y="188" class="name mono" text-anchor="middle">llama-server</text>
+  <text x="844" y="208" class="note" text-anchor="middle">--api-key-file;</text>
+  <text x="844" y="226" class="note" text-anchor="middle">checks the one</text>
+  <text x="844" y="244" class="note" text-anchor="middle">service key again</text>
+
+  <rect x="556" y="286" width="360" height="60" rx="10" class="planned"/>
+  <text x="736" y="310" class="mono name" text-anchor="middle">~/.config/thor-chat/api-key</text>
+  <text x="736" y="330" class="note" text-anchor="middle">one key, the servers' own; visitors never see it</text>
+
+  <path class="flow" d="M476,168 L534,168" marker-end="url(#arrow)"/>
+  <path class="flow" d="M736,140 L736,160" marker-end="url(#arrow)"/>
+  <text x="742" y="156" class="label" text-anchor="start">read at start and on change</text>
+  <path class="flow" d="M752,211 L770,211" marker-end="url(#arrow)"/>
+  <path class="flow" d="M736,286 L736,264" marker-end="url(#arrow)"/>
+  <path class="flow" d="M844,286 L844,264" marker-end="url(#arrow)"/>
+  <text x="654" y="286" class="label" text-anchor="middle">forwards with its own key</text>
+
+  <path class="deny" d="M556,342 L520,342 L520,398 L129,398 L129,242" marker-end="url(#arrow-deny)"/>
+  <text x="330" y="392" class="warn" text-anchor="middle">no key, or a revoked one, on /v1/…: 401</text>
+</svg>

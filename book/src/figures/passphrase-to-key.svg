@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400" role="img" aria-label="Argon2id turns a passphrase and a random salt into a 32-byte key, using 19 MiB of memory over two passes. A plain hash lets a GPU try billions of guesses a second; Argon2id makes every guess hold memory and take a moment.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="400" fill="#FFFFFF"/>
+  <text x="30" y="34" class="title">A passphrase becomes a key: Argon2id</text>
+
+  <rect x="30" y="76" width="270" height="58" rx="8" class="outside"/>
+  <text x="46" y="100" class="name">your passphrase</text>
+  <text x="46" y="120" class="note">a few words a person can remember</text>
+
+  <rect x="30" y="146" width="270" height="58" rx="8" class="outside"/>
+  <text x="46" y="170" class="name">salt, 16 random bytes</text>
+  <text x="46" y="190" class="note">stored with the file, not secret</text>
+
+  <rect x="30" y="216" width="270" height="88" rx="8" class="outside"/>
+  <text x="46" y="240" class="name">parameters, in the code</text>
+  <text x="46" y="260" class="note">19 MiB of memory, 2 passes,</text>
+  <text x="46" y="278" class="note">1 lane, 32-byte output</text>
+  <text x="46" y="296" class="note">(the Argon2id defaults)</text>
+
+  <path class="flow" d="M300,105 L358,140" marker-end="url(#arrow)"/>
+  <path class="flow" d="M300,175 L358,175" marker-end="url(#arrow)"/>
+  <path class="flow" d="M300,258 L358,214" marker-end="url(#arrow)"/>
+
+  <rect x="360" y="76" width="230" height="228" rx="10" class="box built"/>
+  <text x="475" y="106" class="name" text-anchor="middle">Argon2id</text>
+  <text x="475" y="132" class="note" text-anchor="middle">fills 19 MiB with pseudo-</text>
+  <text x="475" y="150" class="note" text-anchor="middle">random work, walks it twice,</text>
+  <text x="475" y="168" class="note" text-anchor="middle">mixes in the passphrase and</text>
+  <text x="475" y="186" class="note" text-anchor="middle">the salt, and keeps 32 bytes.</text>
+  <text x="475" y="216" class="label" text-anchor="middle">slow and memory-hungry</text>
+  <text x="475" y="234" class="label" text-anchor="middle">on purpose</text>
+  <text x="475" y="266" class="note" text-anchor="middle">Same passphrase and salt give</text>
+  <text x="475" y="284" class="note" text-anchor="middle">the same key, every time.</text>
+
+  <path class="flow" d="M590,190 L668,190" marker-end="url(#arrow)"/>
+  <text x="629" y="178" class="label" text-anchor="middle">derives</text>
+
+  <rect x="670" y="150" width="260" height="80" rx="8" class="box built"/>
+  <text x="800" y="180" class="name" text-anchor="middle">32-byte key</text>
+  <text x="800" y="202" class="note" text-anchor="middle">the only thing that opens the file;</text>
+  <text x="800" y="220" class="note" text-anchor="middle">wiped from memory when it is done</text>
+
+  <line x1="30" y1="330" x2="930" y2="330" stroke="#D5DCE4" stroke-width="1"/>
+  <text x="30" y="356" class="note" text-anchor="start">A plain hash such as SHA-256: one guess is one cheap operation, so a GPU tries billions a second. The passphrase is the weak part.</text>
+  <text x="30" y="380" class="warn" text-anchor="start">Argon2id: one guess must hold 19 MiB and take a moment, so guessing slows by orders of magnitude. Illustrative, not a measurement here.</text>
+</svg>

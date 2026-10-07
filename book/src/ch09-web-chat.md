@@ -112,13 +112,18 @@ the sources before trusting a detail.
 
 <figure>
 <img src="figures/cub-invite.png" alt="The invite screen: the cub, 'The cub is invite-only for now', a box to paste an access key, and a link to ask for one">
-<figcaption><b>Figure 9.3</b> What someone without a key sees.</figcaption>
+<figcaption><b>Figure 9.3</b> What someone without a key sees. (The picture is the earlier screen; the name and email form and the DM links were added on 2026-10-07.)</figcaption>
 </figure>
 
-When the server refuses the page (no key, or an old one), the page says so
-instead of failing silently: paste a key and press **Unlock**, or follow the
-link to ask for one. The key is kept in the browser, and can be changed later
-in Settings.
+When the server refuses the page (no key, or a revoked one), the page says so
+instead of failing silently. It offers two ways in:
+
+- **Already have a key?** Paste it and press **Unlock**. The key is kept in the
+  browser and can be changed later in Settings.
+- **New here?** Give a name and an email and press **Request access**. The
+  request is saved in the keyring as `requested`, and the page says to send a
+  message on LinkedIn or X. A person approves it by hand and sends the key
+  back; there is no account, no password and no email from the server.
 
 ### On a phone
 
@@ -270,14 +275,25 @@ shorter address on your own domain, see chapter "Bring your own domain".
 
 ## Access keys
 
+Each person gets their own key, kept in an encrypted keyring on the Thor
+(chapter "Keys, and the cryptography under them"). Make the keyring once:
+
 ```bash
-thor-tigress-serve key && systemctl --user restart thor-chat thor-tigress-agent    # new key
-cat ~/.config/thor-chat/api-key                                            # show it
+thor-tigress-serve keyring-init          # the keyring and its passphrase, both mode 600
+thor-tigress-serve keyring requests      # who asked from the invite screen
+thor-tigress-serve keyring approve EMAIL # mints a key and prints it once
 ```
 
-There is one key, shared by everyone you invite. A new key locks everyone
-out until they paste the new one on the invite screen. Per-person sign-in
-with GitHub is the next step for this server (chapter "Security").
+The agent reads the active keys when it starts and re-reads the file when it
+changes, so an approval or a revocation takes effect on the next request: no
+restart. `~/.config/thor-chat/api-key` still exists, but it is now only the one
+key the agent and llama-server use between themselves; visitors never see it.
+The operator's own copy still works, so a lost keyring does not lock the
+operator out.
+
+A leak is handled with one command: `thor-tigress-serve keyring revoke-all`
+marks every active key revoked at once, and the records stay so people can be
+approved again.
 
 ## Change the page or the server
 
@@ -312,7 +328,9 @@ ssh thor 'cd ~/Projects/thor-thunder-tigress-platform &&
 
 ## Not done yet
 
-- One shared key; no per-person limits or sign-in.
+- No per-person limits, quotas or accounting; a revocation is the only brake.
+- The registration form is open and can be spammed; the waiting list is the
+  only damage, but each request costs an Argon2id run.
 - Search reads snippets, not pages; reading pages is designed in chapter
   "Tool calling (planned)".
 - Conversations stay in one browser; there is no account to sync them.

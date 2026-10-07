@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" role="img" aria-label="Conversations, settings and the key live in your browser. The Thor only holds the conversation it is answering, in memory, and one encrypted file with a name, an email, a status and a key per person. Message text is never written down.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+  </defs>
+  <rect width="960" height="430" fill="#FFFFFF"/>
+  <text x="30" y="34" class="title">What is stored, and where</text>
+
+  <rect x="30" y="56" width="282" height="300" rx="10" class="outside"/>
+  <text x="46" y="82" class="name">Your browser</text>
+  <rect x="46" y="96" width="250" height="52" rx="8" class="box built"/>
+  <text x="58" y="118" class="note">conversations: every message,</text>
+  <text x="58" y="136" class="note">code block and thought</text>
+  <rect x="46" y="158" width="250" height="52" rx="8" class="box built"/>
+  <text x="58" y="180" class="note">settings: theme, model,</text>
+  <text x="58" y="198" class="note">system prompt, Think and Web</text>
+  <rect x="46" y="220" width="250" height="52" rx="8" class="box built"/>
+  <text x="58" y="242" class="note">the key you were given</text>
+  <text x="58" y="260" class="note">(local storage, that address only)</text>
+  <text x="46" y="300" class="note">Clearing site data deletes all of it.</text>
+  <text x="46" y="318" class="note">Another browser or device starts empty.</text>
+  <text x="46" y="342" class="label">Nothing here leaves the device on its own.</text>
+
+  <rect x="339" y="56" width="282" height="300" rx="10" class="outside"/>
+  <text x="355" y="82" class="name">The Thor's memory</text>
+  <rect x="355" y="96" width="250" height="90" rx="8" class="box built"/>
+  <text x="367" y="118" class="note">the conversation just read,</text>
+  <text x="367" y="136" class="note">kept in the slot's prompt cache</text>
+  <text x="367" y="158" class="note">so the next message on that slot</text>
+  <text x="367" y="176" class="note">is not read twice</text>
+  <text x="355" y="216" class="note">Gone when llama-server restarts.</text>
+  <text x="355" y="234" class="note">Four slots share one copy of the model.</text>
+  <text x="355" y="268" class="label">Read to answer, not written down.</text>
+
+  <rect x="648" y="56" width="282" height="300" rx="10" class="outside"/>
+  <text x="664" y="82" class="name">The Thor's disk</text>
+  <rect x="664" y="96" width="250" height="104" rx="8" class="box built"/>
+  <text x="676" y="118" class="mono note">~/.config/thor-chat/keyring</text>
+  <text x="676" y="140" class="note">one sealed record per person:</text>
+  <text x="676" y="158" class="note">name, email, status, key, time</text>
+  <text x="676" y="180" class="note">sealed with Argon2id + XChaCha20</text>
+  <text x="664" y="226" class="note">Also on disk: the one key llama-server</text>
+  <text x="664" y="244" class="note">and this server use between themselves.</text>
+  <text x="664" y="278" class="label">No message text is ever written here.</text>
+
+  <path class="flow" d="M312,150 L337,150" marker-end="url(#arrow)"/>
+  <path class="flow" d="M621,150 L646,150" marker-end="url(#arrow)"/>
+  <text x="480" y="392" class="num" text-anchor="middle">Every message sends the whole history again. None of it is written down on the Thor.</text>
+  <line x1="30" y1="372" x2="930" y2="372" stroke="#D5DCE4" stroke-width="1"/>
+  <text x="480" y="416" class="warn" text-anchor="middle">Not collected at all: cookies from other sites, analytics, advertising, a third-party login.</text>
+</svg>

@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" width="960" height="340" role="img" aria-label="The keyring file: a 15-byte magic line, a 16-byte random salt, a 24-byte nonce, then the records sealed as ciphertext with a 16-byte tag. The plaintext inside is JSON: name, email, status, key and time per person.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .plain { fill: #FFFDF5; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 6 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="340" fill="#FFFFFF"/>
+  <text x="30" y="34" class="title">The keyring file, byte by byte</text>
+  <text x="30" y="60" class="note" text-anchor="start">Everything the file shows. The records are the only part that is a secret.</text>
+
+  <rect x="40" y="86" width="186" height="70" rx="8" class="box built"/>
+  <text x="133" y="112" class="mono name" text-anchor="middle">thor-keyring-1</text>
+  <text x="133" y="134" class="note" text-anchor="middle">magic, 15 bytes</text>
+
+  <rect x="236" y="86" width="150" height="70" rx="8" class="box built"/>
+  <text x="311" y="112" class="name" text-anchor="middle">salt</text>
+  <text x="311" y="134" class="note" text-anchor="middle">16 bytes, random once</text>
+
+  <rect x="396" y="86" width="176" height="70" rx="8" class="box built"/>
+  <text x="484" y="112" class="name" text-anchor="middle">nonce</text>
+  <text x="484" y="134" class="note" text-anchor="middle">24 bytes, fresh every write</text>
+
+  <rect x="582" y="86" width="338" height="70" rx="8" class="box built"/>
+  <text x="751" y="112" class="name" text-anchor="middle">the records, sealed</text>
+  <text x="751" y="134" class="note" text-anchor="middle">ciphertext, then a 16-byte tag</text>
+
+  <path class="flow" d="M762,156 L762,196" marker-end="url(#arrow)"/>
+  <text x="776" y="180" class="label" text-anchor="start">opened only with the passphrase</text>
+
+  <rect x="430" y="200" width="500" height="104" rx="8" class="plain"/>
+  <text x="446" y="224" class="zonelabel">inside, plain JSON</text>
+  <text x="446" y="248" class="mono note">{"name":"Ada Lovelace","email":"ada@example.com",</text>
+  <text x="446" y="266" class="mono note"> "status":"active","key":"53976d…","created":1759795200}</text>
+  <text x="446" y="290" class="note">One line per person: requested, active or revoked.</text>
+
+  <rect x="40" y="200" width="360" height="104" rx="8" class="outside"/>
+  <text x="56" y="224" class="zonelabel">Why each part is there</text>
+  <text x="56" y="248" class="note">magic: refuse a file of another version,</text>
+  <text x="56" y="266" class="note">salt: same passphrase, different key per file,</text>
+  <text x="56" y="284" class="note">nonce: never reuse a number under one key.</text>
+  <text x="56" y="302" class="warn">The tag is what makes a changed byte an error.</text>
+</svg>

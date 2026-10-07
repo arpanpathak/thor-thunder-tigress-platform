@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" width="960" height="340" role="img" aria-label="A form request makes a requested record; approve mints a key and makes it active; revoke takes it away; approve again brings it back. revoke-all stops every active key with one command. The chat server reloads the file when it changes, so no restart is needed.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="340" fill="#FFFFFF"/>
+  <text x="30" y="34" class="title">The life of a key</text>
+
+  <rect x="60" y="58" width="250" height="46" rx="8" class="outside"/>
+  <text x="76" y="80" class="name">the invite form</text>
+  <text x="76" y="98" class="note">posts a name and an email to /request</text>
+  <path class="flow" d="M185,104 L185,138" marker-end="url(#arrow)"/>
+
+  <rect x="70" y="140" width="210" height="76" rx="8" class="planned"/>
+  <text x="175" y="168" class="name" text-anchor="middle">requested</text>
+  <text x="175" y="190" class="note" text-anchor="middle">waiting; no key yet</text>
+
+  <rect x="375" y="140" width="210" height="76" rx="8" class="box built"/>
+  <text x="480" y="168" class="name" text-anchor="middle">active</text>
+  <text x="480" y="190" class="note" text-anchor="middle">the chat lets this key in</text>
+
+  <rect x="680" y="140" width="210" height="76" rx="8" class="planned"/>
+  <text x="785" y="168" class="name" text-anchor="middle">revoked</text>
+  <text x="785" y="190" class="note" text-anchor="middle">record kept, key erased</text>
+
+  <path class="flow" d="M280,168 L373,168" marker-end="url(#arrow)"/>
+  <text x="326" y="150" class="label" text-anchor="middle">approve EMAIL</text>
+  <text x="326" y="212" class="note" text-anchor="middle">24 random bytes,</text>
+  <text x="326" y="228" class="note" text-anchor="middle">printed as 48 hex digits</text>
+
+  <path class="flow" d="M585,168 L678,168" marker-end="url(#arrow)"/>
+  <text x="631" y="150" class="label" text-anchor="middle">revoke EMAIL|KEY</text>
+
+  <path class="flow" d="M785,216 L785,258 L480,258 L480,218" marker-end="url(#arrow)"/>
+  <text x="640" y="278" class="note" text-anchor="middle">approve again: brings the same person back</text>
+
+  <path class="deny" d="M480,216 L480,296 L785,296 L785,218" marker-end="url(#arrow-deny)"/>
+  <text x="300" y="316" class="warn" text-anchor="start">revoke-all: every active key stops at once, one command, no restart</text>
+
+  <rect x="60" y="238" width="250" height="66" rx="8" class="outside"/>
+  <text x="76" y="262" class="note">The chat server reads the file</text>
+  <text x="76" y="280" class="note">when it changes, so a revoke</text>
+  <text x="76" y="298" class="note">takes effect on the next request.</text>
+</svg>
