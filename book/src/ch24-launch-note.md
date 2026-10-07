@@ -5,11 +5,11 @@
 **thor-tigress-cub-junior · Haloom!**
 
 I live in a studio apartment in Seattle, and the heating has never been generous.
-Last autumn I cleared a corner of the desk for a Jetson AGX Thor: one board,
-128 GB of memory shared between its processor and its graphics chip, about the
-size of a hardback book. It answers at fifty-odd tokens a second. While it works
+Last autumn I cleared a corner of the desk for a Jetson AGX Thor: a single
+board, 128 GB of memory shared between its processor and its graphics chip,
+about the size of a hardback book. It answers at fifty-odd tokens a second. While it works
 it runs warm, and I did briefly hope it would take the edge off the cold. It
-does not; the room still needs the radiator. Five of these boards now run as a
+does not; the room still needs the radiator. 5 of these boards now run as a
 cluster, which is how capacity grows here: another board, another set of windows,
 the same page.
 
@@ -50,17 +50,17 @@ first surface, and these six are the ones I am building toward.
 - **Searches the web** when you turn **Web** on, and lists the sources it used.
 - **Thinks first** when you turn **Think** on: the reasoning appears folded above
   the answer, and you can open it.
-- **Picks a model** from the ones loaded, two at a time, across two engines.
+- **Picks a model** from the ones loaded, 2 at a time, across 2 engines.
 - **Works from a coding agent.** The API speaks both OpenAI's and Anthropic's
   shapes, so Claude Code, OpenCode and openbatrangs point at it with a base URL
   and a key.
-- **Wears eleven themes**, from Paper and Night to Solarized, Nord, Dracula, One
+- **Wears 11 themes**, from Paper and Night to Solarized, Nord, Dracula, One
   Dark, Gruvbox, Monokai and Material Deep Ocean, and follows your device until
   you choose one.
 - **Fits a phone**, composer, threads and all.
 
 <figure>
-<img src="figures/cub-welcome.png" alt="The chat page in its light theme: the cub in the middle, a greeting, and four suggested prompts">
+<img src="figures/cub-welcome.png" alt="The chat page in its light theme: the cub in the middle, a greeting, and 4 suggested prompts">
 <figcaption><b>Figure 24.2</b> The first screen, in Paper.</figcaption>
 </figure>
 
@@ -70,9 +70,31 @@ first surface, and these six are the ones I am building toward.
 </figure>
 
 <figure>
-<img class="phone" src="figures/cub-phone.png" alt="The chat page on a phone in the dark theme">
+<img src="figures/cub-phone.png" alt="The chat page on a phone in the dark theme">
 <figcaption><b>Figure 24.4</b> The same page on a 390-pixel-wide phone.</figcaption>
 </figure>
+
+<!-- Captures to come. Record them, drop the files into book/src/figures/, then
+     delete these comment markers and renumber the figures that follow.
+
+<figure>
+<img src="figures/cub-coding.png" alt="The chat page answering a Rust question: the question on the left, the reply streaming in, a highlighted code block, and the stats line underneath">
+<figcaption><b>Figure 24.4</b> Idiomatic Rust, answered in the page.</figcaption>
+</figure>
+
+<figure>
+<img src="figures/cub-websearch.png" alt="A question answered with Web on: the search step listed above the reply, the sources as titled links, and the answer below quoting them">
+<figcaption><b>Figure 24.5</b> A question with Web on, and the sources it used.</figcaption>
+</figure>
+
+<figure>
+<video controls poster="figures/cub-demo-poster.png" width="960">
+  <source src="figures/cub-demo.mp4" type="video/mp4">
+</video>
+<figcaption><b>Video 24.1</b> The page in use: a coding question with a long reply, then the same question with Web on.</figcaption>
+</figure>
+
+-->
 
 ## Asking for a key
 
@@ -93,7 +115,7 @@ given and taken back one person at a time.
 ## What the board keeps
 
 The conversation belongs to your browser, and it stays there. The board holds
-three things:
+3 things:
 
 | Where | What | Until |
 |---|---|---|
@@ -108,7 +130,7 @@ as it does for every service on the machine.
 
 <figure>
 <img src="figures/what-is-stored.svg" alt="Three columns. Your browser holds the conversations, the settings and your key, cleared with site data. The board's memory holds the reply being written and a small prompt cache, gone on restart. The board's disk holds the sealed keyring: one record per person with a name, an email, a status and a key, and the service key the servers use between themselves. No message text is written down.">
-<figcaption><b>Figure 24.6</b> The three places anything is held.</figcaption>
+<figcaption><b>Figure 24.6</b> The 3 places anything is held.</figcaption>
 </figure>
 
 The page sets no cookie of its own, carries no analytics and no advertising, and
@@ -118,7 +140,7 @@ asks for no login.
 
 <figure>
 <img src="figures/keyring-flow.svg" alt="A browser or an agent sends a personal key in a header over HTTPS through Tailscale Funnel. On the board, thor-tigress-agent compares it with the active keys in the sealed keyring, in constant time, and answers 401 when nothing matches. A match is forwarded to the model server with the service key from api-key, and the model server checks that key again.">
-<figcaption><b>Figure 24.7</b> The two keys, and where each one stops.</figcaption>
+<figcaption><b>Figure 24.7</b> The 2 keys, and where each one stops.</figcaption>
 </figure>
 
 1. The invite screen posts a name and an email to `POST /request`, and the
@@ -136,13 +158,13 @@ asks for no login.
 
 The keyring itself is sealed with Argon2id and XChaCha20-Poly1305. Chapter
 "Keys, and the cryptography under them" opens the file and explains both
-algorithms, along with the four things they cannot protect.
+algorithms, along with the 4 things they cannot protect.
 
 ## How many people it can serve
 
 A loaded model keeps its weights and a pool of windows. The default model takes
-33.6 GB of weights and about 24 GiB for four million-token windows; the two
-together measured 57.8 GB while the chat was serving, against 128 GB on the
+33.6 GB of weights and about 24 GiB for 4 million-token windows; with both
+loaded, the chat measured 57.8 GB while it was serving, against 128 GB on the
 board. How that pool is cut is a setting. On one board it is cut like this:
 
 | Windows open at once | Tokens each | Pool |
@@ -154,11 +176,11 @@ board. How that pool is cut is a setting. On one board it is cut like this:
 
 The arithmetic is `windows × tokens × 6 KiB`, and memory is the ceiling: ask for
 longer conversations and fewer fit at once, ask for more at once and each is
-shorter. One conversation can reach a million tokens, about three novels. How
+shorter. One conversation can reach a million tokens, about 3 novels. How
 many people hold a key has no limit at all, because a window belongs to a reply.
 When every window is busy, the next request waits in the queue.
 
-Beyond one board, the cluster is the answer. Five boards run here, each with its
+Beyond a single board, the cluster is the answer. 5 boards run here, each with its
 own windows and its own loaded models, which is how the chat grows: another
 board, another set of windows, the same page in front of it. Chapter "Memory,
 context and slots" has the measurements behind the table.
@@ -184,11 +206,12 @@ Thor: 59.3 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
   4    Qwen3.6 35B A3B NVFP4                          loaded             23.4 GB  TensorRT Edge-LLM · :8081
 ```
 
-Two of them answer today. `thor-tigress-serve load 2` brings a third into memory
+2 of them answer today. `thor-tigress-serve load 2` brings a third into memory
 when the memory allows, and the picker offers it from then on. The default, the
 Nano, answers at about 53 tokens a second and holds a million tokens of
 conversation; Qwen3.6 35B A3B runs on TensorRT Edge-LLM instead of llama.cpp,
-and chapter "Model comparison" sets the two side by side on the same questions.
+and chapter "Model comparison" sets the two of them side by side on the same
+questions.
 
 <figure>
 <img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor, which calls llama-server and SearXNG on localhost.">
