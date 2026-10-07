@@ -180,7 +180,7 @@ connection:
 | `GET /`, `/thor-tigress-cub/` | the page (no key needed) |
 | `GET /about.html`, `/cub.svg`, `/cub.png` | the About page and the art; a fixed list, nothing else in the folder is served |
 | `GET /health` | `{"status":"ok"}` (no key needed) |
-| `GET /v1/models` | the served models, from llama-server |
+| `GET /v1/models` | the served models: llama-server's, plus each engine's given with `--engine` |
 | `POST /v1/chat/completions` | streamed through; with `thor_web_search: true`, the search loop; without `stream: true`, plain JSON |
 | `POST /v1/messages` | Anthropic's API, for Claude Code (chapter "Bring your own agent") |
 | `OPTIONS *` | CORS preflight, so pages and tools on other sites may call the API with a key |
@@ -222,6 +222,7 @@ is greyed out. Loading and unloading models is in chapter "Model serving".
 | Model id | Also answers to | Replies at once | Tokens per reply |
 |---|---|---|---|
 | `NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0` (the default) | `nemotron`, `nemotron-think`, the GGUF path | 4 | 1,048,576 |
+| `Qwen3.6-35B-A3B-NVFP4`, on TensorRT Edge-LLM | its id only | 1 | 32,768 |
 | a model loaded from disk | its id only | 1 | 65,536 |
 
 Any other name is refused with `400`, and so is a request without `model`.

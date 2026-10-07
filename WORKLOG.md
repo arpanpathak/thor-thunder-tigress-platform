@@ -18,6 +18,28 @@ there as untracked.
 
 ## 2026-10-06
 
+### Qwen3.6-35B-A3B on TensorRT Edge-LLM, live in the chat
+
+- Edge-LLM v0.11.0 installed from its aarch64 wheel into
+  `~/.local/share/edge-llm/venv` (venv made with `--without-pip` plus
+  get-pip.py, since `python3.12-venv` and Docker need sudo). Torch 2.13.0+cu130
+  sees the Thor (sm_110).
+- `nvidia/Qwen3.6-35B-A3B-NVFP4` (23.4 GB) in `~/models/edge-llm/`. The first
+  start built the language engine in 270 s and the vision engine in 113 s, and
+  was serving after 442 s. Later starts take 30 s from
+  `~/models/edge-llm/cache`. It uses about 30 GB at a 32K context, batch 1.
+- 20 Rust tasks (`jetson-thor/model-serving/compare.py`), thinking off:
+  Qwen 78.0 tok/s, 18/20 compile, 14/20 tests pass, spark all five rules 30%;
+  Nano 53.3 tok/s, 15/20, 14/20, 5%.
+- Agent: `--engine MODEL=HOST:PORT` routes requests by `model`, and
+  `/v1/models` merges the lists. Coverage stays at 100%; 73 tests.
+- `thor-tigress-serve`: `EDGE_MODEL`, `EDGE_PORT`, `EDGE_CONTEXT`, the `edge`
+  command, the `thor-edge-llm` service (MemoryMax 48G), and an Edge-LLM row in
+  `list` that `load`/`unload` start and stop.
+- On the Thor: `EDGE_MODEL` is set in `~/.config/thor-chat/env`,
+  `thor-edge-llm` is enabled, and the agent was restarted once with no Nano
+  reply in progress. `thor-chat` was not restarted. 35 GB free with both.
+
 ### thor-tigress-serve: subcommands instead of a prompt
 
 - The prompt ("2 load") is replaced by `list`, `list-latest`,

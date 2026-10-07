@@ -1,14 +1,16 @@
 <img class="cub" src="art/cub.svg" alt="The Thor Tigress Cub">
 
-# TensorRT Edge-LLM (planned)
+# TensorRT Edge-LLM
 
-The Thor serves its models with llama.cpp today. NVIDIA's engine for the
-Thor is TensorRT Edge-LLM. This chapter is the plan to test it against
-llama.cpp, and the design for offering both engines if it wins.
+The Thor served its models with llama.cpp only. NVIDIA's engine for the Thor
+is TensorRT Edge-LLM. This chapter is the plan to test it, the design for
+two engines behind one agent, and the first results.
 
-**Status:** nothing is installed or built. The facts below come from
-NVIDIA's documentation and release notes, read on 2026-10-06; each source is
-named. The numbers to measure are listed, not guessed.
+**Status, 2026-10-06:** Qwen3.6-35B-A3B in NVFP4 runs on Edge-LLM v0.11.0 as
+a second model in the Thor Tigress Cub's picker, next to Nemotron 3 Nano on
+llama.cpp. The results are in "First results" below. The Nano on Edge-LLM
+hasn't been built yet. Facts about Edge-LLM come from NVIDIA's documentation
+and release notes; each source is named.
 
 <div class="covers">
 
@@ -65,17 +67,17 @@ From the supported-models page and the release notes:
 ## System design
 
 <figure>
-<img src="figures/edge-llm-design.svg" alt="Planned design: thor-tigress-agent on 8080 routes each request by model id to either the running llama.cpp router on 8079, serving GGUF files, or a planned TensorRT Edge-LLM server on 8081, serving TensorRT engines built on the Thor. thor-tigress-serve manages both.">
-<figcaption><b>Figure 16.1</b> Two engines behind one agent. Green runs today; dashed amber is planned.</figcaption>
+<img src="figures/edge-llm-design.svg" alt="thor-tigress-agent on 8080 routes each request by model id to either the llama.cpp router on 8079, serving Nemotron 3 Nano from a GGUF file, or the TensorRT Edge-LLM server on 8081, serving Qwen3.6-35B-A3B from engines built on the Thor. thor-tigress-serve manages both.">
+<figcaption><b>Figure 16.1</b> Two engines behind one agent, running since 2026-10-06.</figcaption>
 </figure>
 
-| Part | Today | Planned |
+| Part | Before | Now (2026-10-06) |
 |---|---|---|
-| `thor-tigress-agent` | one model server (`--model 127.0.0.1:8079`) | one per engine; each request goes to the engine serving the model it names; `/v1/models` merges both lists |
+| `thor-tigress-agent` | one model server (`--model 127.0.0.1:8079`) | `--engine MODEL=HOST:PORT` per other engine; each request goes to the engine serving the model it names; `/v1/models` merges the lists, leaving out an engine that doesn't answer |
 | llama.cpp router | `:8079`, GGUF files in `~/models/gguf/` | unchanged |
-| Edge-LLM server | none | `:8081`, engines in `~/models/edge-llm/<model>/`, a systemd user service like `thor-chat` |
-| `thor-tigress-serve` | llama.cpp only | `list` gets an engine column; `load NAME --engine edge-llm`; a `build` step for engines |
-| memory checks | cover llama.cpp's models | cover both engines: one Thor, 122.8 GB |
+| Edge-LLM server | none | `:8081`, user service `thor-edge-llm` (`thor-tigress-serve edge`), capped at 48 GB; checkpoint in `~/models/edge-llm/<model>/`, engines in `~/models/edge-llm/cache/` |
+| `thor-tigress-serve` | llama.cpp only | `EDGE_MODEL` names the checkpoint; `list` shows it with its engine; `load` and `unload` start and stop its service |
+| memory checks | cover llama.cpp's models | `load` checks free memory for either engine |
 
 Design rules:
 
@@ -165,6 +167,65 @@ and the number of slots, as for every number in this book.
 - it fits with at least 8 GB free at the context the chat needs,
 - and its server handles thinking and tool calls (below) for 24 hours
   without a restart.
+
+## First results
+
+Measured on 2026-10-06 on the Thor, with Edge-LLM v0.11.0 installed from its
+aarch64 wheel into `~/.local/share/edge-llm/venv` (no container: Docker needs
+sudo there, and the wheel carries the runtime built for
+`jetson-thor-jp72-cu13-sm110`).
+
+**Build.** `tensorrt-edgellm-serve` built everything itself from
+`nvidia/Qwen3.6-35B-A3B-NVFP4` (23.4 GB) on its first start:
+
+| Step | Time |
+|---|---|
+| language-model engine (40 layers) | 270 s, of which TensorRT 261 s |
+| vision engine (the checkpoint is multimodal) | 113 s |
+| first start, total, to the first answer | 442 s |
+| later starts, engines reused from the cache | 30 s |
+
+The engines take 1.7 GB on disk; the weights stay in the checkpoint. The
+vision engine built without trouble, unlike issue #233.
+
+**Memory.** Free memory went from 59 GB to 29 GB while the server started
+next to the Nano, with a 32K-token context and one reply at a time
+(`--max-kv-cache-capacity 32768 --max-input-len 16384 --max-batch-size 1`).
+It settled at about 35 GB free with both running.
+
+**Features the chat needs.** With `--reasoning-parser auto
+--tool-call-parser auto`, through the agent:
+
+| Feature | Result |
+|---|---|
+| streamed reasoning (`reasoning_content`) with **Think** on | yes; first token 0.12 s on the server |
+| `enable_thinking: false` | answers without reasoning |
+| tool calls (the **Web** switch) | yes: it called `web_search` and the agent's search loop ran |
+
+**The same 20 Rust tasks** (in `jetson-thor/model-serving/compare.py`: median, config parsing,
+brackets, a ring buffer and so on), one turn each, thinking off, at most 2,048
+tokens, first Rust block compiled with `rustc --edition 2024 --test`:
+
+| | Qwen3.6-35B-A3B NVFP4, Edge-LLM | Nemotron 3 Nano Q8_0, llama.cpp |
+|---|---|---|
+| speed, median | 78.0 tok/s | 53.3 tok/s |
+| compiles | 18 of 20 | 15 of 20 |
+| tests pass | 14 of 20 | 14 of 20 |
+| answers cut at 2,048 tokens | 0 | 6 |
+| spark: all five rules | 30% | 5% |
+| spark: no comments in function bodies | 40% | 18% |
+| spark: no `unwrap` | 90% | 76% |
+| spark: false claims | 0% | 0% |
+| words of prose per answer | 0 (code only) | 238 |
+
+Against the bar in "What to measure": faster, more answers compile, better
+on the five rules, no false claims; tests passing are equal. So it went into
+the chat as an option, not as the default. The speed estimate of about 90
+tok/s was 15% high.
+
+Not measured yet: four replies at once (the server was built for one), time
+to first token on long prompts, the longest context it holds, and 24 hours of
+use.
 
 ## A clean-code model in the chat
 

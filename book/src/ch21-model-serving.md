@@ -45,7 +45,12 @@ Thor: 59.3 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
   1    Nemotron 3 Nano 30B A3B · Q8_0                 loaded             33.6 GB  default (nemotron)
   2    Nemotron 3.5 Lightning 30B A3B · Q8_0          on disk            35.0 GB
   3    Qwen3.6 27B · Q4_K_M                           on disk            16.8 GB
+  4    Qwen3.6 35B A3B NVFP4                          loaded             23.4 GB  TensorRT Edge-LLM · :8081
 ```
+
+Key 4 runs on TensorRT Edge-LLM instead of llama.cpp (chapter "TensorRT
+Edge-LLM"). `load` and `unload` start and stop its service, with the same
+memory check.
 
 | State | Meaning | Command |
 |---|---|---|
@@ -171,6 +176,8 @@ on the Thor today, so the defaults apply.
 | `CONTEXT` | 1,048,576 | the default model's tokens per reply |
 | `MODELS_MAX` | 2 | models in memory at once |
 | `MIN_FREE_GB` | 8 | memory `load` keeps free |
+| `EDGE_MODEL` | none; on the Thor `~/models/edge-llm/Qwen3.6-35B-A3B-NVFP4` | a checkpoint folder served by TensorRT Edge-LLM; its folder name is the model id |
+| `EDGE_PORT`, `EDGE_CONTEXT` | 8081, 32768 | its server's port and tokens per reply |
 | `PORT`, `MODEL_PORT`, `SEARCH_PORT` | 8080, 8079, 8888 | the page and API, llama-server, SearXNG |
 
 A change to `MODEL`, `USERS`, `CONTEXT` or `MODELS_MAX` takes effect when
@@ -192,9 +199,9 @@ and OpenCode keep working; they get the new model under the old name.
 
 | Command | What it does |
 |---|---|
-| `thor-tigress-serve install` | writes the two services (`thor-chat`, `thor-tigress-agent`), starts them at boot, and puts `thor-tigress-serve` in `~/.local/bin` |
+| `thor-tigress-serve install` | writes the services (`thor-chat`, `thor-tigress-agent`, and `thor-edge-llm` when `EDGE_MODEL` is set), starts them at boot, and puts `thor-tigress-serve` in `~/.local/bin` |
 | `thor-tigress-serve uninstall` | stops and removes both services |
-| `thor-tigress-serve key` | writes a new access key; restart both services to use it |
+| `thor-tigress-serve key` | writes a new access key; restart the services to use it |
 | `thor-tigress-serve logs` | follows both logs |
 
 The services run `thor-tigress-serve run` and `thor-tigress-serve agent`;
@@ -212,6 +219,7 @@ the repository: `jetson-thor/model-serving/thor-tigress-serve install`.
 |---|---|
 | `thor-chat` | systemd user service: `thor-tigress-serve run`, llama-server in router mode on `127.0.0.1:8079` |
 | one llama-server per loaded model | started by the router on a private port |
+| `thor-edge-llm` | systemd user service: `thor-tigress-serve edge`, TensorRT Edge-LLM's server on `127.0.0.1:8081`, capped at 48 GB |
 | `thor-tigress-agent` | systemd user service: `thor-tigress-serve agent`, the page, key check, web search and API on `:8080`; passes `model` through unchanged |
 | `~/.config/thor-chat/models.ini` | the router's list of models; written by `thor-tigress-serve`, don't edit it |
 | `~/.config/thor-chat/models.local.ini` | the models loaded from disk; written by `load`, emptied by `unload` |

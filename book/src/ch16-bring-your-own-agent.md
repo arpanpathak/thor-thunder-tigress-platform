@@ -9,7 +9,7 @@ that speaks the OpenAI or Anthropic API.
 | | |
 |---|---|
 | Address | `https://arpanpathak.taildb9a39.ts.net` |
-| Models | Nemotron 3 Nano 30B-A3B, Q8_0, 1M-token context (`nemotron`); others can be loaded with `thor-tigress-serve` (chapter "Model serving") |
+| Models | Nemotron 3 Nano 30B-A3B, Q8_0, 1M-token context (`nemotron`); Qwen3.6-35B-A3B NVFP4 on TensorRT Edge-LLM, 32K-token context (`Qwen3.6-35B-A3B-NVFP4`); others can be loaded with `thor-tigress-serve` (chapter "Model serving") |
 | Speed | about 53 tokens/s per reply; thinks before answering unless told not to (below) |
 | OpenAI API | `/v1/models`, `/v1/chat/completions` |
 | Anthropic API | `/v1/messages` (Claude Code) |
@@ -64,7 +64,7 @@ K=$(cat ~/.config/thor-chat/api-key)
 curl -s https://arpanpathak.taildb9a39.ts.net/v1/models -H "Authorization: Bearer $K"
 ```
 
-It lists one model. `401` means the key is wrong or no longer valid.
+It lists two models. `401` means the key is wrong or no longer valid.
 
 Every request must name a model. `nemotron` and `nemotron-think` go to the
 Nano, and the full id from `/v1/models` works too. Another model loaded with

@@ -17,14 +17,21 @@ Services:
   thor-tigress-serve logs                  follow both logs
 
 The services run "thor-tigress-serve run" (llama-server in router mode on
-:8079) and "thor-tigress-serve agent" (thor-tigress-agent: the page and API
-on :8080). Settings go in ~/.config/thor-chat/env as KEY=value lines:
+:8079), "thor-tigress-serve agent" (thor-tigress-agent: the page and API on
+:8080) and, with EDGE_MODEL set, "thor-tigress-serve edge" (TensorRT
+Edge-LLM on :8081). Settings go in ~/.config/thor-chat/env as KEY=value lines:
 
   MODEL         the default model's GGUF   Nemotron 3 Nano 30B-A3B Q8_0
   USERS         its replies at once        4
   CONTEXT       its tokens per reply       1048576
   MODELS_MAX    models loaded at once      2
   MIN_FREE_GB   memory kept free           8
+  EDGE_MODEL    a checkpoint folder served by TensorRT Edge-LLM   none
+  EDGE_PORT     its server's port          8081
+  EDGE_CONTEXT  its tokens per reply       32768
+
+With EDGE_MODEL set, "install" also writes the thor-edge-llm service, and the
+agent sends requests for that model (named after the folder) to it.
   PORT, MODEL_PORT, SEARCH_PORT            8080, 8079, 8888
 """
 
@@ -54,6 +61,10 @@ DEFAULTS = {
     "CONTEXT": "1048576",
     "MODELS_MAX": "2",
     "MIN_FREE_GB": "8",
+    "EDGE_MODEL": "",
+    "EDGE_PORT": "8081",
+    "EDGE_CONTEXT": "32768",
+    "EDGE_SERVER": str(HOME / ".local" / "share" / "edge-llm" / "venv" / "bin" / "tensorrt-edgellm-serve"),
     "PORT": "8080",
     "MODEL_PORT": "8079",
     "SEARCH_PORT": "8888",
@@ -282,7 +293,21 @@ def entries(values, router):
     for name, path in disk.items():
         if name not in served:
             rows.append({"id": name, "state": "on disk", "size": size_of(path), "path": path, "note": ""})
+    if values["EDGE_MODEL"]:
+        rows.append(edge_row(values))
     return rows
+
+
+def edge_row(values):
+    """The model TensorRT Edge-LLM serves: loaded while its server answers."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{values['EDGE_PORT']}/v1/models", timeout=5):
+            state = "loaded"
+    except (urllib.error.URLError, TimeoutError, ConnectionError):
+        state = "on disk"
+    size = sum(path.stat().st_size for path in Path(values["EDGE_MODEL"]).glob("*.safetensors"))
+    return {"id": edge_name(values), "state": state, "size": size, "engine": "edge-llm",
+            "note": f"TensorRT Edge-LLM · :{values['EDGE_PORT']}"}
 
 
 def downloadable(values):
@@ -324,6 +349,8 @@ def load(row, values, router):
     reason = room_for(row["size"], values, router)
     if reason:
         return print(f"not loaded: {reason}")
+    if row.get("engine") == "edge-llm":
+        return start_edge(values)
     if row["state"] == "on disk":
         add_from_disk(row["path"])
         router.reload(values)
@@ -349,11 +376,32 @@ def load(row, values, router):
     print(f"ready: {free_gb():.1f} GB free")
 
 
+def start_edge(values):
+    """Starts the thor-edge-llm service and waits until it answers, stopping it
+    again if free memory falls below MIN_FREE_GB."""
+    minimum = int(values["MIN_FREE_GB"])
+    before, started = free_gb(), time.time()
+    subprocess.run(["systemctl", "--user", "start", "thor-edge-llm"], check=True)
+    while edge_row(values)["state"] != "loaded":
+        if free_gb() < minimum:
+            subprocess.run(["systemctl", "--user", "stop", "thor-edge-llm"], check=False)
+            return print(f"free memory fell below {minimum} GB while loading; stopped again")
+        if subprocess.run(["systemctl", "--user", "is-failed", "-q", "thor-edge-llm"]).returncode == 0:
+            return print("failed to start; see: journalctl --user -u thor-edge-llm -n 50")
+        time.sleep(2)
+    print(f"loaded in {time.time() - started:.0f} s: {before - free_gb():.1f} GB used, {free_gb():.1f} GB free")
+
+
 def unload(row, values, router):
     """Frees a model's memory. A model added from disk also leaves the list, so
     the chat page stops offering it; it shows as "on disk" again."""
     if row["state"] == "on disk":
         return print("not loaded")
+    if row.get("engine") == "edge-llm":
+        before = free_gb()
+        subprocess.run(["systemctl", "--user", "stop", "thor-edge-llm"], check=True)
+        time.sleep(3)
+        return print(f"unloaded: {free_gb() - before:.1f} GB freed, {free_gb():.1f} GB free")
     if row["id"] == model_id(values["MODEL"]):
         try:
             answer = input("This is the default model: the chat stops answering until it is loaded again. Unload? [y/N] ")
@@ -444,13 +492,34 @@ def run(values):
     os.execv(values["SERVER"], arguments)
 
 
+def edge_name(values):
+    """The model id the Edge-LLM server answers to: its checkpoint folder's name."""
+    return Path(values["EDGE_MODEL"]).name
+
+
+def edge(values):
+    """TensorRT Edge-LLM's OpenAI-compatible server for EDGE_MODEL; it builds the
+    engine on first start and reuses it from the cache afterwards."""
+    if not values["EDGE_MODEL"]:
+        sys.exit("EDGE_MODEL is not set in ~/.config/thor-chat/env")
+    context = int(values["EDGE_CONTEXT"])
+    os.execv(values["EDGE_SERVER"], [values["EDGE_SERVER"], values["EDGE_MODEL"], "--host", "127.0.0.1",
+                                     "--port", values["EDGE_PORT"], "--served-model-name", edge_name(values),
+                                     "--reasoning-parser", "auto", "--tool-call-parser", "auto", "--enable-auto-tool-choice",
+                                     "--cache-dir", str(Path(values["EDGE_MODEL"]).parent / "cache"),
+                                     "--max-input-len", str(context // 2), "--max-kv-cache-capacity", str(context),
+                                     "--max-batch-size", "1"])
+
+
 def agent(values):
+    engines = ["--engine", f"{edge_name(values)}=127.0.0.1:{values['EDGE_PORT']}"] if values["EDGE_MODEL"] else []
     os.execv(values["AGENT"], [values["AGENT"], "--listen", f"127.0.0.1:{values['PORT']}",
-                               "--model", f"127.0.0.1:{values['MODEL_PORT']}", "--search", f"127.0.0.1:{values['SEARCH_PORT']}",
+                               "--model", f"127.0.0.1:{values['MODEL_PORT']}", *engines,
+                               "--search", f"127.0.0.1:{values['SEARCH_PORT']}",
                                "--web", str(WEB), "--key-file", str(CONFIG / "api-key")])
 
 
-def unit(name, description, command, after):
+def unit(name, description, command, after, limits=""):
     (UNITS / f"{name}.service").write_text(f"""[Unit]
 Description={description}
 After=network-online.target {after}
@@ -459,7 +528,7 @@ After=network-online.target {after}
 ExecStart={Path(__file__).resolve()} {command}
 Restart=on-failure
 RestartSec=5
-
+{limits}
 [Install]
 WantedBy=default.target
 """)
@@ -469,20 +538,25 @@ def install(values):
     UNITS.mkdir(parents=True, exist_ok=True)
     unit("thor-chat", f"Models (llama-server) on 127.0.0.1:{values['MODEL_PORT']}", "run", "")
     unit("thor-tigress-agent", f"Chat page and web search on 127.0.0.1:{values['PORT']}", "agent", "thor-chat.service")
+    services = ["thor-chat", "thor-tigress-agent"]
+    if values["EDGE_MODEL"]:
+        unit("thor-edge-llm", f"{edge_name(values)} (TensorRT Edge-LLM) on 127.0.0.1:{values['EDGE_PORT']}", "edge", "thor-chat.service",
+             "MemoryMax=48G\nMemorySwapMax=0\n")
+        services.append("thor-edge-llm")
     command = HOME / ".local" / "bin" / "thor-tigress-serve"
     command.parent.mkdir(parents=True, exist_ok=True)
     command.unlink(missing_ok=True)
     command.symlink_to(Path(__file__).resolve())
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
-    subprocess.run(["systemctl", "--user", "enable", "thor-chat", "thor-tigress-agent"], check=True, capture_output=True)
-    subprocess.run(["systemctl", "--user", "restart", "thor-chat", "thor-tigress-agent"], check=True)
+    subprocess.run(["systemctl", "--user", "enable", *services], check=True, capture_output=True)
+    subprocess.run(["systemctl", "--user", "restart", *services], check=True)
     subprocess.run(["loginctl", "enable-linger", os.environ.get("USER", "")], check=False)
-    print(f"running; both start at boot. {command} is on your PATH.")
+    print(f"running: {', '.join(services)}; all start at boot. {command} is on your PATH.")
 
 
 def uninstall(values):
-    subprocess.run(["systemctl", "--user", "disable", "--now", "thor-tigress-agent", "thor-chat"], check=False)
-    for name in ("thor-chat", "thor-tigress-agent"):
+    subprocess.run(["systemctl", "--user", "disable", "--now", "thor-tigress-agent", "thor-edge-llm", "thor-chat"], check=False)
+    for name in ("thor-chat", "thor-tigress-agent", "thor-edge-llm"):
         (UNITS / f"{name}.service").unlink(missing_ok=True)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     print("stopped and removed")
@@ -497,12 +571,12 @@ def key(values):
 
 
 def logs(values):
-    os.execvp("journalctl", ["journalctl", "--user", "-u", "thor-chat", "-u", "thor-tigress-agent", "-f"])
+    os.execvp("journalctl", ["journalctl", "--user", "-u", "thor-chat", "-u", "thor-edge-llm", "-u", "thor-tigress-agent", "-f"])
 
 
 COMMANDS = {
     "list": list_here, "list-latest": list_latest,
-    "install": install, "uninstall": uninstall, "key": key, "logs": logs, "run": run, "agent": agent,
+    "install": install, "uninstall": uninstall, "key": key, "logs": logs, "run": run, "agent": agent, "edge": edge,
 }
 COMMANDS_WITH_NAME = {"load": load_command, "unload": unload_command, "download": download_command}
 

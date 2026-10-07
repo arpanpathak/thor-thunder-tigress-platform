@@ -132,11 +132,11 @@ chapter "Web chat: Thor Tigress Cub".
 
 | Setting | Value |
 |---|---|
-| Model | Nemotron 3 Nano 30B-A3B Q8_0; Nemotron 3.5 Lightning is on disk, not loaded |
-| People at once | 4 (`USERS`) |
-| Context per person | 1,048,576 tokens (`CONTEXT`) |
-| Measured | 53 tok/s, first token 0.2 s |
-| Model names | `nemotron` / `nemotron-think`, or the full id; others refused |
+| Models | Nemotron 3 Nano 30B-A3B Q8_0 (llama.cpp, the default); Qwen3.6-35B-A3B NVFP4 (TensorRT Edge-LLM, 78 tok/s); Nemotron 3.5 Lightning on disk, not loaded |
+| People at once | Nano 4 (`USERS`); Qwen 1 |
+| Context per person | Nano 1,048,576 tokens (`CONTEXT`); Qwen 32,768 (`EDGE_CONTEXT`) |
+| Measured | Nano 53 tok/s, first token 0.2 s; Qwen 78 tok/s |
+| Model names | `nemotron` / `nemotron-think`, `Qwen3.6-35B-A3B-NVFP4`, or the full id; others refused |
 
 Change settings in `~/.config/thor-chat/env` (e.g. `USERS=8`), then
 `thor-tigress-serve install`. The page has Web and Think switches, a stop key (Esc),
