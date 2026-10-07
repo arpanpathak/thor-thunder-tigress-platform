@@ -14,6 +14,9 @@ Run these from `/home/jetson/Projects/thor-thunder-tigress-platform`.
 | Review another file, port or flags file | `cargo run --release -p thor-tigress-reinforcer-frontend -- --port PORT --dataset NAME=FILE,FLAGS` |
 | Check the teacher set | `cargo run --release -p thor-hammer-trainer --bin teacher` |
 | Queue real sections to write from | `cargo run --release -p thor-hammer-trainer --bin teacher -- pick 2` |
+| Make the keyring (the encrypted registry of who may chat) | `thor-tigress-serve keyring-init` |
+| See who asked, approve, revoke | `thor-tigress-serve keyring requests` / `approve EMAIL` / `revoke EMAIL` / `revoke-all` |
+| Run the keyring tool itself | `cargo run -p thor-tigress-keyring -- --keyring FILE --passphrase-file FILE keys` |
 | Run the tests | `cargo test` |
 | Lint | `cargo clippy --all-targets -- -D warnings` |
 | Format | `cargo +nightly fmt` |
@@ -29,20 +32,33 @@ thor-thunder-tigress-platform/
 ├── rust-toolchain.toml       Rust 1.99.0
 ├── rustfmt.toml              formatting rules from rust-interview-lab
 ├── crates/
-│   └── thor-hammer-trainer/
+│   ├── thor-hammer-trainer/
+│   │   └── src/
+│   │       ├── main.rs        paths, walking, filtering, output
+│   │       ├── readability.rs
+│   │       ├── chat.rs
+│   │       ├── book.rs
+│   │       ├── code.rs
+│   │       ├── clever_vs_readable.rs
+│   │       ├── slop_flags.rs
+│   │       ├── example.rs     Example, Source, SkipReason
+│   │       ├── report.rs      stats.md
+│   │       ├── error.rs       DataError
+│   │       └── bin/
+│   │           └── teacher.rs   checks the teacher set, queues sections
+│   ├── thor-spark-safety-eval/       slop phrases, the five Rust rules
+│   ├── thor-tigress-reinforcer-frontend/  the review page
+│   ├── thor-lasso-distiller/         conversations from books
+│   ├── thor-tigress-agent/           the chat page's server
+│   └── thor-tigress-keyring/         the encrypted registry
 │       └── src/
-│           ├── main.rs        paths, walking, filtering, output
-│           ├── readability.rs
-│           ├── chat.rs
-│           ├── book.rs
-│           ├── code.rs
-│           ├── clever_vs_readable.rs
-│           ├── slop_flags.rs
-│           ├── example.rs     Example, Source, SkipReason
-│           ├── report.rs      stats.md
-│           ├── error.rs       DataError
-│           └── bin/
-│               └── teacher.rs   checks the teacher set, queues sections
+│           ├── crypto.rs      Argon2id, seal and open
+│           ├── store.rs       records, file format, atomic write
+│           ├── cli.rs         the commands
+│           └── error.rs       KeyringError
+├── jetson-thor/
+│   ├── web/                   the chat page, About page and art
+│   └── model-serving/thor-tigress-serve   settings, units, install
 ├── labels/                   human work, committed
 │   └── slop_flags.jsonl
 ├── data/                     generated, not committed
