@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 410" width="960" height="410" role="img" aria-label="Six planned rooms of the agentic canvas: roleplay with characters who remember the scene; a therapy room with a calm listener and nothing written down on the server; immigration with forms and covering letters checked against the rules; creative writing with story bibles, drafts and revisions side by side; music with a timeline the model can add notes to and play back; and vector graphics with drawing commands it can run and then look at.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #FFFDF5; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <rect width="960" height="410" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">The agentic canvas</text>
+  <text x="30" y="62" class="note">Six rooms of one sandbox, all of them planned. Each is the same board, a different surface, and a set of tools a model may reach for.</text>
+
+  <rect x="30" y="84" width="290" height="130" rx="10" class="planned"/>
+  <text x="175" y="118" class="name" text-anchor="middle">roleplay</text>
+  <text x="175" y="144" class="note" text-anchor="middle">characters who remember</text>
+  <text x="175" y="162" class="note" text-anchor="middle">the scene, with the scene</text>
+  <text x="175" y="180" class="note" text-anchor="middle">kept on the canvas</text>
+
+  <rect x="335" y="84" width="290" height="130" rx="10" class="planned"/>
+  <text x="480" y="118" class="name" text-anchor="middle">a therapy room</text>
+  <text x="480" y="144" class="note" text-anchor="middle">a calm listener, with</text>
+  <text x="480" y="162" class="note" text-anchor="middle">nothing written down</text>
+  <text x="480" y="180" class="note" text-anchor="middle">on the server</text>
+
+  <rect x="640" y="84" width="290" height="130" rx="10" class="planned"/>
+  <text x="785" y="118" class="name" text-anchor="middle">immigration</text>
+  <text x="785" y="144" class="note" text-anchor="middle">forms and covering letters</text>
+  <text x="785" y="162" class="note" text-anchor="middle">drafted with you, checked</text>
+  <text x="785" y="180" class="note" text-anchor="middle">against the rules</text>
+
+  <rect x="30" y="234" width="290" height="130" rx="10" class="planned"/>
+  <text x="175" y="268" class="name" text-anchor="middle">creative writing</text>
+  <text x="175" y="294" class="note" text-anchor="middle">story bibles, drafts and</text>
+  <text x="175" y="312" class="note" text-anchor="middle">revisions standing side</text>
+  <text x="175" y="330" class="note" text-anchor="middle">by side</text>
+
+  <rect x="335" y="234" width="290" height="130" rx="10" class="planned"/>
+  <text x="480" y="268" class="name" text-anchor="middle">music</text>
+  <text x="480" y="294" class="note" text-anchor="middle">a timeline the model can</text>
+  <text x="480" y="312" class="note" text-anchor="middle">add notes to, and play</text>
+  <text x="480" y="330" class="note" text-anchor="middle">back</text>
+
+  <rect x="640" y="234" width="290" height="130" rx="10" class="planned"/>
+  <text x="785" y="268" class="name" text-anchor="middle">vector graphics</text>
+  <text x="785" y="294" class="note" text-anchor="middle">drawing commands it can</text>
+  <text x="785" y="312" class="note" text-anchor="middle">run, and then look at</text>
+  <text x="785" y="330" class="note" text-anchor="middle">what it drew</text>
+
+  <text x="30" y="392" class="label">Amber means planned, in this book and on the page.</text>
+</svg>
