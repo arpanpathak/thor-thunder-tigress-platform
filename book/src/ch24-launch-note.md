@@ -113,8 +113,8 @@ surface that runs today, and these six are the ones I am building toward.
 </figure>
 
 <figure>
-<img src="figures/cub-models.gif" alt="The model picker switching from Nemotron 3 Nano to Qwen3.6 35B A3B, the same question answered by each, and the two stats lines: 176 tokens at 51.0 tokens a second, then 209 tokens at 67.5.">
-<figcaption><b>Figure 24.10</b> Two models, one question: Nemotron 3 Nano at 51.0 tokens a second, Qwen3.6 35B A3B on TensorRT Edge-LLM at 67.5.</figcaption>
+<img src="figures/cub-models.gif" alt="The chat page at phone width: the home screen naming Nemotron 3 Nano 30B A3B, then its answer with a Rust code block and 50.7 tokens a second; then the home screen naming Qwen3.6 35B A3B NVFP4 and its answer at 64.0 tokens a second.">
+<figcaption><b>Figure 24.10</b> Two models, one question, at phone width: Nemotron 3 Nano at 50.7 tokens a second, and Qwen3.6 35B A3B on TensorRT Edge-LLM at 64.0.</figcaption>
 </figure>
 
 ## Getting a key
