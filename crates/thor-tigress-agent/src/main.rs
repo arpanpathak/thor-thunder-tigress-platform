@@ -57,7 +57,11 @@ fn serve(config: Config) -> Outcome<Infallible> {
         config.listen,
         config.upstreams.model.address(),
         config.upstreams.search.address(),
-        if config.key.is_some() { "required" } else { "off" }
+        if config.key.is_some() {
+            "required"
+        } else {
+            "off"
+        }
     );
     let config = Arc::new(config);
     loop {
@@ -81,7 +85,8 @@ impl<T: Read + Write> Connection for T {}
 /// Answers one connection; a failure is logged and, when the client is still
 /// there, answered with its status.
 fn handle(stream: &mut dyn Connection, config: &Config) {
-    let outcome = request::read_request(stream).and_then(|request| routes::answer(stream, &request, config));
+    let outcome =
+        request::read_request(stream).and_then(|request| routes::answer(stream, &request, config));
     let Err(error) = outcome else {
         return;
     };
@@ -120,7 +125,9 @@ mod tests {
     fn a_client_gone_before_the_answer_is_only_logged() -> Outcome {
         let config = Config::from_args(["--key-file".to_string(), "/nonexistent".to_string()])?;
         let request = b"POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 2\r\n\r\n{x".to_vec();
-        let mut client = Vanishing { request: io::Cursor::new(request) };
+        let mut client = Vanishing {
+            request: io::Cursor::new(request),
+        };
         handle(&mut client, &config);
         assert!(client.flush().is_err());
         Ok(())
@@ -136,11 +143,18 @@ mod tests {
 
     #[test]
     fn serve_binds_and_announces() -> Outcome {
-        let config = Config::from_args(["--listen", "127.0.0.1:0", "--key-file", "/nonexistent"].map(String::from))?;
+        let config = Config::from_args(
+            ["--listen", "127.0.0.1:0", "--key-file", "/nonexistent"].map(String::from),
+        )?;
         thread::spawn(move || serve(config));
         thread::sleep(std::time::Duration::from_millis(200));
         let taken = TcpListener::bind("127.0.0.1:0")?;
-        let busy = Config::from_args(["--listen".to_string(), taken.local_addr()?.to_string(), "--key-file".to_string(), "/nonexistent".to_string()])?;
+        let busy = Config::from_args([
+            "--listen".to_string(),
+            taken.local_addr()?.to_string(),
+            "--key-file".to_string(),
+            "/nonexistent".to_string(),
+        ])?;
         assert!(serve(busy).is_err());
         Ok(())
     }
@@ -149,11 +163,17 @@ mod tests {
     fn answers_connections_and_reports_bad_requests() -> Outcome {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?.to_string();
-        let config = Arc::new(Config::from_args(["--key-file".to_string(), "/nonexistent".to_string()])?);
+        let config = Arc::new(Config::from_args([
+            "--key-file".to_string(),
+            "/nonexistent".to_string(),
+        ])?);
         let exchanged = thread::scope(|scope| {
             scope.spawn(|| accept(listener.incoming().take(2), &config));
             let health = exchange(&address, "GET /health HTTP/1.1\r\nHost: x\r\n\r\n")?;
-            let broken = exchange(&address, "POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 2\r\n\r\n{x")?;
+            let broken = exchange(
+                &address,
+                "POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 2\r\n\r\n{x",
+            )?;
             Ok::<_, crate::error::AgentError>((health, broken))
         });
         let (health, broken) = exchanged?;

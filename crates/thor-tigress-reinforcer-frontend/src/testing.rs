@@ -20,7 +20,8 @@ impl TempDir {
     /// Creates a new, empty folder.
     pub fn new() -> Outcome<TempDir> {
         let number = NEXT.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("reinforcer-test-{}-{number}", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("reinforcer-test-{}-{number}", std::process::id()));
         fs::create_dir_all(&path).map_err(ReviewError::io(&path))?;
         Ok(TempDir { path })
     }

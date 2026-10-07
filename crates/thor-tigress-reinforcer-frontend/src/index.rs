@@ -100,7 +100,10 @@ where
     usize: TryFrom<Id>,
 {
     fn new() -> Self {
-        Interner { names: Vec::new(), ids: HashMap::new() }
+        Interner {
+            names: Vec::new(),
+            ids: HashMap::new(),
+        }
     }
 
     /// The id of `name`, adding it when it is new.
@@ -142,7 +145,10 @@ impl Index {
     /// more distinct sources or origins than the index can number.
     pub fn open(path: &Path) -> Outcome<Self> {
         let file = File::open(path).map_err(ReviewError::io(path))?;
-        let mut reader = BufReader::with_capacity(READ_BUFFER, file.try_clone().map_err(ReviewError::io(path))?);
+        let mut reader = BufReader::with_capacity(
+            READ_BUFFER,
+            file.try_clone().map_err(ReviewError::io(path))?,
+        );
         let mut index = Index {
             file,
             path: path.to_path_buf(),
@@ -160,7 +166,8 @@ impl Index {
                 break;
             }
             if !line.trim().is_empty() {
-                let header: Header = serde_json::from_str(&line).map_err(ReviewError::json(path, line_number))?;
+                let header: Header =
+                    serde_json::from_str(&line).map_err(ReviewError::json(path, line_number))?;
                 index.add(&header, offset, read)?;
             }
             offset += u64::try_from(read).unwrap_or(u64::MAX);
@@ -169,7 +176,8 @@ impl Index {
     }
 
     fn add(&mut self, header: &Header, offset: u64, length: usize) -> Outcome {
-        let too_many = || ReviewError::BadRequest("too many distinct sources or origins".to_string());
+        let too_many =
+            || ReviewError::BadRequest("too many distinct sources or origins".to_string());
         let entry = Entry {
             id: header.id.to_string(),
             offset,
@@ -247,9 +255,18 @@ impl Index {
         }
         let mut collections: Vec<CollectionCount> = counts
             .into_iter()
-            .map(|((folder, source), count)| CollectionCount { folder: folder.to_string(), source: source.to_string(), count })
+            .map(|((folder, source), count)| CollectionCount {
+                folder: folder.to_string(),
+                source: source.to_string(),
+                count,
+            })
             .collect();
-        collections.sort_by(|left, right| right.count.cmp(&left.count).then_with(|| left.folder.cmp(&right.folder)));
+        collections.sort_by(|left, right| {
+            right
+                .count
+                .cmp(&left.count)
+                .then_with(|| left.folder.cmp(&right.folder))
+        });
         collections
     }
 
@@ -262,9 +279,17 @@ impl Index {
         }
         let mut sources: Vec<SourceCount> = counts
             .into_iter()
-            .map(|(name, count)| SourceCount { name: name.to_string(), count })
+            .map(|(name, count)| SourceCount {
+                name: name.to_string(),
+                count,
+            })
             .collect();
-        sources.sort_by(|left, right| right.count.cmp(&left.count).then_with(|| left.name.cmp(&right.name)));
+        sources.sort_by(|left, right| {
+            right
+                .count
+                .cmp(&left.count)
+                .then_with(|| left.name.cmp(&right.name))
+        });
         sources
     }
 
@@ -275,10 +300,16 @@ impl Index {
     /// `ReviewError::NotFound` for a position past the end, `ReviewError::Io`
     /// when the read fails, `ReviewError::BadRequest` for text that isn't UTF-8.
     pub fn record(&self, position: usize) -> Outcome<String> {
-        let entry = self.entries.get(position).ok_or_else(|| ReviewError::NotFound(format!("record {position}")))?;
+        let entry = self
+            .entries
+            .get(position)
+            .ok_or_else(|| ReviewError::NotFound(format!("record {position}")))?;
         let mut buffer = vec![0; entry.length];
-        self.file.read_exact_at(&mut buffer, entry.offset).map_err(ReviewError::io(&self.path))?;
-        String::from_utf8(buffer).map_err(|_| ReviewError::BadRequest(format!("record {position} is not UTF-8")))
+        self.file
+            .read_exact_at(&mut buffer, entry.offset)
+            .map_err(ReviewError::io(&self.path))?;
+        String::from_utf8(buffer)
+            .map_err(|_| ReviewError::BadRequest(format!("record {position} is not UTF-8")))
     }
 
     /// One record, read as a `T`.
@@ -287,7 +318,8 @@ impl Index {
     ///
     /// As for [`Index::record`], and `ReviewError::Json` when the record isn't a `T`.
     pub fn parsed<T: DeserializeOwned>(&self, position: usize) -> Outcome<T> {
-        serde_json::from_str(&self.record(position)?).map_err(ReviewError::json(&self.path, position + 1))
+        serde_json::from_str(&self.record(position)?)
+            .map_err(ReviewError::json(&self.path, position + 1))
     }
 
     /// Every position the filter selects, in file order.
@@ -300,7 +332,11 @@ impl Index {
     ///
     /// `ReviewError::Io` when the file can't be read for a search.
     pub fn matching(&self, filter: &Filter, flagged: &Ids) -> Outcome<Vec<usize>> {
-        let kept = |position: &usize| self.entries.get(*position).is_some_and(|entry| self.keeps(entry, filter, flagged));
+        let kept = |position: &usize| {
+            self.entries
+                .get(*position)
+                .is_some_and(|entry| self.keeps(entry, filter, flagged))
+        };
         match filter.query.as_deref() {
             None => Ok((0..self.entries.len()).filter(kept).collect()),
             Some(query) => Ok(self.containing(query)?.into_iter().filter(kept).collect()),
@@ -329,8 +365,13 @@ impl Index {
 
     /// True when one entry passes the source, flag and collection parts of a filter.
     fn keeps(&self, entry: &Entry, filter: &Filter, flagged: &Ids) -> bool {
-        let source_ok = filter.source.as_deref().is_none_or(|source| self.source_of(entry) == source);
-        let flag_ok = filter.flagged.is_none_or(|wanted| wanted == flagged.contains(&entry.id));
+        let source_ok = filter
+            .source
+            .as_deref()
+            .is_none_or(|source| self.source_of(entry) == source);
+        let flag_ok = filter
+            .flagged
+            .is_none_or(|wanted| wanted == flagged.contains(&entry.id));
         let collection_ok = filter
             .collection
             .as_deref()
@@ -343,7 +384,9 @@ impl Index {
 /// backslash still matches the raw record line.
 fn json_escaped(text: &str) -> String {
     let quoted = serde_json::Value::from(text).to_string();
-    let inner = quoted.strip_prefix('"').and_then(|rest| rest.strip_suffix('"'));
+    let inner = quoted
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'));
     inner.unwrap_or_default().to_string()
 }
 
@@ -355,20 +398,29 @@ mod tests {
     fn more_sources_than_ids_is_refused() -> Outcome {
         let folder = TempDir::new()?;
         let lines: String = (0..=usize::from(u16::MAX) + 1)
-            .map(|number| format!("{{\"id\":\"{number}\",\"source\":\"s{number}\",\"origin\":\"o\"}}\n"))
+            .map(|number| {
+                format!("{{\"id\":\"{number}\",\"source\":\"s{number}\",\"origin\":\"o\"}}\n")
+            })
             .collect();
         let path = folder.file("train.jsonl", &lines)?;
-        assert!(matches!(Index::open(&path), Err(ReviewError::BadRequest(message)) if message.contains("too many")));
+        assert!(
+            matches!(Index::open(&path), Err(ReviewError::BadRequest(message)) if message.contains("too many"))
+        );
         Ok(())
     }
 
     #[test]
     fn a_record_changed_into_invalid_text_after_indexing_is_refused() -> Outcome {
         let folder = TempDir::new()?;
-        let path = folder.file("train.jsonl", "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n")?;
+        let path = folder.file(
+            "train.jsonl",
+            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
+        )?;
         let index = Index::open(&path)?;
         std::fs::write(&path, [0xff_u8; 64]).map_err(ReviewError::io(&path))?;
-        assert!(matches!(index.record(0), Err(ReviewError::BadRequest(message)) if message.contains("not UTF-8")));
+        assert!(
+            matches!(index.record(0), Err(ReviewError::BadRequest(message)) if message.contains("not UTF-8"))
+        );
         Ok(())
     }
     use crate::testing::TempDir;
@@ -377,11 +429,17 @@ mod tests {
     fn equally_large_collections_come_in_folder_order() -> Outcome {
         let folder = TempDir::new()?;
         let lines = concat!(
-            r#"{"id":"r","source":"corpus","origin":"rbe/src/a.md"}"#, "\n",
-            r#"{"id":"t","source":"corpus","origin":"trpl/src/a.md"}"#, "\n"
+            r#"{"id":"r","source":"corpus","origin":"rbe/src/a.md"}"#,
+            "\n",
+            r#"{"id":"t","source":"corpus","origin":"trpl/src/a.md"}"#,
+            "\n"
         );
         let index = Index::open(&folder.file("train.jsonl", lines)?)?;
-        let folders: Vec<String> = index.collections().into_iter().map(|collection| collection.folder).collect();
+        let folders: Vec<String> = index
+            .collections()
+            .into_iter()
+            .map(|collection| collection.folder)
+            .collect();
         assert_eq!(folders, ["rbe", "trpl"]);
         Ok(())
     }
@@ -396,10 +454,14 @@ mod tests {
     );
 
     const BOOKS: &str = concat!(
-        r#"{"id":"t1","instruction":"a","response":"b","source":"corpus","origin":"trpl/src/ch01.md"}"#, "\n",
-        r#"{"id":"t2","instruction":"a","response":"b","source":"corpus","origin":"trpl/src/ch02.md"}"#, "\n",
-        r#"{"id":"r1","instruction":"a","response":"b","source":"corpus","origin":"rbe/src/hello.md"}"#, "\n",
-        r#"{"id":"c1","instruction":"a","response":"b","source":"chat","origin":"conversations.json#x/1"}"#, "\n"
+        r#"{"id":"t1","instruction":"a","response":"b","source":"corpus","origin":"trpl/src/ch01.md"}"#,
+        "\n",
+        r#"{"id":"t2","instruction":"a","response":"b","source":"corpus","origin":"trpl/src/ch02.md"}"#,
+        "\n",
+        r#"{"id":"r1","instruction":"a","response":"b","source":"corpus","origin":"rbe/src/hello.md"}"#,
+        "\n",
+        r#"{"id":"c1","instruction":"a","response":"b","source":"chat","origin":"conversations.json#x/1"}"#,
+        "\n"
     );
 
     fn index_of(folder: &TempDir, lines: &str) -> Outcome<Index> {
@@ -420,9 +482,21 @@ mod tests {
         assert!(index.contains("b2") && !index.contains("zz"));
         assert_eq!(
             index.counts(),
-            [SourceCount { name: "book".to_string(), count: 2 }, SourceCount { name: "chat".to_string(), count: 1 }]
+            [
+                SourceCount {
+                    name: "book".to_string(),
+                    count: 2
+                },
+                SourceCount {
+                    name: "chat".to_string(),
+                    count: 1
+                }
+            ]
         );
-        assert_eq!(index.entry(1).map(|entry| index.origin_of(entry)), Some("c1"));
+        assert_eq!(
+            index.entry(1).map(|entry| index.origin_of(entry)),
+            Some("c1")
+        );
         Ok(())
     }
 
@@ -445,9 +519,18 @@ mod tests {
         let folder = TempDir::new()?;
         let index = index_of(&folder, LINES)?;
         let flagged: Ids = ["b2".to_string()].into_iter().collect();
-        assert_eq!(index.matching(&filter(|f| f.source = Some("book".to_string())), &flagged)?, [0, 2]);
-        assert_eq!(index.matching(&filter(|f| f.flagged = Some(true)), &flagged)?, [1]);
-        assert_eq!(index.matching(&filter(|f| f.flagged = Some(false)), &flagged)?, [0, 2]);
+        assert_eq!(
+            index.matching(&filter(|f| f.source = Some("book".to_string())), &flagged)?,
+            [0, 2]
+        );
+        assert_eq!(
+            index.matching(&filter(|f| f.flagged = Some(true)), &flagged)?,
+            [1]
+        );
+        assert_eq!(
+            index.matching(&filter(|f| f.flagged = Some(false)), &flagged)?,
+            [0, 2]
+        );
         Ok(())
     }
 
@@ -455,16 +538,31 @@ mod tests {
     fn searches_the_whole_record_ignoring_case() -> Outcome {
         let folder = TempDir::new()?;
         let index = index_of(&folder, LINES)?;
-        assert_eq!(index.matching(&filter(|f| f.query = Some("PAGE TABLE".to_string())), &Ids::new())?, [2]);
+        assert_eq!(
+            index.matching(
+                &filter(|f| f.query = Some("PAGE TABLE".to_string())),
+                &Ids::new()
+            )?,
+            [2]
+        );
         Ok(())
     }
 
     #[test]
     fn finds_a_query_that_contains_a_quote() -> Outcome {
         let folder = TempDir::new()?;
-        let line = concat!(r#"{"id":"q1","instruction":"x","response":"say \"hi\" now","source":"chat","origin":"c"}"#, "\n");
+        let line = concat!(
+            r#"{"id":"q1","instruction":"x","response":"say \"hi\" now","source":"chat","origin":"c"}"#,
+            "\n"
+        );
         let index = index_of(&folder, line)?;
-        assert_eq!(index.matching(&filter(|f| f.query = Some("say \"hi\"".to_string())), &Ids::new())?, [0]);
+        assert_eq!(
+            index.matching(
+                &filter(|f| f.query = Some("say \"hi\"".to_string())),
+                &Ids::new()
+            )?,
+            [0]
+        );
         Ok(())
     }
 
@@ -472,15 +570,32 @@ mod tests {
     fn knows_which_book_a_record_came_from() -> Outcome {
         let folder = TempDir::new()?;
         let index = index_of(&folder, BOOKS)?;
-        assert_eq!(index.matching(&filter(|f| f.collection = Some("trpl".to_string())), &Ids::new())?, [0, 1]);
+        assert_eq!(
+            index.matching(
+                &filter(|f| f.collection = Some("trpl".to_string())),
+                &Ids::new()
+            )?,
+            [0, 1]
+        );
         assert_eq!(
             index.collections(),
             [
-                CollectionCount { folder: "trpl".to_string(), source: "corpus".to_string(), count: 2 },
-                CollectionCount { folder: "rbe".to_string(), source: "corpus".to_string(), count: 1 },
+                CollectionCount {
+                    folder: "trpl".to_string(),
+                    source: "corpus".to_string(),
+                    count: 2
+                },
+                CollectionCount {
+                    folder: "rbe".to_string(),
+                    source: "corpus".to_string(),
+                    count: 1
+                },
             ]
         );
-        assert_eq!(index.entry(3).and_then(|entry| index.collection_of(entry)), None);
+        assert_eq!(
+            index.entry(3).and_then(|entry| index.collection_of(entry)),
+            None
+        );
         Ok(())
     }
 
@@ -495,7 +610,14 @@ mod tests {
     #[test]
     fn the_interner_numbers_each_name_once() {
         let mut interner: Interner<u16> = Interner::new();
-        assert_eq!([interner.id_of("book"), interner.id_of("chat"), interner.id_of("book")], [Some(0), Some(1), Some(0)]);
+        assert_eq!(
+            [
+                interner.id_of("book"),
+                interner.id_of("chat"),
+                interner.id_of("book")
+            ],
+            [Some(0), Some(1), Some(0)]
+        );
         assert_eq!(interner.name(1), "chat");
         assert_eq!(interner.name(7), "");
     }

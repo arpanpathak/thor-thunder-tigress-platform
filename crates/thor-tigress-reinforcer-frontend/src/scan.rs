@@ -40,59 +40,107 @@ pub struct Rule {
 /// Markup from a book source that ended up inside an answer. Learned as output,
 /// it teaches the model to emit HTML.
 const SOURCE_MARKUP: [&str; 12] = [
-    "<span", "<div", "<figure", "<figcaption", "<img", "<table", "<br", "</p", "</div", "&amp;", "&lt;", "&gt;",
+    "<span",
+    "<div",
+    "<figure",
+    "<figcaption",
+    "<img",
+    "<table",
+    "<br",
+    "</p",
+    "</div",
+    "&amp;",
+    "&lt;",
+    "&gt;",
 ];
 
 /// The rules, in the order the report lists them.
 pub const RULES: [Rule; 8] = [
-    Rule { name: "source_markup", category: SlopCategory::Other, phrases: &SOURCE_MARKUP },
+    Rule {
+        name: "source_markup",
+        category: SlopCategory::Other,
+        phrases: &SOURCE_MARKUP,
+    },
     Rule {
         name: "flattery_filler_opener",
         category: SlopCategory::FlatteryFillerOpener,
         phrases: &[
-            "great question", "excellent question", "you're absolutely right", "you are absolutely right",
-            "i'd be happy to help", "i would be happy to help", "happy to help", "what a fascinating",
-            "that's a clean", "nicely done",
+            "great question",
+            "excellent question",
+            "you're absolutely right",
+            "you are absolutely right",
+            "i'd be happy to help",
+            "i would be happy to help",
+            "happy to help",
+            "what a fascinating",
+            "that's a clean",
+            "nicely done",
         ],
     },
     Rule {
         name: "empty_depth_words",
         category: SlopCategory::EmptyDepthWords,
         phrases: &[
-            "rich tapestry", "delve into", "unlock the full potential", "a testament to", "at the intersection of",
-            "in today's fast-paced world", "nuanced interplay", "navigate the complex landscape", "navigate the landscape",
+            "rich tapestry",
+            "delve into",
+            "unlock the full potential",
+            "a testament to",
+            "at the intersection of",
+            "in today's fast-paced world",
+            "nuanced interplay",
+            "navigate the complex landscape",
+            "navigate the landscape",
         ],
     },
     Rule {
         name: "fake_importance",
         category: SlopCategory::FakeImportance,
         phrases: &[
-            "this is where it really matters", "makes all the difference", "earns its place", "game-changer",
-            "the real story here", "more than a tool", "speaks volumes", "the real currency",
-            "says the most with the fewest words", "it's not just",
+            "this is where it really matters",
+            "makes all the difference",
+            "earns its place",
+            "game-changer",
+            "the real story here",
+            "more than a tool",
+            "speaks volumes",
+            "the real currency",
+            "says the most with the fewest words",
+            "it's not just",
         ],
     },
     Rule {
         name: "dramatic_setup",
         category: SlopCategory::DramaticSetup,
         phrases: &[
-            "here's the thing", "let's be honest", "the truth is", "but here's where it gets interesting",
-            "let that sink in", "spoiler:",
+            "here's the thing",
+            "let's be honest",
+            "the truth is",
+            "but here's where it gets interesting",
+            "let that sink in",
+            "spoiler:",
         ],
     },
     Rule {
         name: "fake_balance_hedging",
         category: SlopCategory::FakeBalanceHedging,
         phrases: &[
-            "it's worth noting", "no one-size-fits-all", "one size fits all", "ultimately, it depends",
-            "both approaches have their merits", "it's important to consider",
+            "it's worth noting",
+            "no one-size-fits-all",
+            "one size fits all",
+            "ultimately, it depends",
+            "both approaches have their merits",
+            "it's important to consider",
         ],
     },
     Rule {
         name: "wrap_up_repeat",
         category: SlopCategory::WrapUpRepeat,
         phrases: &[
-            "in summary", "in conclusion", "at the end of the day", "the bottom line", "hope this helps",
+            "in summary",
+            "in conclusion",
+            "at the end of the day",
+            "the bottom line",
+            "hope this helps",
             "let me know if you'd like",
         ],
     },
@@ -159,7 +207,11 @@ pub fn run(training: &Path, out: &Path) -> Outcome {
     for (rule, count) in counts(&suggestions) {
         println!("  {rule:<24} {count:>6}");
     }
-    println!("  {:<24} {:>6} distinct examples", "total", examples(&suggestions));
+    println!(
+        "  {:<24} {:>6} distinct examples",
+        "total",
+        examples(&suggestions)
+    );
     println!("wrote {}", out.display());
     Ok(())
 }
@@ -174,7 +226,10 @@ pub fn scan(index: &Index) -> Outcome<Vec<Suggestion>> {
     let mut suggestions = Vec::new();
     for (position, entry) in index.entries().enumerate() {
         let texts: Texts = index.parsed(position)?;
-        for (field, text) in [(Field::Instruction, &texts.instruction), (Field::Response, &texts.response)] {
+        for (field, text) in [
+            (Field::Instruction, &texts.instruction),
+            (Field::Response, &texts.response),
+        ] {
             suggestions.extend(findings(field, text).into_iter().map(|finding| Suggestion {
                 id: entry.id.clone(),
                 source: index.source_of(entry).to_string(),
@@ -195,13 +250,24 @@ fn findings(field: Field, text: &str) -> Vec<Finding> {
     let mut found: Vec<Finding> = RULES
         .iter()
         .filter_map(|rule| {
-            let phrase = rule.phrases.iter().find(|phrase| lowered.contains(*phrase))?;
-            Some(Finding { rule: rule.name, category: rule.category, matched: (*phrase).to_string() })
+            let phrase = rule
+                .phrases
+                .iter()
+                .find(|phrase| lowered.contains(*phrase))?;
+            Some(Finding {
+                rule: rule.name,
+                category: rule.category,
+                matched: (*phrase).to_string(),
+            })
         })
         .collect();
     let dashes = text.matches('—').count();
     if field == Field::Response && dashes >= EM_DASH_LIMIT {
-        found.push(Finding { rule: EM_DASH_RULE, category: SlopCategory::RhythmTrick, matched: format!("{dashes} em dashes") });
+        found.push(Finding {
+            rule: EM_DASH_RULE,
+            category: SlopCategory::RhythmTrick,
+            matched: format!("{dashes} em dashes"),
+        });
     }
     found
 }
@@ -217,7 +283,10 @@ fn counts(suggestions: &[Suggestion]) -> BTreeMap<&str, usize> {
 
 /// How many distinct examples were touched.
 fn examples(suggestions: &[Suggestion]) -> usize {
-    let ids: BTreeSet<&str> = suggestions.iter().map(|suggestion| suggestion.id.as_str()).collect();
+    let ids: BTreeSet<&str> = suggestions
+        .iter()
+        .map(|suggestion| suggestion.id.as_str())
+        .collect();
     ids.len()
 }
 
@@ -229,7 +298,10 @@ fn examples(suggestions: &[Suggestion]) -> usize {
 /// `ReviewError::Io` or `ReviewError::Json` for unreadable files,
 /// `ReviewError::Io` when the flags can't be written.
 pub fn apply(suggestions: &Path, flags: &Path) -> Outcome {
-    let added = apply_to(&jsonl::read_lines(suggestions)?, &mut FlagStore::open(flags)?)?;
+    let added = apply_to(
+        &jsonl::read_lines(suggestions)?,
+        &mut FlagStore::open(flags)?,
+    )?;
     println!("applied {added} suggestions to {}", flags.display());
     Ok(())
 }
@@ -239,14 +311,23 @@ pub fn apply(suggestions: &Path, flags: &Path) -> Outcome {
 fn apply_to(suggestions: &[Suggestion], store: &mut FlagStore) -> Outcome<usize> {
     let mut reasons: BTreeMap<&str, Vec<String>> = BTreeMap::new();
     for suggestion in suggestions {
-        reasons.entry(&suggestion.id).or_default().push(suggestion.reason());
+        reasons
+            .entry(&suggestion.id)
+            .or_default()
+            .push(suggestion.reason());
     }
     let mut added = 0;
     for (id, reasons) in reasons {
         if store.get(id).is_some() {
             continue;
         }
-        store.set(id, Flag { note: format!("{AUTO_NOTE} {}", reasons.join("; ")), spans: Vec::new() });
+        store.set(
+            id,
+            Flag {
+                note: format!("{AUTO_NOTE} {}", reasons.join("; ")),
+                spans: Vec::new(),
+            },
+        );
         added += 1;
     }
     store.save()?;
@@ -285,9 +366,15 @@ mod tests {
 
     #[test]
     fn finds_the_first_phrase_of_each_rule_once() {
-        let found = findings(Field::Response, "Great question! Happy to help. In summary, <span>x</span>.");
+        let found = findings(
+            Field::Response,
+            "Great question! Happy to help. In summary, <span>x</span>.",
+        );
         let rules: Vec<&str> = found.iter().map(|finding| finding.rule).collect();
-        assert_eq!(rules, ["source_markup", "flattery_filler_opener", "wrap_up_repeat"]);
+        assert_eq!(
+            rules,
+            ["source_markup", "flattery_filler_opener", "wrap_up_repeat"]
+        );
         assert_eq!(found[1].matched, "great question");
     }
 
@@ -297,7 +384,11 @@ mod tests {
         assert_eq!(findings(Field::Instruction, text), []);
         assert_eq!(
             findings(Field::Response, text),
-            [Finding { rule: EM_DASH_RULE, category: SlopCategory::RhythmTrick, matched: "2 em dashes".to_string() }]
+            [Finding {
+                rule: EM_DASH_RULE,
+                category: SlopCategory::RhythmTrick,
+                matched: "2 em dashes".to_string()
+            }]
         );
     }
 
@@ -305,15 +396,27 @@ mod tests {
     fn scans_every_record_and_reports_counts() -> Outcome {
         let folder = TempDir::new()?;
         let records = concat!(
-            r#"{"id":"a","source":"chat","origin":"c","instruction":"Great question?","response":"In summary — fine — ok"}"#, "\n",
-            r#"{"id":"b","source":"book","origin":"x","instruction":"q","response":"plain"}"#, "\n"
+            r#"{"id":"a","source":"chat","origin":"c","instruction":"Great question?","response":"In summary — fine — ok"}"#,
+            "\n",
+            r#"{"id":"b","source":"book","origin":"x","instruction":"q","response":"plain"}"#,
+            "\n"
         );
         let training = folder.file("train.jsonl", records)?;
         let out = folder.path().join("labels/auto.jsonl");
         run(&training, &out)?;
         let written: Vec<Suggestion> = jsonl::read_lines(&out)?;
-        let rules: Vec<(&str, Field)> = written.iter().map(|found| (found.rule.as_str(), found.field)).collect();
-        assert_eq!(rules, [("flattery_filler_opener", Field::Instruction), ("wrap_up_repeat", Field::Response), (EM_DASH_RULE, Field::Response)]);
+        let rules: Vec<(&str, Field)> = written
+            .iter()
+            .map(|found| (found.rule.as_str(), found.field))
+            .collect();
+        assert_eq!(
+            rules,
+            [
+                ("flattery_filler_opener", Field::Instruction),
+                ("wrap_up_repeat", Field::Response),
+                (EM_DASH_RULE, Field::Response)
+            ]
+        );
         assert_eq!(counts(&written).get(EM_DASH_RULE), Some(&1));
         assert_eq!(examples(&written), 1);
         Ok(())
@@ -321,7 +424,8 @@ mod tests {
 
     #[test]
     fn writes_the_auto_flags_format() -> Outcome {
-        let line = serde_json::to_string(&suggestion("a", "wrap_up_repeat")).map_err(crate::error::ReviewError::unserializable)?;
+        let line = serde_json::to_string(&suggestion("a", "wrap_up_repeat"))
+            .map_err(crate::error::ReviewError::unserializable)?;
         assert_eq!(
             line,
             r#"{"id":"a","source":"chat","rule":"wrap_up_repeat","category":"wrap_up_repeat","field":"response","match":"in summary"}"#
@@ -333,13 +437,28 @@ mod tests {
     fn applying_never_overwrites_a_persons_flag() -> Outcome {
         let folder = TempDir::new()?;
         let mut store = FlagStore::open(&folder.path().join("flags.jsonl"))?;
-        store.set("a", Flag { note: "mine".to_string(), spans: Vec::new() });
-        let added = apply_to(&[suggestion("a", "x"), suggestion("b", "wrap_up_repeat"), suggestion("b", "other")], &mut store)?;
+        store.set(
+            "a",
+            Flag {
+                note: "mine".to_string(),
+                spans: Vec::new(),
+            },
+        );
+        let added = apply_to(
+            &[
+                suggestion("a", "x"),
+                suggestion("b", "wrap_up_repeat"),
+                suggestion("b", "other"),
+            ],
+            &mut store,
+        )?;
         assert_eq!(added, 1);
         assert_eq!(store.get("a").map(|flag| flag.note.as_str()), Some("mine"));
         assert_eq!(
             store.get("b").map(|flag| flag.note.as_str()),
-            Some(r#"auto: wrap_up_repeat [wrap_up_repeat] in chat matched "in summary" in response; other [wrap_up_repeat] in chat matched "in summary" in response"#)
+            Some(
+                r#"auto: wrap_up_repeat [wrap_up_repeat] in chat matched "in summary" in response; other [wrap_up_repeat] in chat matched "in summary" in response"#
+            )
         );
         Ok(())
     }

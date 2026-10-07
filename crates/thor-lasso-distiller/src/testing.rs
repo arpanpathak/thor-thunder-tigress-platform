@@ -28,7 +28,10 @@ impl FakeModel {
     /// `DistillError::Io` when no local port can be bound.
     pub fn start(replies: &[&str]) -> Result<Self, DistillError> {
         let listener = TcpListener::bind("127.0.0.1:0").map_err(DistillError::io("listener"))?;
-        let address = listener.local_addr().map_err(DistillError::io("listener"))?.to_string();
+        let address = listener
+            .local_addr()
+            .map_err(DistillError::io("listener"))?
+            .to_string();
         let requests = Arc::new(Mutex::new(Vec::new()));
         let seen = Arc::clone(&requests);
         let bodies: Vec<String> = replies
@@ -36,21 +39,36 @@ impl FakeModel {
             .map(|reply| serde_json::json!({ "choices": [{ "message": { "role": "assistant", "content": reply } }] }).to_string())
             .collect();
         thread::spawn(move || {
-            for (body, mut stream) in bodies.into_iter().zip(listener.incoming().filter_map(Result::ok)) {
+            for (body, mut stream) in bodies
+                .into_iter()
+                .zip(listener.incoming().filter_map(Result::ok))
+            {
                 let mut buffer = vec![0_u8; REQUEST_BUFFER];
                 let read = stream.read(&mut buffer).unwrap_or_default();
-                seen.lock().unwrap_or_else(PoisonError::into_inner).push(String::from_utf8_lossy(&buffer[..read]).into_owned());
-                let reply = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+                seen.lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .push(String::from_utf8_lossy(&buffer[..read]).into_owned());
+                let reply = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
                 let _ = stream.write_all(reply.as_bytes());
             }
         });
-        let client = Client { address, model: "teacher".to_string(), key: None };
+        let client = Client {
+            address,
+            model: "teacher".to_string(),
+            key: None,
+        };
         Ok(Self { client, requests })
     }
 
     /// How many requests the server has answered.
     #[must_use]
     pub fn request_count(&self) -> usize {
-        self.requests.lock().unwrap_or_else(PoisonError::into_inner).len()
+        self.requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len()
     }
 }

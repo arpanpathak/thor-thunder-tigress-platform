@@ -264,7 +264,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn two_questions_in_a_row_become_one_and_an_empty_question_is_skipped() -> Result<(), DataError> {
+    fn two_questions_in_a_row_become_one_and_an_empty_question_is_skipped() -> Result<(), DataError>
+    {
         let export = r#"[{"uuid": "c4", "chat_messages": [
             {"sender": "human", "content": [{"type": "text", "text": "First part."}]},
             {"sender": "human", "content": [{"type": "text", "text": "Second part."}]},
@@ -274,7 +275,10 @@ mod tests {
         ]}]"#;
         let mut skip_reasons = Vec::new();
         let found = examples(export, &mut skip_reasons)?;
-        let questions: Vec<&str> = found.iter().map(|example| example.instruction.as_str()).collect();
+        let questions: Vec<&str> = found
+            .iter()
+            .map(|example| example.instruction.as_str())
+            .collect();
         assert_eq!(questions, ["First part.\n\nSecond part."]);
         assert_eq!(skip_reasons, [SkipReason::EmptyTurn]);
         Ok(())
@@ -290,8 +294,14 @@ mod tests {
         ]}]"#;
         let mut skip_reasons = Vec::new();
         let found = examples(export, &mut skip_reasons)?;
-        let questions: Vec<&str> = found.iter().map(|example| example.instruction.as_str()).collect();
-        assert_eq!(questions, ["Review this file.\n\nAttached file `main.rs`:\n\nfn main() {}"]);
+        let questions: Vec<&str> = found
+            .iter()
+            .map(|example| example.instruction.as_str())
+            .collect();
+        assert_eq!(
+            questions,
+            ["Review this file.\n\nAttached file `main.rs`:\n\nfn main() {}"]
+        );
         Ok(())
     }
 

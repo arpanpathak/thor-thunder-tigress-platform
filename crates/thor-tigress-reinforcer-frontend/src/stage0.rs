@@ -48,12 +48,17 @@ pub fn suggestions(source: &str, response: &str) -> Suggestions {
         .slop
         .hits
         .into_iter()
-        .map(|hit| SlopHit { text: hit.text, category: hit.category.into() })
+        .map(|hit| SlopHit {
+            text: hit.text,
+            category: hit.category.into(),
+        })
         .collect();
     let mut violations = Vec::new();
     for block in score.blocks {
         for violation in block.report.violations {
-            let line = (block.line + violation.line).checked_sub(2).and_then(|index| lines.get(index));
+            let line = (block.line + violation.line)
+                .checked_sub(2)
+                .and_then(|index| lines.get(index));
             violations.push(Violation {
                 rule: titles::rule_title(violation.rule),
                 detail: violation.detail,
@@ -72,13 +77,27 @@ mod tests {
     fn suggests_slop_and_rule_breaks_with_the_line_text() {
         let answer = "Great question! Here it is.\n```rust\nfn main() {\n    let x = run().unwrap();\n}\n```\n";
         let found = suggestions("chat", answer);
-        assert!(found.slop.iter().any(|hit| hit.category == SlopCategory::FlatteryFillerOpener));
-        let unwrap = found.violations.iter().find(|violation| violation.rule == "Calls unwrap() or expect()");
-        assert_eq!(unwrap.map(|violation| violation.line.as_str()), Some("let x = run().unwrap();"));
+        assert!(
+            found
+                .slop
+                .iter()
+                .any(|hit| hit.category == SlopCategory::FlatteryFillerOpener)
+        );
+        let unwrap = found
+            .violations
+            .iter()
+            .find(|violation| violation.rule == "Calls unwrap() or expect()");
+        assert_eq!(
+            unwrap.map(|violation| violation.line.as_str()),
+            Some("let x = run().unwrap();")
+        );
     }
 
     #[test]
     fn suggests_nothing_in_the_reviewers_own_sources() {
-        assert_eq!(suggestions("readability", "Great question! x.unwrap()"), Suggestions::default());
+        assert_eq!(
+            suggestions("readability", "Great question! x.unwrap()"),
+            Suggestions::default()
+        );
     }
 }

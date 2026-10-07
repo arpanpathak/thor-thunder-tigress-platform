@@ -74,7 +74,10 @@ fn read_raw_request(stream: &TcpStream) -> Outcome<String> {
 
 /// An `HTTP/1.1 200` response with a JSON body.
 pub fn json_response(body: &str) -> String {
-    format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}", body.len())
+    format!(
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
+    )
 }
 
 /// An `HTTP/1.1 200` event stream carrying `events`, then `[DONE]`.

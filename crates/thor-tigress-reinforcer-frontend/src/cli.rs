@@ -33,8 +33,18 @@ const DEFAULT_AUTO_FLAGS: &str = "labels/auto_flags.jsonl";
 /// The datasets `serve` shows when none is named: name, records, flags, removed.
 const DEFAULT_DATASETS: [(&str, &str, &str, &str); 3] = [
     ("train", DEFAULT_TRAINING, DEFAULT_FLAGS, DEFAULT_SLOP),
-    ("teacher", "data/teacher.jsonl", "labels/teacher_flags.jsonl", "data/teacher_removed.jsonl"),
-    ("conversations", "data/conversations.jsonl", "labels/conversation_flags.jsonl", "data/conversations_removed.jsonl"),
+    (
+        "teacher",
+        "data/teacher.jsonl",
+        "labels/teacher_flags.jsonl",
+        "data/teacher_removed.jsonl",
+    ),
+    (
+        "conversations",
+        "data/conversations.jsonl",
+        "labels/conversation_flags.jsonl",
+        "data/conversations_removed.jsonl",
+    ),
 ];
 
 /// The usage text.
@@ -101,7 +111,10 @@ impl Command {
 }
 
 fn nth_or(arguments: &[String], position: usize, default: &str) -> String {
-    arguments.get(position).cloned().unwrap_or_else(|| default.to_string())
+    arguments
+        .get(position)
+        .cloned()
+        .unwrap_or_else(|| default.to_string())
 }
 
 fn serve(options: &[String]) -> Command {
@@ -116,7 +129,11 @@ fn serve(options: &[String]) -> Command {
             "--port" => port.clone_from(value),
             "--dataset" => match dataset(value) {
                 Some(spec) => datasets.push(spec),
-                None => return Command::Usage(format!("--dataset {value}: expected NAME=RECORDS[,FLAGS[,REMOVED]]")),
+                None => {
+                    return Command::Usage(format!(
+                        "--dataset {value}: expected NAME=RECORDS[,FLAGS[,REMOVED]]"
+                    ));
+                }
             },
             other => return Command::Usage(format!("unknown option {other}")),
         }
@@ -124,7 +141,14 @@ fn serve(options: &[String]) -> Command {
     if datasets.is_empty() {
         datasets = DEFAULT_DATASETS
             .iter()
-            .map(|&(name, records, flags, removed)| DatasetSpec::new(name, Path::new(records), Path::new(flags), Path::new(removed)))
+            .map(|&(name, records, flags, removed)| {
+                DatasetSpec::new(
+                    name,
+                    Path::new(records),
+                    Path::new(flags),
+                    Path::new(removed),
+                )
+            })
             .collect();
     }
     Command::Serve { port, datasets }
@@ -136,9 +160,20 @@ fn dataset(value: &str) -> Option<DatasetSpec> {
     let (name, files) = value.split_once('=')?;
     let mut files = files.split(',').filter(|file| !file.is_empty());
     let records = files.next()?;
-    let flags = files.next().map_or_else(|| format!("labels/{name}_flags.jsonl"), str::to_string);
-    let removed = files.next().map_or_else(|| format!("data/{name}_removed.jsonl"), str::to_string);
-    (!name.is_empty()).then(|| DatasetSpec::new(name, Path::new(records), Path::new(&flags), Path::new(&removed)))
+    let flags = files
+        .next()
+        .map_or_else(|| format!("labels/{name}_flags.jsonl"), str::to_string);
+    let removed = files
+        .next()
+        .map_or_else(|| format!("data/{name}_removed.jsonl"), str::to_string);
+    (!name.is_empty()).then(|| {
+        DatasetSpec::new(
+            name,
+            Path::new(records),
+            Path::new(&flags),
+            Path::new(&removed),
+        )
+    })
 }
 
 #[cfg(test)]
@@ -151,7 +186,9 @@ mod tests {
 
     fn names(command: &Command) -> Vec<String> {
         match command {
-            Command::Serve { datasets, .. } => datasets.iter().map(|spec| spec.name.clone()).collect(),
+            Command::Serve { datasets, .. } => {
+                datasets.iter().map(|spec| spec.name.clone()).collect()
+            }
             Command::Scan { .. } | Command::Apply { .. } | Command::Usage(_) => Vec::new(),
         }
     }
@@ -167,18 +204,40 @@ mod tests {
     fn serves_every_default_dataset_when_nothing_is_given() {
         assert_eq!(names(&command(&[])), ["train", "teacher", "conversations"]);
         assert!(names(&command(&["scan"])).is_empty() && specs(command(&["apply"])).is_empty());
-        assert_eq!(names(&command(&["serve", "--port", "9000"])), ["train", "teacher", "conversations"]);
-        assert!(matches!(command(&["--port", "9000"]), Command::Serve { port, .. } if port == "9000"));
+        assert_eq!(
+            names(&command(&["serve", "--port", "9000"])),
+            ["train", "teacher", "conversations"]
+        );
+        assert!(
+            matches!(command(&["--port", "9000"]), Command::Serve { port, .. } if port == "9000")
+        );
     }
 
     #[test]
     fn reads_named_datasets() {
-        let served = command(&["serve", "--dataset", "mine=a.jsonl,f.jsonl,r.jsonl", "--dataset", "other=b.jsonl"]);
+        let served = command(&[
+            "serve",
+            "--dataset",
+            "mine=a.jsonl,f.jsonl,r.jsonl",
+            "--dataset",
+            "other=b.jsonl",
+        ]);
         assert!(matches!(&served, Command::Serve { port, .. } if port == DEFAULT_PORT));
         let datasets = specs(served);
-        assert_eq!(datasets[0], DatasetSpec::new("mine", Path::new("a.jsonl"), Path::new("f.jsonl"), Path::new("r.jsonl")));
+        assert_eq!(
+            datasets[0],
+            DatasetSpec::new(
+                "mine",
+                Path::new("a.jsonl"),
+                Path::new("f.jsonl"),
+                Path::new("r.jsonl")
+            )
+        );
         assert_eq!(datasets[1].flags, PathBuf::from("labels/other_flags.jsonl"));
-        assert_eq!(datasets[1].removed, PathBuf::from("data/other_removed.jsonl"));
+        assert_eq!(
+            datasets[1].removed,
+            PathBuf::from("data/other_removed.jsonl")
+        );
     }
 
     #[test]
@@ -186,7 +245,15 @@ mod tests {
         let served = command(&["data/conversations.jsonl", "8788", "labels/c.jsonl"]);
         assert!(matches!(&served, Command::Serve { port, .. } if port == "8788"));
         let datasets = specs(served);
-        assert_eq!(datasets, [DatasetSpec::new("train", Path::new("data/conversations.jsonl"), Path::new("labels/c.jsonl"), Path::new(DEFAULT_SLOP))]);
+        assert_eq!(
+            datasets,
+            [DatasetSpec::new(
+                "train",
+                Path::new("data/conversations.jsonl"),
+                Path::new("labels/c.jsonl"),
+                Path::new(DEFAULT_SLOP)
+            )]
+        );
     }
 
     #[test]
@@ -201,10 +268,19 @@ mod tests {
 
     #[test]
     fn reads_scan_and_apply() {
-        assert_eq!(command(&["scan"]), Command::Scan { training: DEFAULT_TRAINING.into(), out: DEFAULT_AUTO_FLAGS.into() });
+        assert_eq!(
+            command(&["scan"]),
+            Command::Scan {
+                training: DEFAULT_TRAINING.into(),
+                out: DEFAULT_AUTO_FLAGS.into()
+            }
+        );
         assert_eq!(
             command(&["apply", "a.jsonl", "f.jsonl"]),
-            Command::Apply { suggestions: "a.jsonl".into(), flags: "f.jsonl".into() }
+            Command::Apply {
+                suggestions: "a.jsonl".into(),
+                flags: "f.jsonl".into()
+            }
         );
     }
 }

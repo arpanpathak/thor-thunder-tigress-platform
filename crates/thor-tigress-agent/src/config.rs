@@ -107,7 +107,10 @@ impl Config {
                 engines: options
                     .engines
                     .into_iter()
-                    .map(|(model, address)| Engine { model, endpoint: Endpoint::new(address, None) })
+                    .map(|(model, address)| Engine {
+                        model,
+                        endpoint: Endpoint::new(address, None),
+                    })
                     .collect(),
                 search: Endpoint::new(options.search, None),
             },
@@ -140,7 +143,9 @@ struct Options {
 
 impl Default for Options {
     fn default() -> Self {
-        let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
+        let home = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_default();
         Options {
             listen: DEFAULT_LISTEN.to_string(),
             model: DEFAULT_MODEL.to_string(),
@@ -182,8 +187,12 @@ impl Options {
 /// Reads `MODEL=HOST:PORT`.
 fn engine(value: &str) -> Outcome<(String, String)> {
     match value.split_once('=') {
-        Some((model, address)) if !model.is_empty() && !address.is_empty() => Ok((model.to_string(), address.to_string())),
-        _ => Err(AgentError::Config(format!("--engine {value}: expected MODEL=HOST:PORT"))),
+        Some((model, address)) if !model.is_empty() && !address.is_empty() => {
+            Ok((model.to_string(), address.to_string()))
+        }
+        _ => Err(AgentError::Config(format!(
+            "--engine {value}: expected MODEL=HOST:PORT"
+        ))),
     }
 }
 
@@ -232,7 +241,16 @@ mod tests {
     #[test]
     fn options_override_defaults() -> Outcome {
         let config = Config::from_args(args(&[
-            "--listen", "0.0.0.0:9000", "--model", "m:1", "--search", "s:2", "--web", "/srv", "--key-file", "/none",
+            "--listen",
+            "0.0.0.0:9000",
+            "--model",
+            "m:1",
+            "--search",
+            "s:2",
+            "--web",
+            "/srv",
+            "--key-file",
+            "/none",
         ]))?;
         assert_eq!(config.listen, "0.0.0.0:9000");
         assert_eq!(config.upstreams.model.address(), "m:1");
@@ -246,11 +264,23 @@ mod tests {
         let config = Config::from_args(args(&["--engine", "qwen=e:1", "--key-file", "/none"]))?;
         let upstreams = &config.upstreams;
         assert_eq!(upstreams.serving(Some("qwen")).address(), "e:1");
-        assert_eq!(upstreams.serving(Some("nemotron")).address(), "127.0.0.1:8079");
+        assert_eq!(
+            upstreams.serving(Some("nemotron")).address(),
+            "127.0.0.1:8079"
+        );
         assert_eq!(upstreams.serving(None).address(), "127.0.0.1:8079");
-        assert_eq!(upstreams.serving_body(br#"{"model":"qwen"}"#).address(), "e:1");
-        assert_eq!(upstreams.serving_body(br#"{"messages":[]}"#).address(), "127.0.0.1:8079");
-        assert_eq!(upstreams.serving_body(b"not json").address(), "127.0.0.1:8079");
+        assert_eq!(
+            upstreams.serving_body(br#"{"model":"qwen"}"#).address(),
+            "e:1"
+        );
+        assert_eq!(
+            upstreams.serving_body(br#"{"messages":[]}"#).address(),
+            "127.0.0.1:8079"
+        );
+        assert_eq!(
+            upstreams.serving_body(b"not json").address(),
+            "127.0.0.1:8079"
+        );
         assert_eq!(upstreams.engines[0].endpoint.authorization(), None);
         Ok(())
     }
@@ -259,7 +289,10 @@ mod tests {
     fn rejects_an_engine_without_a_model_or_address() {
         for value in ["qwen", "=e:1", "qwen="] {
             let refused = Config::from_args(args(&["--engine", value]));
-            assert!(refused.is_err_and(|error| error.to_string().ends_with("expected MODEL=HOST:PORT")), "{value}");
+            assert!(
+                refused.is_err_and(|error| error.to_string().ends_with("expected MODEL=HOST:PORT")),
+                "{value}"
+            );
         }
     }
 
@@ -268,7 +301,9 @@ mod tests {
         let unknown = Config::from_args(args(&["--port", "1"]));
         let incomplete = Config::from_args(args(&["--listen"]));
         assert!(unknown.is_err_and(|error| error.to_string() == "config: unknown option --port"));
-        assert!(incomplete.is_err_and(|error| error.to_string() == "config: --listen needs a value"));
+        assert!(
+            incomplete.is_err_and(|error| error.to_string() == "config: --listen needs a value")
+        );
     }
 
     #[test]
@@ -279,7 +314,10 @@ mod tests {
         fs::remove_file(&path)?;
         let config = config?;
         assert_eq!(config.key.as_deref(), Some("secret"));
-        assert_eq!(config.upstreams.model.authorization(), Some("Bearer secret"));
+        assert_eq!(
+            config.upstreams.model.authorization(),
+            Some("Bearer secret")
+        );
         assert_eq!(config.upstreams.search.authorization(), None);
         Ok(())
     }

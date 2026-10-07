@@ -114,10 +114,20 @@ pub fn sections(train: &Path, manifest: &Path) -> Result<Vec<Section>, DataError
         }
         let source = row.origin.split('/').next().unwrap_or_default().to_string();
         let licence = match row.source.as_str() {
-            "corpus" => licences.get(&source).cloned().unwrap_or_else(|| "unknown".to_string()),
+            "corpus" => licences
+                .get(&source)
+                .cloned()
+                .unwrap_or_else(|| "unknown".to_string()),
             _ => AUTHORS_OWN.to_string(),
         };
-        sections.push(Section { id: row.id, source, origin: row.origin, licence, text: row.response, language: None });
+        sections.push(Section {
+            id: row.id,
+            source,
+            origin: row.origin,
+            licence,
+            text: row.response,
+            language: None,
+        });
     }
     Ok(sections)
 }
@@ -148,7 +158,11 @@ pub fn code_sections(root: &Path, manifest: &Path) -> Result<Vec<Section>, DataE
             if !(MIN_CODE_CHARS..=MAX_CODE_CHARS).contains(&text.chars().count()) {
                 continue;
             }
-            let relative = file.strip_prefix(root).unwrap_or(&file).display().to_string();
+            let relative = file
+                .strip_prefix(root)
+                .unwrap_or(&file)
+                .display()
+                .to_string();
             sections.push(Section {
                 id: stable_id(&format!("{relative}\n{text}")),
                 source: row.name.clone(),
@@ -164,14 +178,20 @@ pub fn code_sections(root: &Path, manifest: &Path) -> Result<Vec<Section>, DataE
 
 fn language_of(file: &Path) -> Option<&'static str> {
     let extension = file.extension()?.to_str()?;
-    CODE_LANGUAGES.iter().find(|(known, _)| *known == extension).map(|&(_, tag)| tag)
+    CODE_LANGUAGES
+        .iter()
+        .find(|(known, _)| *known == extension)
+        .map(|&(_, tag)| tag)
 }
 
 fn source_files(folder: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<(), DataError> {
     if !folder.is_dir() {
         return Ok(());
     }
-    for entry in fs::read_dir(folder).map_err(DataError::io(folder))?.filter_map(Result::ok) {
+    for entry in fs::read_dir(folder)
+        .map_err(DataError::io(folder))?
+        .filter_map(Result::ok)
+    {
         let path = entry.path();
         if path.file_name().is_some_and(|name| name == ".git") {
             continue;
@@ -189,7 +209,12 @@ fn source_files(folder: &Path, files: &mut Vec<std::path::PathBuf>) -> Result<()
 /// from an excluded source.
 #[must_use]
 pub fn is_teachable(section: &Section) -> bool {
-    let file = section.origin.rsplit('/').next().unwrap_or_default().to_lowercase();
+    let file = section
+        .origin
+        .rsplit('/')
+        .next()
+        .unwrap_or_default()
+        .to_lowercase();
     section.text.chars().count() >= MIN_SECTION_CHARS
         && !PAPERWORK.iter().any(|word| file.contains(word))
         && !EXCLUDED_SOURCES.contains(&section.source.as_str())
@@ -200,11 +225,22 @@ pub fn is_teachable(section: &Section) -> bool {
 /// every run: sections are taken in order of id, which spreads them over the
 /// files of a source.
 #[must_use]
-pub fn pick<'a>(sections: &'a [Section], per_source: usize, wanted: &[String], used: &HashSet<String>) -> Vec<&'a Section> {
+pub fn pick<'a>(
+    sections: &'a [Section],
+    per_source: usize,
+    wanted: &[String],
+    used: &HashSet<String>,
+) -> Vec<&'a Section> {
     let mut by_source: BTreeMap<&str, Vec<&Section>> = BTreeMap::new();
-    for section in sections.iter().filter(|section| is_teachable(section) && !used.contains(&section.id)) {
+    for section in sections
+        .iter()
+        .filter(|section| is_teachable(section) && !used.contains(&section.id))
+    {
         if wanted.is_empty() || wanted.contains(&section.source) {
-            by_source.entry(section.source.as_str()).or_default().push(section);
+            by_source
+                .entry(section.source.as_str())
+                .or_default()
+                .push(section);
         }
     }
     by_source
@@ -246,7 +282,11 @@ mod tests {
         let binary = folder.join("blob.rs");
         fs::write(&binary, vec![0xff_u8; MIN_CODE_CHARS + 1]).map_err(DataError::io(&binary))?;
         let manifest = root.join("manifest.tsv");
-        fs::write(&manifest, "source\tkind\tcommit\tlicence_file\tlicence\nlib\tcode\tabc\tLICENSE\tMIT License\n").map_err(DataError::io(&manifest))?;
+        fs::write(
+            &manifest,
+            "source\tkind\tcommit\tlicence_file\tlicence\nlib\tcode\tabc\tLICENSE\tMIT License\n",
+        )
+        .map_err(DataError::io(&manifest))?;
         assert_eq!(code_sections(&root, &manifest)?, []);
         fs::remove_dir_all(&root).map_err(DataError::io(&root))
     }
@@ -266,8 +306,18 @@ mod tests {
     fn leaves_out_paperwork_and_short_sections() {
         assert!(is_teachable(&section("a", "trpl", "ch08.md", 900)));
         assert!(!is_teachable(&section("a", "trpl", "ch08.md", 100)));
-        assert!(!is_teachable(&section("a", "trpl", "CODE_OF_CONDUCT.md", 900)));
-        assert!(!is_teachable(&section("a", "gpu-accelerated-kubernetes", "ch01.md", 900)));
+        assert!(!is_teachable(&section(
+            "a",
+            "trpl",
+            "CODE_OF_CONDUCT.md",
+            900
+        )));
+        assert!(!is_teachable(&section(
+            "a",
+            "gpu-accelerated-kubernetes",
+            "ch01.md",
+            900
+        )));
     }
 
     #[test]
@@ -289,7 +339,10 @@ mod tests {
         let rows = "source\tkind\tcommit\tlicence_file\tlicence\nlib\tcode\tabc\tLICENSE\tMIT License\ndocs\tbook\tabc\tLICENSE\tMIT License\nclosed\tcode\tabc\tLICENSE\tAll rights reserved\nmissing\tcode\tabc\tLICENSE\tMIT License\n";
         fs::write(&manifest, rows).map_err(DataError::io(&manifest))?;
         let found = code_sections(&root, &manifest)?;
-        let origins: Vec<(&str, Option<&str>)> = found.iter().map(|found| (found.origin.as_str(), found.language)).collect();
+        let origins: Vec<(&str, Option<&str>)> = found
+            .iter()
+            .map(|found| (found.origin.as_str(), found.language))
+            .collect();
         assert_eq!(origins, [("lib/src/a.rs", Some("rust"))]);
         let queue = render_queue(&found.iter().collect::<Vec<_>>());
         assert!(queue.contains("````rust\nfn main() {}"));
@@ -305,10 +358,15 @@ mod tests {
             section("z", "trpl", "d.md", 900),
         ];
         let used = HashSet::from(["a".to_string()]);
-        let ids: Vec<&str> = pick(&sections, 1, &[], &used).into_iter().map(|picked| picked.id.as_str()).collect();
+        let ids: Vec<&str> = pick(&sections, 1, &[], &used)
+            .into_iter()
+            .map(|picked| picked.id.as_str())
+            .collect();
         assert_eq!(ids, ["b", "z"]);
-        let only_go: Vec<&str> =
-            pick(&sections, 5, &["go".to_string()], &HashSet::new()).into_iter().map(|picked| picked.id.as_str()).collect();
+        let only_go: Vec<&str> = pick(&sections, 5, &["go".to_string()], &HashSet::new())
+            .into_iter()
+            .map(|picked| picked.id.as_str())
+            .collect();
         assert_eq!(only_go, ["a", "b", "c"]);
     }
 
@@ -332,11 +390,20 @@ mod tests {
             r#"{"id":"4","instruction":"","response":"text","source":"corpus","origin":"gone/src/a.md"}"#,
         ];
         fs::write(&train, rows.join("\n")).map_err(DataError::io(&train))?;
-        fs::write(&manifest, "source\tkind\tcommit\tlicence_file\tlicence\ntrpl\tbook\tabc\tLICENSE\tMIT License\n")
-            .map_err(DataError::io(&manifest))?;
+        fs::write(
+            &manifest,
+            "source\tkind\tcommit\tlicence_file\tlicence\ntrpl\tbook\tabc\tLICENSE\tMIT License\n",
+        )
+        .map_err(DataError::io(&manifest))?;
         let found = sections(&train, &manifest)?;
-        let licences: Vec<(&str, &str)> = found.iter().map(|found| (found.id.as_str(), found.licence.as_str())).collect();
-        assert_eq!(licences, [("1", "MIT"), ("2", AUTHORS_OWN), ("4", "unknown")]);
+        let licences: Vec<(&str, &str)> = found
+            .iter()
+            .map(|found| (found.id.as_str(), found.licence.as_str()))
+            .collect();
+        assert_eq!(
+            licences,
+            [("1", "MIT"), ("2", AUTHORS_OWN), ("4", "unknown")]
+        );
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 }

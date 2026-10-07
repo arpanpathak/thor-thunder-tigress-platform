@@ -30,10 +30,7 @@ pub fn examples(readability_set: &str) -> Vec<Example> {
     let without_comments = remove_html_comments(readability_set);
     let mut examples = Vec::new();
     for entry in without_comments.split("\n---\n") {
-        let Some(instruction_and_response) = entry
-            .trim()
-            .strip_prefix("### Instruction")
-        else {
+        let Some(instruction_and_response) = entry.trim().strip_prefix("### Instruction") else {
             continue;
         };
         let Some((instruction, response)) = instruction_and_response.split_once("### Response")
@@ -75,7 +72,10 @@ mod tests {
     #[test]
     fn skips_an_entry_without_a_response_and_an_unclosed_comment() {
         let set = "# Set\n---\n### Instruction\nNo answer here.\n---\n### Instruction\nQ\n### Response\nA <!-- never closed";
-        let pairs: Vec<(String, String)> = examples(set).into_iter().map(|example| (example.instruction, example.response)).collect();
+        let pairs: Vec<(String, String)> = examples(set)
+            .into_iter()
+            .map(|example| (example.instruction, example.response))
+            .collect();
         assert_eq!(pairs, [("Q".to_string(), "A".to_string())]);
     }
 

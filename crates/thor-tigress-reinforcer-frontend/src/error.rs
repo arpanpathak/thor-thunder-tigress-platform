@@ -62,7 +62,9 @@ impl ReviewError {
         match self {
             ReviewError::BadRequest(_) => Some(Status::BadRequest),
             ReviewError::NotFound(_) => Some(Status::NotFound),
-            ReviewError::Io { .. } | ReviewError::Json { .. } | ReviewError::Poisoned => Some(Status::InternalError),
+            ReviewError::Io { .. } | ReviewError::Json { .. } | ReviewError::Poisoned => {
+                Some(Status::InternalError)
+            }
             ReviewError::Connection(_) => None,
         }
     }
@@ -76,7 +78,10 @@ impl fmt::Display for ReviewError {
             ReviewError::Connection(source) => write!(f, "connection: {source}"),
             ReviewError::BadRequest(message) => write!(f, "bad request: {message}"),
             ReviewError::NotFound(message) => write!(f, "not found: {message}"),
-            ReviewError::Poisoned => write!(f, "the flags are unavailable after a crash; restart the tool"),
+            ReviewError::Poisoned => write!(
+                f,
+                "the flags are unavailable after a crash; restart the tool"
+            ),
         }
     }
 }
@@ -105,7 +110,11 @@ mod tests {
     fn a_json_error_keeps_its_source() {
         use std::error::Error as _;
         let source = serde_json::from_str::<u8>("x").err();
-        let error = source.map(|source| ReviewError::Json { path: "f.jsonl".into(), line: 1, source });
+        let error = source.map(|source| ReviewError::Json {
+            path: "f.jsonl".into(),
+            line: 1,
+            source,
+        });
         assert!(error.as_ref().and_then(|error| error.source()).is_some());
     }
     use std::error::Error;
@@ -113,7 +122,8 @@ mod tests {
     #[test]
     fn every_error_says_what_and_where() -> Outcome {
         let path = Path::new("labels/flags.jsonl");
-        let parse = serde_json::from_str::<serde_json::Value>("{").map_err(ReviewError::json(path, 3));
+        let parse =
+            serde_json::from_str::<serde_json::Value>("{").map_err(ReviewError::json(path, 3));
         let errors = [
             ReviewError::io(path)(io::Error::other("disk full")),
             parse.err().ok_or(ReviewError::Poisoned)?,
@@ -134,15 +144,25 @@ mod tests {
 
     #[test]
     fn statuses_follow_the_kind_of_error() {
-        assert_eq!(ReviewError::BadRequest(String::new()).status(), Some(Status::BadRequest));
-        assert_eq!(ReviewError::NotFound(String::new()).status(), Some(Status::NotFound));
+        assert_eq!(
+            ReviewError::BadRequest(String::new()).status(),
+            Some(Status::BadRequest)
+        );
+        assert_eq!(
+            ReviewError::NotFound(String::new()).status(),
+            Some(Status::NotFound)
+        );
         assert_eq!(ReviewError::Poisoned.status(), Some(Status::InternalError));
         assert_eq!(ReviewError::from(io::Error::other("gone")).status(), None);
     }
 
     #[test]
     fn wrapped_errors_keep_their_source() {
-        assert!(ReviewError::from(io::Error::other("gone")).source().is_some());
+        assert!(
+            ReviewError::from(io::Error::other("gone"))
+                .source()
+                .is_some()
+        );
         assert!(ReviewError::Poisoned.source().is_none());
     }
 }

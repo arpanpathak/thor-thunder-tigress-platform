@@ -37,7 +37,9 @@ pub fn collection_title(folder: &str) -> String {
         "ms-style-guide" => "Microsoft Writing Style Guide",
         "kubernetes-website" => "Kubernetes Documentation",
         "go-website" => "Go Documentation",
-        "cracking-the-systems-programming-interview" => "Cracking the Systems Programming Interview",
+        "cracking-the-systems-programming-interview" => {
+            "Cracking the Systems Programming Interview"
+        }
         "cracking-the-systems-engineering-book" => "Cracking the Systems Engineering Book",
         "gpu-accelerated-kubernetes" => "GPU-Accelerated Kubernetes",
         "rust-interview-lab" => "Rust Interview Lab",

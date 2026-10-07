@@ -140,8 +140,14 @@ mod tests {
         assert_eq!(
             names,
             [
-                "fake_importance", "dramatic_setup", "empty_depth_words", "fake_balance_hedging",
-                "flattery_filler_opener", "wrap_up_repeat", "rhythm_trick", "other",
+                "fake_importance",
+                "dramatic_setup",
+                "empty_depth_words",
+                "fake_balance_hedging",
+                "flattery_filler_opener",
+                "wrap_up_repeat",
+                "rhythm_trick",
+                "other",
             ]
         );
         for category in SlopCategory::ALL {
@@ -161,8 +167,18 @@ mod tests {
 
     #[test]
     fn every_category_has_words_and_stage0_maps_onto_it() {
-        assert!(SlopCategory::ALL.iter().all(|category| !category.description().is_empty()));
-        assert_eq!(SlopCategory::from(Category::WrapUpRepeat), SlopCategory::WrapUpRepeat);
-        assert_eq!(SlopCategory::from(Category::FakeImportance), SlopCategory::FakeImportance);
+        assert!(
+            SlopCategory::ALL
+                .iter()
+                .all(|category| !category.description().is_empty())
+        );
+        assert_eq!(
+            SlopCategory::from(Category::WrapUpRepeat),
+            SlopCategory::WrapUpRepeat
+        );
+        assert_eq!(
+            SlopCategory::from(Category::FakeImportance),
+            SlopCategory::FakeImportance
+        );
     }
 }

@@ -69,7 +69,10 @@ fn main() -> ExitCode {
 fn serve(port: &str, datasets: &[DatasetSpec]) -> Outcome<Infallible> {
     let workspace = Arc::new(Workspace::open(datasets)?);
     for info in workspace.infos()? {
-        println!("{:<14} {:>7} records, {:>5} flagged  {}", info.name, info.records, info.flagged, info.file);
+        println!(
+            "{:<14} {:>7} records, {:>5} flagged  {}",
+            info.name, info.records, info.flagged, info.file
+        );
     }
     for missing in workspace.missing() {
         println!("not found, skipped: {missing}");
@@ -98,7 +101,8 @@ impl<T: Read + Write> Connection for T {}
 /// Answers one connection; a failure is logged and, when someone is still
 /// listening, answered with its status.
 fn handle(stream: &mut dyn Connection, workspace: &Workspace) {
-    let outcome = http::read_request(stream).and_then(|request| api::answer(stream, &request, workspace));
+    let outcome =
+        http::read_request(stream).and_then(|request| api::answer(stream, &request, workspace));
     let Err(error) = outcome else {
         return;
     };
@@ -160,10 +164,20 @@ mod tests {
     #[test]
     fn a_vanished_or_broken_client_is_only_logged() -> Outcome {
         let folder = TempDir::new()?;
-        let records = folder.file("train.jsonl", "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n")?;
-        let spec = DatasetSpec::new("train", &records, &folder.path().join("f.jsonl"), &folder.path().join("r.jsonl"));
+        let records = folder.file(
+            "train.jsonl",
+            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
+        )?;
+        let spec = DatasetSpec::new(
+            "train",
+            &records,
+            &folder.path().join("f.jsonl"),
+            &folder.path().join("r.jsonl"),
+        );
         let workspace = Workspace::open(&[spec])?;
-        let mut vanishing = Vanishing { request: io::Cursor::new(b"GET /missing HTTP/1.1\r\n\r\n".to_vec()) };
+        let mut vanishing = Vanishing {
+            request: io::Cursor::new(b"GET /missing HTTP/1.1\r\n\r\n".to_vec()),
+        };
         handle(&mut vanishing, &workspace);
         assert!(vanishing.flush().is_err());
         let mut broken = Broken;
@@ -174,21 +188,39 @@ mod tests {
     use std::io::{Read, Write};
 
     fn exchange(address: &str, request: &str) -> Outcome<String> {
-        let mut stream = TcpStream::connect(address).map_err(ReviewError::io(Path::new(address)))?;
-        stream.write_all(request.as_bytes()).map_err(ReviewError::io(Path::new(address)))?;
+        let mut stream =
+            TcpStream::connect(address).map_err(ReviewError::io(Path::new(address)))?;
+        stream
+            .write_all(request.as_bytes())
+            .map_err(ReviewError::io(Path::new(address)))?;
         let mut reply = String::new();
-        stream.read_to_string(&mut reply).map_err(ReviewError::io(Path::new(address)))?;
+        stream
+            .read_to_string(&mut reply)
+            .map_err(ReviewError::io(Path::new(address)))?;
         Ok(reply)
     }
 
     #[test]
     fn serve_opens_the_datasets_and_listens() -> Outcome {
         let folder = TempDir::new()?;
-        let records = folder.file("train.jsonl", "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n")?;
+        let records = folder.file(
+            "train.jsonl",
+            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
+        )?;
         let missing = folder.path().join("none.jsonl");
         let specs = vec![
-            DatasetSpec::new("train", &records, &folder.path().join("f.jsonl"), &folder.path().join("r.jsonl")),
-            DatasetSpec::new("teacher", &missing, &folder.path().join("g.jsonl"), &folder.path().join("s.jsonl")),
+            DatasetSpec::new(
+                "train",
+                &records,
+                &folder.path().join("f.jsonl"),
+                &folder.path().join("r.jsonl"),
+            ),
+            DatasetSpec::new(
+                "teacher",
+                &missing,
+                &folder.path().join("g.jsonl"),
+                &folder.path().join("s.jsonl"),
+            ),
         ];
         thread::spawn(move || serve("0", &specs));
         thread::sleep(std::time::Duration::from_millis(200));
@@ -200,10 +232,19 @@ mod tests {
     fn serves_every_dataset_and_reports_bad_requests() -> Outcome {
         let folder = TempDir::new()?;
         let records = folder.file("train.jsonl", "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\",\"instruction\":\"Q\",\"response\":\"A\"}\n")?;
-        let spec = DatasetSpec::new("train", &records, &folder.path().join("flags.jsonl"), &folder.path().join("removed.jsonl"));
+        let spec = DatasetSpec::new(
+            "train",
+            &records,
+            &folder.path().join("flags.jsonl"),
+            &folder.path().join("removed.jsonl"),
+        );
         let workspace = Arc::new(Workspace::open(&[spec])?);
-        let listener = TcpListener::bind("127.0.0.1:0").map_err(ReviewError::io(Path::new("listener")))?;
-        let address = listener.local_addr().map_err(ReviewError::io(Path::new("listener")))?.to_string();
+        let listener =
+            TcpListener::bind("127.0.0.1:0").map_err(ReviewError::io(Path::new("listener")))?;
+        let address = listener
+            .local_addr()
+            .map_err(ReviewError::io(Path::new("listener")))?
+            .to_string();
         let server = thread::spawn(move || accept(listener.incoming().take(3), &workspace));
         let datasets = exchange(&address, "GET /api/datasets HTTP/1.1\r\n\r\n")?;
         let unknown = exchange(&address, "GET /api/meta?dataset=nope HTTP/1.1\r\n\r\n")?;

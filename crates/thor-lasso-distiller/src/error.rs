@@ -66,11 +66,20 @@ mod tests {
     #[test]
     fn every_error_says_what_and_where() {
         let io = DistillError::io("data/train.jsonl")(io::Error::other("disk full"));
-        let json = serde_json::from_str::<u8>("x").err().map(|source| DistillError::Json { path: "t.jsonl".into(), line: 3, source });
+        let json = serde_json::from_str::<u8>("x")
+            .err()
+            .map(|source| DistillError::Json {
+                path: "t.jsonl".into(),
+                line: 3,
+                source,
+            });
         let server = DistillError::Server("engine not loaded".to_string());
         let usage = DistillError::Usage("usage: lasso".to_string());
         assert_eq!(io.to_string(), "data/train.jsonl: disk full");
-        assert!(json.as_ref().is_some_and(|error| error.to_string().starts_with("t.jsonl:3: ")));
+        assert!(
+            json.as_ref()
+                .is_some_and(|error| error.to_string().starts_with("t.jsonl:3: "))
+        );
         assert_eq!(server.to_string(), "model server: engine not loaded");
         assert_eq!(usage.to_string(), "usage: lasso");
         assert!(io.source().is_some());

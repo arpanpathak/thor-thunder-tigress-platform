@@ -48,7 +48,10 @@ fn prepare(body: &[u8]) -> Outcome<Vec<u8>> {
         && thinking == Thinking::Off
         && !fields.contains_key(TEMPLATE_SETTINGS)
     {
-        fields.insert(TEMPLATE_SETTINGS.to_string(), json!({ "enable_thinking": false }));
+        fields.insert(
+            TEMPLATE_SETTINGS.to_string(),
+            json!({ "enable_thinking": false }),
+        );
     }
     Ok(serde_json::to_vec(&request)?)
 }
@@ -60,23 +63,44 @@ mod tests {
 
     fn thinking_sent(body: &Value) -> Outcome<Value> {
         let prepared: Value = serde_json::from_slice(&prepare(&serde_json::to_vec(body)?)?)?;
-        Ok(prepared.pointer("/chat_template_kwargs/enable_thinking").cloned().unwrap_or(Value::Null))
+        Ok(prepared
+            .pointer("/chat_template_kwargs/enable_thinking")
+            .cloned()
+            .unwrap_or(Value::Null))
     }
 
     #[test]
     fn reads_what_the_request_asks_for() {
-        assert_eq!(Thinking::asked_by(&json!({"thinking": {"type": "enabled"}})), Thinking::On);
-        assert_eq!(Thinking::asked_by(&json!({"thinking": {"type": "adaptive"}})), Thinking::On);
-        assert_eq!(Thinking::asked_by(&json!({"thinking": {"type": "disabled"}})), Thinking::Off);
+        assert_eq!(
+            Thinking::asked_by(&json!({"thinking": {"type": "enabled"}})),
+            Thinking::On
+        );
+        assert_eq!(
+            Thinking::asked_by(&json!({"thinking": {"type": "adaptive"}})),
+            Thinking::On
+        );
+        assert_eq!(
+            Thinking::asked_by(&json!({"thinking": {"type": "disabled"}})),
+            Thinking::Off
+        );
         assert_eq!(Thinking::asked_by(&json!({})), Thinking::Off);
     }
 
     #[test]
     fn turns_thinking_off_unless_asked() -> Outcome {
         assert_eq!(thinking_sent(&json!({"messages": []}))?, json!(false));
-        assert_eq!(thinking_sent(&json!({"thinking": {"type": "disabled"}}))?, json!(false));
-        assert_eq!(thinking_sent(&json!({"thinking": {"type": "adaptive"}}))?, Value::Null);
-        assert_eq!(thinking_sent(&json!({"chat_template_kwargs": {"enable_thinking": true}}))?, json!(true));
+        assert_eq!(
+            thinking_sent(&json!({"thinking": {"type": "disabled"}}))?,
+            json!(false)
+        );
+        assert_eq!(
+            thinking_sent(&json!({"thinking": {"type": "adaptive"}}))?,
+            Value::Null
+        );
+        assert_eq!(
+            thinking_sent(&json!({"chat_template_kwargs": {"enable_thinking": true}}))?,
+            json!(true)
+        );
         Ok(())
     }
 
@@ -91,7 +115,11 @@ mod tests {
     fn forwards_and_relays() -> Outcome {
         let server = FakeServer::start(vec![json_response(r#"{"type":"message"}"#)])?;
         let mut client = Vec::new();
-        forward(&mut client, br#"{"messages":[]}"#, &Endpoint::new(server.address(), None))?;
+        forward(
+            &mut client,
+            br#"{"messages":[]}"#,
+            &Endpoint::new(server.address(), None),
+        )?;
         let sent = server.requests()?;
         assert!(sent[0].starts_with("POST /v1/messages HTTP/1.1"));
         assert!(sent[0].contains(r#""enable_thinking":false"#));

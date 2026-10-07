@@ -23,13 +23,25 @@ pub struct StaticFile {
 }
 
 /// The chat page.
-const PAGE: StaticFile = StaticFile { name: "index.html", content_type: ContentType::Html };
+const PAGE: StaticFile = StaticFile {
+    name: "index.html",
+    content_type: ContentType::Html,
+};
 
 /// The other files in the web folder that may be served; nothing else is.
 const FILES: [StaticFile; 3] = [
-    StaticFile { name: "about.html", content_type: ContentType::Html },
-    StaticFile { name: "cub.svg", content_type: ContentType::Svg },
-    StaticFile { name: "cub.png", content_type: ContentType::Png },
+    StaticFile {
+        name: "about.html",
+        content_type: ContentType::Html,
+    },
+    StaticFile {
+        name: "cub.svg",
+        content_type: ContentType::Svg,
+    },
+    StaticFile {
+        name: "cub.png",
+        content_type: ContentType::Png,
+    },
 ];
 
 /// What a request asks for.
@@ -108,9 +120,16 @@ pub fn answer(client: &mut dyn Write, request: &Request, config: &Config) -> Out
         Route::Health => response::respond(client, Status::Ok, ContentType::Json, HEALTHY),
         Route::Models => models::list(client, upstreams),
         Route::ChatCompletions => chat::answer(client, &request.body, upstreams),
-        Route::Messages => messages::forward(client, &request.body, upstreams.serving_body(&request.body)),
-        Route::CountTokens => upstreams.serving_body(&request.body).post(paths::COUNT_TOKENS, &request.body)?.relay(client),
-        Route::NotFound => response::respond(client, Status::NotFound, ContentType::Text, b"not found"),
+        Route::Messages => {
+            messages::forward(client, &request.body, upstreams.serving_body(&request.body))
+        }
+        Route::CountTokens => upstreams
+            .serving_body(&request.body)
+            .post(paths::COUNT_TOKENS, &request.body)?
+            .relay(client),
+        Route::NotFound => {
+            response::respond(client, Status::NotFound, ContentType::Text, b"not found")
+        }
     }
 }
 
@@ -129,7 +148,10 @@ mod tests {
     };
 
     fn file(name: &str) -> Route {
-        FILES.into_iter().find(|file| file.name == name).map_or(Route::NotFound, Route::File)
+        FILES
+            .into_iter()
+            .find(|file| file.name == name)
+            .map_or(Route::NotFound, Route::File)
     }
 
     #[test]
@@ -158,7 +180,13 @@ mod tests {
 
     #[test]
     fn serves_only_the_listed_files() {
-        for path in ["/serve.sh", "/../../.config/thor-chat/api-key", "/thor-tigress-cub/../serve.sh", "about.html", "/"] {
+        for path in [
+            "/serve.sh",
+            "/../../.config/thor-chat/api-key",
+            "/thor-tigress-cub/../serve.sh",
+            "about.html",
+            "/",
+        ] {
             assert_eq!(listed_file(path), None, "{path}");
         }
     }
@@ -170,7 +198,8 @@ mod tests {
     }
 
     fn setup(responses: Vec<String>, key: Option<&str>) -> Outcome<Setup> {
-        let folder = std::env::temp_dir().join(format!("thor-web-{}-{}", std::process::id(), rand_suffix()));
+        let folder =
+            std::env::temp_dir().join(format!("thor-web-{}-{}", std::process::id(), rand_suffix()));
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("index.html"), "<p>cub</p>")?;
         let model = FakeServer::start(responses)?;
@@ -183,7 +212,11 @@ mod tests {
             "/nonexistent".to_string(),
         ])?;
         config.key = key.map(ToString::to_string);
-        Ok(Setup { config, model, folder })
+        Ok(Setup {
+            config,
+            model,
+            folder,
+        })
     }
 
     fn rand_suffix() -> u128 {
@@ -216,7 +249,10 @@ mod tests {
         fs::remove_dir_all(&setup.folder)?;
         assert!(page.starts_with("HTTP/1.1 200 OK") && page.ends_with("<p>cub</p>"));
         assert!(health.ends_with(r#"{"status":"ok"}"#));
-        assert!(missing.is_err(), "a listed file missing from the folder is an I/O error");
+        assert!(
+            missing.is_err(),
+            "a listed file missing from the folder is an I/O error"
+        );
         Ok(())
     }
 
@@ -235,7 +271,8 @@ mod tests {
 
     #[test]
     fn sends_chat_and_messages_to_the_model() -> Outcome {
-        let reply = json_response(r#"{"choices":[{"message":{"role":"assistant","content":"hi"}}]}"#);
+        let reply =
+            json_response(r#"{"choices":[{"message":{"role":"assistant","content":"hi"}}]}"#);
         let setup = setup(vec![reply.clone(), reply], None)?;
         let mut chat = request("POST", "/v1/chat/completions", None);
         chat.body = br#"{"messages":[{"role":"user","content":"hi"}]}"#.to_vec();
@@ -254,34 +291,62 @@ mod tests {
         let reply = json_response(r#"{"ok":true}"#);
         let engine = FakeServer::start(vec![reply.clone(), reply.clone(), reply])?;
         let mut setup = setup(Vec::new(), None)?;
-        setup.config.upstreams.engines.push(Engine { model: "qwen".to_string(), endpoint: Endpoint::new(engine.address(), None) });
-        let answers = [paths::CHAT_COMPLETIONS, paths::MESSAGES, paths::COUNT_TOKENS]
-            .into_iter()
-            .map(|path| {
-                let mut asked = request("POST", path, None);
-                asked.body = br#"{"model":"qwen","messages":[{"role":"user","content":"hi"}]}"#.to_vec();
-                answered(&setup, &asked)
-            })
-            .collect::<Outcome<Vec<String>>>()?;
+        setup.config.upstreams.engines.push(Engine {
+            model: "qwen".to_string(),
+            endpoint: Endpoint::new(engine.address(), None),
+        });
+        let answers = [
+            paths::CHAT_COMPLETIONS,
+            paths::MESSAGES,
+            paths::COUNT_TOKENS,
+        ]
+        .into_iter()
+        .map(|path| {
+            let mut asked = request("POST", path, None);
+            asked.body =
+                br#"{"model":"qwen","messages":[{"role":"user","content":"hi"}]}"#.to_vec();
+            answered(&setup, &asked)
+        })
+        .collect::<Outcome<Vec<String>>>()?;
         fs::remove_dir_all(&setup.folder)?;
         let seen = engine.requests()?;
-        assert!(answers.iter().all(|answer| answer.ends_with(r#"{"ok":true}"#)), "{answers:?}");
-        assert!(seen[0].starts_with("POST /v1/chat/completions") && seen[1].starts_with("POST /v1/messages "));
+        assert!(
+            answers
+                .iter()
+                .all(|answer| answer.ends_with(r#"{"ok":true}"#)),
+            "{answers:?}"
+        );
+        assert!(
+            seen[0].starts_with("POST /v1/chat/completions")
+                && seen[1].starts_with("POST /v1/messages ")
+        );
         assert!(seen[2].starts_with("POST /v1/messages/count_tokens"));
         Ok(())
     }
 
     #[test]
     fn passes_model_routes_through_with_the_key() -> Outcome {
-        let setup = setup(vec![json_response(r#"{"data":[]}"#), json_response(r#"{"input_tokens":3}"#)], Some("k"))?;
+        let setup = setup(
+            vec![
+                json_response(r#"{"data":[]}"#),
+                json_response(r#"{"input_tokens":3}"#),
+            ],
+            Some("k"),
+        )?;
         let models = answered(&setup, &request("GET", "/v1/models", Some("Bearer k")))?;
-        let count = answered(&setup, &request("POST", "/v1/messages/count_tokens", Some("Bearer k")))?;
+        let count = answered(
+            &setup,
+            &request("POST", "/v1/messages/count_tokens", Some("Bearer k")),
+        )?;
         let unknown = answered(&setup, &request("GET", "/v1/embeddings", Some("Bearer k")))?;
         fs::remove_dir_all(&setup.folder)?;
         let seen = setup.model.requests()?;
         assert!(models.ends_with(r#"{"data":[]}"#) && count.ends_with(r#"{"input_tokens":3}"#));
         assert!(unknown.starts_with("HTTP/1.1 404 Not Found"));
-        assert!(seen[0].starts_with("GET /v1/models") && seen[1].starts_with("POST /v1/messages/count_tokens"));
+        assert!(
+            seen[0].starts_with("GET /v1/models")
+                && seen[1].starts_with("POST /v1/messages/count_tokens")
+        );
         Ok(())
     }
 }

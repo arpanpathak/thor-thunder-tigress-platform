@@ -118,16 +118,22 @@ pub fn fenced(text: &str) -> Vec<Fenced> {
             let mut words = info.split(',').map(str::trim);
             let tag = words.next().unwrap_or_default().to_string();
             let ignored = words.any(|word| word == "ignore");
-            Some(Fenced { tag, ignored, code: captures.get(2)?.as_str().to_string() })
+            Some(Fenced {
+                tag,
+                ignored,
+                code: captures.get(2)?.as_str().to_string(),
+            })
         })
         .collect()
 }
 
-static FENCED: LazyLock<Option<Regex>> =
-    LazyLock::new(|| Regex::new(r"(?ms)^[ \t]*```[ \t]*([\w+#.,-]*)[^\n]*\n(.*?)^[ \t]*```[ \t]*$").ok());
+static FENCED: LazyLock<Option<Regex>> = LazyLock::new(|| {
+    Regex::new(r"(?ms)^[ \t]*```[ \t]*([\w+#.,-]*)[^\n]*\n(.*?)^[ \t]*```[ \t]*$").ok()
+});
 
-static JAVA_CLASS: LazyLock<Option<Regex>> =
-    LazyLock::new(|| Regex::new(r"public\s+(?:final\s+)?(?:class|record|enum|interface)\s+(\w+)").ok());
+static JAVA_CLASS: LazyLock<Option<Regex>> = LazyLock::new(|| {
+    Regex::new(r"public\s+(?:final\s+)?(?:class|record|enum|interface)\s+(\w+)").ok()
+});
 
 /// The blocks of `text` whose fence names a language checked here.
 #[must_use]
@@ -136,7 +142,11 @@ pub fn blocks(text: &str) -> Vec<Block> {
         .into_iter()
         .filter_map(|block| {
             let language = Language::of(&block.tag)?;
-            Some(Block { language, code: block.code, ignored: block.ignored })
+            Some(Block {
+                language,
+                code: block.code,
+                ignored: block.ignored,
+            })
         })
         .collect()
 }
@@ -182,11 +192,19 @@ fn plan(block: &Block, folder: &Path) -> Plan {
             if code.contains("int main") {
                 let mut build = command("g++", &flags, &file, folder);
                 build.arg("-o").arg(&program);
-                Plan { build, run: Some(Command::new(&program)), file }
+                Plan {
+                    build,
+                    run: Some(Command::new(&program)),
+                    file,
+                }
             } else {
                 let mut build = command("g++", &flags, &file, folder);
                 build.arg("-fsyntax-only");
-                Plan { build, run: None, file }
+                Plan {
+                    build,
+                    run: None,
+                    file,
+                }
             }
         }
         Language::Java => {
@@ -206,26 +224,42 @@ fn plan(block: &Block, folder: &Path) -> Plan {
             Plan { file, build, run }
         }
         Language::JavaScript => {
-            let module = code.lines().any(|line| line.starts_with("import ") || line.starts_with("export "));
+            let module = code
+                .lines()
+                .any(|line| line.starts_with("import ") || line.starts_with("export "));
             let file = folder.join(if module { "example.mjs" } else { "example.js" });
             Plan {
                 build: command("node", &["--check"], &file, folder),
-                run: code.contains("assert").then(|| command("node", &[], &file, folder)),
+                run: code
+                    .contains("assert")
+                    .then(|| command("node", &[], &file, folder)),
                 file,
             }
         }
         Language::Shell => {
             let file = folder.join("example.sh");
-            Plan { build: command("bash", &["-n"], &file, folder), run: None, file }
+            Plan {
+                build: command("bash", &["-n"], &file, folder),
+                run: None,
+                file,
+            }
         }
         Language::Yaml => {
             let file = folder.join("example.yaml");
             let load = "import sys, yaml; list(yaml.safe_load_all(open(sys.argv[1])))";
-            Plan { build: command("python3", &["-c", load], &file, folder), run: None, file }
+            Plan {
+                build: command("python3", &["-c", load], &file, folder),
+                run: None,
+                file,
+            }
         }
         Language::Json => {
             let file = folder.join("example.json");
-            Plan { build: command("python3", &["-m", "json.tool"], &file, folder), run: None, file }
+            Plan {
+                build: command("python3", &["-m", "json.tool"], &file, folder),
+                run: None,
+                file,
+            }
         }
     }
 }
@@ -248,7 +282,10 @@ pub fn check(block: &Block, scratch: &Path) -> Result<Built, DataError> {
         return Ok(Built::BuildFailed(output));
     }
     let Some(run) = run else {
-        return Ok(Built::Clean { tests: 0, ran: false });
+        return Ok(Built::Clean {
+            tests: 0,
+            ran: false,
+        });
     };
     Ok(Built::after_run(run_limited(run, scratch, TEST_LIMIT)?))
 }
@@ -258,12 +295,22 @@ mod tests {
     use super::*;
 
     fn scratch(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("thor-hammer-languages-{name}-{}", std::process::id()))
+        std::env::temp_dir().join(format!(
+            "thor-hammer-languages-{name}-{}",
+            std::process::id()
+        ))
     }
 
     fn checked(language: Language, code: &str) -> Result<Built, DataError> {
         let folder = scratch(language.name());
-        let built = check(&Block { language, code: code.to_string(), ignored: false }, &folder)?;
+        let built = check(
+            &Block {
+                language,
+                code: code.to_string(),
+                ignored: false,
+            },
+            &folder,
+        )?;
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))?;
         Ok(built)
     }
@@ -271,7 +318,10 @@ mod tests {
     #[test]
     fn finds_tagged_blocks_only() {
         let text = "```python\nprint(1)\n```\n\n```\nuntagged\n```\n\n```text\nplain\n```\n\n```Go\npackage main\n```\n";
-        let found: Vec<Language> = blocks(text).into_iter().map(|block| block.language).collect();
+        let found: Vec<Language> = blocks(text)
+            .into_iter()
+            .map(|block| block.language)
+            .collect();
         assert_eq!(found, [Language::Python, Language::Go]);
     }
 
@@ -279,41 +329,113 @@ mod tests {
     fn an_ignored_fence_is_not_built() -> Result<(), DataError> {
         let text = "```go,ignore\nfmt.Println(x)\n```\n\n```rust,no_run\nfn main() {}\n```\n";
         let found = fenced(text);
-        assert_eq!(found.iter().map(|block| (block.tag.as_str(), block.ignored)).collect::<Vec<_>>(), [("go", true), ("rust", false)]);
-        let ignored = blocks(text).into_iter().next().map(|block| check(&block, &scratch("ignored")));
+        assert_eq!(
+            found
+                .iter()
+                .map(|block| (block.tag.as_str(), block.ignored))
+                .collect::<Vec<_>>(),
+            [("go", true), ("rust", false)]
+        );
+        let ignored = blocks(text)
+            .into_iter()
+            .next()
+            .map(|block| check(&block, &scratch("ignored")));
         assert!(matches!(ignored, Some(Ok(Built::Ignored))));
         Ok(())
     }
 
     #[test]
     fn runs_a_python_program_and_catches_a_failed_assert() -> Result<(), DataError> {
-        assert_eq!(checked(Language::Python, "assert sum([1, 2]) == 3\n")?, Built::Clean { tests: 0, ran: true });
-        assert!(matches!(checked(Language::Python, "assert 1 == 2\n")?, Built::TestsFailed(_)));
-        assert!(matches!(checked(Language::Python, "def f(:\n")?, Built::BuildFailed(_)));
+        assert_eq!(
+            checked(Language::Python, "assert sum([1, 2]) == 3\n")?,
+            Built::Clean {
+                tests: 0,
+                ran: true
+            }
+        );
+        assert!(matches!(
+            checked(Language::Python, "assert 1 == 2\n")?,
+            Built::TestsFailed(_)
+        ));
+        assert!(matches!(
+            checked(Language::Python, "def f(:\n")?,
+            Built::BuildFailed(_)
+        ));
         Ok(())
     }
 
     #[test]
     fn builds_go_cpp_and_java() -> Result<(), DataError> {
         let go = "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hi\")\n}\n";
-        assert_eq!(checked(Language::Go, go)?, Built::Clean { tests: 0, ran: true });
+        assert_eq!(
+            checked(Language::Go, go)?,
+            Built::Clean {
+                tests: 0,
+                ran: true
+            }
+        );
         let cpp = "#include <vector>\nint main() { std::vector<int> v{1}; return v.size() == 1 ? 0 : 1; }\n";
-        assert_eq!(checked(Language::Cpp, cpp)?, Built::Clean { tests: 0, ran: true });
+        assert_eq!(
+            checked(Language::Cpp, cpp)?,
+            Built::Clean {
+                tests: 0,
+                ran: true
+            }
+        );
         let java = "public class Hello {\n    public static void main(String[] args) {\n        System.out.println(\"hi\");\n    }\n}\n";
-        assert_eq!(checked(Language::Java, java)?, Built::Clean { tests: 0, ran: true });
-        assert_eq!(checked(Language::Cpp, "inline int twice(int x) { return 2 * x; }\n")?, Built::Clean { tests: 0, ran: false });
+        assert_eq!(
+            checked(Language::Java, java)?,
+            Built::Clean {
+                tests: 0,
+                ran: true
+            }
+        );
+        assert_eq!(
+            checked(Language::Cpp, "inline int twice(int x) { return 2 * x; }\n")?,
+            Built::Clean {
+                tests: 0,
+                ran: false
+            }
+        );
         Ok(())
     }
 
     #[test]
     fn parses_data_and_scripts_without_running_them() -> Result<(), DataError> {
-        assert_eq!(checked(Language::Yaml, "a: [1, 2]\n")?, Built::Clean { tests: 0, ran: false });
-        assert!(matches!(checked(Language::Yaml, "a: [1, 2\n")?, Built::BuildFailed(_)));
-        assert!(matches!(checked(Language::Json, "{\"a\": }")?, Built::BuildFailed(_)));
-        assert_eq!(checked(Language::Shell, "set -eu\necho hi\n")?, Built::Clean { tests: 0, ran: false });
-        assert!(matches!(checked(Language::JavaScript, "const a = ;\n")?, Built::BuildFailed(_)));
+        assert_eq!(
+            checked(Language::Yaml, "a: [1, 2]\n")?,
+            Built::Clean {
+                tests: 0,
+                ran: false
+            }
+        );
+        assert!(matches!(
+            checked(Language::Yaml, "a: [1, 2\n")?,
+            Built::BuildFailed(_)
+        ));
+        assert!(matches!(
+            checked(Language::Json, "{\"a\": }")?,
+            Built::BuildFailed(_)
+        ));
+        assert_eq!(
+            checked(Language::Shell, "set -eu\necho hi\n")?,
+            Built::Clean {
+                tests: 0,
+                ran: false
+            }
+        );
+        assert!(matches!(
+            checked(Language::JavaScript, "const a = ;\n")?,
+            Built::BuildFailed(_)
+        ));
         let tested = "const assert = require(\"node:assert\");\nassert.strictEqual(1 + 1, 2);\n";
-        assert_eq!(checked(Language::JavaScript, tested)?, Built::Clean { tests: 0, ran: true });
+        assert_eq!(
+            checked(Language::JavaScript, tested)?,
+            Built::Clean {
+                tests: 0,
+                ran: true
+            }
+        );
         Ok(())
     }
 
@@ -324,7 +446,19 @@ mod tests {
             .filter_map(Language::of)
             .map(Language::name)
             .collect();
-        assert_eq!(names, ["python", "go", "c++", "java", "javascript", "bash", "yaml", "json"]);
+        assert_eq!(
+            names,
+            [
+                "python",
+                "go",
+                "c++",
+                "java",
+                "javascript",
+                "bash",
+                "yaml",
+                "json"
+            ]
+        );
         assert_eq!(Language::of("toml"), None);
     }
 }

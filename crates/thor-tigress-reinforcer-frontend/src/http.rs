@@ -94,19 +94,26 @@ impl Request {
     /// The first value of a parameter.
     #[must_use]
     pub fn param(&self, name: &str) -> Option<&str> {
-        self.params.iter().find(|param| param.key == name).map(|param| param.value.as_str())
+        self.params
+            .iter()
+            .find(|param| param.key == name)
+            .map(|param| param.value.as_str())
     }
 
     /// A parameter that counts only when it has text.
     #[must_use]
     pub fn text(&self, name: &str) -> Option<String> {
-        self.param(name).filter(|text| !text.trim().is_empty()).map(str::to_string)
+        self.param(name)
+            .filter(|text| !text.trim().is_empty())
+            .map(str::to_string)
     }
 
     /// A parameter as a number, or `fallback` when absent or unparsable.
     #[must_use]
     pub fn number(&self, name: &str, fallback: usize) -> usize {
-        self.param(name).and_then(|value| value.parse().ok()).unwrap_or(fallback)
+        self.param(name)
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(fallback)
     }
 
     /// A parameter as a yes or no: `1`, `true`, `yes` or `0`, `false`, `no`.
@@ -136,7 +143,9 @@ pub fn read_request(stream: &mut dyn Read) -> Outcome<Request> {
     let (path, query) = target.split_once('?').unwrap_or((target, ""));
     let length = read_content_length(&mut reader)?;
     if length > MAX_BODY {
-        return Err(ReviewError::BadRequest(format!("body over {MAX_BODY} bytes")));
+        return Err(ReviewError::BadRequest(format!(
+            "body over {MAX_BODY} bytes"
+        )));
     }
     let mut body = vec![0; length];
     reader.read_exact(&mut body)?;
@@ -171,7 +180,10 @@ fn parse_query(query: &str) -> Vec<Param> {
         .filter(|pair| !pair.is_empty())
         .map(|pair| {
             let (key, value) = pair.split_once('=').unwrap_or((pair, ""));
-            Param { key: decode(key), value: decode(value) }
+            Param {
+                key: decode(key),
+                value: decode(value),
+            }
         })
         .collect()
 }
@@ -200,7 +212,9 @@ fn percent_escape(bytes: &mut Bytes<'_>) -> Option<u8> {
 }
 
 fn hex_digit(byte: u8) -> Option<u8> {
-    char::from(byte).to_digit(16).and_then(|digit| u8::try_from(digit).ok())
+    char::from(byte)
+        .to_digit(16)
+        .and_then(|digit| u8::try_from(digit).ok())
 }
 
 /// Writes a complete response and closes the connection.
@@ -208,7 +222,12 @@ fn hex_digit(byte: u8) -> Option<u8> {
 /// # Errors
 ///
 /// `ReviewError::Connection` when the client is gone.
-pub fn write_response(stream: &mut dyn Write, status: Status, content_type: ContentType, body: &[u8]) -> Outcome {
+pub fn write_response(
+    stream: &mut dyn Write,
+    status: Status,
+    content_type: ContentType,
+    body: &[u8],
+) -> Outcome {
     let head = format!(
         "HTTP/1.1 {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         status.line(),
@@ -247,7 +266,9 @@ mod tests {
     fn a_value_that_cannot_be_serialized_is_a_bad_request() {
         let mut out = Vec::new();
         let result = write_json(&mut out, Status::Ok, &Unserializable);
-        assert!(matches!(result, Err(ReviewError::BadRequest(message)) if message.contains("refused")));
+        assert!(
+            matches!(result, Err(ReviewError::BadRequest(message)) if message.contains("refused"))
+        );
         assert!(out.is_empty());
     }
 
@@ -264,7 +285,14 @@ mod tests {
     #[test]
     fn reads_method_path_params_and_body() -> Outcome {
         let request = read_request(&mut "post /api/page?start=20&q=page%20table&flagged=1&empty= HTTP/1.1\r\nContent-Length: 2\r\n\r\n{}".as_bytes())?;
-        assert_eq!((request.method.as_str(), request.path.as_str(), request.body.as_str()), ("POST", "/api/page", "{}"));
+        assert_eq!(
+            (
+                request.method.as_str(),
+                request.path.as_str(),
+                request.body.as_str()
+            ),
+            ("POST", "/api/page", "{}")
+        );
         assert_eq!(request.param("q"), Some("page table"));
         assert_eq!(request.number("start", 0), 20);
         assert_eq!(request.number("limit", 7), 7);
@@ -282,25 +310,52 @@ mod tests {
 
     #[test]
     fn rejects_a_body_over_the_limit() {
-        let raw = format!("POST / HTTP/1.1\r\nContent-Length: {}\r\n\r\n", MAX_BODY + 1);
-        assert!(read_request(&mut raw.as_bytes()).is_err_and(|error| error.to_string().starts_with("bad request: body over")));
+        let raw = format!(
+            "POST / HTTP/1.1\r\nContent-Length: {}\r\n\r\n",
+            MAX_BODY + 1
+        );
+        assert!(
+            read_request(&mut raw.as_bytes())
+                .is_err_and(|error| error.to_string().starts_with("bad request: body over"))
+        );
     }
 
     #[test]
     fn writes_status_type_and_json() -> Outcome {
         let mut out = Vec::new();
-        write_json(&mut out, Status::NotFound, &serde_json::json!({ "error": "x" }))?;
+        write_json(
+            &mut out,
+            Status::NotFound,
+            &serde_json::json!({ "error": "x" }),
+        )?;
         let text = String::from_utf8_lossy(&out);
-        assert!(text.starts_with("HTTP/1.1 404 Not Found\r\nContent-Type: application/json; charset=utf-8\r\n"));
+        assert!(text.starts_with(
+            "HTTP/1.1 404 Not Found\r\nContent-Type: application/json; charset=utf-8\r\n"
+        ));
         assert!(text.ends_with(r#"{"error":"x"}"#));
         Ok(())
     }
 
     #[test]
     fn every_status_and_type_has_its_header() {
-        let lines = [Status::Ok, Status::BadRequest, Status::NotFound, Status::InternalError].map(Status::line);
-        let types = [ContentType::Html, ContentType::Json, ContentType::JsonLines].map(ContentType::header);
-        assert_eq!(lines, ["200 OK", "400 Bad Request", "404 Not Found", "500 Internal Server Error"]);
+        let lines = [
+            Status::Ok,
+            Status::BadRequest,
+            Status::NotFound,
+            Status::InternalError,
+        ]
+        .map(Status::line);
+        let types =
+            [ContentType::Html, ContentType::Json, ContentType::JsonLines].map(ContentType::header);
+        assert_eq!(
+            lines,
+            [
+                "200 OK",
+                "400 Bad Request",
+                "404 Not Found",
+                "500 Internal Server Error"
+            ]
+        );
         assert_eq!(types[2], "application/x-ndjson; charset=utf-8");
     }
 }

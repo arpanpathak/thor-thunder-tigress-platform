@@ -34,7 +34,9 @@ fn exits_with_failure_and_a_reason() -> Result<(), RunError> {
     assert!(String::from_utf8_lossy(&unknown.stderr).starts_with("thor-tigress-agent: "));
     let taken = TcpListener::bind("127.0.0.1:0")?;
     let address = taken.local_addr()?.to_string();
-    let busy = Command::new(program).args(["--listen", &address, "--key-file", "/nonexistent"]).output()?;
+    let busy = Command::new(program)
+        .args(["--listen", &address, "--key-file", "/nonexistent"])
+        .output()?;
     assert!(!busy.status.success());
     assert!(String::from_utf8_lossy(&busy.stderr).starts_with("thor-tigress-agent: "));
     assert_eq!(RunError::from(io::Error::other("x")).to_string(), "x");

@@ -56,7 +56,8 @@ fn unmatched_flag_list(unmatched_flags: &[UnmatchedFlag]) -> Vec<String> {
         "## Flags that matched no example".to_string(),
         String::new(),
         "These flags are in `labels/slop_flags.jsonl`, but no example in this build".to_string(),
-        "has their id, so they were NOT applied. Re-point or clear them in the review tool.".to_string(),
+        "has their id, so they were NOT applied. Re-point or clear them in the review tool."
+            .to_string(),
         String::new(),
     ];
     if unmatched_flags.is_empty() {
@@ -89,10 +90,7 @@ fn source_table(training_set: &[Example]) -> Vec<String> {
             from_source.len()
         ));
     }
-    let total_tokens: usize = training_set
-        .iter()
-        .map(estimated_tokens)
-        .sum();
+    let total_tokens: usize = training_set.iter().map(estimated_tokens).sum();
     table_lines.push(format!(
         "| total | {} | {total_tokens} |",
         training_set.len()

@@ -89,7 +89,11 @@ impl Conversation {
     /// A stable id: [`stable_id`] of every turn's text.
     #[must_use]
     pub fn id(&self) -> String {
-        let text: Vec<&str> = self.turns.iter().map(|turn| turn.content.as_str()).collect();
+        let text: Vec<&str> = self
+            .turns
+            .iter()
+            .map(|turn| turn.content.as_str())
+            .collect();
         stable_id(&text.join("\n"))
     }
 
@@ -117,8 +121,16 @@ impl Conversation {
     /// Characters in every turn and the rejected answer.
     #[must_use]
     pub fn char_count(&self) -> usize {
-        let turns: usize = self.turns.iter().map(|turn| turn.content.chars().count()).sum();
-        turns + self.rejected.as_ref().map_or(0, |rejected| rejected.chars().count())
+        let turns: usize = self
+            .turns
+            .iter()
+            .map(|turn| turn.content.chars().count())
+            .sum();
+        turns
+            + self
+                .rejected
+                .as_ref()
+                .map_or(0, |rejected| rejected.chars().count())
     }
 }
 
@@ -195,7 +207,11 @@ pub fn entries(markdown: &str, file: &str) -> Vec<(String, Result<Conversation, 
 /// A [`FormatError`] naming the first thing the entry gets wrong.
 pub fn parse(entry: &str, origin: &str) -> Result<Conversation, FormatError> {
     let (comment, body) = source_and_body(entry).ok_or(FormatError::NoSource)?;
-    let Provenance { source, section, licence } = Provenance::read(&comment);
+    let Provenance {
+        source,
+        section,
+        licence,
+    } = Provenance::read(&comment);
     let sections = sections(body);
     let (rejected, turn_sections) = match sections.split_last() {
         Some(((Heading::Rejected, text), before)) => (Some(text.clone()), before),
@@ -204,15 +220,27 @@ pub fn parse(entry: &str, origin: &str) -> Result<Conversation, FormatError> {
     let turns = turn_sections
         .iter()
         .map(|(heading, content)| match heading {
-            Heading::Speaker(role) => Ok(Turn { role: *role, content: content.clone() }),
+            Heading::Speaker(role) => Ok(Turn {
+                role: *role,
+                content: content.clone(),
+            }),
             Heading::Rejected => Err(FormatError::RejectedNotLast),
         })
         .collect::<Result<Vec<Turn>, FormatError>>()?;
     check_order(&turns)?;
-    if turns.iter().any(|turn| turn.content.is_empty()) || rejected.as_ref().is_some_and(String::is_empty) {
+    if turns.iter().any(|turn| turn.content.is_empty())
+        || rejected.as_ref().is_some_and(String::is_empty)
+    {
         return Err(FormatError::EmptySection);
     }
-    Ok(Conversation { source, section, licence, origin: origin.to_string(), turns, rejected })
+    Ok(Conversation {
+        source,
+        section,
+        licence,
+        origin: origin.to_string(),
+        turns,
+        rejected,
+    })
 }
 
 /// What the source comment says about where an entry comes from.
@@ -227,7 +255,11 @@ impl Provenance {
     fn read(comment: &str) -> Provenance {
         let mut parts = comment.split(';').map(str::trim);
         let source = parts.next().unwrap_or_default().to_string();
-        let mut provenance = Provenance { source, section: None, licence: None };
+        let mut provenance = Provenance {
+            source,
+            section: None,
+            licence: None,
+        };
         for (key, value) in parts.filter_map(|part| part.split_once(':')) {
             let value = Some(value.trim().to_string());
             match key.trim() {
@@ -265,7 +297,10 @@ fn check_order(turns: &[Turn]) -> Result<(), FormatError> {
     let Some(last) = turns.last() else {
         return Err(FormatError::NoTurns);
     };
-    let alternates = turns.iter().zip([Role::User, Role::Assistant].iter().cycle()).all(|(turn, role)| turn.role == *role);
+    let alternates = turns
+        .iter()
+        .zip([Role::User, Role::Assistant].iter().cycle())
+        .all(|(turn, role)| turn.role == *role);
     match (alternates, last.role) {
         (false, _) => Err(FormatError::OutOfOrder),
         (true, Role::User) => Err(FormatError::EndsWithUser),
@@ -285,9 +320,18 @@ mod tests {
         assert_eq!(conversation.source, "std docs");
         assert_eq!(conversation.turns.len(), 4);
         assert_eq!(conversation.prompt().len(), 3);
-        assert_eq!(conversation.last_answer().map(|turn| turn.content.as_str()), Some("Fixed."));
+        assert_eq!(
+            conversation.last_answer().map(|turn| turn.content.as_str()),
+            Some("Fixed.")
+        );
         assert_eq!(conversation.rejected.as_deref(), Some("Still unwraps."));
-        assert_eq!(conversation.answers().map(|(position, _)| position).collect::<Vec<_>>(), [2, 4]);
+        assert_eq!(
+            conversation
+                .answers()
+                .map(|(position, _)| position)
+                .collect::<Vec<_>>(),
+            [2, 4]
+        );
         Ok(())
     }
 
@@ -306,19 +350,40 @@ mod tests {
     #[test]
     fn splits_a_file_into_numbered_entries() {
         let file = format!("{ENTRY}---\n<!-- source: b -->\n### User\nQ\n### Assistant\nA\n");
-        let origins: Vec<String> = entries(&file, "f.md").into_iter().map(|(origin, _)| origin).collect();
+        let origins: Vec<String> = entries(&file, "f.md")
+            .into_iter()
+            .map(|(origin, _)| origin)
+            .collect();
         assert_eq!(origins, ["f.md#1", "f.md#2"]);
     }
 
     #[test]
     fn refuses_entries_that_break_the_format() {
         let refused = |entry: &str| parse(entry, "x").err();
-        assert_eq!(refused("### User\nQ\n### Assistant\nA"), Some(FormatError::NoSource));
-        assert_eq!(refused("<!-- source: s -->\nno sections"), Some(FormatError::NoTurns));
-        assert_eq!(refused("<!-- source: s -->\n### Assistant\nA"), Some(FormatError::OutOfOrder));
-        assert_eq!(refused("<!-- source: s -->\n### User\nQ"), Some(FormatError::EndsWithUser));
-        assert_eq!(refused("<!-- source: s -->\n### User\nQ\n### Rejected\nR\n### Assistant\nA"), Some(FormatError::RejectedNotLast));
-        assert_eq!(refused("<!-- source: s -->\n### User\n\n### Assistant\nA"), Some(FormatError::EmptySection));
+        assert_eq!(
+            refused("### User\nQ\n### Assistant\nA"),
+            Some(FormatError::NoSource)
+        );
+        assert_eq!(
+            refused("<!-- source: s -->\nno sections"),
+            Some(FormatError::NoTurns)
+        );
+        assert_eq!(
+            refused("<!-- source: s -->\n### Assistant\nA"),
+            Some(FormatError::OutOfOrder)
+        );
+        assert_eq!(
+            refused("<!-- source: s -->\n### User\nQ"),
+            Some(FormatError::EndsWithUser)
+        );
+        assert_eq!(
+            refused("<!-- source: s -->\n### User\nQ\n### Rejected\nR\n### Assistant\nA"),
+            Some(FormatError::RejectedNotLast)
+        );
+        assert_eq!(
+            refused("<!-- source: s -->\n### User\n\n### Assistant\nA"),
+            Some(FormatError::EmptySection)
+        );
     }
 
     #[test]
@@ -332,7 +397,14 @@ mod tests {
             FormatError::EmptySection,
         ];
         assert!(errors.iter().all(|error| !error.to_string().is_empty()));
-        assert_eq!(parse("<!-- source: s; topic: heaps -->\n### User\nQ\n### Assistant\nA", "x")?.section, None);
+        assert_eq!(
+            parse(
+                "<!-- source: s; topic: heaps -->\n### User\nQ\n### Assistant\nA",
+                "x"
+            )?
+            .section,
+            None
+        );
         assert_eq!(parse("<!-- source: s -->\n### User\nQ\n### Assistant\nA\n### Rejected\nR\n### Rejected\nR", "x").err(), Some(FormatError::RejectedNotLast));
         Ok(())
     }
@@ -349,7 +421,10 @@ mod tests {
     #[test]
     fn counts_characters_with_the_rejected_answer() -> Result<(), FormatError> {
         let conversation = parse(ENTRY, "a")?;
-        assert_eq!(conversation.char_count(), "Write it.Done.No unwrap.Fixed.Still unwraps.".len());
+        assert_eq!(
+            conversation.char_count(),
+            "Write it.Done.No unwrap.Fixed.Still unwraps.".len()
+        );
         Ok(())
     }
 }

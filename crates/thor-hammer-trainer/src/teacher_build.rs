@@ -54,7 +54,8 @@ const MANIFEST: &str = "train/corpus.manifest.tsv";
 const CORPUS: &str = "corpus";
 
 /// The usage line printed for arguments that can't be read.
-pub const USAGE: &str = "usage: teacher [check] [SOURCE_DIR] [OUTPUT_DIR]\n       teacher pick COUNT [SOURCE...]";
+pub const USAGE: &str =
+    "usage: teacher [check] [SOURCE_DIR] [OUTPUT_DIR]\n       teacher pick COUNT [SOURCE...]";
 
 /// Where the command reads and writes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,7 +75,12 @@ impl Paths {
     /// and `output` replaced.
     #[must_use]
     pub fn new(source: PathBuf, output: PathBuf) -> Self {
-        Self { source, output, corpus: PathBuf::from(CORPUS), manifest: PathBuf::from(MANIFEST) }
+        Self {
+            source,
+            output,
+            corpus: PathBuf::from(CORPUS),
+            manifest: PathBuf::from(MANIFEST),
+        }
     }
 
     /// Every section an entry can be written from: prose passages and source files.
@@ -125,11 +131,22 @@ impl Command {
             let Some(count) = arguments.next().and_then(|count| count.parse().ok()) else {
                 return Command::Usage;
             };
-            return Command::Pick { count, sources: arguments.collect() };
+            return Command::Pick {
+                count,
+                sources: arguments.collect(),
+            };
         }
         arguments.next_if(|first| first == "check");
-        let source = PathBuf::from(arguments.next().unwrap_or_else(|| DEFAULT_SOURCE.to_string()));
-        let output = PathBuf::from(arguments.next().unwrap_or_else(|| DEFAULT_OUTPUT.to_string()));
+        let source = PathBuf::from(
+            arguments
+                .next()
+                .unwrap_or_else(|| DEFAULT_SOURCE.to_string()),
+        );
+        let output = PathBuf::from(
+            arguments
+                .next()
+                .unwrap_or_else(|| DEFAULT_OUTPUT.to_string()),
+        );
         Command::Check { source, output }
     }
 }
@@ -143,7 +160,9 @@ struct Outcome {
 impl Outcome {
     fn passed(&self) -> Option<(&Conversation, &Checked)> {
         match &self.result {
-            Ok((conversation, checked)) if checked.problems.is_empty() => Some((conversation, checked)),
+            Ok((conversation, checked)) if checked.problems.is_empty() => {
+                Some((conversation, checked))
+            }
             Ok(_) | Err(_) => None,
         }
     }
@@ -212,8 +231,16 @@ pub fn queue(paths: &Paths, count: usize, sources: &[String]) -> Result<String, 
     for section in &picked {
         *per_source.entry(section.source.as_str()).or_insert(0) += 1;
     }
-    let teachable = sections.iter().filter(|section| pick::is_teachable(section)).count();
-    let mut summary = format!("{} sections queued in {} ({teachable} teachable, {} already used)\n", picked.len(), path.display(), used.len());
+    let teachable = sections
+        .iter()
+        .filter(|section| pick::is_teachable(section))
+        .count();
+    let mut summary = format!(
+        "{} sections queued in {} ({teachable} teachable, {} already used)\n",
+        picked.len(),
+        path.display(),
+        used.len()
+    );
     for (source, count) in per_source {
         let _ = writeln!(summary, "  {source:<44} {count}");
     }
@@ -233,7 +260,10 @@ impl CheckResult {
     /// The report without its list of problems, for the terminal.
     #[must_use]
     pub fn summary(&self) -> &str {
-        self.report.split("\n## Problems").next().unwrap_or_default()
+        self.report
+            .split("\n## Problems")
+            .next()
+            .unwrap_or_default()
     }
 }
 
@@ -246,15 +276,23 @@ impl CheckResult {
 pub fn check(paths: &Paths) -> Result<CheckResult, DataError> {
     let (source, output) = (paths.source.as_path(), paths.output.as_path());
     let entries = read_entries(source)?;
-    let needs_sections = entries.iter().any(|(_, parsed)| parsed.as_ref().is_ok_and(|entry| entry.section.is_some()));
+    let needs_sections = entries
+        .iter()
+        .any(|(_, parsed)| parsed.as_ref().is_ok_and(|entry| entry.section.is_some()));
     let sections: HashMap<String, Section> = if needs_sections {
-        paths.sections()?.into_iter().map(|section| (section.id.clone(), section)).collect()
+        paths
+            .sections()?
+            .into_iter()
+            .map(|section| (section.id.clone(), section))
+            .collect()
     } else {
         HashMap::new()
     };
     let entries = entries.into_iter().map(|(origin, parsed)| {
         let known = parsed.and_then(|entry| match &entry.section {
-            Some(id) if !sections.contains_key(id) => Err(format!("section {id} is not in {TRAINING_FILE} or the code repositories")),
+            Some(id) if !sections.contains_key(id) => Err(format!(
+                "section {id} is not in {TRAINING_FILE} or the code repositories"
+            )),
             _ => Ok(entry),
         });
         (origin, known)
@@ -265,19 +303,30 @@ pub fn check(paths: &Paths) -> Result<CheckResult, DataError> {
         fs::remove_dir_all(&scratch).map_err(DataError::io(&scratch))?;
     }
     fs::create_dir_all(output).map_err(DataError::io(output))?;
-    let passed: Vec<(&Conversation, &Checked)> = outcomes.iter().filter_map(Outcome::passed).collect();
-    let chat_lines = passed.iter().map(|(conversation, checked)| chat_line(conversation, checked, &sections));
+    let passed: Vec<(&Conversation, &Checked)> =
+        outcomes.iter().filter_map(Outcome::passed).collect();
+    let chat_lines = passed
+        .iter()
+        .map(|(conversation, checked)| chat_line(conversation, checked, &sections));
     write_jsonl(&output.join("teacher.jsonl"), chat_lines)?;
-    let preference_lines = passed.iter().filter_map(|(conversation, _)| preference_line(conversation));
+    let preference_lines = passed
+        .iter()
+        .filter_map(|(conversation, _)| preference_line(conversation));
     write_jsonl(&output.join("teacher_preferences.jsonl"), preference_lines)?;
     let report = render_report(&outcomes, &sections);
     let report_path = output.join("teacher.md");
     fs::write(&report_path, &report).map_err(DataError::io(&report_path))?;
-    Ok(CheckResult { report, all_passed: passed.len() == outcomes.len() })
+    Ok(CheckResult {
+        report,
+        all_passed: passed.len() == outcomes.len(),
+    })
 }
 
 fn markdown_files(folder: &Path, files: &mut Vec<PathBuf>) -> Result<(), DataError> {
-    for entry in fs::read_dir(folder).map_err(DataError::io(folder))?.filter_map(Result::ok) {
+    for entry in fs::read_dir(folder)
+        .map_err(DataError::io(folder))?
+        .filter_map(Result::ok)
+    {
         let path = entry.path();
         if path.is_dir() {
             markdown_files(&path, files)?;
@@ -295,11 +344,17 @@ fn read_entries(source: &Path) -> Result<Vec<Entry>, DataError> {
     let mut entries = Vec::new();
     for file in files {
         let markdown = fs::read_to_string(&file).map_err(DataError::io(&file))?;
-        let name = file.strip_prefix(source).unwrap_or(&file).display().to_string();
+        let name = file
+            .strip_prefix(source)
+            .unwrap_or(&file)
+            .display()
+            .to_string();
         entries.extend(
             teacher::entries(&markdown, &name)
                 .into_iter()
-                .map(|(origin, parsed)| (origin, parsed.map_err(|error| format!("format: {error}")))),
+                .map(|(origin, parsed)| {
+                    (origin, parsed.map_err(|error| format!("format: {error}")))
+                }),
         );
     }
     Ok(entries)
@@ -317,7 +372,8 @@ fn check_all(entries: Vec<Entry>, scratch: &Path) -> Result<Vec<Outcome>, DataEr
         }
     });
     drop(sender);
-    let mut finished: Vec<(usize, Result<Vec<Outcome>, DataError>)> = receiver.into_iter().collect();
+    let mut finished: Vec<(usize, Result<Vec<Outcome>, DataError>)> =
+        receiver.into_iter().collect();
     finished.sort_by_key(|&(worker, _)| worker);
     let mut outcomes = Vec::new();
     for (_, checked) in finished {
@@ -331,7 +387,8 @@ fn check_chunk(chunk: Vec<Entry>, folder: &Path) -> Result<Vec<Outcome>, DataErr
         .into_iter()
         .map(|(origin, parsed)| {
             let result = match parsed {
-                Ok(conversation) => verify::check(&conversation, folder).map(|checked| Ok((conversation, checked)))?,
+                Ok(conversation) => verify::check(&conversation, folder)
+                    .map(|checked| Ok((conversation, checked)))?,
                 Err(format) => Err(format),
             };
             Ok(Outcome { origin, result })
@@ -339,8 +396,15 @@ fn check_chunk(chunk: Vec<Entry>, folder: &Path) -> Result<Vec<Outcome>, DataErr
         .collect()
 }
 
-fn chat_line<'a>(conversation: &'a Conversation, checked: &'a Checked, sections: &'a HashMap<String, Section>) -> ChatLine<'a> {
-    let section = conversation.section.as_ref().and_then(|id| sections.get(id));
+fn chat_line<'a>(
+    conversation: &'a Conversation,
+    checked: &'a Checked,
+    sections: &'a HashMap<String, Section>,
+) -> ChatLine<'a> {
+    let section = conversation
+        .section
+        .as_ref()
+        .and_then(|id| sections.get(id));
     ChatLine {
         id: conversation.id(),
         source: TEACHER_SOURCE,
@@ -348,7 +412,10 @@ fn chat_line<'a>(conversation: &'a Conversation, checked: &'a Checked, sections:
         entry: &conversation.origin,
         based_on: &conversation.source,
         section: conversation.section.as_deref(),
-        licence: conversation.licence.as_deref().or(section.map(|found| found.licence.as_str())),
+        licence: conversation
+            .licence
+            .as_deref()
+            .or(section.map(|found| found.licence.as_str())),
         source_text: section.map(|found| found.text.as_str()),
         notes: &checked.notes,
         messages: &conversation.turns,
@@ -364,7 +431,10 @@ fn preference_line(conversation: &Conversation) -> Option<PreferenceLine<'_>> {
         origin: &conversation.origin,
         prompt: conversation.prompt(),
         chosen: [chosen],
-        rejected: [Turn { role: Role::Assistant, content: rejected.clone() }],
+        rejected: [Turn {
+            role: Role::Assistant,
+            content: rejected.clone(),
+        }],
     })
 }
 
@@ -379,24 +449,48 @@ fn write_jsonl<T: Serialize>(path: &Path, lines: impl Iterator<Item = T>) -> Res
 }
 
 fn render_report(outcomes: &[Outcome], sections: &HashMap<String, Section>) -> String {
-    let passed: Vec<(&Conversation, &Checked)> = outcomes.iter().filter_map(Outcome::passed).collect();
-    let turns: usize = passed.iter().map(|(conversation, _)| conversation.turns.len()).sum();
-    let multi_turn = passed.iter().filter(|(conversation, _)| conversation.turns.len() > 2).count();
-    let grounded = passed.iter().filter(|(conversation, _)| conversation.section.is_some()).count();
+    let passed: Vec<(&Conversation, &Checked)> =
+        outcomes.iter().filter_map(Outcome::passed).collect();
+    let turns: usize = passed
+        .iter()
+        .map(|(conversation, _)| conversation.turns.len())
+        .sum();
+    let multi_turn = passed
+        .iter()
+        .filter(|(conversation, _)| conversation.turns.len() > 2)
+        .count();
+    let grounded = passed
+        .iter()
+        .filter(|(conversation, _)| conversation.section.is_some())
+        .count();
     let tests: usize = passed.iter().map(|(_, checked)| checked.tests).sum();
     let runs: usize = passed.iter().map(|(_, checked)| checked.runs).sum();
     let notes: usize = passed.iter().map(|(_, checked)| checked.notes.len()).sum();
     let ignored: usize = passed.iter().map(|(_, checked)| checked.ignored).sum();
-    let tokens: usize = passed.iter().map(|(conversation, _)| conversation.char_count()).sum::<usize>() / CHARS_PER_TOKEN;
-    let rejected: Vec<&String> = passed.iter().filter_map(|(conversation, _)| conversation.rejected.as_ref()).collect();
-    let caught = rejected.iter().filter(|text| !verify::spark_objections(text).is_empty()).count();
+    let tokens: usize = passed
+        .iter()
+        .map(|(conversation, _)| conversation.char_count())
+        .sum::<usize>()
+        / CHARS_PER_TOKEN;
+    let rejected: Vec<&String> = passed
+        .iter()
+        .filter_map(|(conversation, _)| conversation.rejected.as_ref())
+        .collect();
+    let caught = rejected
+        .iter()
+        .filter(|text| !verify::spark_objections(text).is_empty())
+        .count();
     let mut languages: BTreeMap<&str, usize> = BTreeMap::new();
     let mut sources: BTreeMap<&str, usize> = BTreeMap::new();
     for (conversation, checked) in &passed {
         for (language, count) in &checked.blocks {
             *languages.entry(language).or_insert(0) += count;
         }
-        let source = conversation.section.as_ref().and_then(|id| sections.get(id)).map_or("written by the teacher", |found| found.source.as_str());
+        let source = conversation
+            .section
+            .as_ref()
+            .and_then(|id| sections.get(id))
+            .map_or("written by the teacher", |found| found.source.as_str());
         *sources.entry(source).or_insert(0) += 1;
     }
     let mut report = format!(
@@ -422,12 +516,20 @@ fn render_report(outcomes: &[Outcome], sections: &HashMap<String, Section>) -> S
         let _ = writeln!(report, "| {source} | {count} |");
     }
     report.push_str("\n## Problems\n\n");
-    let failed: Vec<&Outcome> = outcomes.iter().filter(|outcome| outcome.passed().is_none()).collect();
+    let failed: Vec<&Outcome> = outcomes
+        .iter()
+        .filter(|outcome| outcome.passed().is_none())
+        .collect();
     if failed.is_empty() {
         report.push_str("- none\n");
     }
     for outcome in failed {
-        let _ = write!(report, "### {}\n\n```text\n{}\n```\n\n", outcome.origin, outcome.problems().join("\n"));
+        let _ = write!(
+            report,
+            "### {}\n\n```text\n{}\n```\n\n",
+            outcome.origin,
+            outcome.problems().join("\n")
+        );
     }
     report
 }
@@ -443,7 +545,8 @@ mod tests {
 
     impl Workspace {
         fn new(name: &str) -> Result<Self, DataError> {
-            let root = std::env::temp_dir().join(format!("thor-hammer-teacher-{name}-{}", std::process::id()));
+            let root = std::env::temp_dir()
+                .join(format!("thor-hammer-teacher-{name}-{}", std::process::id()));
             let paths = Paths {
                 source: root.join("teacher"),
                 output: root.join("data"),
@@ -454,7 +557,10 @@ mod tests {
             workspace.write("manifest.tsv", "source\tkind\tcommit\tlicence_file\tlicence\nbook\tbook\tabc\tLICENSE\tMIT License\nlib\tcode\tabc\tLICENSE\tMIT License\n")?;
             let train = r#"{"id":"s1","instruction":"","response":"A long passage about heaps.","source":"corpus","origin":"book/heaps.md"}"#;
             workspace.write("data/train.jsonl", train)?;
-            workspace.write("corpus/lib/src/heap.py", &"def push(heap, item):\n    heap.append(item)\n".repeat(60))?;
+            workspace.write(
+                "corpus/lib/src/heap.py",
+                &"def push(heap, item):\n    heap.append(item)\n".repeat(60),
+            )?;
             Ok(workspace)
         }
 
@@ -482,9 +588,27 @@ mod tests {
     #[test]
     fn reads_the_command_line() {
         let words = |list: &[&str]| Command::from_args(list.iter().map(ToString::to_string));
-        assert_eq!(words(&[]), Command::Check { source: DEFAULT_SOURCE.into(), output: DEFAULT_OUTPUT.into() });
-        assert_eq!(words(&["check", "a", "b"]), Command::Check { source: "a".into(), output: "b".into() });
-        assert_eq!(words(&["pick", "3", "trpl"]), Command::Pick { count: 3, sources: vec!["trpl".to_string()] });
+        assert_eq!(
+            words(&[]),
+            Command::Check {
+                source: DEFAULT_SOURCE.into(),
+                output: DEFAULT_OUTPUT.into()
+            }
+        );
+        assert_eq!(
+            words(&["check", "a", "b"]),
+            Command::Check {
+                source: "a".into(),
+                output: "b".into()
+            }
+        );
+        assert_eq!(
+            words(&["pick", "3", "trpl"]),
+            Command::Pick {
+                count: 3,
+                sources: vec!["trpl".to_string()]
+            }
+        );
         assert_eq!(words(&["pick", "many"]), Command::Usage);
     }
 
@@ -493,7 +617,10 @@ mod tests {
         let workspace = Workspace::new("check")?;
         workspace.write("teacher/a.md", &format!("{GOOD}---\n<!-- source: notes -->\n### User\nQ\n\n### Assistant\nGreat question!\n\n```python\nassert 1 + 1 == 2\n```\n---\n<!-- source: notes -->\n### User\nQ\n\n### Assistant\n```python\nassert sorted([2, 1]) == [1, 2]\n```\n"))?;
         let unknown = GOOD.replace("section: s1", "section: nowhere");
-        workspace.write("teacher/more/b.md", &format!("{unknown}---\n### User\nno source comment\n"))?;
+        workspace.write(
+            "teacher/more/b.md",
+            &format!("{unknown}---\n### User\nno source comment\n"),
+        )?;
         let result = check(&workspace.paths)?;
         assert!(!result.all_passed);
         assert!(result.summary().contains("| Passed every check | 2 |"));
@@ -503,20 +630,35 @@ mod tests {
         assert!(result.report.contains("format: no <!-- source"));
         let chat = workspace.read("data/teacher.jsonl")?;
         assert!(chat.contains("\"source_text\":\"A long passage about heaps.\""));
-        assert!(chat.contains("\"source\":\"teacher\",\"origin\":\"book/heaps.md\",\"entry\":\"a.md#1\""));
+        assert!(
+            chat.contains(
+                "\"source\":\"teacher\",\"origin\":\"book/heaps.md\",\"entry\":\"a.md#1\""
+            )
+        );
         assert!(chat.contains("\"licence\":\"MIT\""));
         let preferences = workspace.read("data/teacher_preferences.jsonl")?;
-        assert!(preferences.contains("\"rejected\":[{\"role\":\"assistant\",\"content\":\"Great question!"));
+        assert!(
+            preferences
+                .contains("\"rejected\":[{\"role\":\"assistant\",\"content\":\"Great question!")
+        );
         assert!(result.report.contains("| book | 1 |"));
-        assert!(result.report.contains("| Rejected answers spark also catches | 1 of 1 |"));
+        assert!(
+            result
+                .report
+                .contains("| Rejected answers spark also catches | 1 of 1 |")
+        );
         Ok(())
     }
 
     #[test]
     fn a_set_without_grounded_entries_needs_no_sections() -> Result<(), DataError> {
         let workspace = Workspace::new("plain")?;
-        workspace.write("teacher/a.md", "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA plain answer.\n")?;
-        fs::remove_file(workspace.root.join("data/train.jsonl")).map_err(DataError::io(&workspace.root))?;
+        workspace.write(
+            "teacher/a.md",
+            "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA plain answer.\n",
+        )?;
+        fs::remove_file(workspace.root.join("data/train.jsonl"))
+            .map_err(DataError::io(&workspace.root))?;
         let result = check(&workspace.paths)?;
         assert!(result.all_passed);
         assert!(result.report.contains("| written by the teacher | 1 |"));
@@ -531,20 +673,28 @@ mod tests {
             r#"{{"id":"s1","instruction":"","response":"{}","source":"corpus","origin":"book/heaps.md"}}"#,
             "heaps ".repeat(200)
         ))?;
-        workspace.write("teacher/a.md", "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA.\n")?;
+        workspace.write(
+            "teacher/a.md",
+            "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA.\n",
+        )?;
         let summary = queue(&workspace.paths, 5, &[])?;
         assert!(summary.starts_with("2 sections queued"));
         let queued = workspace.read("data/teacher_queue.md")?;
         assert!(queued.contains("section: s1; licence: MIT"));
         assert!(queued.contains("````python\ndef push"));
         workspace.write("teacher/a.md", GOOD)?;
-        assert!(queue(&workspace.paths, 5, &["book".to_string()])?.starts_with("0 sections queued"));
+        assert!(
+            queue(&workspace.paths, 5, &["book".to_string()])?.starts_with("0 sections queued")
+        );
         Ok(())
     }
 
     #[test]
     fn default_paths_point_at_the_repository_layout() {
         let paths = Paths::new("t".into(), "d".into());
-        assert_eq!((paths.corpus, paths.manifest), (PathBuf::from(CORPUS), PathBuf::from(MANIFEST)));
+        assert_eq!(
+            (paths.corpus, paths.manifest),
+            (PathBuf::from(CORPUS), PathBuf::from(MANIFEST))
+        );
     }
 }

@@ -97,10 +97,7 @@ fn header_comment(source_code: &str, header_marker: &str) -> Option<String> {
         .map_while(|line| line.strip_prefix(header_marker))
         .map(str::trim)
         .collect();
-    let header = header_lines
-        .join("\n")
-        .trim()
-        .to_string();
+    let header = header_lines.join("\n").trim().to_string();
     match header.is_empty() {
         true => None,
         false => Some(header),

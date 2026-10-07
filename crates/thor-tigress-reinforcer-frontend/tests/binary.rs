@@ -36,20 +36,43 @@ fn folder() -> Result<PathBuf, RunError> {
 fn scans_applies_and_refuses() -> Result<(), RunError> {
     let folder = folder()?;
     let train = folder.join("train.jsonl");
-    fs::write(&train, "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\",\"instruction\":\"q\",\"response\":\"In summary, it works.\"}\n")?;
+    fs::write(
+        &train,
+        "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\",\"instruction\":\"q\",\"response\":\"In summary, it works.\"}\n",
+    )?;
     let suggestions = folder.join("auto.jsonl");
     let flags = folder.join("flags.jsonl");
     let program = env!("CARGO_BIN_EXE_reinforcer");
-    let scanned = Command::new(program).arg("scan").arg(&train).arg(&suggestions).output()?;
-    assert!(scanned.status.success(), "{}", String::from_utf8_lossy(&scanned.stderr));
-    let applied = Command::new(program).arg("apply").arg(&suggestions).arg(&flags).output()?;
-    assert!(applied.status.success(), "{}", String::from_utf8_lossy(&applied.stderr));
+    let scanned = Command::new(program)
+        .arg("scan")
+        .arg(&train)
+        .arg(&suggestions)
+        .output()?;
+    assert!(
+        scanned.status.success(),
+        "{}",
+        String::from_utf8_lossy(&scanned.stderr)
+    );
+    let applied = Command::new(program)
+        .arg("apply")
+        .arg(&suggestions)
+        .arg(&flags)
+        .output()?;
+    assert!(
+        applied.status.success(),
+        "{}",
+        String::from_utf8_lossy(&applied.stderr)
+    );
     assert!(String::from_utf8_lossy(&applied.stdout).starts_with("applied "));
-    let usage = Command::new(program).args(["serve", "--colour", "dark"]).output()?;
+    let usage = Command::new(program)
+        .args(["serve", "--colour", "dark"])
+        .output()?;
     assert!(!usage.status.success());
     assert!(String::from_utf8_lossy(&usage.stderr).contains("usage: reinforcer"));
     let missing = folder.join("none.jsonl").display().to_string();
-    let nothing = Command::new(program).args(["serve", "--dataset", &format!("x={missing}")]).output()?;
+    let nothing = Command::new(program)
+        .args(["serve", "--dataset", &format!("x={missing}")])
+        .output()?;
     assert!(!nothing.status.success());
     assert!(String::from_utf8_lossy(&nothing.stderr).contains("no dataset to show"));
     assert_eq!(RunError::from(io::Error::other("x")).to_string(), "x");

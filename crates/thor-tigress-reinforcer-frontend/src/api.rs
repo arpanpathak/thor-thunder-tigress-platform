@@ -104,15 +104,28 @@ struct Datasets {
 pub fn answer(stream: &mut dyn Write, request: &Request, workspace: &Workspace) -> Outcome {
     match Route::of(&request.method, &request.path) {
         Route::Page => http::write_response(stream, Status::Ok, ContentType::Html, PAGE.as_bytes()),
-        Route::Datasets => ok(stream, &Datasets { datasets: workspace.infos()?, missing: workspace.missing().to_vec() }),
-        _ => answer_in(stream, request, &workspace.dataset(request.param("dataset"))?.app),
+        Route::Datasets => ok(
+            stream,
+            &Datasets {
+                datasets: workspace.infos()?,
+                missing: workspace.missing().to_vec(),
+            },
+        ),
+        _ => answer_in(
+            stream,
+            request,
+            &workspace.dataset(request.param("dataset"))?.app,
+        ),
     }
 }
 
 /// Answers one request about one dataset.
 fn answer_in(stream: &mut dyn Write, request: &Request, app: &App) -> Outcome {
     match Route::of(&request.method, &request.path) {
-        Route::Page | Route::Datasets => Err(ReviewError::NotFound(format!("{} {}", request.method, request.path))),
+        Route::Page | Route::Datasets => Err(ReviewError::NotFound(format!(
+            "{} {}",
+            request.method, request.path
+        ))),
         Route::SlopFile => {
             let removed = fs::read(&app.slop).unwrap_or_default();
             http::write_response(stream, Status::Ok, ContentType::JsonLines, &removed)
@@ -121,11 +134,22 @@ fn answer_in(stream: &mut dyn Write, request: &Request, app: &App) -> Outcome {
         Route::Orphans => ok(stream, &orphans(app)?),
         Route::Categories => ok(stream, &categories()),
         Route::Records => ok(stream, &records(app, request)?),
-        Route::Record => ok(stream, &item(app, request.number("position", usize::MAX), Length::Whole)?),
+        Route::Record => ok(
+            stream,
+            &item(app, request.number("position", usize::MAX), Length::Whole)?,
+        ),
         Route::SetFlag => ok(stream, &set_flag(app, request)?),
-        Route::Phrases => ok(stream, &Phrases { phrases: app.flags()?.phrases() }),
+        Route::Phrases => ok(
+            stream,
+            &Phrases {
+                phrases: app.flags()?.phrases(),
+            },
+        ),
         Route::FlagMatches => ok(stream, &flag_matches(app, request)?),
-        Route::NotFound => Err(ReviewError::NotFound(format!("{} {}", request.method, request.path))),
+        Route::NotFound => Err(ReviewError::NotFound(format!(
+            "{} {}",
+            request.method, request.path
+        ))),
     }
 }
 
@@ -163,7 +187,11 @@ fn meta(app: &App) -> Outcome<Meta> {
         .index
         .counts()
         .into_iter()
-        .map(|source| SourceInfo { title: titles::source_title(&source.name), name: source.name, count: source.count })
+        .map(|source| SourceInfo {
+            title: titles::source_title(&source.name),
+            name: source.name,
+            count: source.count,
+        })
         .collect();
     let collections = app
         .index
@@ -206,8 +234,14 @@ fn orphans(app: &App) -> Outcome<Orphans> {
     let store = app.flags()?;
     let mut orphans: Vec<Orphan> = store
         .iter()
-        .filter(|(id, flag)| !app.index.contains(id) && !app.slop_ids.contains(*id) && flag.is_reviewed())
-        .map(|(id, flag)| Orphan { id: id.to_string(), note: flag.note.clone(), spans: flag.spans.clone() })
+        .filter(|(id, flag)| {
+            !app.index.contains(id) && !app.slop_ids.contains(*id) && flag.is_reviewed()
+        })
+        .map(|(id, flag)| Orphan {
+            id: id.to_string(),
+            note: flag.note.clone(),
+            spans: flag.spans.clone(),
+        })
         .collect();
     orphans.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(Orphans { orphans })
@@ -228,7 +262,10 @@ struct CategoryInfo {
 fn categories() -> Categories {
     let categories = SlopCategory::ALL
         .into_iter()
-        .map(|category| CategoryInfo { name: category, description: category.description() })
+        .map(|category| CategoryInfo {
+            name: category,
+            description: category.description(),
+        })
         .collect();
     Categories { categories }
 }
@@ -258,7 +295,11 @@ fn records(app: &App, request: &Request) -> Outcome<Page> {
         .take(limit)
         .map(|position| item(app, position, Length::ShortenedTo(MAX_INLINE_RESPONSE)))
         .collect::<Outcome<Vec<Item>>>()?;
-    Ok(Page { start, total, items })
+    Ok(Page {
+        start,
+        total,
+        items,
+    })
 }
 
 /// How much of an answer to send.
@@ -320,7 +361,10 @@ struct RecordText {
 /// One record, with its flag if it has one. The length of the whole answer
 /// is always sent, so the reader can be told what is held back.
 fn item(app: &App, position: usize, length: Length) -> Outcome<Item> {
-    let entry = app.index.entry(position).ok_or_else(|| ReviewError::NotFound(format!("record {position}")))?;
+    let entry = app
+        .index
+        .entry(position)
+        .ok_or_else(|| ReviewError::NotFound(format!("record {position}")))?;
     let record: RecordText = app.index.parsed(position)?;
     let source = app.index.source_of(entry);
     let response_chars = record.response.chars().count();
@@ -391,12 +435,21 @@ fn set_flag(app: &App, request: &Request) -> Outcome<FlagSaved> {
     let wanted: FlagRequest = body(request, "flag")?;
     let mut store = app.flags()?;
     if wanted.flagged {
-        store.set(&wanted.id, Flag { note: wanted.note, spans: wanted.spans });
+        store.set(
+            &wanted.id,
+            Flag {
+                note: wanted.note,
+                spans: wanted.spans,
+            },
+        );
     } else {
         store.clear(&wanted.id);
     }
     store.save()?;
-    Ok(FlagSaved { ok: true, flagged: wanted.flagged })
+    Ok(FlagSaved {
+        ok: true,
+        flagged: wanted.flagged,
+    })
 }
 
 /// Every phrase a reviewer has marked, for the page to highlight everywhere.
@@ -430,16 +483,25 @@ fn flag_matches(app: &App, request: &Request) -> Outcome<Matched> {
     let wanted: MatchRequest = body(request, "flag-matches")?;
     let needle = wanted.text.trim().to_lowercase();
     if needle.chars().count() < MIN_PHRASE_CHARS {
-        return Err(ReviewError::BadRequest(format!("a phrase needs at least {MIN_PHRASE_CHARS} characters")));
+        return Err(ReviewError::BadRequest(format!(
+            "a phrase needs at least {MIN_PHRASE_CHARS} characters"
+        )));
     }
-    let filter = Filter { query: Some(needle.clone()), ..Filter::default() };
+    let filter = Filter {
+        query: Some(needle.clone()),
+        ..Filter::default()
+    };
     let mut found = Vec::new();
     for position in app.index.matching(&filter, &Ids::new())? {
         let record: RecordText = app.index.parsed(position)?;
         let Some(text) = occurrence(&record.response, &needle) else {
             continue;
         };
-        let id = app.index.entry(position).map(|entry| entry.id.clone()).unwrap_or_default();
+        let id = app
+            .index
+            .entry(position)
+            .map(|entry| entry.id.clone())
+            .unwrap_or_default();
         found.push(Occurrence { id, text });
     }
     let mut store = app.flags()?;
@@ -447,12 +509,19 @@ fn flag_matches(app: &App, request: &Request) -> Outcome<Matched> {
     let added = found
         .iter()
         .filter(|occurrence| {
-            let span = Span { field: Field::Response, text: occurrence.text.clone(), category: wanted.category };
+            let span = Span {
+                field: Field::Response,
+                text: occurrence.text.clone(),
+                category: wanted.category,
+            };
             store.add_span(&occurrence.id, span, &note)
         })
         .count();
     store.save()?;
-    Ok(Matched { matched: found.len(), added })
+    Ok(Matched {
+        matched: found.len(),
+        added,
+    })
 }
 
 /// The first place `needle` (lowercase) appears in `text`, as written there.
@@ -463,7 +532,8 @@ fn occurrence(text: &str, needle: &str) -> Option<String> {
 
 /// A request's JSON body as a `T`; `what` names it in the error.
 fn body<T: serde::de::DeserializeOwned>(request: &Request, what: &str) -> Outcome<T> {
-    serde_json::from_str(&request.body).map_err(|error| ReviewError::BadRequest(format!("{what} body: {error}")))
+    serde_json::from_str(&request.body)
+        .map_err(|error| ReviewError::BadRequest(format!("{what} body: {error}")))
 }
 
 #[cfg(test)]
@@ -474,15 +544,26 @@ mod tests {
     #[test]
     fn a_phrase_found_outside_the_answers_marks_nothing() -> Outcome {
         let setup = setup()?;
-        let reply = call(&setup.app, "POST", "/api/flag-matches", r#"{"text":"trpl/src","category":"other"}"#)?;
-        assert_eq!((reply.body["matched"].as_u64(), reply.body["added"].as_u64()), (Some(0), Some(0)));
+        let reply = call(
+            &setup.app,
+            "POST",
+            "/api/flag-matches",
+            r#"{"text":"trpl/src","category":"other"}"#,
+        )?;
+        assert_eq!(
+            (reply.body["matched"].as_u64(), reply.body["added"].as_u64()),
+            (Some(0), Some(0))
+        );
         Ok(())
     }
 
     const TRAINING: &str = concat!(
-        r#"{"id":"a1","source":"chat","origin":"c1","instruction":"Why?","response":"Great question! Here's the thing: no."}"#, "\n",
-        r#"{"id":"b2","source":"corpus","origin":"trpl/src/ch01.md","instruction":"What is a page?","response":"Here's The Thing about pages."}"#, "\n",
-        r#"{"id":"c3","source":"readability","origin":"r","instruction":"Rewrite","response":"line one\nline two\nline three"}"#, "\n"
+        r#"{"id":"a1","source":"chat","origin":"c1","instruction":"Why?","response":"Great question! Here's the thing: no."}"#,
+        "\n",
+        r#"{"id":"b2","source":"corpus","origin":"trpl/src/ch01.md","instruction":"What is a page?","response":"Here's The Thing about pages."}"#,
+        "\n",
+        r#"{"id":"c3","source":"readability","origin":"r","instruction":"Rewrite","response":"line one\nline two\nline three"}"#,
+        "\n"
     );
 
     struct Setup {
@@ -495,14 +576,21 @@ mod tests {
         let training = folder.file("train.jsonl", TRAINING)?;
         let slop = folder.file("slop.jsonl", "{\"id\":\"gone\",\"response\":\"old\"}\n")?;
         let flag_lines = concat!(
-            r#"{"id":"gone","note":"removed"}"#, "\n",
-            r#"{"id":"lost","note":"text changed","spans":[]}"#, "\n",
-            r#"{"id":"also-lost","note":"rebuilt","spans":[]}"#, "\n",
-            r#"{"id":"auto-only","note":"auto: x","spans":[]}"#, "\n"
+            r#"{"id":"gone","note":"removed"}"#,
+            "\n",
+            r#"{"id":"lost","note":"text changed","spans":[]}"#,
+            "\n",
+            r#"{"id":"also-lost","note":"rebuilt","spans":[]}"#,
+            "\n",
+            r#"{"id":"auto-only","note":"auto: x","spans":[]}"#,
+            "\n"
         );
         let flags = folder.file("flags.jsonl", flag_lines)?;
         let app = App::open(&training, &flags, &slop)?;
-        Ok(Setup { app, _folder: folder })
+        Ok(Setup {
+            app,
+            _folder: folder,
+        })
     }
 
     /// A reply: its status line and its JSON body.
@@ -546,9 +634,18 @@ mod tests {
     fn serves_the_removed_examples() -> Outcome {
         let setup = setup()?;
         let removed = call(&setup.app, "GET", "/slop.jsonl", "")?;
-        assert_eq!((removed.status.as_str(), &removed.body["id"]), ("HTTP/1.1 200 OK", &Value::from("gone")));
-        assert!(matches!(call(&setup.app, "DELETE", "/api/flag", ""), Err(ReviewError::NotFound(_))));
-        assert!(matches!(call(&setup.app, "GET", "/", ""), Err(ReviewError::NotFound(_))));
+        assert_eq!(
+            (removed.status.as_str(), &removed.body["id"]),
+            ("HTTP/1.1 200 OK", &Value::from("gone"))
+        );
+        assert!(matches!(
+            call(&setup.app, "DELETE", "/api/flag", ""),
+            Err(ReviewError::NotFound(_))
+        ));
+        assert!(matches!(
+            call(&setup.app, "GET", "/", ""),
+            Err(ReviewError::NotFound(_))
+        ));
         Ok(())
     }
 
@@ -559,20 +656,42 @@ mod tests {
         let teacher_line = r#"{"id":"t1","source":"teacher","origin":"trpl/src/ch08.md","entry":"grounded/trpl.md#1","based_on":"trpl/src/ch08.md","licence":"Apache-2.0","source_text":"Vectors hold values.","notes":["turn 2: R1"],"messages":[{"role":"user","content":"Q?"},{"role":"assistant","content":"A."}]}"#;
         let teacher = folder.file("teacher.jsonl", &format!("{teacher_line}\n"))?;
         let specs = [
-            crate::workspace::DatasetSpec::new("train", &train, &folder.path().join("f1.jsonl"), &folder.path().join("r1.jsonl")),
-            crate::workspace::DatasetSpec::new("teacher", &teacher, &folder.path().join("f2.jsonl"), &folder.path().join("r2.jsonl")),
+            crate::workspace::DatasetSpec::new(
+                "train",
+                &train,
+                &folder.path().join("f1.jsonl"),
+                &folder.path().join("r1.jsonl"),
+            ),
+            crate::workspace::DatasetSpec::new(
+                "teacher",
+                &teacher,
+                &folder.path().join("f2.jsonl"),
+                &folder.path().join("r2.jsonl"),
+            ),
         ];
         let workspace = Workspace::open(&specs)?;
         let mut page = Vec::new();
         answer(&mut page, &Request::new("GET", "/", ""), &workspace)?;
         assert!(String::from_utf8_lossy(&page).starts_with("HTTP/1.1 200 OK"));
         let mut listed = Vec::new();
-        answer(&mut listed, &Request::new("GET", "/api/datasets", ""), &workspace)?;
+        answer(
+            &mut listed,
+            &Request::new("GET", "/api/datasets", ""),
+            &workspace,
+        )?;
         assert!(String::from_utf8_lossy(&listed).contains(r#""name":"teacher","#));
         let mut records = Vec::new();
-        answer(&mut records, &Request::new("GET", "/api/page?dataset=teacher", ""), &workspace)?;
+        answer(
+            &mut records,
+            &Request::new("GET", "/api/page?dataset=teacher", ""),
+            &workspace,
+        )?;
         let text = String::from_utf8_lossy(&records).into_owned();
-        assert!(text.contains(r#""source_text":"Vectors hold values.""#) && text.contains(r#""licence":"Apache-2.0""#), "{text}");
+        assert!(
+            text.contains(r#""source_text":"Vectors hold values.""#)
+                && text.contains(r#""licence":"Apache-2.0""#),
+            "{text}"
+        );
         assert!(text.contains(r#""collection_title":"The Rust Programming Language""#));
         Ok(())
     }
@@ -581,9 +700,15 @@ mod tests {
     fn meta_counts_sources_books_and_flags() -> Outcome {
         let setup = setup()?;
         let meta = call(&setup.app, "GET", "/api/meta", "")?.body;
-        assert_eq!((meta["total"].as_u64(), meta["flagged"].as_u64()), (Some(3), Some(4)));
+        assert_eq!(
+            (meta["total"].as_u64(), meta["flagged"].as_u64()),
+            (Some(3), Some(4))
+        );
         assert_eq!(meta["sources"].as_array().map(Vec::len), Some(3));
-        assert_eq!(meta["collections"][0]["title"], "The Rust Programming Language");
+        assert_eq!(
+            meta["collections"][0]["title"],
+            "The Rust Programming Language"
+        );
         Ok(())
     }
 
@@ -603,7 +728,10 @@ mod tests {
     fn categories_carry_names_and_words() -> Outcome {
         let setup = setup()?;
         let body = call(&setup.app, "GET", "/api/categories", "")?.body;
-        assert_eq!(body["categories"][0], serde_json::json!({ "name": "fake_importance", "description": "fake importance" }));
+        assert_eq!(
+            body["categories"][0],
+            serde_json::json!({ "name": "fake_importance", "description": "fake importance" })
+        );
         assert_eq!(body["categories"].as_array().map(Vec::len), Some(8));
         Ok(())
     }
@@ -614,8 +742,15 @@ mod tests {
         let page = call(&setup.app, "GET", "/api/page?source=chat&limit=500", "")?.body;
         assert_eq!(page["total"], 1);
         let item = &page["items"][0];
-        assert_eq!((item["id"].as_str(), item["source_title"].as_str()), (Some("a1"), Some("Claude chat export")));
-        assert!(item["suggestions"]["slop"].as_array().is_some_and(|hits| !hits.is_empty()));
+        assert_eq!(
+            (item["id"].as_str(), item["source_title"].as_str()),
+            (Some("a1"), Some("Claude chat export"))
+        );
+        assert!(
+            item["suggestions"]["slop"]
+                .as_array()
+                .is_some_and(|hits| !hits.is_empty())
+        );
         let searched = call(&setup.app, "GET", "/api/page?q=here%27s+the+thing", "")?.body;
         assert_eq!(searched["total"], 2);
         Ok(())
@@ -626,8 +761,14 @@ mod tests {
         let setup = setup()?;
         let record = call(&setup.app, "GET", "/api/record?position=2", "")?.body;
         assert_eq!(record["response"], "line one\nline two\nline three");
-        assert_eq!(record["suggestions"], serde_json::json!({ "slop": [], "violations": [] }));
-        assert!(matches!(call(&setup.app, "GET", "/api/record?position=99", ""), Err(ReviewError::NotFound(_))));
+        assert_eq!(
+            record["suggestions"],
+            serde_json::json!({ "slop": [], "violations": [] })
+        );
+        assert!(matches!(
+            call(&setup.app, "GET", "/api/record?position=99", ""),
+            Err(ReviewError::NotFound(_))
+        ));
         Ok(())
     }
 
@@ -637,8 +778,16 @@ mod tests {
         let body = r#"{"id":"a1","note":"flattery","spans":[{"field":"response","text":"Great question!","category":"flattery_filler_opener"}]}"#;
         let set = call(&setup.app, "POST", "/api/flag", body)?.body;
         assert_eq!(set, serde_json::json!({ "ok": true, "flagged": true }));
-        assert_eq!(setup.app.flags()?.get("a1").map(|flag| flag.spans.len()), Some(1));
-        call(&setup.app, "POST", "/api/flag", r#"{"id":"a1","flagged":false}"#)?;
+        assert_eq!(
+            setup.app.flags()?.get("a1").map(|flag| flag.spans.len()),
+            Some(1)
+        );
+        call(
+            &setup.app,
+            "POST",
+            "/api/flag",
+            r#"{"id":"a1","flagged":false}"#,
+        )?;
         assert_eq!(setup.app.flags()?.get("a1"), None);
         Ok(())
     }
@@ -647,7 +796,10 @@ mod tests {
     fn an_unknown_category_is_a_bad_request() -> Outcome {
         let setup = setup()?;
         let body = r#"{"id":"a1","spans":[{"field":"response","text":"x","category":"made_up"}]}"#;
-        assert!(matches!(call(&setup.app, "POST", "/api/flag", body), Err(ReviewError::BadRequest(_))));
+        assert!(matches!(
+            call(&setup.app, "POST", "/api/flag", body),
+            Err(ReviewError::BadRequest(_))
+        ));
         Ok(())
     }
 
@@ -659,7 +811,11 @@ mod tests {
         let again = call(&setup.app, "POST", "/api/flag-matches", body)?.body;
         assert_eq!(first, serde_json::json!({ "matched": 2, "added": 2 }));
         assert_eq!(again, serde_json::json!({ "matched": 2, "added": 0 }));
-        let marked = setup.app.flags()?.get("b2").map(|flag| flag.spans[0].text.clone());
+        let marked = setup
+            .app
+            .flags()?
+            .get("b2")
+            .map(|flag| flag.spans[0].text.clone());
         assert_eq!(marked.as_deref(), Some("Here's The Thing"));
         let phrases = call(&setup.app, "GET", "/api/phrases", "")?.body;
         assert_eq!(phrases["phrases"][0]["examples"], 2);
@@ -669,7 +825,12 @@ mod tests {
     #[test]
     fn refuses_a_phrase_that_is_too_short() -> Outcome {
         let setup = setup()?;
-        let outcome = call(&setup.app, "POST", "/api/flag-matches", r#"{"text":" ok ","category":"other"}"#);
+        let outcome = call(
+            &setup.app,
+            "POST",
+            "/api/flag-matches",
+            r#"{"text":" ok ","category":"other"}"#,
+        );
         assert!(outcome.is_err_and(|error| error.to_string().contains("at least 4 characters")));
         Ok(())
     }
@@ -687,10 +848,20 @@ mod tests {
         let long = "x".repeat(MAX_INLINE_RESPONSE + 10);
         let line = serde_json::json!({ "id": "l", "source": "chat", "origin": "c", "response": format!("short\n{long}") });
         let training = folder.file("train.jsonl", &format!("{line}\n"))?;
-        let app = App::open(&training, &folder.path().join("f.jsonl"), &folder.path().join("s.jsonl"))?;
+        let app = App::open(
+            &training,
+            &folder.path().join("f.jsonl"),
+            &folder.path().join("s.jsonl"),
+        )?;
         let item = &call(&app, "GET", "/api/page", "")?.body["items"][0];
-        assert_eq!((item["response"].as_str(), item["shortened"].as_bool()), (Some("short"), Some(true)));
-        assert_eq!(item["response_chars"].as_u64(), u64::try_from(MAX_INLINE_RESPONSE + 16).ok());
+        assert_eq!(
+            (item["response"].as_str(), item["shortened"].as_bool()),
+            (Some("short"), Some(true))
+        );
+        assert_eq!(
+            item["response_chars"].as_u64(),
+            u64::try_from(MAX_INLINE_RESPONSE + 16).ok()
+        );
         Ok(())
     }
 }

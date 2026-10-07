@@ -29,7 +29,12 @@ impl DatasetSpec {
     /// A dataset named `name` with its three files.
     #[must_use]
     pub fn new(name: &str, records: &Path, flags: &Path, removed: &Path) -> Self {
-        Self { name: name.to_string(), records: records.to_path_buf(), flags: flags.to_path_buf(), removed: removed.to_path_buf() }
+        Self {
+            name: name.to_string(),
+            records: records.to_path_buf(),
+            flags: flags.to_path_buf(),
+            removed: removed.to_path_buf(),
+        }
     }
 }
 
@@ -78,10 +83,16 @@ impl Workspace {
                 continue;
             }
             let app = App::open(&spec.records, &spec.flags, &spec.removed)?;
-            datasets.push(Dataset { name: spec.name.clone(), app });
+            datasets.push(Dataset {
+                name: spec.name.clone(),
+                app,
+            });
         }
         if datasets.is_empty() {
-            return Err(ReviewError::NotFound(format!("no dataset to show: {}", missing.join(", "))));
+            return Err(ReviewError::NotFound(format!(
+                "no dataset to show: {}",
+                missing.join(", ")
+            )));
         }
         Ok(Workspace { datasets, missing })
     }
@@ -132,28 +143,53 @@ mod tests {
 
     fn spec(folder: &TempDir, name: &str) -> DatasetSpec {
         let path = folder.path();
-        DatasetSpec::new(name, &path.join(format!("{name}.jsonl")), &path.join(format!("{name}-flags.jsonl")), &path.join("removed.jsonl"))
+        DatasetSpec::new(
+            name,
+            &path.join(format!("{name}.jsonl")),
+            &path.join(format!("{name}-flags.jsonl")),
+            &path.join("removed.jsonl"),
+        )
     }
 
     #[test]
     fn opens_what_exists_and_lists_what_is_missing() -> Outcome {
         let folder = TempDir::new()?;
-        folder.file("train.jsonl", "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n")?;
+        folder.file(
+            "train.jsonl",
+            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
+        )?;
         folder.file("teacher.jsonl", "{\"id\":\"t\",\"source\":\"teacher\",\"origin\":\"trpl/src/a.md\"}\n{\"id\":\"u\",\"source\":\"teacher\",\"origin\":\"x\"}\n")?;
-        let workspace = Workspace::open(&[spec(&folder, "train"), spec(&folder, "teacher"), spec(&folder, "conversations")])?;
-        let names: Vec<(String, usize)> = workspace.infos()?.into_iter().map(|info| (info.name, info.records)).collect();
-        assert_eq!(names, [("train".to_string(), 1), ("teacher".to_string(), 2)]);
+        let workspace = Workspace::open(&[
+            spec(&folder, "train"),
+            spec(&folder, "teacher"),
+            spec(&folder, "conversations"),
+        ])?;
+        let names: Vec<(String, usize)> = workspace
+            .infos()?
+            .into_iter()
+            .map(|info| (info.name, info.records))
+            .collect();
+        assert_eq!(
+            names,
+            [("train".to_string(), 1), ("teacher".to_string(), 2)]
+        );
         assert!(workspace.missing()[0].starts_with("conversations ("));
         assert_eq!(workspace.dataset(None)?.name, "train");
         assert_eq!(workspace.dataset(Some("teacher"))?.name, "teacher");
-        assert!(matches!(workspace.dataset(Some("nope")), Err(ReviewError::NotFound(_))));
+        assert!(matches!(
+            workspace.dataset(Some("nope")),
+            Err(ReviewError::NotFound(_))
+        ));
         Ok(())
     }
 
     #[test]
     fn nothing_to_open_is_an_error() -> Outcome {
         let folder = TempDir::new()?;
-        assert!(matches!(Workspace::open(&[spec(&folder, "train")]), Err(ReviewError::NotFound(_))));
+        assert!(matches!(
+            Workspace::open(&[spec(&folder, "train")]),
+            Err(ReviewError::NotFound(_))
+        ));
         Ok(())
     }
 }

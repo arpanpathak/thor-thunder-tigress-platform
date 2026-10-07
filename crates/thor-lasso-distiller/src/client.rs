@@ -40,7 +40,12 @@ impl Client {
     /// Thinking is switched off (`enable_thinking: false`, which servers that
     /// do not know it ignore): a hybrid reasoning model would otherwise spend
     /// the whole token budget reasoning and return no question at all.
-    pub fn complete(&self, messages: &[Message], max_tokens: u32, temperature: f32) -> Result<String, DistillError> {
+    pub fn complete(
+        &self,
+        messages: &[Message],
+        max_tokens: u32,
+        temperature: f32,
+    ) -> Result<String, DistillError> {
         let body = json!({
             "model": self.model,
             "messages": messages
@@ -63,13 +68,16 @@ impl Client {
     }
 
     fn post(&self, path: &str, body: &str) -> Result<String, DistillError> {
-        let server = |error: std::io::Error| DistillError::Server(format!("{}: {error}", self.address));
+        let server =
+            |error: std::io::Error| DistillError::Server(format!("{}: {error}", self.address));
         let mut stream = TcpStream::connect(&self.address).map_err(server)?;
         stream.set_read_timeout(Some(TIMEOUT)).map_err(server)?;
         let request = format!(
             "POST {path} HTTP/1.1\r\nHost: {}\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
             self.address,
-            self.key.as_ref().map_or(String::new(), |key| format!("Authorization: Bearer {key}\r\n")),
+            self.key.as_ref().map_or(String::new(), |key| format!(
+                "Authorization: Bearer {key}\r\n"
+            )),
             body.len()
         );
         stream.write_all(request.as_bytes()).map_err(server)?;
@@ -95,7 +103,11 @@ impl Client {
         };
         match status.split_whitespace().nth(1) {
             Some("200") => Ok(body),
-            _ => Err(DistillError::Server(format!("{} {}", status.trim(), body.trim()))),
+            _ => Err(DistillError::Server(format!(
+                "{} {}",
+                status.trim(),
+                body.trim()
+            ))),
         }
     }
 }
@@ -140,7 +152,10 @@ mod tests {
     #[test]
     fn reads_the_first_choice_of_a_reply() -> Result<(), DistillError> {
         let body = r#"{"choices":[{"message":{"role":"assistant","content":"How do I share a Vec between threads?"}}]}"#;
-        let reply = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}", body.len());
+        let reply = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        );
         let client = Client {
             address: serve_once(reply)?,
             model: "teacher".to_string(),
@@ -150,47 +165,84 @@ mod tests {
             role: "user",
             content: "hi".to_string(),
         };
-        assert_eq!(client.complete(&[message], 32, 0.7)?, "How do I share a Vec between threads?");
+        assert_eq!(
+            client.complete(&[message], 32, 0.7)?,
+            "How do I share a Vec between threads?"
+        );
         Ok(())
     }
 
     #[test]
     fn reports_a_server_error() -> Result<(), DistillError> {
         let client = Client {
-            address: serve_once("HTTP/1.1 500 Internal Server Error\r\n\r\nengine not loaded".to_string())?,
+            address: serve_once(
+                "HTTP/1.1 500 Internal Server Error\r\n\r\nengine not loaded".to_string(),
+            )?,
             model: "teacher".to_string(),
             key: None,
         };
         let outcome = client.complete(&[], 32, 0.7);
-        assert!(matches!(outcome, Err(DistillError::Server(message)) if message.contains("engine not loaded")));
+        assert!(
+            matches!(outcome, Err(DistillError::Server(message)) if message.contains("engine not loaded"))
+        );
         Ok(())
     }
 
     #[test]
     fn reads_a_chunked_reply() -> Result<(), DistillError> {
         let body = r#"{"choices":[{"message":{"role":"assistant","content":"chunked"}}]}"#;
-        let reply = format!("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n{body}\r\n0\r\n\r\n", body.len());
-        let client = Client { address: serve_once(reply)?, model: "teacher".to_string(), key: Some("k".to_string()) };
+        let reply = format!(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n{:x}\r\n{body}\r\n0\r\n\r\n",
+            body.len()
+        );
+        let client = Client {
+            address: serve_once(reply)?,
+            model: "teacher".to_string(),
+            key: Some("k".to_string()),
+        };
         assert_eq!(client.complete(&[], 8, 0.0)?, "chunked");
         Ok(())
     }
 
     #[test]
-    fn a_reply_without_json_or_a_message_and_a_closed_port_are_server_errors() -> Result<(), DistillError> {
-        let client = |address: String| Client { address, model: "teacher".to_string(), key: None };
-        let not_json = client(serve_once("HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nnope".to_string())?);
-        assert!(matches!(not_json.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply is not JSON")));
-        let empty = client(serve_once("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}".to_string())?);
-        assert!(matches!(empty.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply has no message")));
-        let closed = std::net::TcpListener::bind("127.0.0.1:0").map_err(DistillError::io("listener"))?;
-        let address = closed.local_addr().map_err(DistillError::io("listener"))?.to_string();
+    fn a_reply_without_json_or_a_message_and_a_closed_port_are_server_errors()
+    -> Result<(), DistillError> {
+        let client = |address: String| Client {
+            address,
+            model: "teacher".to_string(),
+            key: None,
+        };
+        let not_json = client(serve_once(
+            "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nnope".to_string(),
+        )?);
+        assert!(
+            matches!(not_json.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply is not JSON"))
+        );
+        let empty = client(serve_once(
+            "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}".to_string(),
+        )?);
+        assert!(
+            matches!(empty.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply has no message"))
+        );
+        let closed =
+            std::net::TcpListener::bind("127.0.0.1:0").map_err(DistillError::io("listener"))?;
+        let address = closed
+            .local_addr()
+            .map_err(DistillError::io("listener"))?
+            .to_string();
         drop(closed);
-        assert!(matches!(client(address).complete(&[], 8, 0.0), Err(DistillError::Server(_))));
+        assert!(matches!(
+            client(address).complete(&[], 8, 0.0),
+            Err(DistillError::Server(_))
+        ));
         Ok(())
     }
 
     #[test]
     fn joins_chunked_bodies() {
-        assert_eq!(dechunk("5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"), "hello world");
+        assert_eq!(
+            dechunk("5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"),
+            "hello world"
+        );
     }
 }

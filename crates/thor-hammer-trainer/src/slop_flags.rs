@@ -134,10 +134,7 @@ pub fn read(path: &Path) -> Result<HashMap<String, SlopFlag>, DataError> {
         Err(error) => return Err(DataError::io(path)(error)),
     };
     let mut flags_by_id = HashMap::new();
-    for line in flags_jsonl
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-    {
+    for line in flags_jsonl.lines().filter(|line| !line.trim().is_empty()) {
         let flag: SlopFlag = serde_json::from_str(line)?;
         flags_by_id.insert(flag.id.clone(), flag);
     }
@@ -222,7 +219,10 @@ mod tests {
 
     #[test]
     fn a_flags_path_that_is_a_folder_is_an_error() {
-        assert!(matches!(read(&std::env::temp_dir()), Err(DataError::Io { .. })));
+        assert!(matches!(
+            read(&std::env::temp_dir()),
+            Err(DataError::Io { .. })
+        ));
     }
     use crate::example::Source;
 
@@ -237,12 +237,17 @@ mod tests {
 
     #[test]
     fn a_machine_flag_nobody_reviewed_removes_nothing() -> Result<(), DataError> {
-        let guessed = example("A page is a block of memory \u{2014} fixed size \u{2014} mapped by the MMU.");
-        let flag_line = format!(r#"{{"id":"{}","note":"auto: em_dash_habit","spans":[]}}"#, guessed.id());
+        let guessed =
+            example("A page is a block of memory \u{2014} fixed size \u{2014} mapped by the MMU.");
+        let flag_line = format!(
+            r#"{{"id":"{}","note":"auto: em_dash_habit","spans":[]}}"#,
+            guessed.id()
+        );
         let flag: SlopFlag = serde_json::from_str(&flag_line)?;
         let flags_by_id = HashMap::from([(guessed.id(), flag)]);
         let mut skip_reasons = Vec::new();
-        let (kept, flagged, unmatched) = separate_flagged(vec![guessed.clone()], &flags_by_id, &mut skip_reasons);
+        let (kept, flagged, unmatched) =
+            separate_flagged(vec![guessed.clone()], &flags_by_id, &mut skip_reasons);
         assert_eq!(kept, [guessed]);
         assert!(flagged.is_empty() && unmatched.is_empty() && skip_reasons.is_empty());
         Ok(())

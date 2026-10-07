@@ -48,7 +48,10 @@ pub struct AnswerScore {
 }
 
 static FENCED: LazyLock<Option<Regex>> = LazyLock::new(|| {
-    Regex::new(r"(?ms)^[ \t]*(?:```|~~~)[ \t]*([\w+#.-]*)[^\n]*\n(.*?)(?:^[ \t]*(?:```|~~~)[ \t]*$|\z)").ok()
+    Regex::new(
+        r"(?ms)^[ \t]*(?:```|~~~)[ \t]*([\w+#.-]*)[^\n]*\n(.*?)(?:^[ \t]*(?:```|~~~)[ \t]*$|\z)",
+    )
+    .ok()
 });
 
 static RUST_HINT: LazyLock<Option<Regex>> =
@@ -63,14 +66,21 @@ pub fn rust_blocks(text: &str) -> Vec<CodeBlock> {
         .as_ref()
         .zip(RUST_HINT.as_ref())
         .into_iter()
-        .flat_map(|(fenced, hint)| fenced.captures_iter(text).map(move |captures| (captures, hint)))
+        .flat_map(|(fenced, hint)| {
+            fenced
+                .captures_iter(text)
+                .map(move |captures| (captures, hint))
+        })
         .filter_map(|(captures, hint)| {
             let language = captures.get(1).map_or("", |found| found.as_str());
             let code = captures.get(2)?;
             let is_rust = matches!(language, "rust" | "rs")
                 || (language.is_empty() && hint.is_match(code.as_str()));
             let line = text[..code.start()].matches('\n').count() + 1;
-            is_rust.then(|| CodeBlock { line, code: code.as_str().to_string() })
+            is_rust.then(|| CodeBlock {
+                line,
+                code: code.as_str().to_string(),
+            })
         })
         .collect()
 }
@@ -80,7 +90,10 @@ pub fn rust_blocks(text: &str) -> Vec<CodeBlock> {
 pub fn score(text: &str) -> AnswerScore {
     let blocks = rust_blocks(text)
         .into_iter()
-        .map(|block| Block { line: block.line, report: rules::check(&block.code) })
+        .map(|block| Block {
+            line: block.line,
+            report: rules::check(&block.code),
+        })
         .collect();
     combine(text, blocks)
 }
@@ -92,7 +105,10 @@ pub fn score_parts(prose: &str, code: &str) -> AnswerScore {
     let blocks = if code.trim().is_empty() {
         Vec::new()
     } else {
-        vec![Block { line: 1, report: rules::check(code) }]
+        vec![Block {
+            line: 1,
+            report: rules::check(code),
+        }]
     };
     combine(prose, blocks)
 }
@@ -116,7 +132,8 @@ fn combine(prose: &str, blocks: Vec<Block>) -> AnswerScore {
             (*rule, verdict)
         })
         .collect();
-    let all_rules = (!blocks.is_empty()).then(|| blocks.iter().all(|block| block.report.all_pass()));
+    let all_rules =
+        (!blocks.is_empty()).then(|| blocks.iter().all(|block| block.report.all_pass()));
     let false_claims = claims::false_claims(&slop::prose_only(prose), &rules);
     AnswerScore {
         slop: slop::check(prose),
@@ -134,7 +151,10 @@ mod tests {
     #[test]
     fn finds_labelled_and_unlabelled_rust_blocks_but_not_shell() {
         let text = "Intro\n```rust\nfn a() {}\n```\n```\nlet x = 1;\n```\n```sh\ncargo run\n```\n";
-        let lines: Vec<usize> = rust_blocks(text).into_iter().map(|block| block.line).collect();
+        let lines: Vec<usize> = rust_blocks(text)
+            .into_iter()
+            .map(|block| block.line)
+            .collect();
         assert_eq!(lines, vec![3, 6]);
     }
 
@@ -142,7 +162,12 @@ mod tests {
     fn an_answer_without_code_has_no_rule_verdict() {
         let scored = score("Use an iterator here.");
         assert_eq!(scored.all_rules, None);
-        assert!(scored.rules.values().all(|verdict| *verdict == Verdict::NotApplicable));
+        assert!(
+            scored
+                .rules
+                .values()
+                .all(|verdict| *verdict == Verdict::NotApplicable)
+        );
     }
 
     #[test]

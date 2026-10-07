@@ -135,14 +135,21 @@ impl ScoreOptions {
         let mut output = None;
         let mut rest = arguments.iter();
         while let Some(argument) = rest.next() {
-            let mut value = || rest.next().cloned().ok_or_else(|| EvalError::Usage(format!("{argument} needs a value")));
+            let mut value = || {
+                rest.next()
+                    .cloned()
+                    .ok_or_else(|| EvalError::Usage(format!("{argument} needs a value")))
+            };
             match argument.as_str() {
                 "--field" => field = value()?,
                 "--code-field" => code_field = Some(value()?),
                 "--label" => label = Some(value()?),
                 "--out" => output = Some(PathBuf::from(value()?)),
                 flag if flag.starts_with("--") => {
-                    return Err(EvalError::Usage(format!("unknown option {flag}\n{}", usage())));
+                    return Err(EvalError::Usage(format!(
+                        "unknown option {flag}\n{}",
+                        usage()
+                    )));
                 }
                 path => input = Some(PathBuf::from(path)),
             }
@@ -161,7 +168,9 @@ impl ScoreOptions {
 }
 
 fn stem(path: &Path) -> String {
-    path.file_stem().map(|stem| stem.to_string_lossy().into_owned()).unwrap_or_default()
+    path.file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// Every `.rs` file under `paths`, sorted; folders are walked, skipping
@@ -204,12 +213,21 @@ fn check_rust(paths: &[PathBuf]) -> Outcome<Report> {
             lines.push(format!("{}: does not parse: {error}", file.display()));
         }
         for violation in &report.violations {
-            lines.push(format!("{}:{}: {}: {}", file.display(), violation.line, violation.rule.label(), violation.detail));
+            lines.push(format!(
+                "{}:{}: {}: {}",
+                file.display(),
+                violation.line,
+                violation.rule.label(),
+                violation.detail
+            ));
         }
     }
     let problems = lines.len();
     lines.push(format!("{} files, {problems} problems", files.len()));
-    Ok(Report { lines, exit: exit_for(problems) })
+    Ok(Report {
+        lines,
+        exit: exit_for(problems),
+    })
 }
 
 fn check_text(paths: &[PathBuf]) -> Outcome<Report> {
@@ -220,7 +238,12 @@ fn check_text(paths: &[PathBuf]) -> Outcome<Report> {
         let report = slop::check(&text);
         for hit in &report.hits {
             let line = text[..hit.start].matches('\n').count() + 1;
-            lines.push(format!("{}:{line}: {}: {}", path.display(), hit.category.label(), hit.text));
+            lines.push(format!(
+                "{}:{line}: {}: {}",
+                path.display(),
+                hit.category.label(),
+                hit.text
+            ));
         }
         lines.push(format!(
             "{}: {} phrases, {} em dashes, {} words",
@@ -231,11 +254,18 @@ fn check_text(paths: &[PathBuf]) -> Outcome<Report> {
         ));
         total += report.score();
     }
-    Ok(Report { lines, exit: exit_for(total) })
+    Ok(Report {
+        lines,
+        exit: exit_for(total),
+    })
 }
 
 fn exit_for(problems: usize) -> Exit {
-    if problems == 0 { Exit::Clean } else { Exit::Problems }
+    if problems == 0 {
+        Exit::Clean
+    } else {
+        Exit::Problems
+    }
 }
 
 /// One answer of a run with its score.
@@ -249,13 +279,21 @@ fn score_run(options: &ScoreOptions) -> Outcome<Report> {
     let file = fs::File::create(&options.output).map_err(EvalError::io(&options.output))?;
     let mut writer = BufWriter::new(file);
     let mut summary = Summary::default();
-    for (line, number) in text.lines().zip(1..).filter(|(line, _)| !line.trim().is_empty()) {
+    for (line, number) in text
+        .lines()
+        .zip(1..)
+        .filter(|(line, _)| !line.trim().is_empty())
+    {
         let Scored { mut record, score } = score_line(line, number, options)?;
         summary.add(&score);
-        let spark = serde_json::to_value(&score).map_err(EvalError::json(&options.output, number))?;
+        let spark =
+            serde_json::to_value(&score).map_err(EvalError::json(&options.output, number))?;
         if let Value::Object(fields) = &mut record {
             fields.insert("spark".to_string(), spark);
-            fields.insert("spark_run".to_string(), Value::String(options.label.clone()));
+            fields.insert(
+                "spark_run".to_string(),
+                Value::String(options.label.clone()),
+            );
         }
         writeln!(writer, "{record}").map_err(EvalError::io(&options.output))?;
     }
@@ -271,18 +309,26 @@ fn score_run(options: &ScoreOptions) -> Outcome<Report> {
         format!("\nslop by category: {}", categories.join(", ")),
         format!("wrote {}", options.output.display()),
     ];
-    Ok(Report { lines, exit: Exit::Clean })
+    Ok(Report {
+        lines,
+        exit: Exit::Clean,
+    })
 }
 
 /// Scores line `number` of the run.
 fn score_line(line: &str, number: usize, options: &ScoreOptions) -> Outcome<Scored> {
-    let record: Value = serde_json::from_str(line).map_err(EvalError::json(&options.input, number))?;
+    let record: Value =
+        serde_json::from_str(line).map_err(EvalError::json(&options.input, number))?;
     let read = |name: &str| {
-        record.get(name).and_then(Value::as_str).map(str::to_string).ok_or_else(|| EvalError::MissingField {
-            path: options.input.clone(),
-            line: number,
-            field: name.to_string(),
-        })
+        record
+            .get(name)
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .ok_or_else(|| EvalError::MissingField {
+                path: options.input.clone(),
+                line: number,
+                field: name.to_string(),
+            })
     };
     let prose = read(&options.field)?;
     let score = match &options.code_field {
@@ -301,7 +347,8 @@ mod tests {
 
     impl Folder {
         fn new(name: &str) -> Outcome<Folder> {
-            let path = std::env::temp_dir().join(format!("spark-cli-{}-{name}", std::process::id()));
+            let path =
+                std::env::temp_dir().join(format!("spark-cli-{}-{name}", std::process::id()));
             fs::create_dir_all(&path).map_err(EvalError::io(&path))?;
             Ok(Folder(path))
         }
@@ -327,8 +374,14 @@ mod tests {
 
     #[test]
     fn reads_each_command() -> Outcome {
-        assert_eq!(Command::from_args(&args(&["rs", "src"]))?, Command::Rust(vec![PathBuf::from("src")]));
-        assert_eq!(Command::from_args(&args(&["text", "a.md"]))?, Command::Text(vec![PathBuf::from("a.md")]));
+        assert_eq!(
+            Command::from_args(&args(&["rs", "src"]))?,
+            Command::Rust(vec![PathBuf::from("src")])
+        );
+        assert_eq!(
+            Command::from_args(&args(&["text", "a.md"]))?,
+            Command::Text(vec![PathBuf::from("a.md")])
+        );
         let expected = ScoreOptions {
             input: PathBuf::from("runs/base.jsonl"),
             field: "text".to_string(),
@@ -336,30 +389,59 @@ mod tests {
             label: "base".to_string(),
             output: PathBuf::from("runs/base.scored.jsonl"),
         };
-        assert_eq!(Command::from_args(&args(&["score", "runs/base.jsonl", "--code-field", "code"]))?, Command::Score(expected));
+        assert_eq!(
+            Command::from_args(&args(&["score", "runs/base.jsonl", "--code-field", "code"]))?,
+            Command::Score(expected)
+        );
         Ok(())
     }
 
     #[test]
     fn refuses_what_it_does_not_understand() {
-        for words in [&[][..], &["lint"], &["rs"], &["score"], &["score", "a", "--colour"], &["score", "a", "--label"]] {
-            assert!(matches!(Command::from_args(&args(words)), Err(EvalError::Usage(_))), "{words:?}");
+        for words in [
+            &[][..],
+            &["lint"],
+            &["rs"],
+            &["score"],
+            &["score", "a", "--colour"],
+            &["score", "a", "--label"],
+        ] {
+            assert!(
+                matches!(Command::from_args(&args(words)), Err(EvalError::Usage(_))),
+                "{words:?}"
+            );
         }
     }
 
     #[test]
     fn checks_rust_files_and_skips_build_output() -> Outcome {
         let folder = Folder::new("rs")?;
-        folder.file("src/good.rs", "/// Adds.\npub fn add(a: i32, b: i32) -> i32 { a + b }\n")?;
+        folder.file(
+            "src/good.rs",
+            "/// Adds.\npub fn add(a: i32, b: i32) -> i32 { a + b }\n",
+        )?;
         folder.file("src/bad.rs", "fn a() { b().unwrap(); }\n")?;
         folder.file("src/broken.rs", "fn a( {\n")?;
         folder.file("target/skip.rs", "fn a() { b().unwrap(); }\n")?;
         folder.file(".hidden/skip.rs", "fn a() { b().unwrap(); }\n")?;
         let report = Command::Rust(vec![folder.0.clone()]).run()?;
         assert_eq!(report.exit, Exit::Problems);
-        assert!(report.lines.iter().any(|line| line.ends_with("bad.rs:1: R1 no unwrap: .unwrap()")));
-        assert!(report.lines.iter().any(|line| line.contains("broken.rs: does not parse")));
-        assert_eq!(report.lines.last().map(String::as_str), Some("3 files, 2 problems"));
+        assert!(
+            report
+                .lines
+                .iter()
+                .any(|line| line.ends_with("bad.rs:1: R1 no unwrap: .unwrap()"))
+        );
+        assert!(
+            report
+                .lines
+                .iter()
+                .any(|line| line.contains("broken.rs: does not parse"))
+        );
+        assert_eq!(
+            report.lines.last().map(String::as_str),
+            Some("3 files, 2 problems")
+        );
         Ok(())
     }
 
@@ -377,7 +459,9 @@ mod tests {
         let file = folder.file("answer.md", "Fine.\nGreat question! Here it is.\n")?;
         let report = Command::Text(vec![file]).run()?;
         assert_eq!(report.exit, Exit::Problems);
-        assert!(report.lines[0].ends_with("answer.md:2: flattery and filler openers: Great question"));
+        assert!(
+            report.lines[0].ends_with("answer.md:2: flattery and filler openers: Great question")
+        );
         assert!(report.lines[1].ends_with("1 phrases, 0 em dashes, 6 words"));
         Ok(())
     }
@@ -387,9 +471,18 @@ mod tests {
         let folder = Folder::new("score")?;
         let lines = "{\"text\":\"Great question!\",\"code\":\"fn a() { b().unwrap(); }\"}\n\n{\"text\":\"Plain.\",\"code\":\"\"}\n";
         let run = folder.file("run.jsonl", lines)?;
-        let report = Command::from_args(&args(&["score", &run.to_string_lossy(), "--code-field", "code", "--label", "base"]))?.run()?;
+        let report = Command::from_args(&args(&[
+            "score",
+            &run.to_string_lossy(),
+            "--code-field",
+            "code",
+            "--label",
+            "base",
+        ]))?
+        .run()?;
         assert!(report.lines[1].starts_with("| base | 2 | 1 |"));
-        let written = fs::read_to_string(folder.0.join("run.scored.jsonl")).map_err(EvalError::io(&folder.0))?;
+        let written = fs::read_to_string(folder.0.join("run.scored.jsonl"))
+            .map_err(EvalError::io(&folder.0))?;
         let first: Value = serde_json::from_str(written.lines().next().unwrap_or_default())
             .map_err(EvalError::json(&folder.0, 1))?;
         assert_eq!(first["spark_run"], "base");
@@ -402,9 +495,16 @@ mod tests {
         let folder = Folder::new("missing")?;
         let run = folder.file("run.jsonl", "{\"text\":\"ok\"}\n{\"other\":1}\n")?;
         let outcome = Command::from_args(&args(&["score", &run.to_string_lossy()]))?.run();
-        assert!(outcome.is_err_and(|error| error.to_string().ends_with("run.jsonl:2: no string field \"text\"")));
+        assert!(outcome.is_err_and(|error| {
+            error
+                .to_string()
+                .ends_with("run.jsonl:2: no string field \"text\"")
+        }));
         let bad = folder.file("bad.jsonl", "not json\n")?;
-        assert!(matches!(Command::from_args(&args(&["score", &bad.to_string_lossy()]))?.run(), Err(EvalError::Json { line: 1, .. })));
+        assert!(matches!(
+            Command::from_args(&args(&["score", &bad.to_string_lossy()]))?.run(),
+            Err(EvalError::Json { line: 1, .. })
+        ));
         Ok(())
     }
 }

@@ -97,8 +97,14 @@ static PATTERNS: LazyLock<Vec<ClaimPattern>> = LazyLock::new(|| {
     CLAIMS
         .iter()
         .filter_map(|(claim, pattern)| {
-            let regex = RegexBuilder::new(pattern).case_insensitive(true).build().ok()?;
-            Some(ClaimPattern { claim: *claim, regex })
+            let regex = RegexBuilder::new(pattern)
+                .case_insensitive(true)
+                .build()
+                .ok()?;
+            Some(ClaimPattern {
+                claim: *claim,
+                regex,
+            })
         })
         .collect()
 });
@@ -130,7 +136,11 @@ mod tests {
         Rule::ALL
             .iter()
             .map(|rule| {
-                let verdict = if failing.contains(rule) { Verdict::Fail } else { Verdict::Pass };
+                let verdict = if failing.contains(rule) {
+                    Verdict::Fail
+                } else {
+                    Verdict::Pass
+                };
                 (*rule, verdict)
             })
             .collect()
@@ -141,7 +151,10 @@ mod tests {
         let prose = "Clean Code: No comments inside function bodies.";
         let found = false_claims(prose, &verdicts(&[Rule::NoBodyComments]));
         assert_eq!(found.len(), 1);
-        assert_eq!(found.first().and_then(|claim| claim.rule), Some(Rule::NoBodyComments));
+        assert_eq!(
+            found.first().and_then(|claim| claim.rule),
+            Some(Rule::NoBodyComments)
+        );
     }
 
     #[test]

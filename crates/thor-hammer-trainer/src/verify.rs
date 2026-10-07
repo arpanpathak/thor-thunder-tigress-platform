@@ -106,11 +106,26 @@ impl Problem {
 impl fmt::Display for Problem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Problem::Build { turn, language, output } => write!(f, "turn {turn}: {language} does not build cleanly\n{output}"),
-            Problem::Tests { turn, language, output } => write!(f, "turn {turn}: {language} tests or program fail\n{output}"),
-            Problem::TimedOut { turn } => write!(f, "turn {turn}: tests ran over {} s", TEST_LIMIT.as_secs()),
+            Problem::Build {
+                turn,
+                language,
+                output,
+            } => write!(
+                f,
+                "turn {turn}: {language} does not build cleanly\n{output}"
+            ),
+            Problem::Tests {
+                turn,
+                language,
+                output,
+            } => write!(f, "turn {turn}: {language} tests or program fail\n{output}"),
+            Problem::TimedOut { turn } => {
+                write!(f, "turn {turn}: tests ran over {} s", TEST_LIMIT.as_secs())
+            }
             Problem::Rule { turn, detail } => write!(f, "turn {turn}: {detail}"),
-            Problem::Slop { turn, phrases } => write!(f, "turn {turn}: slop: {}", phrases.join(", ")),
+            Problem::Slop { turn, phrases } => {
+                write!(f, "turn {turn}: slop: {}", phrases.join(", "))
+            }
             Problem::FalseClaim { turn, text } => write!(f, "turn {turn}: false claim: {text}"),
         }
     }
@@ -149,8 +164,16 @@ impl Checked {
                 self.tests += tests;
                 self.runs += usize::from(ran && language != "rust");
             }
-            Built::BuildFailed(output) => self.problems.push(Problem::Build { turn, language, output }),
-            Built::TestsFailed(output) => self.problems.push(Problem::Tests { turn, language, output }),
+            Built::BuildFailed(output) => self.problems.push(Problem::Build {
+                turn,
+                language,
+                output,
+            }),
+            Built::TestsFailed(output) => self.problems.push(Problem::Tests {
+                turn,
+                language,
+                output,
+            }),
             Built::TimedOut => self.problems.push(Problem::TimedOut { turn }),
             Built::Ignored => self.ignored += 1,
         }
@@ -167,8 +190,15 @@ pub fn spark_objections(text: &str) -> Vec<String> {
         .iter()
         .flat_map(|block| &block.report.violations)
         .map(|violation| violation.rule.label().to_string());
-    let slop = score.slop.hits.iter().map(|hit| format!("slop: {}", hit.text));
-    let claims = score.false_claims.iter().map(|claim| format!("false claim: {}", claim.text));
+    let slop = score
+        .slop
+        .hits
+        .iter()
+        .map(|hit| format!("slop: {}", hit.text));
+    let claims = score
+        .false_claims
+        .iter()
+        .map(|claim| format!("false claim: {}", claim.text));
     let mut objections: Vec<String> = rules.chain(slop).chain(claims).collect();
     objections.dedup();
     objections
@@ -190,8 +220,15 @@ pub fn check(conversation: &Conversation, scratch: &Path) -> Result<Checked, Dat
                 other => checked.problems.push(other),
             }
         }
-        for block in languages::fenced(&answer_turn.content).into_iter().filter(|block| matches!(block.tag.as_str(), "rust" | "rs")) {
-            let built = if block.ignored { Built::Ignored } else { build_and_test(&block.code, scratch)? };
+        for block in languages::fenced(&answer_turn.content)
+            .into_iter()
+            .filter(|block| matches!(block.tag.as_str(), "rust" | "rs"))
+        {
+            let built = if block.ignored {
+                Built::Ignored
+            } else {
+                build_and_test(&block.code, scratch)?
+            };
             checked.record(turn, "rust", built);
         }
         for block in languages::blocks(&answer_turn.content) {
@@ -205,11 +242,27 @@ pub fn check(conversation: &Conversation, scratch: &Path) -> Result<Checked, Dat
 fn spark_problems(turn: usize, text: &str) -> Vec<Problem> {
     let score = answer::score(text);
     let rules = score.blocks.iter().flat_map(|block| {
-        let parse_error = block.report.parse_error.iter().map(move |error| Problem::Rule { turn, detail: format!("does not parse: {error}") });
-        let violations = block.report.violations.iter().map(move |violation| Problem::Rule {
-            turn,
-            detail: format!("{} at block line {}: {}", violation.rule.label(), violation.line, violation.detail),
-        });
+        let parse_error = block
+            .report
+            .parse_error
+            .iter()
+            .map(move |error| Problem::Rule {
+                turn,
+                detail: format!("does not parse: {error}"),
+            });
+        let violations = block
+            .report
+            .violations
+            .iter()
+            .map(move |violation| Problem::Rule {
+                turn,
+                detail: format!(
+                    "{} at block line {}: {}",
+                    violation.rule.label(),
+                    violation.line,
+                    violation.detail
+                ),
+            });
         parse_error.chain(violations)
     });
     let slop = (!score.slop.clean()).then(|| Problem::Slop {
@@ -219,10 +272,15 @@ fn spark_problems(turn: usize, text: &str) -> Vec<Problem> {
             .hits
             .iter()
             .map(|hit| hit.text.clone())
-            .chain((score.slop.em_dashes > 1).then(|| format!("{} em dashes", score.slop.em_dashes)))
+            .chain(
+                (score.slop.em_dashes > 1).then(|| format!("{} em dashes", score.slop.em_dashes)),
+            )
             .collect(),
     });
-    let claims = score.false_claims.iter().map(|claim| Problem::FalseClaim { turn, text: claim.text.clone() });
+    let claims = score.false_claims.iter().map(|claim| Problem::FalseClaim {
+        turn,
+        text: claim.text.clone(),
+    });
     rules.chain(slop).chain(claims).collect()
 }
 
@@ -252,7 +310,10 @@ impl Built {
     #[must_use]
     pub fn after_run(finished: Finished) -> Built {
         match finished {
-            Finished::Passed(output) => Built::Clean { tests: passed_tests(&output), ran: true },
+            Finished::Passed(output) => Built::Clean {
+                tests: passed_tests(&output),
+                ran: true,
+            },
             Finished::Failed(output) => Built::TestsFailed(output),
             Finished::OverTime => Built::TimedOut,
         }
@@ -268,7 +329,10 @@ enum CrateType {
 
 impl CrateType {
     fn of(code: &str) -> CrateType {
-        if code.lines().any(|line| line.trim_start().starts_with("fn main(")) {
+        if code
+            .lines()
+            .any(|line| line.trim_start().starts_with("fn main("))
+        {
             CrateType::Bin
         } else {
             CrateType::Lib
@@ -288,15 +352,28 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
     let source = scratch.join("example.rs");
     fs::write(&source, code).map_err(DataError::io(&source))?;
     let crate_type = CrateType::of(code).flag();
-    let build = clippy(&source, scratch, &["--crate-type", crate_type, "--emit=metadata", "--out-dir"], scratch)?;
+    let build = clippy(
+        &source,
+        scratch,
+        &["--crate-type", crate_type, "--emit=metadata", "--out-dir"],
+        scratch,
+    )?;
     if let Finished::Failed(output) = build {
         return Ok(Built::BuildFailed(output));
     }
     if !code.contains("#[test]") {
-        return Ok(Built::Clean { tests: 0, ran: false });
+        return Ok(Built::Clean {
+            tests: 0,
+            ran: false,
+        });
     }
     let test_binary = scratch.join("example-tests");
-    let test_build = clippy(&source, scratch, &["--test", "-A", "dead_code", "-o"], &test_binary)?;
+    let test_build = clippy(
+        &source,
+        scratch,
+        &["--test", "-A", "dead_code", "-o"],
+        &test_binary,
+    )?;
     if let Finished::Failed(output) = test_build {
         return Ok(Built::BuildFailed(output));
     }
@@ -305,7 +382,12 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
     Ok(Built::after_run(run_limited(run, scratch, TEST_LIMIT)?))
 }
 
-fn clippy(source: &Path, scratch: &Path, mode: &[&str], target: &Path) -> Result<Finished, DataError> {
+fn clippy(
+    source: &Path,
+    scratch: &Path,
+    mode: &[&str],
+    target: &Path,
+) -> Result<Finished, DataError> {
     let mut command = Command::new("clippy-driver");
     command
         .args(["--edition", EDITION, "--crate-name", "example"])
@@ -327,7 +409,11 @@ pub enum Finished {
     OverTime,
 }
 
-pub(crate) fn run_limited(mut command: Command, scratch: &Path, limit: Duration) -> Result<Finished, DataError> {
+pub(crate) fn run_limited(
+    mut command: Command,
+    scratch: &Path,
+    limit: Duration,
+) -> Result<Finished, DataError> {
     let log: PathBuf = scratch.join("output.log");
     let file = fs::File::create(&log).map_err(DataError::io(&log))?;
     let copy = file.try_clone().map_err(DataError::io(&log))?;
@@ -359,7 +445,11 @@ pub(crate) fn run_limited(mut command: Command, scratch: &Path, limit: Duration)
 }
 
 fn first_lines(output: &str) -> String {
-    output.lines().take(OUTPUT_LINES).collect::<Vec<_>>().join("\n")
+    output
+        .lines()
+        .take(OUTPUT_LINES)
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn passed_tests(output: &str) -> usize {
@@ -381,7 +471,8 @@ mod tests {
     }
 
     fn conversation(answer: &str) -> Result<Conversation, DataError> {
-        let entry = format!("<!-- source: test -->\n### User\nWrite it.\n### Assistant\n{answer}\n");
+        let entry =
+            format!("<!-- source: test -->\n### User\nWrite it.\n### Assistant\n{answer}\n");
         teacher::parse(&entry, "test").map_err(DataError::format("test"))
     }
 
@@ -391,7 +482,10 @@ mod tests {
     fn a_clean_block_builds_and_its_tests_count() -> Result<(), DataError> {
         let folder = scratch("good");
         let checked = check(&conversation(GOOD)?, &folder)?;
-        assert_eq!((checked.block_count(), checked.tests, checked.problems.len()), (1, 1, 0));
+        assert_eq!(
+            (checked.block_count(), checked.tests, checked.problems.len()),
+            (1, 1, 0)
+        );
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 
@@ -410,7 +504,12 @@ mod tests {
     #[test]
     fn an_unwrap_breaks_a_rule_and_clippy_pedantic() -> Result<(), DataError> {
         let folder = scratch("unwrap");
-        let checked = check(&conversation(&GOOD.replace("values.iter().sum()", "values.first().copied().unwrap()"))?, &folder)?;
+        let checked = check(
+            &conversation(
+                &GOOD.replace("values.iter().sum()", "values.first().copied().unwrap()"),
+            )?,
+            &folder,
+        )?;
         assert_eq!(kinds(&checked), ["rule", "build"]);
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
@@ -418,9 +517,19 @@ mod tests {
     #[test]
     fn a_clippy_warning_fails_the_build() -> Result<(), DataError> {
         let folder = scratch("lint");
-        let linted = GOOD.replace("values.iter().sum()", "values.iter().fold(0, |sum, value| sum + value)");
+        let linted = GOOD.replace(
+            "values.iter().sum()",
+            "values.iter().fold(0, |sum, value| sum + value)",
+        );
         let checked = check(&conversation(&linted)?, &folder)?;
-        assert!(matches!(checked.problems.as_slice(), [Problem::Build { turn: 2, language: "rust", .. }]));
+        assert!(matches!(
+            checked.problems.as_slice(),
+            [Problem::Build {
+                turn: 2,
+                language: "rust",
+                ..
+            }]
+        ));
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 
@@ -429,8 +538,18 @@ mod tests {
         let folder = scratch("prose");
         let sloppy = "Great question! This code never uses unwrap.\n\n```rust\n/// One.\n#[must_use]\npub fn one(values: &[u8]) -> u8 {\n    values.first().copied().unwrap()\n}\n```";
         let checked = check(&conversation(sloppy)?, &folder)?;
-        assert!(checked.problems.iter().any(|problem| matches!(problem, Problem::Slop { .. })));
-        assert!(checked.problems.iter().any(|problem| matches!(problem, Problem::FalseClaim { .. })));
+        assert!(
+            checked
+                .problems
+                .iter()
+                .any(|problem| matches!(problem, Problem::Slop { .. }))
+        );
+        assert!(
+            checked
+                .problems
+                .iter()
+                .any(|problem| matches!(problem, Problem::FalseClaim { .. }))
+        );
         assert!(!spark_objections(sloppy).is_empty());
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
@@ -438,17 +557,27 @@ mod tests {
     #[test]
     fn only_a_main_function_makes_a_program() {
         assert_eq!(CrateType::of("fn main() {}"), CrateType::Bin);
-        assert_eq!(CrateType::of("const CODE: &str = \"fn main() {}\";"), CrateType::Lib);
+        assert_eq!(
+            CrateType::of("const CODE: &str = \"fn main() {}\";"),
+            CrateType::Lib
+        );
     }
 
     #[test]
     fn checks_other_languages_and_counts_them() -> Result<(), DataError> {
         let folder = scratch("python");
-        let answer = "Two blocks.\n\n```python\nassert max([3, 9]) == 9\n```\n\n```python\ndef f(:\n```";
+        let answer =
+            "Two blocks.\n\n```python\nassert max([3, 9]) == 9\n```\n\n```python\ndef f(:\n```";
         let checked = check(&conversation(answer)?, &folder)?;
         assert_eq!(checked.blocks.get("python"), Some(&2));
         assert_eq!(checked.runs, 1);
-        assert!(matches!(checked.problems.as_slice(), [Problem::Build { language: "python", .. }]));
+        assert!(matches!(
+            checked.problems.as_slice(),
+            [Problem::Build {
+                language: "python",
+                ..
+            }]
+        ));
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 
@@ -456,7 +585,9 @@ mod tests {
     fn a_grounded_entry_keeps_broken_rules_as_notes() -> Result<(), DataError> {
         let folder = scratch("grounded");
         let answer = "```rust\n/// One.\n#[must_use]\npub fn one(text: &str) -> u8 {\n    text.parse().unwrap_or(1)\n}\n\nfn main() {\n    let n: u8 = \"1\".parse().unwrap();\n    println!(\"{}\", one(\"x\") + n);\n}\n```";
-        let entry = format!("<!-- source: trpl; section: abc -->\n### User\nShow unwrap.\n### Assistant\n{answer}\n");
+        let entry = format!(
+            "<!-- source: trpl; section: abc -->\n### User\nShow unwrap.\n### Assistant\n{answer}\n"
+        );
         let grounded = teacher::parse(&entry, "x").map_err(DataError::format("x"))?;
         let checked = check(&grounded, &folder)?;
         assert!(checked.problems.is_empty(), "{:?}", checked.problems);
@@ -470,9 +601,15 @@ mod tests {
         fs::create_dir_all(&folder).map_err(DataError::io(&folder))?;
         let mut sleeper = Command::new("sleep");
         sleeper.arg("5");
-        assert_eq!(run_limited(sleeper, &folder, Duration::from_millis(50))?, Finished::OverTime);
+        assert_eq!(
+            run_limited(sleeper, &folder, Duration::from_millis(50))?,
+            Finished::OverTime
+        );
         assert_eq!(Built::after_run(Finished::OverTime), Built::TimedOut);
-        assert_eq!(Built::after_run(Finished::Failed("x".to_string())), Built::TestsFailed("x".to_string()));
+        assert_eq!(
+            Built::after_run(Finished::Failed("x".to_string())),
+            Built::TestsFailed("x".to_string())
+        );
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }
 
@@ -486,13 +623,23 @@ mod tests {
         assert_eq!(checked.ignored, 1);
         assert_eq!(checked.block_count(), 3);
         let lines: Vec<String> = checked.problems.iter().map(ToString::to_string).collect();
-        assert_eq!(lines, ["turn 2: tests ran over 30 s", "turn 2: go tests or program fail\npanic", "turn 4: python does not build cleanly\nsyntax"]);
+        assert_eq!(
+            lines,
+            [
+                "turn 2: tests ran over 30 s",
+                "turn 2: go tests or program fail\npanic",
+                "turn 4: python does not build cleanly\nsyntax"
+            ]
+        );
     }
 
     #[test]
     fn a_warning_only_in_test_code_fails_the_test_build() -> Result<(), DataError> {
         let folder = scratch("testlint");
-        let linted = GOOD.replace("assert_eq!(total(&[1, 2]), 3);", "let unused = 1;\n        assert_eq!(total(&[1, 2]), 3);");
+        let linted = GOOD.replace(
+            "assert_eq!(total(&[1, 2]), 3);",
+            "let unused = 1;\n        assert_eq!(total(&[1, 2]), 3);",
+        );
         let checked = check(&conversation(&linted)?, &folder)?;
         assert_eq!(kinds(&checked), ["build"]);
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
@@ -501,15 +648,35 @@ mod tests {
     #[test]
     fn names_every_kind_of_problem() {
         let problems = [
-            Problem::Build { turn: 1, language: "rust", output: String::new() },
-            Problem::Tests { turn: 1, language: "rust", output: String::new() },
+            Problem::Build {
+                turn: 1,
+                language: "rust",
+                output: String::new(),
+            },
+            Problem::Tests {
+                turn: 1,
+                language: "rust",
+                output: String::new(),
+            },
             Problem::TimedOut { turn: 1 },
-            Problem::Rule { turn: 1, detail: String::new() },
-            Problem::Slop { turn: 1, phrases: Vec::new() },
-            Problem::FalseClaim { turn: 1, text: String::new() },
+            Problem::Rule {
+                turn: 1,
+                detail: String::new(),
+            },
+            Problem::Slop {
+                turn: 1,
+                phrases: Vec::new(),
+            },
+            Problem::FalseClaim {
+                turn: 1,
+                text: String::new(),
+            },
         ];
         let kinds: Vec<&str> = problems.iter().map(Problem::kind).collect();
-        assert_eq!(kinds, ["build", "tests", "timed out", "rule", "slop", "false claim"]);
+        assert_eq!(
+            kinds,
+            ["build", "tests", "timed out", "rule", "slop", "false claim"]
+        );
     }
 
     #[test]
@@ -524,7 +691,10 @@ mod tests {
 
     #[test]
     fn counts_passed_tests_across_result_lines() {
-        assert_eq!(passed_tests("test result: ok. 3 passed; 0 failed\ntest result: ok. 2 passed;"), 5);
+        assert_eq!(
+            passed_tests("test result: ok. 3 passed; 0 failed\ntest result: ok. 2 passed;"),
+            5
+        );
         assert_eq!(passed_tests("nothing"), 0);
     }
 
@@ -532,10 +702,23 @@ mod tests {
     fn describes_each_problem_with_its_turn() {
         let problems = [
             Problem::TimedOut { turn: 2 },
-            Problem::Slop { turn: 4, phrases: vec!["Great question".to_string()] },
-            Problem::FalseClaim { turn: 2, text: "never unwraps".to_string() },
+            Problem::Slop {
+                turn: 4,
+                phrases: vec!["Great question".to_string()],
+            },
+            Problem::FalseClaim {
+                turn: 2,
+                text: "never unwraps".to_string(),
+            },
         ];
         let lines: Vec<String> = problems.iter().map(ToString::to_string).collect();
-        assert_eq!(lines, ["turn 2: tests ran over 30 s", "turn 4: slop: Great question", "turn 2: false claim: never unwraps"]);
+        assert_eq!(
+            lines,
+            [
+                "turn 2: tests ran over 30 s",
+                "turn 4: slop: Great question",
+                "turn 2: false claim: never unwraps"
+            ]
+        );
     }
 }

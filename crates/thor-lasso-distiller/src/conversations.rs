@@ -33,7 +33,8 @@ const ATTEMPTS: usize = 3;
 const REPEAT_OVERLAP: f64 = 0.6;
 
 /// The instructions for checking that a section answers a question.
-const ANSWER_CHECK_PROMPT: &str = "You check whether a text answers a question. Reply with yes or no only.";
+const ANSWER_CHECK_PROMPT: &str =
+    "You check whether a text answers a question. Reply with yes or no only.";
 
 /// The longest part of a passage shown to the model, in characters. Enough
 /// for the model to see what the section is about without filling its context.
@@ -45,16 +46,33 @@ const MAX_QUESTION: usize = 220;
 /// Words that show a question was written about the text instead of about the
 /// engineer's problem.
 const SOURCE_WORDS: [&str; 10] = [
-    "passage", "this section", "the section", "the text", "this chapter", "the chapter",
-    "the book", "the author", "the excerpt", "the document",
+    "passage",
+    "this section",
+    "the section",
+    "the text",
+    "this chapter",
+    "the chapter",
+    "the book",
+    "the author",
+    "the excerpt",
+    "the document",
 ];
 
 /// Phrases that tie a passage to its book. Such a passage stays in the
 /// training set as text, but as a chat answer "as we saw in this chapter"
 /// makes no sense, so it is not used in a conversation.
 const BOOK_REFERENCES: [&str; 11] = [
-    "this book", "this chapter", "previous chapter", "next chapter", "in chapter ", "as we saw",
-    "we'll see", "we\u{2019}ll see", "later in this", "earlier in this", "this section",
+    "this book",
+    "this chapter",
+    "previous chapter",
+    "next chapter",
+    "in chapter ",
+    "as we saw",
+    "we'll see",
+    "we\u{2019}ll see",
+    "later in this",
+    "earlier in this",
+    "this section",
 ];
 
 /// The instructions given to the teacher before every question.
@@ -83,7 +101,9 @@ impl Passage {
     /// its own book, chapter or section.
     pub fn reads_as_answer(&self) -> bool {
         let lowered = self.text.to_lowercase();
-        !BOOK_REFERENCES.iter().any(|phrase| lowered.contains(phrase))
+        !BOOK_REFERENCES
+            .iter()
+            .any(|phrase| lowered.contains(phrase))
     }
 
     /// The section as an answer: the text without its leading title lines,
@@ -105,7 +125,11 @@ impl Passage {
 pub fn read_passages(path: &Path, collections: &[String]) -> Result<Vec<Passage>, DistillError> {
     let text = fs::read_to_string(path).map_err(DistillError::io(path))?;
     let mut passages = Vec::new();
-    for (index, line) in text.lines().enumerate().filter(|(_, line)| !line.trim().is_empty()) {
+    for (index, line) in text
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| !line.trim().is_empty())
+    {
         let record: Value = serde_json::from_str(line).map_err(|source| DistillError::Json {
             path: path.to_path_buf(),
             line: index + 1,
@@ -119,7 +143,10 @@ pub fn read_passages(path: &Path, collections: &[String]) -> Result<Vec<Passage>
             origin: field("origin").to_string(),
             text: field("response").to_string(),
         };
-        let wanted = collections.is_empty() || collections.iter().any(|wanted| wanted == passage.collection());
+        let wanted = collections.is_empty()
+            || collections
+                .iter()
+                .any(|wanted| wanted == passage.collection());
         if wanted && passage.reads_as_answer() {
             passages.push(passage);
         }
@@ -133,7 +160,11 @@ pub fn plan(passages: Vec<Passage>, turns: usize) -> Vec<Vec<Passage>> {
     let mut chapters: Vec<Vec<Passage>> = Vec::new();
     for passage in passages {
         match chapters.last_mut() {
-            Some(chapter) if chapter.first().is_some_and(|first| first.origin == passage.origin) => {
+            Some(chapter)
+                if chapter
+                    .first()
+                    .is_some_and(|first| first.origin == passage.origin) =>
+            {
                 chapter.push(passage)
             }
             _ => chapters.push(vec![passage]),
@@ -233,8 +264,12 @@ pub fn check_question(reply: &str) -> Result<String, Rejection> {
         question if question.lines().count() > 1 => Err(Rejection::NotOneLine),
         question if !question.ends_with('?') => Err(Rejection::NotAQuestion),
         question if question.chars().count() > MAX_QUESTION => Err(Rejection::TooLong),
-        _ if mentioned.is_some() => Err(Rejection::MentionsSource(mentioned.copied().unwrap_or_default())),
-        _ if slop_hit.is_some() => Err(Rejection::Slop(slop_hit.map(|hit| hit.text).unwrap_or_default())),
+        _ if mentioned.is_some() => Err(Rejection::MentionsSource(
+            mentioned.copied().unwrap_or_default(),
+        )),
+        _ if slop_hit.is_some() => Err(Rejection::Slop(
+            slop_hit.map(|hit| hit.text).unwrap_or_default(),
+        )),
         question => Ok(question.to_string()),
     }
 }
@@ -290,18 +325,29 @@ impl Conversation {
 /// turns it has.
 pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, DistillError> {
     let mut conversation = Conversation {
-        origin: sections.first().map(|passage| passage.origin.clone()).unwrap_or_default(),
+        origin: sections
+            .first()
+            .map(|passage| passage.origin.clone())
+            .unwrap_or_default(),
         key: conversation_key(sections),
         ..Conversation::default()
     };
     for passage in sections {
-        let asked: Vec<String> = conversation.turns.iter().map(|(question, _)| question.clone()).collect();
+        let asked: Vec<String> = conversation
+            .turns
+            .iter()
+            .map(|(question, _)| question.clone())
+            .collect();
         let prompt = question_prompt(&asked, passage);
         let mut question = None;
         for _ in 0..ATTEMPTS {
             let reply = client.complete(&prompt, 80, 0.7)?;
             let verdict = match check_question(&reply) {
-                Ok(checked) if asked.iter().any(|earlier| overlap(earlier, &checked) >= REPEAT_OVERLAP) => {
+                Ok(checked)
+                    if asked
+                        .iter()
+                        .any(|earlier| overlap(earlier, &checked) >= REPEAT_OVERLAP) =>
+                {
                     Err(Rejection::Repeats)
                 }
                 Ok(checked) if !answers(client, &checked, passage)? => Err(Rejection::NotAnswered),
@@ -312,7 +358,9 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
                     question = Some(checked);
                     break;
                 }
-                Err(reason) => conversation.rejected.push((reply.trim().to_string(), reason.to_string())),
+                Err(reason) => conversation
+                    .rejected
+                    .push((reply.trim().to_string(), reason.to_string())),
             }
         }
         match question {
@@ -334,7 +382,9 @@ pub fn answers(client: &Client, question: &str, passage: &Passage) -> Result<boo
         },
         Message {
             role: "user",
-            content: format!("Question: {question}\n\nText:\n<<<\n{shown}\n>>>\n\nDoes the text answer the question?"),
+            content: format!(
+                "Question: {question}\n\nText:\n<<<\n{shown}\n>>>\n\nDoes the text answer the question?"
+            ),
         },
     ];
     let reply = client.complete(&prompt, 4, 0.0)?;
@@ -362,7 +412,11 @@ fn overlap(first: &str, second: &str) -> f64 {
 /// its first section.
 pub fn conversation_key(sections: &[Passage]) -> String {
     let first = sections.first().map_or(String::new(), |passage| {
-        format!("{}\n{}", passage.origin, passage.text.chars().take(200).collect::<String>())
+        format!(
+            "{}\n{}",
+            passage.origin,
+            passage.text.chars().take(200).collect::<String>()
+        )
     });
     fnv_hex(&first)
 }
@@ -383,11 +437,9 @@ pub fn plan_counts(planned: &[Vec<Passage>]) -> BTreeMap<String, (usize, usize)>
 /// The FNV-1a hash of `text` as 16 hex digits, the id scheme the training
 /// file uses.
 fn fnv_hex(text: &str) -> String {
-    let hash = text
-        .bytes()
-        .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
-            (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
-        });
+    let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    });
     format!("{hash:016x}")
 }
 
@@ -412,9 +464,18 @@ mod tests {
 
     #[test]
     fn rejects_questions_about_the_text_or_with_slop() {
-        assert_eq!(check_question("What does this section say about traits?"), Err(Rejection::MentionsSource("this section")));
-        assert_eq!(check_question("Explain vectors."), Err(Rejection::NotAQuestion));
-        assert_eq!(check_question("Great question! Why use Arc?"), Err(Rejection::Slop("Great question".to_string())));
+        assert_eq!(
+            check_question("What does this section say about traits?"),
+            Err(Rejection::MentionsSource("this section"))
+        );
+        assert_eq!(
+            check_question("Explain vectors."),
+            Err(Rejection::NotAQuestion)
+        );
+        assert_eq!(
+            check_question("Great question! Why use Arc?"),
+            Err(Rejection::Slop("Great question".to_string()))
+        );
         assert_eq!(check_question("Why?\nBecause."), Err(Rejection::NotOneLine));
     }
 
@@ -440,7 +501,10 @@ mod tests {
 
     #[test]
     fn an_answer_drops_the_title_lines() {
-        assert_eq!(passage("x", "# Vectors\n\n## Growing\n\nPush appends.").answer(), "Push appends.");
+        assert_eq!(
+            passage("x", "# Vectors\n\n## Growing\n\nPush appends.").answer(),
+            "Push appends."
+        );
     }
 
     #[test]
@@ -455,14 +519,23 @@ mod tests {
             .local_addr()
             .map_err(DistillError::io("listener"))?
             .to_string();
-        let replies = ["What does this section explain?", "Why does push sometimes reallocate a Vec?", "yes"];
+        let replies = [
+            "What does this section explain?",
+            "Why does push sometimes reallocate a Vec?",
+            "yes",
+        ];
         thread::spawn(move || {
             replies.iter().for_each(|reply| {
                 if let Ok((mut stream, _)) = listener.accept() {
                     let mut buffer = [0u8; 16_384];
                     let _ = stream.read(&mut buffer);
-                    let body = json!({ "choices": [{ "message": { "content": reply } }] }).to_string();
-                    let _ = write!(stream, "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}", body.len());
+                    let body =
+                        json!({ "choices": [{ "message": { "content": reply } }] }).to_string();
+                    let _ = write!(
+                        stream,
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}",
+                        body.len()
+                    );
                 }
             });
         });
@@ -471,10 +544,16 @@ mod tests {
             model: "teacher".to_string(),
             key: None,
         };
-        let conversation = converse(&client, &[passage("trpl/v.md", "# Vectors\n\nPush may reallocate.")])?;
+        let conversation = converse(
+            &client,
+            &[passage("trpl/v.md", "# Vectors\n\nPush may reallocate.")],
+        )?;
         assert_eq!(
             conversation.turns,
-            [("Why does push sometimes reallocate a Vec?".to_string(), "Push may reallocate.".to_string())]
+            [(
+                "Why does push sometimes reallocate a Vec?".to_string(),
+                "Push may reallocate.".to_string()
+            )]
         );
         assert_eq!(conversation.rejected.len(), 1);
         Ok(())
@@ -482,14 +561,27 @@ mod tests {
 
     #[test]
     fn measures_how_much_two_questions_overlap() {
-        assert!(overlap("Why does Vec push reallocate?", "Why does push on a Vec reallocate?") >= REPEAT_OVERLAP);
-        assert!(overlap("Why does Vec push reallocate?", "How do I share an Arc between threads?") < REPEAT_OVERLAP);
+        assert!(
+            overlap(
+                "Why does Vec push reallocate?",
+                "Why does push on a Vec reallocate?"
+            ) >= REPEAT_OVERLAP
+        );
+        assert!(
+            overlap(
+                "Why does Vec push reallocate?",
+                "How do I share an Arc between threads?"
+            ) < REPEAT_OVERLAP
+        );
     }
 
     #[test]
     fn a_follow_up_prompt_lists_the_earlier_questions() {
         let messages = question_prompt(&["Why Vec?".to_string()], &passage("x", "text"));
-        let user = messages.last().map(|message| message.content.as_str()).unwrap_or_default();
+        let user = messages
+            .last()
+            .map(|message| message.content.as_str())
+            .unwrap_or_default();
         assert!(user.contains("- Why Vec?") && user.contains("follow-up"));
     }
 }
@@ -500,7 +592,10 @@ mod conversation_tests {
     use crate::testing::FakeModel;
 
     fn section(text: &str) -> Passage {
-        Passage { origin: "trpl/src/ch08.md".to_string(), text: format!("## Heading\n\n{text}") }
+        Passage {
+            origin: "trpl/src/ch08.md".to_string(),
+            text: format!("## Heading\n\n{text}"),
+        }
     }
 
     #[test]
@@ -516,13 +611,34 @@ mod conversation_tests {
             "yes",
         ];
         let model = FakeModel::start(&replies)?;
-        let sections = [section("Use push to grow a vector."), section("Use push_str to append to a String.")];
+        let sections = [
+            section("Use push to grow a vector."),
+            section("Use push_str to append to a String."),
+        ];
         let conversation = converse(&model.client, &sections)?;
-        let questions: Vec<&str> = conversation.turns.iter().map(|(question, _)| question.as_str()).collect();
-        assert_eq!(questions, ["How do I grow a vector?", "How do I append to a String?"]);
+        let questions: Vec<&str> = conversation
+            .turns
+            .iter()
+            .map(|(question, _)| question.as_str())
+            .collect();
+        assert_eq!(
+            questions,
+            ["How do I grow a vector?", "How do I append to a String?"]
+        );
         assert_eq!(conversation.turns[0].1, "Use push to grow a vector.");
-        let reasons: Vec<&str> = conversation.rejected.iter().map(|(_, reason)| reason.as_str()).collect();
-        assert_eq!(reasons, ["does not end with a question mark", "repeats an earlier question", "the section does not answer it"]);
+        let reasons: Vec<&str> = conversation
+            .rejected
+            .iter()
+            .map(|(_, reason)| reason.as_str())
+            .collect();
+        assert_eq!(
+            reasons,
+            [
+                "does not end with a question mark",
+                "repeats an earlier question",
+                "the section does not answer it"
+            ]
+        );
         assert_eq!(model.request_count(), replies.len());
         let line = conversation.to_json("teacher");
         assert_eq!(line["messages"].as_array().map(Vec::len), Some(4));
@@ -564,17 +680,32 @@ mod conversation_tests {
     fn checks_every_kind_of_bad_question() {
         assert_eq!(check_question("  "), Err(Rejection::Empty));
         assert_eq!(check_question("Why?\nAnd why?"), Err(Rejection::NotOneLine));
-        assert_eq!(check_question(&format!("{}?", "a".repeat(MAX_QUESTION))), Err(Rejection::TooLong));
-        assert!(matches!(check_question("What does this chapter say?"), Err(Rejection::MentionsSource(_))));
-        assert!(matches!(check_question("Great question, how do I start?"), Err(Rejection::Slop(_))));
-        assert_eq!(check_question("Question: \"How do I start?\""), Ok("How do I start?".to_string()));
+        assert_eq!(
+            check_question(&format!("{}?", "a".repeat(MAX_QUESTION))),
+            Err(Rejection::TooLong)
+        );
+        assert!(matches!(
+            check_question("What does this chapter say?"),
+            Err(Rejection::MentionsSource(_))
+        ));
+        assert!(matches!(
+            check_question("Great question, how do I start?"),
+            Err(Rejection::Slop(_))
+        ));
+        assert_eq!(
+            check_question("Question: \"How do I start?\""),
+            Ok("How do I start?".to_string())
+        );
     }
 
     #[test]
     fn a_bad_line_in_the_training_file_names_its_line() -> Result<(), DistillError> {
-        let path = std::env::temp_dir().join(format!("thor-lasso-bad-{}.jsonl", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("thor-lasso-bad-{}.jsonl", std::process::id()));
         fs::write(&path, "{\"instruction\":\"\"}\nnot json\n").map_err(DistillError::io(&path))?;
-        let error = read_passages(&path, &[]).err().map(|error| error.to_string());
+        let error = read_passages(&path, &[])
+            .err()
+            .map(|error| error.to_string());
         fs::remove_file(&path).map_err(DistillError::io(&path))?;
         assert!(error.is_some_and(|message| message.contains(":2: ")));
         Ok(())

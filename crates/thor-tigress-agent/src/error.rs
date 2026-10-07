@@ -69,9 +69,15 @@ mod tests {
     #[test]
     fn a_json_error_keeps_its_source() {
         use std::error::Error as _;
-        let error = serde_json::from_str::<u8>("x").map_err(AgentError::from).err();
+        let error = serde_json::from_str::<u8>("x")
+            .map_err(AgentError::from)
+            .err();
         assert!(error.as_ref().and_then(|error| error.source()).is_some());
-        assert!(AgentError::from(std::io::Error::other("x")).source().is_some());
+        assert!(
+            AgentError::from(std::io::Error::other("x"))
+                .source()
+                .is_some()
+        );
     }
     use std::error::Error;
 
@@ -86,14 +92,21 @@ mod tests {
         let shown: Vec<String> = errors.iter().map(ToString::to_string).collect();
         assert_eq!(
             shown,
-            ["i/o: disk", "bad request: no body", "upstream: 502", "config: --listen needs a value"]
+            [
+                "i/o: disk",
+                "bad request: no body",
+                "upstream: 502",
+                "config: --listen needs a value"
+            ]
         );
     }
 
     #[test]
     fn wrapped_errors_keep_their_source() {
         let json: Outcome<serde_json::Value> = serde_json::from_str("{").map_err(AgentError::from);
-        assert!(json.is_err_and(|error| error.to_string().starts_with("json: ") && error.source().is_some()));
+        assert!(json.is_err_and(
+            |error| error.to_string().starts_with("json: ") && error.source().is_some()
+        ));
         assert!(AgentError::bad_request("x").source().is_none());
     }
 }

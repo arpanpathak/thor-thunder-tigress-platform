@@ -52,7 +52,12 @@ impl Cursor<'_> {
             self.bump();
         }
         let doc = (text.starts_with("///") && !text.starts_with("////")) || text.starts_with("//!");
-        Comment { line, column, text, doc }
+        Comment {
+            line,
+            column,
+            text,
+            doc,
+        }
     }
 
     fn block_comment(&mut self, line: usize, column: usize) -> Comment {
@@ -82,7 +87,12 @@ impl Cursor<'_> {
         }
         let doc = (text.starts_with("/**") && !text.starts_with("/***") && text != "/**/")
             || text.starts_with("/*!");
-        Comment { line, column, text, doc }
+        Comment {
+            line,
+            column,
+            text,
+            doc,
+        }
     }
 
     fn skip_string(&mut self) {
@@ -214,12 +224,18 @@ mod tests {
 
     #[test]
     fn ignores_slashes_inside_strings() {
-        assert_eq!(texts(r#"let url = "http://x"; let raw = r"//"; let c = '/';"#), Vec::<String>::new());
+        assert_eq!(
+            texts(r#"let url = "http://x"; let raw = r"//"; let c = '/';"#),
+            Vec::<String>::new()
+        );
     }
 
     #[test]
     fn ignores_slashes_inside_raw_strings_with_hashes() {
-        assert_eq!(texts(r##"let s = r#"a "quoted" // part"#;"##), Vec::<String>::new());
+        assert_eq!(
+            texts(r##"let s = r#"a "quoted" // part"#;"##),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

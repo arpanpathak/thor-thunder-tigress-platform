@@ -20,7 +20,8 @@ pub const EVENT_PREFIX: &str = "data:";
 
 /// What the server sends back when the access key is missing or wrong, in
 /// the error format OpenAI clients expect.
-const INVALID_KEY: &[u8] = br#"{"error":{"code":401,"message":"Invalid API Key","type":"authentication_error"}}"#;
+const INVALID_KEY: &[u8] =
+    br#"{"error":{"code":401,"message":"Invalid API Key","type":"authentication_error"}}"#;
 
 /// The statuses this server answers with itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,7 +82,12 @@ impl ContentType {
 /// # Errors
 ///
 /// `AgentError::Io` when the client is gone.
-pub fn respond(stream: &mut dyn Write, status: Status, content_type: ContentType, body: &[u8]) -> Outcome {
+pub fn respond(
+    stream: &mut dyn Write,
+    status: Status,
+    content_type: ContentType,
+    body: &[u8],
+) -> Outcome {
     write!(
         stream,
         "HTTP/1.1 {}\r\n{CORS}Content-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
@@ -188,28 +194,73 @@ mod tests {
 
     #[test]
     fn every_status_and_content_type_has_its_header() {
-        let lines = [Status::Ok, Status::Unauthorized, Status::BadRequest, Status::NotFound, Status::BadGateway].map(Status::line);
-        let types = [ContentType::Json, ContentType::Text, ContentType::Html, ContentType::Svg, ContentType::Png]
-            .map(ContentType::header);
-        assert_eq!(lines, ["200 OK", "401 Unauthorized", "400 Bad Request", "404 Not Found", "502 Bad Gateway"]);
-        assert_eq!(types, ["application/json", "text/plain", "text/html; charset=utf-8", "image/svg+xml", "image/png"]);
+        let lines = [
+            Status::Ok,
+            Status::Unauthorized,
+            Status::BadRequest,
+            Status::NotFound,
+            Status::BadGateway,
+        ]
+        .map(Status::line);
+        let types = [
+            ContentType::Json,
+            ContentType::Text,
+            ContentType::Html,
+            ContentType::Svg,
+            ContentType::Png,
+        ]
+        .map(ContentType::header);
+        assert_eq!(
+            lines,
+            [
+                "200 OK",
+                "401 Unauthorized",
+                "400 Bad Request",
+                "404 Not Found",
+                "502 Bad Gateway"
+            ]
+        );
+        assert_eq!(
+            types,
+            [
+                "application/json",
+                "text/plain",
+                "text/html; charset=utf-8",
+                "image/svg+xml",
+                "image/png"
+            ]
+        );
     }
 
     #[test]
     fn unauthorized_uses_the_openai_error_shape() -> Outcome {
         let text = written(unauthorized)?;
         assert!(text.starts_with("HTTP/1.1 401 Unauthorized"));
-        assert!(text.ends_with(r#"{"error":{"code":401,"message":"Invalid API Key","type":"authentication_error"}}"#));
+        assert!(text.ends_with(
+            r#"{"error":{"code":401,"message":"Invalid API Key","type":"authentication_error"}}"#
+        ));
         Ok(())
     }
 
     #[test]
     fn failures_get_the_status_that_explains_them() -> Outcome {
-        let bad = written(|out| failure(out, &AgentError::bad_request("the body must be a JSON object")))?;
-        let gateway = written(|out| failure(out, &AgentError::Upstream("127.0.0.1:8079: refused".to_string())))?;
+        let bad = written(|out| {
+            failure(
+                out,
+                &AgentError::bad_request("the body must be a JSON object"),
+            )
+        })?;
+        let gateway = written(|out| {
+            failure(
+                out,
+                &AgentError::Upstream("127.0.0.1:8079: refused".to_string()),
+            )
+        })?;
         let gone = written(|out| failure(out, &AgentError::from(std::io::Error::other("reset"))))?;
         assert!(bad.starts_with("HTTP/1.1 400 Bad Request"));
-        assert!(bad.ends_with(r#"{"error":{"message":"bad request: the body must be a JSON object"}}"#));
+        assert!(
+            bad.ends_with(r#"{"error":{"message":"bad request: the body must be a JSON object"}}"#)
+        );
         assert!(gateway.starts_with("HTTP/1.1 502 Bad Gateway"));
         assert_eq!(gone, "");
         Ok(())

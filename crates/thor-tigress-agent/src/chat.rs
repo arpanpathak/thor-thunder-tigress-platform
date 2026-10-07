@@ -167,9 +167,15 @@ struct Round {
 #[serde(tag = "role", rename_all = "lowercase")]
 enum Added<'a> {
     /// The model's turn that asked for tools.
-    Assistant { content: &'a str, tool_calls: Vec<CallRecord<'a>> },
+    Assistant {
+        content: &'a str,
+        tool_calls: Vec<CallRecord<'a>>,
+    },
     /// One tool's result.
-    Tool { tool_call_id: &'a str, content: &'a str },
+    Tool {
+        tool_call_id: &'a str,
+        content: &'a str,
+    },
 }
 
 /// A tool call as it is written back into the conversation.
@@ -193,7 +199,10 @@ struct FunctionRecord<'a> {
 #[serde(rename_all = "lowercase")]
 enum ThorEvent<'a> {
     /// A search ran: the query and the sources it found.
-    Search { query: &'a str, results: Vec<Source<'a>> },
+    Search {
+        query: &'a str,
+        results: Vec<Source<'a>>,
+    },
     /// Something failed after the stream started.
     Error(String),
 }
@@ -215,16 +224,25 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
     let Value::Object(mut fields) = serde_json::from_slice(body)? else {
         return Err(AgentError::bad_request("the body must be a JSON object"));
     };
-    let web_search = fields.remove(WEB_SEARCH_SWITCH).and_then(|value| value.as_bool()).unwrap_or(false);
+    let web_search = fields
+        .remove(WEB_SEARCH_SWITCH)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
     let model = upstreams.serving(fields.get(MODEL).and_then(Value::as_str));
     match Mode::of(web_search, streamed) {
-        Mode::Relay => model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?.relay(client),
-        Mode::Stream => as_events(client, &mut |client| stream_round(client, &fields, model).map(drop)),
+        Mode::Relay => model
+            .post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?
+            .relay(client),
+        Mode::Stream => as_events(client, &mut |client| {
+            stream_round(client, &fields, model).map(drop)
+        }),
         Mode::Search => {
             fields.insert(STREAM.to_string(), Value::Bool(true));
             nudge_to_search(&mut fields);
-            as_events(client, &mut |client| search_loop(client, fields.clone(), model, &upstreams.search))
+            as_events(client, &mut |client| {
+                search_loop(client, fields.clone(), model, &upstreams.search)
+            })
         }
     }
 }
@@ -245,7 +263,12 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 
 /// Asks the model, runs the tools it calls, and asks again, until it answers
 /// without a tool call or the rounds run out.
-fn search_loop(client: &mut dyn Write, mut fields: Fields, model: &Endpoint, search: &Endpoint) -> Outcome {
+fn search_loop(
+    client: &mut dyn Write,
+    mut fields: Fields,
+    model: &Endpoint,
+    search: &Endpoint,
+) -> Outcome {
     for round_number in 1..=MAX_ROUNDS {
         offer_tools(&mut fields, round_number < MAX_ROUNDS);
         let round = stream_round(client, &fields, model)?;
@@ -268,12 +291,17 @@ fn nudge_to_search(fields: &mut Fields) {
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return;
     };
-    let first_is_system = messages.first().is_some_and(|message| message.get("role").and_then(Value::as_str) == Some("system"));
+    let first_is_system = messages
+        .first()
+        .is_some_and(|message| message.get("role").and_then(Value::as_str) == Some("system"));
     if !first_is_system {
         messages.insert(0, json!({ "role": "system", "content": SEARCH_HINT }));
         return;
     }
-    let merged = messages[0].get("content").and_then(Value::as_str).map(|content| format!("{content}\n\n{SEARCH_HINT}"));
+    let merged = messages[0]
+        .get("content")
+        .and_then(Value::as_str)
+        .map(|content| format!("{content}\n\n{SEARCH_HINT}"));
     if let Some(content) = merged {
         messages[0]["content"] = Value::String(content);
     }
@@ -281,7 +309,10 @@ fn nudge_to_search(fields: &mut Fields) {
 
 fn offer_tools(fields: &mut Fields, offered: bool) {
     if offered {
-        fields.insert(TOOLS.to_string(), Tool::ALL.map(Tool::definition).into_iter().collect());
+        fields.insert(
+            TOOLS.to_string(),
+            Tool::ALL.map(Tool::definition).into_iter().collect(),
+        );
     } else {
         fields.remove(TOOLS);
     }
@@ -294,7 +325,10 @@ fn append_round(fields: &mut Fields, round: &Round, results: &[String]) -> Outco
     };
     messages.push(serde_json::to_value(round.as_message())?);
     for (call, result) in round.calls.iter().zip(results) {
-        messages.push(serde_json::to_value(Added::Tool { tool_call_id: &call.id, content: result })?);
+        messages.push(serde_json::to_value(Added::Tool {
+            tool_call_id: &call.id,
+            content: result,
+        })?);
     }
     Ok(())
 }
@@ -312,12 +346,24 @@ fn web_search(client: &mut dyn Write, call: &ToolCall, searxng: &Endpoint) -> Ou
         return Ok("The search needs a non-empty query.".to_string());
     };
     let results = search::search(searxng, &query).unwrap_or_default();
-    send_thor(client, &ThorEvent::Search { query: &query, results: sources(&results) })?;
+    send_thor(
+        client,
+        &ThorEvent::Search {
+            query: &query,
+            results: sources(&results),
+        },
+    )?;
     Ok(search::as_tool_text(&results))
 }
 
 fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
-    results.iter().map(|result| Source { title: &result.title, url: &result.url }).collect()
+    results
+        .iter()
+        .map(|result| Source {
+            title: &result.title,
+            url: &result.url,
+        })
+        .collect()
 }
 
 /// Streams one model reply to the client, collecting any tool calls.
@@ -325,7 +371,10 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
     let response = model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(fields)?)?;
     if !response.is_ok() {
         let status = response.status;
-        return Err(AgentError::Upstream(format!("model server returned {status}: {}", response.text()?)));
+        return Err(AgentError::Upstream(format!(
+            "model server returned {status}: {}",
+            response.text()?
+        )));
     }
     let mut round = Round::default();
     for line in response.body.lines() {
@@ -370,10 +419,16 @@ impl Round {
             .map(|call| CallRecord {
                 id: &call.id,
                 kind: "function",
-                function: FunctionRecord { name: &call.name, arguments: &call.arguments },
+                function: FunctionRecord {
+                    name: &call.name,
+                    arguments: &call.arguments,
+                },
             })
             .collect();
-        Added::Assistant { content: &self.content, tool_calls }
+        Added::Assistant {
+            content: &self.content,
+            tool_calls,
+        }
     }
 }
 
@@ -383,7 +438,8 @@ impl ToolCall {
         self.id.push_str(&piece.id.unwrap_or_default());
         if let Some(function) = piece.function {
             self.name.push_str(&function.name.unwrap_or_default());
-            self.arguments.push_str(&function.arguments.unwrap_or_default());
+            self.arguments
+                .push_str(&function.arguments.unwrap_or_default());
         }
     }
 
@@ -444,15 +500,24 @@ mod tests {
     fn tools_are_found_by_name() {
         assert_eq!(Tool::named("web_search"), Some(Tool::WebSearch));
         assert_eq!(Tool::named("fetch_page"), None);
-        assert_eq!(Tool::WebSearch.definition()["function"]["name"], "web_search");
+        assert_eq!(
+            Tool::WebSearch.definition()["function"]["name"],
+            "web_search"
+        );
     }
 
     #[test]
     fn a_search_request_gains_a_system_hint() {
         let mut fields = Fields::new();
-        fields.insert(MESSAGES.to_string(), json!([{ "role": "user", "content": "news?" }]));
+        fields.insert(
+            MESSAGES.to_string(),
+            json!([{ "role": "user", "content": "news?" }]),
+        );
         nudge_to_search(&mut fields);
-        assert_eq!(fields[MESSAGES], json!([{ "role": "system", "content": SEARCH_HINT }, { "role": "user", "content": "news?" }]));
+        assert_eq!(
+            fields[MESSAGES],
+            json!([{ "role": "system", "content": SEARCH_HINT }, { "role": "user", "content": "news?" }])
+        );
     }
 
     #[test]
@@ -460,7 +525,10 @@ mod tests {
         let mut fields = Fields::new();
         fields.insert(MESSAGES.to_string(), json!([{ "role": "system", "content": "Be brief." }, { "role": "user", "content": "hi" }]));
         nudge_to_search(&mut fields);
-        assert_eq!(fields[MESSAGES][0]["content"], json!(format!("Be brief.\n\n{SEARCH_HINT}")));
+        assert_eq!(
+            fields[MESSAGES][0]["content"],
+            json!(format!("Be brief.\n\n{SEARCH_HINT}"))
+        );
         assert_eq!(fields[MESSAGES].as_array().map(Vec::len), Some(2));
     }
 
@@ -486,7 +554,9 @@ mod tests {
         let mut round = Round::default();
         round.absorb(chunk(r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"a1","function":{"name":"web_search","arguments":"{\"que"}}]}}]}"#)?);
         round.absorb(chunk(r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"ry\":\"rust\"}"}}]}}]}"#)?);
-        round.absorb(chunk(r#"{"choices":[{"delta":{"content":"ok","tool_calls":null}}]}"#)?);
+        round.absorb(chunk(
+            r#"{"choices":[{"delta":{"content":"ok","tool_calls":null}}]}"#,
+        )?);
         round.absorb(chunk(r#"{"choices":[],"timings":{}}"#)?);
         assert_eq!(round.content, "ok");
         assert_eq!(round.calls.len(), 1);
@@ -497,15 +567,23 @@ mod tests {
     #[test]
     fn ignores_tool_calls_past_the_limit() -> Outcome {
         let mut round = Round::default();
-        round.absorb(chunk(r#"{"choices":[{"delta":{"tool_calls":[{"index":1000000,"id":"x"}]}}]}"#)?);
+        round.absorb(chunk(
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":1000000,"id":"x"}]}}]}"#,
+        )?);
         assert_eq!(round.calls, []);
         Ok(())
     }
 
     #[test]
     fn a_query_must_be_present_and_non_empty() {
-        let call = |arguments: &str| ToolCall { arguments: arguments.to_string(), ..ToolCall::default() };
-        assert_eq!(call(r#"{"query":"  rust  "}"#).query().as_deref(), Some("rust"));
+        let call = |arguments: &str| ToolCall {
+            arguments: arguments.to_string(),
+            ..ToolCall::default()
+        };
+        assert_eq!(
+            call(r#"{"query":"  rust  "}"#).query().as_deref(),
+            Some("rust")
+        );
         assert_eq!(call(r#"{"query":"  "}"#).query(), None);
         assert_eq!(call(r#"{"q":"rust"}"#).query(), None);
         assert_eq!(call("not json").query(), None);
@@ -515,14 +593,21 @@ mod tests {
     fn added_messages_have_openais_shape() -> Outcome {
         let round = Round {
             content: "thinking".to_string(),
-            calls: vec![ToolCall { id: "c1".to_string(), name: "web_search".to_string(), arguments: "{}".to_string() }],
+            calls: vec![ToolCall {
+                id: "c1".to_string(),
+                name: "web_search".to_string(),
+                arguments: "{}".to_string(),
+            }],
         };
         assert_eq!(
             serde_json::to_value(round.as_message())?,
             json!({"role":"assistant","content":"thinking","tool_calls":[{"id":"c1","type":"function","function":{"name":"web_search","arguments":"{}"}}]})
         );
         assert_eq!(
-            serde_json::to_value(Added::Tool { tool_call_id: "c1", content: "[1] x" })?,
+            serde_json::to_value(Added::Tool {
+                tool_call_id: "c1",
+                content: "[1] x"
+            })?,
             json!({"role":"tool","tool_call_id":"c1","content":"[1] x"})
         );
         Ok(())
@@ -530,9 +615,16 @@ mod tests {
 
     #[test]
     fn relays_a_request_that_does_not_stream() -> Outcome {
-        let (model, search) = (FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?, idle()?);
+        let (model, search) = (
+            FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?,
+            idle()?,
+        );
         let mut client = Vec::new();
-        answer(&mut client, br#"{"messages":[]}"#, &upstreams(&model, &search))?;
+        answer(
+            &mut client,
+            br#"{"messages":[]}"#,
+            &upstreams(&model, &search),
+        )?;
         assert!(String::from_utf8_lossy(&client).ends_with(r#"{"choices":[]}"#));
         assert!(model.requests()?[0].ends_with(r#"{"messages":[]}"#));
         Ok(())
@@ -543,7 +635,11 @@ mod tests {
         let token = r#"{"choices":[{"delta":{"content":"hi"}}]}"#;
         let (model, search) = (FakeServer::start(vec![event_stream(&[token])])?, idle()?);
         let mut client = Vec::new();
-        answer(&mut client, br#"{"messages":[],"stream":true}"#, &upstreams(&model, &search))?;
+        answer(
+            &mut client,
+            br#"{"messages":[],"stream":true}"#,
+            &upstreams(&model, &search),
+        )?;
         assert_eq!(events(&client), [token, DONE]);
         assert!(!model.requests()?[0].contains(SEARCH_HINT));
         Ok(())
@@ -567,7 +663,9 @@ mod tests {
         let call = call_event("web_search", r#"{"query":"rust"}"#);
         let reply = r#"{"choices":[{"delta":{"content":"Rust 1.99"}}]}"#;
         let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
-        let search = FakeServer::start(vec![json_response(r#"{"results":[{"title":"Rust","url":"https://r","content":"new"}]}"#)])?;
+        let search = FakeServer::start(vec![json_response(
+            r#"{"results":[{"title":"Rust","url":"https://r","content":"new"}]}"#,
+        )])?;
         let mut client = Vec::new();
         let request = br#"{"messages":[{"role":"user","content":"news?"}],"thor_web_search":true}"#;
         answer(&mut client, request, &upstreams(&model, &search))?;
@@ -585,7 +683,11 @@ mod tests {
     fn the_last_round_has_no_tools() -> Outcome {
         let call = call_event("other", "{}");
         let model = FakeServer::start(vec![event_stream(&[&call]); MAX_ROUNDS])?;
-        answer(&mut Vec::new(), br#"{"messages":[],"thor_web_search":true}"#, &upstreams(&model, &idle()?))?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[],"thor_web_search":true}"#,
+            &upstreams(&model, &idle()?),
+        )?;
         let seen = model.requests()?;
         assert_eq!(seen.len(), MAX_ROUNDS);
         assert!(seen[MAX_ROUNDS - 2].contains(r#""tools""#));
@@ -596,11 +698,24 @@ mod tests {
 
     #[test]
     fn a_model_error_becomes_an_error_event() -> Outcome {
-        let (model, search) = (FakeServer::start(vec!["HTTP/1.1 500 Oops\r\n\r\nbroken".to_string()])?, idle()?);
+        let (model, search) = (
+            FakeServer::start(vec!["HTTP/1.1 500 Oops\r\n\r\nbroken".to_string()])?,
+            idle()?,
+        );
         let mut client = Vec::new();
-        answer(&mut client, br#"{"messages":[],"stream":true}"#, &upstreams(&model, &search))?;
+        answer(
+            &mut client,
+            br#"{"messages":[],"stream":true}"#,
+            &upstreams(&model, &search),
+        )?;
         let sent = events(&client);
-        assert_eq!(sent, [r#"{"thor":{"error":"upstream: model server returned 500: broken"}}"#, DONE]);
+        assert_eq!(
+            sent,
+            [
+                r#"{"thor":{"error":"upstream: model server returned 500: broken"}}"#,
+                DONE
+            ]
+        );
         Ok(())
     }
 
@@ -608,16 +723,31 @@ mod tests {
     fn rejects_a_body_that_is_not_an_object() -> Outcome {
         let (model, search) = (idle()?, idle()?);
         let outcome = answer(&mut Vec::new(), b"[]", &upstreams(&model, &search));
-        assert!(outcome.is_err_and(|error| error.to_string() == "bad request: the body must be a JSON object"));
+        assert!(
+            outcome.is_err_and(
+                |error| error.to_string() == "bad request: the body must be a JSON object"
+            )
+        );
         Ok(())
     }
 
     #[test]
     fn a_search_without_messages_is_reported() -> Outcome {
-        let (model, search) = (FakeServer::start(vec![event_stream(&[&call_event("web_search", "{}")])])?, idle()?);
+        let (model, search) = (
+            FakeServer::start(vec![event_stream(&[&call_event("web_search", "{}")])])?,
+            idle()?,
+        );
         let mut client = Vec::new();
-        answer(&mut client, br#"{"thor_web_search":true}"#, &upstreams(&model, &search))?;
-        assert!(events(&client).iter().any(|event| event.contains("messages must be a list")));
+        answer(
+            &mut client,
+            br#"{"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+        assert!(
+            events(&client)
+                .iter()
+                .any(|event| event.contains("messages must be a list"))
+        );
         Ok(())
     }
 }

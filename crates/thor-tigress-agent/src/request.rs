@@ -45,7 +45,10 @@ pub fn read_request(stream: &mut dyn Read) -> Outcome<Request> {
     let mut parts = line.split_whitespace();
     let method = parts.next().unwrap_or_default().to_string();
     let target = parts.next().unwrap_or_default();
-    let path = target.split_once('?').map_or(target, |(path, _)| path).to_string();
+    let path = target
+        .split_once('?')
+        .map_or(target, |(path, _)| path)
+        .to_string();
     let headers = read_headers(&mut reader)?;
     let body = read_body(&mut reader, headers.content_length)?;
     Ok(Request {
@@ -90,7 +93,9 @@ impl Headers {
 
 fn read_body(reader: &mut dyn Read, length: usize) -> Outcome<Vec<u8>> {
     if length > MAX_BODY {
-        return Err(AgentError::bad_request(format!("body over {MAX_BODY} bytes")));
+        return Err(AgentError::bad_request(format!(
+            "body over {MAX_BODY} bytes"
+        )));
     }
     let mut body = vec![0; length];
     reader.read_exact(&mut body)?;
@@ -107,7 +112,9 @@ mod tests {
 
     #[test]
     fn reads_method_path_and_body() -> Outcome {
-        let request = parse("POST /v1/chat/completions?x=1 HTTP/1.1\r\nHost: t\r\nContent-Length: 2\r\n\r\n{}")?;
+        let request = parse(
+            "POST /v1/chat/completions?x=1 HTTP/1.1\r\nHost: t\r\nContent-Length: 2\r\n\r\n{}",
+        )?;
         assert_eq!(
             request,
             Request {

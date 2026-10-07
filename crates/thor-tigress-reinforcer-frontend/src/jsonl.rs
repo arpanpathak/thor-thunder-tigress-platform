@@ -65,11 +65,37 @@ mod tests {
     fn writes_and_reads_back_skipping_blank_lines() -> Outcome {
         let folder = TempDir::new()?;
         let path = folder.path().join("nested/lines.jsonl");
-        write_lines(&path, &[Line { id: "a".to_string() }, Line { id: "b".to_string() }])?;
-        fs::write(&path, format!("{}\n\n", fs::read_to_string(&path).map_err(ReviewError::io(&path))?))
-            .map_err(ReviewError::io(&path))?;
+        write_lines(
+            &path,
+            &[
+                Line {
+                    id: "a".to_string(),
+                },
+                Line {
+                    id: "b".to_string(),
+                },
+            ],
+        )?;
+        fs::write(
+            &path,
+            format!(
+                "{}\n\n",
+                fs::read_to_string(&path).map_err(ReviewError::io(&path))?
+            ),
+        )
+        .map_err(ReviewError::io(&path))?;
         let lines: Vec<Line> = read_lines(&path)?;
-        assert_eq!(lines, [Line { id: "a".to_string() }, Line { id: "b".to_string() }]);
+        assert_eq!(
+            lines,
+            [
+                Line {
+                    id: "a".to_string()
+                },
+                Line {
+                    id: "b".to_string()
+                }
+            ]
+        );
         Ok(())
     }
 

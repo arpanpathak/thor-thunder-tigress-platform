@@ -54,20 +54,40 @@ struct Found {
 pub fn search(searxng: &Endpoint, query: &str) -> Outcome<Vec<SearchResult>> {
     let response = searxng.get(&format!("{SEARCH}?q={}&format=json", encode(query)))?;
     if !response.is_ok() {
-        return Err(AgentError::Upstream(format!("search returned {}", response.status)));
+        return Err(AgentError::Upstream(format!(
+            "search returned {}",
+            response.status
+        )));
     }
     let answer: Answer = serde_json::from_str(&response.text()?)?;
-    Ok(answer.results.into_iter().filter_map(Found::into_result).take(MAX_RESULTS).collect())
+    Ok(answer
+        .results
+        .into_iter()
+        .filter_map(Found::into_result)
+        .take(MAX_RESULTS)
+        .collect())
 }
 
 impl Found {
     /// The result with trimmed fields and a short snippet; `None` without an address.
     fn into_result(self) -> Option<SearchResult> {
-        let url = self.url.as_deref().map(str::trim).filter(|url| !url.is_empty())?.to_string();
+        let url = self
+            .url
+            .as_deref()
+            .map(str::trim)
+            .filter(|url| !url.is_empty())?
+            .to_string();
         Some(SearchResult {
             title: self.title.as_deref().unwrap_or_default().trim().to_string(),
             url,
-            snippet: self.content.as_deref().unwrap_or_default().trim().chars().take(MAX_SNIPPET).collect(),
+            snippet: self
+                .content
+                .as_deref()
+                .unwrap_or_default()
+                .trim()
+                .chars()
+                .take(MAX_SNIPPET)
+                .collect(),
         })
     }
 }
@@ -81,7 +101,12 @@ pub fn as_tool_text(results: &[SearchResult]) -> String {
     let entries: Vec<String> = results
         .iter()
         .zip(1..)
-        .map(|(result, number)| format!("[{number}] {}\n{}\n{}", result.title, result.url, result.snippet))
+        .map(|(result, number)| {
+            format!(
+                "[{number}] {}\n{}\n{}",
+                result.title, result.url, result.snippet
+            )
+        })
         .collect();
     entries.join("\n\n")
 }
@@ -90,7 +115,9 @@ pub fn as_tool_text(results: &[SearchResult]) -> String {
 fn encode(text: &str) -> String {
     text.bytes()
         .map(|byte| match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => char::from(byte).to_string(),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                char::from(byte).to_string()
+            }
             b' ' => "+".to_string(),
             other => format!("%{other:02X}"),
         })
@@ -105,7 +132,10 @@ mod tests {
 
     #[test]
     fn encodes_a_query() {
-        assert_eq!(encode("rust 1.99 & tokio/axum"), "rust+1.99+%26+tokio%2Faxum");
+        assert_eq!(
+            encode("rust 1.99 & tokio/axum"),
+            "rust+1.99+%26+tokio%2Faxum"
+        );
     }
 
     #[test]
@@ -129,12 +159,17 @@ mod tests {
             .map(|n| json!({"title": format!(" t{n} "), "url": format!("https://e/{n}"), "content": long}))
             .collect();
         results.insert(0, json!({"title": "no address", "url": null}));
-        let server = FakeServer::start(vec![json_response(&json!({ "results": results }).to_string())])?;
+        let server = FakeServer::start(vec![json_response(
+            &json!({ "results": results }).to_string(),
+        )])?;
         let found = search(&Endpoint::new(server.address(), None), "rust tokio")?;
         let request = server.requests()?;
         assert!(request[0].starts_with("GET /search?q=rust+tokio&format=json HTTP/1.1"));
         assert_eq!(found.len(), MAX_RESULTS);
-        assert_eq!((found[0].title.as_str(), found[0].url.as_str()), ("t0", "https://e/0"));
+        assert_eq!(
+            (found[0].title.as_str(), found[0].url.as_str()),
+            ("t0", "https://e/0")
+        );
         assert_eq!(found[0].snippet.chars().count(), MAX_SNIPPET);
         Ok(())
     }

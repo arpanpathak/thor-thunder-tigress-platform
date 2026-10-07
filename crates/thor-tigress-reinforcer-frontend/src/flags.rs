@@ -151,10 +151,19 @@ impl FlagStore {
             found
                 .entry(text.to_lowercase())
                 .and_modify(|phrase| phrase.examples += 1)
-                .or_insert_with(|| Phrase { text: text.to_string(), category: span.category, examples: 1 });
+                .or_insert_with(|| Phrase {
+                    text: text.to_string(),
+                    category: span.category,
+                    examples: 1,
+                });
         }
         let mut phrases: Vec<Phrase> = found.into_values().collect();
-        phrases.sort_by(|left, right| right.examples.cmp(&left.examples).then_with(|| left.text.cmp(&right.text)));
+        phrases.sort_by(|left, right| {
+            right
+                .examples
+                .cmp(&left.examples)
+                .then_with(|| left.text.cmp(&right.text))
+        });
         phrases
     }
 
@@ -162,10 +171,10 @@ impl FlagStore {
     /// example has none. Returns false when the example already carries the
     /// same phrase in the same field.
     pub fn add_span(&mut self, id: &str, span: Span, note: &str) -> bool {
-        let flag = self
-            .flags
-            .entry(id.to_string())
-            .or_insert_with(|| Flag { note: note.to_string(), spans: Vec::new() });
+        let flag = self.flags.entry(id.to_string()).or_insert_with(|| Flag {
+            note: note.to_string(),
+            spans: Vec::new(),
+        });
         let present = flag
             .spans
             .iter()
@@ -182,7 +191,10 @@ impl FlagStore {
     ///
     /// `ReviewError::Io` when the file can't be written.
     pub fn save(&self) -> Outcome {
-        let mut lines: Vec<FlagLine<&str, &Flag>> = self.iter().map(|(id, flag)| FlagLine { id, flag }).collect();
+        let mut lines: Vec<FlagLine<&str, &Flag>> = self
+            .iter()
+            .map(|(id, flag)| FlagLine { id, flag })
+            .collect();
         lines.sort_by_key(|line| line.id);
         jsonl::write_lines(&self.path, &lines)
     }
@@ -194,13 +206,20 @@ mod tests {
     use crate::testing::TempDir;
 
     fn span(text: &str) -> Span {
-        Span { field: Field::Response, text: text.to_string(), category: SlopCategory::DramaticSetup }
+        Span {
+            field: Field::Response,
+            text: text.to_string(),
+            category: SlopCategory::DramaticSetup,
+        }
     }
 
     #[test]
     fn a_missing_file_means_no_flags() -> Outcome {
         let folder = TempDir::new()?;
-        assert_eq!(FlagStore::open(&folder.path().join("flags.jsonl"))?.len(), 0);
+        assert_eq!(
+            FlagStore::open(&folder.path().join("flags.jsonl"))?.len(),
+            0
+        );
         Ok(())
     }
 
@@ -209,7 +228,13 @@ mod tests {
         let folder = TempDir::new()?;
         let path = folder.path().join("flags.jsonl");
         let mut store = FlagStore::open(&path)?;
-        store.set("b", Flag { note: "opens with flattery".to_string(), spans: vec![span("Here's the thing")] });
+        store.set(
+            "b",
+            Flag {
+                note: "opens with flattery".to_string(),
+                spans: vec![span("Here's the thing")],
+            },
+        );
         store.set("a", Flag::default());
         store.save()?;
         let text = std::fs::read_to_string(&path).map_err(crate::error::ReviewError::io(&path))?;
@@ -242,7 +267,14 @@ mod tests {
         assert!(!store.add_span("b", span("HERE'S THE THING"), ""));
         assert!(store.add_span("c", span("ok"), ""));
         let phrases = store.phrases();
-        assert_eq!(phrases, [Phrase { text: "Here's the thing".to_string(), category: SlopCategory::DramaticSetup, examples: 2 }]);
+        assert_eq!(
+            phrases,
+            [Phrase {
+                text: "Here's the thing".to_string(),
+                category: SlopCategory::DramaticSetup,
+                examples: 2
+            }]
+        );
         Ok(())
     }
 
@@ -252,15 +284,25 @@ mod tests {
         let mut store = FlagStore::open(&folder.path().join("flags.jsonl"))?;
         store.add_span("a", span("Truly remarkable"), "");
         store.add_span("b", span("At the end of the day"), "");
-        let texts: Vec<String> = store.phrases().into_iter().map(|phrase| phrase.text).collect();
+        let texts: Vec<String> = store
+            .phrases()
+            .into_iter()
+            .map(|phrase| phrase.text)
+            .collect();
         assert_eq!(texts, ["At the end of the day", "Truly remarkable"]);
         Ok(())
     }
 
     #[test]
     fn a_machine_flag_is_not_reviewed_until_a_person_marks_it() {
-        let auto = Flag { note: "auto: in summary".to_string(), spans: Vec::new() };
-        let marked = Flag { note: "auto: in summary".to_string(), spans: vec![span("In summary")] };
+        let auto = Flag {
+            note: "auto: in summary".to_string(),
+            spans: Vec::new(),
+        };
+        let marked = Flag {
+            note: "auto: in summary".to_string(),
+            spans: vec![span("In summary")],
+        };
         assert!(!auto.is_reviewed());
         assert!(marked.is_reviewed());
         assert!(Flag::default().is_reviewed());

@@ -85,7 +85,13 @@ impl Summary {
         let columns = [
             vec!["Run", "n", "With code", "Parses", "All 5 rules"],
             rules,
-            vec!["False claim", "Clean prose", "Slop / 1k words", "Em-dash habit", "Words / answer"],
+            vec![
+                "False claim",
+                "Clean prose",
+                "Slop / 1k words",
+                "Em-dash habit",
+                "Words / answer",
+            ],
         ]
         .concat();
         let divider = vec!["---"; columns.len()];
@@ -98,7 +104,11 @@ impl Summary {
     pub fn row(&self, label: &str) -> String {
         let rules = Rule::ALL.iter().map(|rule| {
             let count = self.rules.get(rule).copied().unwrap_or_default();
-            format!("{} of {}", percent(count.passed, count.applied), count.applied)
+            format!(
+                "{} of {}",
+                percent(count.passed, count.applied),
+                count.applied
+            )
         });
         let cells: Vec<String> = [
             label.to_string(),
@@ -166,14 +176,29 @@ mod tests {
         summary.add(&score("Plain words."));
         summary.add(&score("```rust\nfn a() { b().unwrap(); }\n```"));
         assert_eq!(summary.with_code, 1);
-        assert_eq!(summary.rules.get(&Rule::NoUnwrap), Some(&RuleCount { passed: 0, applied: 1 }));
-        assert_eq!(summary.rules.get(&Rule::ErrorEnum), Some(&RuleCount { passed: 0, applied: 0 }));
+        assert_eq!(
+            summary.rules.get(&Rule::NoUnwrap),
+            Some(&RuleCount {
+                passed: 0,
+                applied: 1
+            })
+        );
+        assert_eq!(
+            summary.rules.get(&Rule::ErrorEnum),
+            Some(&RuleCount {
+                passed: 0,
+                applied: 0
+            })
+        );
         assert_eq!(summary.all_rules, 0);
     }
 
     #[test]
     fn a_row_has_one_cell_per_header_column() {
-        let header_cells = Summary::header().lines().next().map_or(0, |line| line.matches('|').count());
+        let header_cells = Summary::header()
+            .lines()
+            .next()
+            .map_or(0, |line| line.matches('|').count());
         let row_cells = Summary::default().row("empty").matches('|').count();
         assert_eq!(header_cells, row_cells);
     }
@@ -186,15 +211,28 @@ mod tests {
 
     #[test]
     fn rounds_halves_to_even_like_float_formatting() {
-        let integer: Vec<String> = [(1, 8), (3, 8), (5, 8), (1, 200), (2, 3), (1, 3)].iter().map(|&(part, whole)| percent(part, whole)).collect();
+        let integer: Vec<String> = [(1, 8), (3, 8), (5, 8), (1, 200), (2, 3), (1, 3)]
+            .iter()
+            .map(|&(part, whole)| percent(part, whole))
+            .collect();
         assert_eq!(integer, ["12%", "38%", "62%", "0%", "67%", "33%"]);
-        assert_eq!([per_thousand(1, 16), per_thousand(1, 3), per_thousand(0, 9), per_thousand(1, 0)], ["62.5", "333.3", "0.0", "–"]);
+        assert_eq!(
+            [
+                per_thousand(1, 16),
+                per_thousand(1, 3),
+                per_thousand(0, 9),
+                per_thousand(1, 0)
+            ],
+            ["62.5", "333.3", "0.0", "–"]
+        );
     }
 
     #[test]
     fn a_row_reports_rates_slop_and_words() {
         let mut summary = Summary::default();
-        summary.add(&score("Great question! Use iter().\n```rust\n/// Adds.\npub fn a() {}\n```"));
+        summary.add(&score(
+            "Great question! Use iter().\n```rust\n/// Adds.\npub fn a() {}\n```",
+        ));
         let row = summary.row("run");
         assert!(row.starts_with("| run | 1 | 1 | 100% | 100% |"), "{row}");
         assert!(row.contains("100% of 1"));

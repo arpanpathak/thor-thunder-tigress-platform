@@ -108,7 +108,11 @@ impl CodeReport {
     /// True when the code parsed and no rule failed.
     #[must_use]
     pub fn all_pass(&self) -> bool {
-        self.parsed && self.verdicts.values().all(|verdict| *verdict != Verdict::Fail)
+        self.parsed
+            && self
+                .verdicts
+                .values()
+                .all(|verdict| *verdict != Verdict::Fail)
     }
 }
 
@@ -273,18 +277,24 @@ const LIBRARY_ERRORS: [&str; 9] = [
 
 impl ErrorFacts {
     fn handles_errors(&self) -> bool {
-        !self.crates.is_empty() || !self.returned.is_empty() || self.implementors("Error").next().is_some()
+        !self.crates.is_empty()
+            || !self.returned.is_empty()
+            || self.implementors("Error").next().is_some()
     }
 
     /// The `impl`s of `trait_name`, following `use … as …` renames.
     fn implementors<'a>(&'a self, trait_name: &'a str) -> impl Iterator<Item = &'a Implementation> {
         self.impls.iter().filter(move |implementation| {
-            self.renames.get(&implementation.trait_name).unwrap_or(&implementation.trait_name) == trait_name
+            self.renames
+                .get(&implementation.trait_name)
+                .unwrap_or(&implementation.trait_name)
+                == trait_name
         })
     }
 
     fn implements(&self, trait_name: &str, type_name: &str) -> bool {
-        self.implementors(trait_name).any(|implementation| implementation.type_name == type_name)
+        self.implementors(trait_name)
+            .any(|implementation| implementation.type_name == type_name)
     }
 
     fn local(&self, name: &str) -> bool {
@@ -292,7 +302,11 @@ impl ErrorFacts {
     }
 
     fn violations(&self) -> Vec<Violation> {
-        let violation = |line: usize, detail: String| Violation { rule: Rule::ErrorEnum, line, detail };
+        let violation = |line: usize, detail: String| Violation {
+            rule: Rule::ErrorEnum,
+            line,
+            detail,
+        };
         let mut found: Vec<Violation> = self
             .crates
             .iter()
@@ -300,7 +314,10 @@ impl ErrorFacts {
             .collect();
         for implementation in self.implementors("Error") {
             if self.structs.contains(&implementation.type_name) {
-                found.push(violation(implementation.line, format!("{} is a struct, not an enum", implementation.type_name)));
+                found.push(violation(
+                    implementation.line,
+                    format!("{} is a struct, not an enum", implementation.type_name),
+                ));
             }
         }
         let mut reported = BTreeSet::new();
@@ -324,9 +341,15 @@ impl ErrorFacts {
             ErrorType::Text(text) => Some(format!("returns Result<_, {text}>")),
             ErrorType::Boxed => Some("returns Result<_, Box<dyn Error>>".to_string()),
             ErrorType::Named(name) if self.enums.contains(name) => self.missing_traits(name),
-            ErrorType::Named(name) if self.structs.contains(name) => Some(format!("{name} is a struct, not an enum")),
-            ErrorType::Named(name) if !self.local(name) && LIBRARY_ERRORS.contains(&name.as_str()) => {
-                Some(format!("returns the library error {name}, not a custom enum"))
+            ErrorType::Named(name) if self.structs.contains(name) => {
+                Some(format!("{name} is a struct, not an enum"))
+            }
+            ErrorType::Named(name)
+                if !self.local(name) && LIBRARY_ERRORS.contains(&name.as_str()) =>
+            {
+                Some(format!(
+                    "returns the library error {name}, not a custom enum"
+                ))
             }
             ErrorType::Named(_) => None,
         }
@@ -378,7 +401,13 @@ impl Scan {
         self.violations.push(Violation { rule, line, detail });
     }
 
-    fn check_docs(&mut self, visibility: &Visibility, attributes: &[Attribute], name: &str, span: Span) {
+    fn check_docs(
+        &mut self,
+        visibility: &Visibility,
+        attributes: &[Attribute],
+        name: &str,
+        span: Span,
+    ) {
         if !matches!(visibility, Visibility::Public(_)) {
             return;
         }
@@ -387,7 +416,11 @@ impl Scan {
             .iter()
             .any(|attribute| attribute.path().is_ident("doc"));
         if !documented {
-            self.report(Rule::PubDocs, span, format!("pub {name} has no doc comment"));
+            self.report(
+                Rule::PubDocs,
+                span,
+                format!("pub {name} has no doc comment"),
+            );
         }
     }
 
@@ -398,7 +431,10 @@ impl Scan {
             line: position.line.saturating_sub(self.offset),
             column: position.column,
         };
-        self.bodies.push(Body { open: shift(open), close: shift(close) });
+        self.bodies.push(Body {
+            open: shift(open),
+            close: shift(close),
+        });
     }
 
     fn comments_in_bodies(&self, comments: &[Comment]) -> Vec<Violation> {
@@ -430,14 +466,23 @@ impl Scan {
             .any(|attribute| {
                 let mut found = false;
                 let _ = attribute.parse_nested_meta(|meta| {
-                    found |= meta.path.segments.last().is_some_and(|last| last.ident == "Error");
+                    found |= meta
+                        .path
+                        .segments
+                        .last()
+                        .is_some_and(|last| last.ident == "Error");
                     Ok(())
                 });
                 found
             });
         if derives {
-            let line = attributes.first().map_or(1, |attribute| self.line(attribute.span()));
-            self.errors.crates.push(At { line, value: "thiserror (derive(Error))".to_string() });
+            let line = attributes
+                .first()
+                .map_or(1, |attribute| self.line(attribute.span()));
+            self.errors.crates.push(At {
+                line,
+                value: "thiserror (derive(Error))".to_string(),
+            });
         }
     }
 }
@@ -479,7 +524,12 @@ impl<'ast> Visit<'ast> for Scan {
     }
 
     fn visit_impl_item_fn(&mut self, item: &'ast ImplItemFn) {
-        self.check_docs(&item.vis, &item.attrs, &format!("fn {}", item.sig.ident), item.span());
+        self.check_docs(
+            &item.vis,
+            &item.attrs,
+            &format!("fn {}", item.sig.ident),
+            item.span(),
+        );
         if !self.in_trait_impl {
             self.signature(&item.sig);
         }
@@ -503,7 +553,11 @@ impl<'ast> Visit<'ast> for Scan {
             .map(|segment| segment.ident.to_string());
         if let (Some(trait_name), Some(self_name)) = (trait_name, type_name(&item.self_ty)) {
             let line = self.line(item.span());
-            self.errors.impls.push(Implementation { line, trait_name, type_name: self_name });
+            self.errors.impls.push(Implementation {
+                line,
+                trait_name,
+                type_name: self_name,
+            });
         }
         let outer = self.in_trait_impl;
         self.in_trait_impl = item.trait_.is_some();
@@ -580,7 +634,10 @@ impl<'ast> Visit<'ast> for Scan {
             .map(|segment| segment.ident.to_string());
         if let Some(name) = last.filter(|name| name == "anyhow" || name == "bail") {
             let line = self.line(mac.span());
-            self.errors.crates.push(At { line, value: format!("anyhow ({name}!)") });
+            self.errors.crates.push(At {
+                line,
+                value: format!("anyhow ({name}!)"),
+            });
         }
         for argument in &macro_arguments(mac) {
             self.visit_expr(argument);
@@ -810,17 +867,42 @@ pub fn macros() -> anyhow::Result<()> {
     #[test]
     fn finds_an_index_inside_a_macro_and_shortens_a_long_comment() {
         let source = "/// Prints.\npub fn show(values: &[u8]) {\n    for i in 0..values.len() {\n        println!(\"{}\", values[i]);\n    }\n    // This comment inside the body is much longer than sixty characters in total.\n}\n";
-        let details: Vec<String> = check(source).violations.into_iter().map(|violation| violation.detail).collect();
-        assert!(details.iter().any(|detail| detail == "for i in a range, used as an index"), "{details:?}");
-        let unnamed = check("/// Counts.\npub fn count(values: &[u8]) {\n    for _ in 0..values.len() {}\n    for value in values {\n        drop(value);\n    }\n}\n");
-        assert!(unnamed.violations.iter().any(|violation| violation.detail == "for _ in a range, used as an index"));
-        assert!(details.iter().any(|detail| detail.ends_with('…') && detail.chars().count() == DETAIL_CHARS + 1), "{details:?}");
+        let details: Vec<String> = check(source)
+            .violations
+            .into_iter()
+            .map(|violation| violation.detail)
+            .collect();
+        assert!(
+            details
+                .iter()
+                .any(|detail| detail == "for i in a range, used as an index"),
+            "{details:?}"
+        );
+        let unnamed = check(
+            "/// Counts.\npub fn count(values: &[u8]) {\n    for _ in 0..values.len() {}\n    for value in values {\n        drop(value);\n    }\n}\n",
+        );
+        assert!(
+            unnamed
+                .violations
+                .iter()
+                .any(|violation| violation.detail == "for _ in a range, used as an index")
+        );
+        assert!(
+            details
+                .iter()
+                .any(|detail| detail.ends_with('…') && detail.chars().count() == DETAIL_CHARS + 1),
+            "{details:?}"
+        );
     }
 
     #[test]
     fn reports_every_uncommon_form() {
         let report = check(UNCOMMON_FORMS);
-        let found: Vec<(usize, &str)> = report.violations.iter().map(|violation| (violation.line, violation.detail.as_str())).collect();
+        let found: Vec<(usize, &str)> = report
+            .violations
+            .iter()
+            .map(|violation| (violation.line, violation.detail.as_str()))
+            .collect();
         let expected = [
             (13, "Failure is a struct, not an enum"),
             (15, "uses the thiserror (derive(Error)) crate"),
@@ -838,8 +920,14 @@ pub fn macros() -> anyhow::Result<()> {
             (50, ".unwrap()"),
             (51, "uses the anyhow (bail!) crate"),
         ];
-        assert!(expected.iter().all(|wanted| found.contains(wanted)), "{found:?}");
-        let undocumented = found.iter().filter(|(_, detail)| detail.ends_with("has no doc comment")).count();
+        assert!(
+            expected.iter().all(|wanted| found.contains(wanted)),
+            "{found:?}"
+        );
+        let undocumented = found
+            .iter()
+            .filter(|(_, detail)| detail.ends_with("has no doc comment"))
+            .count();
         assert_eq!(undocumented, 20);
         assert_eq!(report.violations.len(), 33);
     }
@@ -866,22 +954,37 @@ pub fn macros() -> anyhow::Result<()> {
 
     #[test]
     fn unwrap_or_is_allowed() {
-        assert_eq!(verdict("fn a() { b().unwrap_or(0); }", Rule::NoUnwrap), Verdict::Pass);
+        assert_eq!(
+            verdict("fn a() { b().unwrap_or(0); }", Rule::NoUnwrap),
+            Verdict::Pass
+        );
     }
 
     #[test]
     fn rule_two_does_not_apply_to_code_without_error_handling() {
-        assert_eq!(verdict("fn add(a: i32, b: i32) -> i32 { a + b }", Rule::ErrorEnum), Verdict::NotApplicable);
+        assert_eq!(
+            verdict("fn add(a: i32, b: i32) -> i32 { a + b }", Rule::ErrorEnum),
+            Verdict::NotApplicable
+        );
     }
 
     #[test]
     fn rule_two_fails_string_errors_and_boxed_errors() {
-        assert_eq!(verdict("fn a() -> Result<(), String> { Ok(()) }", Rule::ErrorEnum), Verdict::Fail);
         assert_eq!(
-            verdict("fn main() -> Result<(), Box<dyn std::error::Error>> { Ok(()) }", Rule::ErrorEnum),
+            verdict("fn a() -> Result<(), String> { Ok(()) }", Rule::ErrorEnum),
             Verdict::Fail
         );
-        assert_eq!(verdict("use anyhow::Result;", Rule::ErrorEnum), Verdict::Fail);
+        assert_eq!(
+            verdict(
+                "fn main() -> Result<(), Box<dyn std::error::Error>> { Ok(()) }",
+                Rule::ErrorEnum
+            ),
+            Verdict::Fail
+        );
+        assert_eq!(
+            verdict("use anyhow::Result;", Rule::ErrorEnum),
+            Verdict::Fail
+        );
     }
 
     #[test]
@@ -921,43 +1024,71 @@ pub fn macros() -> anyhow::Result<()> {
 
     #[test]
     fn rule_two_follows_a_result_alias() {
-        let source = "type Result<T> = std::result::Result<T, String>; fn a() -> Result<()> { Ok(()) }";
+        let source =
+            "type Result<T> = std::result::Result<T, String>; fn a() -> Result<()> { Ok(()) }";
         assert_eq!(verdict(source, Rule::ErrorEnum), Verdict::Fail);
     }
 
     #[test]
     fn rule_two_fails_a_library_error_and_trusts_types_from_other_files() {
         assert_eq!(
-            verdict("fn a() -> Result<(), std::io::Error> { Ok(()) }", Rule::ErrorEnum),
+            verdict(
+                "fn a() -> Result<(), std::io::Error> { Ok(()) }",
+                Rule::ErrorEnum
+            ),
             Verdict::Fail
         );
-        assert_eq!(verdict("fn a() -> Result<(), DataError> { Ok(()) }", Rule::ErrorEnum), Verdict::Pass);
+        assert_eq!(
+            verdict(
+                "fn a() -> Result<(), DataError> { Ok(()) }",
+                Rule::ErrorEnum
+            ),
+            Verdict::Pass
+        );
     }
 
     #[test]
     fn rule_two_reads_io_result_as_io_error_and_ignores_fmt_result() {
-        assert_eq!(verdict("fn main() -> std::io::Result<()> { Ok(()) }", Rule::ErrorEnum), Verdict::Fail);
+        assert_eq!(
+            verdict(
+                "fn main() -> std::io::Result<()> { Ok(()) }",
+                Rule::ErrorEnum
+            ),
+            Verdict::Fail
+        );
         let display = "struct S; impl std::fmt::Display for S { fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { Ok(()) } }";
         assert_eq!(verdict(display, Rule::ErrorEnum), Verdict::NotApplicable);
     }
 
     #[test]
     fn a_module_declared_by_file_needs_no_doc_at_the_declaration() {
-        assert_eq!(verdict("pub mod rules;", Rule::PubDocs), Verdict::NotApplicable);
+        assert_eq!(
+            verdict("pub mod rules;", Rule::PubDocs),
+            Verdict::NotApplicable
+        );
         assert_eq!(verdict("pub mod inline {}", Rule::PubDocs), Verdict::Fail);
     }
 
     #[test]
     fn undocumented_pub_items_fail_and_private_ones_do_not_count() {
         assert_eq!(verdict("pub fn a() {}", Rule::PubDocs), Verdict::Fail);
-        assert_eq!(verdict("/// Adds.\npub fn a() {}", Rule::PubDocs), Verdict::Pass);
+        assert_eq!(
+            verdict("/// Adds.\npub fn a() {}", Rule::PubDocs),
+            Verdict::Pass
+        );
         assert_eq!(verdict("fn a() {}", Rule::PubDocs), Verdict::NotApplicable);
     }
 
     #[test]
     fn comments_inside_bodies_fail_and_outside_do_not() {
-        assert_eq!(verdict("// fine\nfn a() {\n    1;\n}", Rule::NoBodyComments), Verdict::Pass);
-        assert_eq!(verdict("fn a() {\n    // not fine\n    1;\n}", Rule::NoBodyComments), Verdict::Fail);
+        assert_eq!(
+            verdict("// fine\nfn a() {\n    1;\n}", Rule::NoBodyComments),
+            Verdict::Pass
+        );
+        assert_eq!(
+            verdict("fn a() {\n    // not fine\n    1;\n}", Rule::NoBodyComments),
+            Verdict::Fail
+        );
     }
 
     #[test]
@@ -970,14 +1101,32 @@ pub fn macros() -> anyhow::Result<()> {
             .map(|violation| (violation.rule, violation.line))
             .collect();
         assert_eq!(lines, vec![(Rule::NoUnwrap, 2)]);
-        assert_eq!(report.verdicts.get(&Rule::NoBodyComments), Some(&Verdict::NotApplicable));
+        assert_eq!(
+            report.verdicts.get(&Rule::NoBodyComments),
+            Some(&Verdict::NotApplicable)
+        );
     }
 
     #[test]
     fn index_loops_fail_and_counted_repeats_do_not() {
-        assert_eq!(verdict("fn a(v: &[i32]) { for i in 0..v.len() { let _ = i; } }", Rule::NoIndexLoops), Verdict::Fail);
-        assert_eq!(verdict("fn a(v: &[i32], n: usize) { for i in 0..n { f(v[i]); } }", Rule::NoIndexLoops), Verdict::Fail);
-        assert_eq!(verdict("fn a() { for _ in 0..3 { f(); } }", Rule::NoIndexLoops), Verdict::Pass);
+        assert_eq!(
+            verdict(
+                "fn a(v: &[i32]) { for i in 0..v.len() { let _ = i; } }",
+                Rule::NoIndexLoops
+            ),
+            Verdict::Fail
+        );
+        assert_eq!(
+            verdict(
+                "fn a(v: &[i32], n: usize) { for i in 0..n { f(v[i]); } }",
+                Rule::NoIndexLoops
+            ),
+            Verdict::Fail
+        );
+        assert_eq!(
+            verdict("fn a() { for _ in 0..3 { f(); } }", Rule::NoIndexLoops),
+            Verdict::Pass
+        );
     }
 
     #[test]

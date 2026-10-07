@@ -28,9 +28,20 @@ pub fn list(client: &mut dyn Write, upstreams: &Upstreams) -> Outcome {
     }
     let mut list: Value = serde_json::from_str(&answer.text()?)?;
     if let Some(data) = list.get_mut("data").and_then(Value::as_array_mut) {
-        data.extend(upstreams.engines.iter().filter_map(|engine| listed(&engine.endpoint)).flatten());
+        data.extend(
+            upstreams
+                .engines
+                .iter()
+                .filter_map(|engine| listed(&engine.endpoint))
+                .flatten(),
+        );
     }
-    response::respond(client, Status::Ok, ContentType::Json, &serde_json::to_vec(&list)?)
+    response::respond(
+        client,
+        Status::Ok,
+        ContentType::Json,
+        &serde_json::to_vec(&list)?,
+    )
 }
 
 /// The models an engine lists; `None` when it can't be reached or answers
@@ -54,7 +65,10 @@ mod tests {
             model: Endpoint::new(model.address(), None),
             engines: engines
                 .iter()
-                .map(|address| Engine { model: "m".to_string(), endpoint: Endpoint::new(address.clone(), None) })
+                .map(|address| Engine {
+                    model: "m".to_string(),
+                    endpoint: Endpoint::new(address.clone(), None),
+                })
                 .collect(),
             search: Endpoint::new(model.address(), None),
         }
@@ -62,14 +76,22 @@ mod tests {
 
     /// An address nothing listens on.
     fn closed() -> Outcome<String> {
-        Ok(std::net::TcpListener::bind("127.0.0.1:0")?.local_addr()?.to_string())
+        Ok(std::net::TcpListener::bind("127.0.0.1:0")?
+            .local_addr()?
+            .to_string())
     }
 
     fn listed_ids(client: &[u8]) -> Outcome<Vec<String>> {
         let text = String::from_utf8_lossy(client);
         let body = text.split("\r\n\r\n").nth(1).unwrap_or_default();
         let list: Value = serde_json::from_str(body)?;
-        Ok(list["data"].as_array().into_iter().flatten().filter_map(|model| model["id"].as_str()).map(ToString::to_string).collect())
+        Ok(list["data"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|model| model["id"].as_str())
+            .map(ToString::to_string)
+            .collect())
     }
 
     #[test]
@@ -78,7 +100,12 @@ mod tests {
         let edge = FakeServer::start(vec![json_response(r#"{"data":[{"id":"qwen"}]}"#)])?;
         let garbled = FakeServer::start(vec![json_response("not json")])?;
         let empty = FakeServer::start(vec![json_response(r#"{"object":"list"}"#)])?;
-        let engines = [edge.address(), closed()?, garbled.address(), empty.address()];
+        let engines = [
+            edge.address(),
+            closed()?,
+            garbled.address(),
+            empty.address(),
+        ];
         let mut client = Vec::new();
         list(&mut client, &upstreams(&llama, &engines))?;
         assert_eq!(listed_ids(&client)?, ["nano", "qwen"]);
@@ -88,7 +115,9 @@ mod tests {
     #[test]
     fn relays_llama_server_as_it_is_without_engines_or_on_an_error() -> Outcome {
         let alone = FakeServer::start(vec![json_response(r#"{"data":[{"id":"nano"}]}"#)])?;
-        let failing = FakeServer::start(vec!["HTTP/1.1 503 Busy\r\nContent-Length: 4\r\n\r\nbusy".to_string()])?;
+        let failing = FakeServer::start(vec![
+            "HTTP/1.1 503 Busy\r\nContent-Length: 4\r\n\r\nbusy".to_string(),
+        ])?;
         let mut relayed = Vec::new();
         let mut refused = Vec::new();
         list(&mut relayed, &upstreams(&alone, &[]))?;

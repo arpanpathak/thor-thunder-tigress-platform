@@ -38,7 +38,8 @@ use crate::{
     book, chat, clever_vs_readable, code, corpus,
     error::DataError,
     example::{Example, SkipReason},
-    readability, report, report::ReportInput,
+    readability, report,
+    report::ReportInput,
     slop_flags,
 };
 
@@ -189,7 +190,12 @@ pub fn build_training_set(inputs: &Inputs, output_dir: &Path) -> Result<Built, D
         slop_flags::separate_flagged(unique_examples, &slop_flags_by_id, &mut skip_reasons);
     let warnings = unmatched_flags
         .iter()
-        .map(|unmatched| format!("warning: flag {} matched no example and was NOT applied: {}", unmatched.id, unmatched.note))
+        .map(|unmatched| {
+            format!(
+                "warning: flag {} matched no example and was NOT applied: {}",
+                unmatched.id, unmatched.note
+            )
+        })
         .collect();
     let preference_file = inputs.datastore.join(CLEVER_VS_READABLE_DPO);
     let preference_pairs = clever_vs_readable::preference_pairs(&read_file(&preference_file)?)?;
@@ -201,18 +207,26 @@ pub fn build_training_set(inputs: &Inputs, output_dir: &Path) -> Result<Built, D
         slop_span_counts: &slop_span_counts,
         unmatched_flags: &unmatched_flags,
     });
-    let training_records: Vec<TrainingRecord> = training_set.iter().map(TrainingRecord::new).collect();
+    let training_records: Vec<TrainingRecord> =
+        training_set.iter().map(TrainingRecord::new).collect();
     fs::create_dir_all(output_dir).map_err(DataError::io(output_dir))?;
     write_jsonl(&output_dir.join("train.jsonl"), &training_records)?;
     write_jsonl(&output_dir.join("slop.jsonl"), &flagged_examples)?;
     write_jsonl(&output_dir.join("preferences.jsonl"), &preference_pairs)?;
     write_file(&output_dir.join("stats.md"), &report)?;
-    Ok(Built { corpus_lines, warnings, report })
+    Ok(Built {
+        corpus_lines,
+        warnings,
+        report,
+    })
 }
 
 /// Reads every source, curated sets first, so the curated copy of a duplicate
 /// is the one kept. Also returns one line per corpus source.
-fn read_all_examples(inputs: &Inputs, skip_reasons: &mut Vec<SkipReason>) -> Result<(Vec<Example>, Vec<String>), DataError> {
+fn read_all_examples(
+    inputs: &Inputs,
+    skip_reasons: &mut Vec<SkipReason>,
+) -> Result<(Vec<Example>, Vec<String>), DataError> {
     let datastore = inputs.datastore.as_path();
     let readability_set = read_file(&datastore.join("readability_training.md"))?;
     let clever_vs_readable_set = read_file(&datastore.join(CLEVER_VS_READABLE_SFT))?;
@@ -220,10 +234,16 @@ fn read_all_examples(inputs: &Inputs, skip_reasons: &mut Vec<SkipReason>) -> Res
     let single_chat = read_file(&datastore.join("chat_0.md"))?;
 
     let mut examples = readability::examples(&readability_set);
-    examples.extend(clever_vs_readable::examples(&clever_vs_readable_set, skip_reasons)?);
+    examples.extend(clever_vs_readable::examples(
+        &clever_vs_readable_set,
+        skip_reasons,
+    )?);
     examples.extend(chat::examples(&chat_export, skip_reasons)?);
     examples.extend(chat::example_from_question_file(&single_chat, "chat_0.md"));
-    examples.extend(book_repository_examples(&inputs.book_repository, skip_reasons)?);
+    examples.extend(book_repository_examples(
+        &inputs.book_repository,
+        skip_reasons,
+    )?);
     let fetched = corpus::examples(&inputs.corpus, &inputs.manifest)?;
     let corpus_lines = fetched.reports.iter().map(corpus_line).collect();
     examples.extend(fetched.examples);
@@ -234,15 +254,28 @@ fn read_all_examples(inputs: &Inputs, skip_reasons: &mut Vec<SkipReason>) -> Res
 fn corpus_line(report: &corpus::SourceReport) -> String {
     let name = &report.name;
     match &report.outcome {
-        corpus::SourceOutcome::Used { examples, before_cap, licence } if examples < before_cap => {
-            format!("  {name:<22} {examples:>6} examples  {}  (capped from {before_cap})", licence.name())
+        corpus::SourceOutcome::Used {
+            examples,
+            before_cap,
+            licence,
+        } if examples < before_cap => {
+            format!(
+                "  {name:<22} {examples:>6} examples  {}  (capped from {before_cap})",
+                licence.name()
+            )
         }
-        corpus::SourceOutcome::Used { examples, licence, .. } => {
+        corpus::SourceOutcome::Used {
+            examples, licence, ..
+        } => {
             format!("  {name:<22} {examples:>6} examples  {}", licence.name())
         }
-        corpus::SourceOutcome::LicenceRefused(licence) => format!("  {name:<22} refused, licence {}", licence.name()),
+        corpus::SourceOutcome::LicenceRefused(licence) => {
+            format!("  {name:<22} refused, licence {}", licence.name())
+        }
         corpus::SourceOutcome::NoMarkdown => format!("  {name:<22} no markdown found"),
-        corpus::SourceOutcome::CodeOnly => format!("  {name:<22} code repository, read by the teacher"),
+        corpus::SourceOutcome::CodeOnly => {
+            format!("  {name:<22} code repository, read by the teacher")
+        }
     }
 }
 
@@ -257,15 +290,24 @@ fn write_file(path: &Path, contents: &str) -> Result<(), DataError> {
 }
 
 /// Turns every chapter and source file under `root` into examples.
-fn book_repository_examples(root: &Path, skip_reasons: &mut Vec<SkipReason>) -> Result<Vec<Example>, DataError> {
+fn book_repository_examples(
+    root: &Path,
+    skip_reasons: &mut Vec<SkipReason>,
+) -> Result<Vec<Example>, DataError> {
     let mut book_files = Vec::new();
     collect_book_files(root, &mut book_files)?;
     book_files.sort();
     let mut examples = Vec::new();
     for (path, kind) in book_files {
-        let origin = path.strip_prefix(root).unwrap_or(&path).display().to_string();
+        let origin = path
+            .strip_prefix(root)
+            .unwrap_or(&path)
+            .display()
+            .to_string();
         match kind {
-            BookFile::Chapter => examples.extend(book::examples(&corpus::clean(&read_file(&path)?), &origin)),
+            BookFile::Chapter => {
+                examples.extend(book::examples(&corpus::clean(&read_file(&path)?), &origin))
+            }
             BookFile::Code => match code::example(&read_file(&path)?, &path, &origin) {
                 Some(example) => examples.push(example),
                 None => skip_reasons.push(SkipReason::NoHeaderComment),
@@ -277,7 +319,10 @@ fn book_repository_examples(root: &Path, skip_reasons: &mut Vec<SkipReason>) -> 
 }
 
 /// Walks `directory` and collects every chapter, notes file and source file with its kind.
-fn collect_book_files(directory: &Path, book_files: &mut Vec<(PathBuf, BookFile)>) -> Result<(), DataError> {
+fn collect_book_files(
+    directory: &Path,
+    book_files: &mut Vec<(PathBuf, BookFile)>,
+) -> Result<(), DataError> {
     for entry in fs::read_dir(directory).map_err(DataError::io(directory))? {
         let path = entry.map_err(DataError::io(directory))?.path();
         match classify(&path) {
@@ -291,11 +336,18 @@ fn collect_book_files(directory: &Path, book_files: &mut Vec<(PathBuf, BookFile)
 
 /// Decides what a path holds from its name, extension and type.
 fn classify(path: &Path) -> CorpusFile {
-    let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
     let is_hidden = name.starts_with('.');
     let is_ignored_directory = IGNORED_DIRECTORIES.contains(&name);
     let is_markdown = path.extension().is_some_and(|extension| extension == "md");
-    match (is_hidden || is_ignored_directory, path.is_dir(), is_markdown) {
+    match (
+        is_hidden || is_ignored_directory,
+        path.is_dir(),
+        is_markdown,
+    ) {
         (true, ..) => CorpusFile::Ignored,
         (false, true, ..) => CorpusFile::Directory,
         (false, false, true) if NOTES_FILES.contains(&name) => CorpusFile::File(BookFile::Notes),
@@ -354,24 +406,50 @@ mod tests {
 
     impl Fixture {
         fn new(name: &str) -> Result<Self, DataError> {
-            let root = std::env::temp_dir().join(format!("thor-hammer-build-{name}-{}", std::process::id()));
+            let root = std::env::temp_dir()
+                .join(format!("thor-hammer-build-{name}-{}", std::process::id()));
             let fixture = Self { root };
-            let long = "A page is a fixed-size block of virtual memory that the kernel maps. ".repeat(4);
-            fixture.write("store/readability_training.md", &format!("# Set\n---\n### Instruction\nWhat is a page?\n### Response\n{long}\n"))?;
-            let sft = format!(r#"{{"messages": [{{"role": "user", "content": "Rewrite this loop."}}, {{"role": "assistant", "content": "{long}"}}], "meta": {{"id": "rs-x"}}}}"#);
-            fixture.write("store/clever_vs_readable/clever_vs_readable_sft.jsonl", &sft)?;
+            let long =
+                "A page is a fixed-size block of virtual memory that the kernel maps. ".repeat(4);
+            fixture.write(
+                "store/readability_training.md",
+                &format!("# Set\n---\n### Instruction\nWhat is a page?\n### Response\n{long}\n"),
+            )?;
+            let sft = format!(
+                r#"{{"messages": [{{"role": "user", "content": "Rewrite this loop."}}, {{"role": "assistant", "content": "{long}"}}], "meta": {{"id": "rs-x"}}}}"#
+            );
+            fixture.write(
+                "store/clever_vs_readable/clever_vs_readable_sft.jsonl",
+                &sft,
+            )?;
             let dpo = r#"{"prompt":[{"role":"user","content":"Q"}],"chosen":[{"role":"assistant","content":"good"}],"rejected":[{"role":"assistant","content":"bad"}],"meta":{"id":"rs-x"}}"#;
             fixture.write("store/clever_vs_readable/clever_vs_readable_dpo.jsonl", dpo)?;
-            let export = format!(r#"[{{"uuid": "c1", "chat_messages": [{{"sender": "human", "content": [{{"type": "text", "text": "What is a futex?"}}]}}, {{"sender": "assistant", "content": [{{"type": "text", "text": "A fast userspace mutex. {long}"}}]}}]}}]"#);
+            let export = format!(
+                r#"[{{"uuid": "c1", "chat_messages": [{{"sender": "human", "content": [{{"type": "text", "text": "What is a futex?"}}]}}, {{"sender": "assistant", "content": [{{"type": "text", "text": "A fast userspace mutex. {long}"}}]}}]}}]"#
+            );
             fixture.write("store/work/extracted/conversations.json", &export)?;
-            fixture.write("store/chat_0.md", &format!("#Question\nWhat is a TLB?\n#Answer\nA cache of page translations. {long}\n"))?;
-            fixture.write("books/book/ch01.md", &format!("# Memory\n\n## Pages\n\n{long}\n"))?;
+            fixture.write(
+                "store/chat_0.md",
+                &format!(
+                    "#Question\nWhat is a TLB?\n#Answer\nA cache of page translations. {long}\n"
+                ),
+            )?;
+            fixture.write(
+                "books/book/ch01.md",
+                &format!("# Memory\n\n## Pages\n\n{long}\n"),
+            )?;
             fixture.write("books/book/WORKLOG.md", "notes")?;
-            fixture.write("books/lab/topk.rs", &format!("//! Top K frequent elements, using a heap. {long}\nfn main() {{}}\n"))?;
+            fixture.write(
+                "books/lab/topk.rs",
+                &format!("//! Top K frequent elements, using a heap. {long}\nfn main() {{}}\n"),
+            )?;
             fixture.write("books/lab/bare.rs", "fn main() {}\n")?;
             fixture.write("books/target/skip.md", "build output")?;
             fixture.write("books/.git/HEAD.md", "hidden")?;
-            fixture.write("corpus/eng-practices/review/index.md", &format!("# Review\n\n## Design\n\n{long}\n"))?;
+            fixture.write(
+                "corpus/eng-practices/review/index.md",
+                &format!("# Review\n\n## Design\n\n{long}\n"),
+            )?;
             fixture.write("corpus/closed/review/a.md", "# Closed\n")?;
             fixture.write("corpus/empty/README.txt", "nothing")?;
             let manifest = "source\tkind\tcommit\tlicence_file\tlicence\neng-practices\tdocs\tabc\tLICENSE\tAttribution 4.0 International\nclosed\tdocs\tabc\tLICENSE\tAll rights reserved\nempty\tdocs\tabc\tLICENSE\tMIT License\nlib\tcode\tabc\tLICENSE\tMIT License\n";
@@ -415,13 +493,33 @@ mod tests {
         let sources: Vec<String> = train
             .lines()
             .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-            .filter_map(|record| record.get("source").and_then(serde_json::Value::as_str).map(String::from))
+            .filter_map(|record| {
+                record
+                    .get("source")
+                    .and_then(serde_json::Value::as_str)
+                    .map(String::from)
+            })
             .collect();
-        assert_eq!(sources, ["readability", "clever_vs_readable", "chat", "chat", "book", "code", "corpus"]);
+        assert_eq!(
+            sources,
+            [
+                "readability",
+                "clever_vs_readable",
+                "chat",
+                "chat",
+                "book",
+                "code",
+                "corpus"
+            ]
+        );
         assert_eq!(fixture.read("out/preferences.jsonl")?.lines().count(), 1);
         assert_eq!(fixture.read("out/slop.jsonl")?, "");
         assert!(built.report.contains("1 markdown files of notes"));
-        assert!(built.report.contains("1 code files without a header comment"));
+        assert!(
+            built
+                .report
+                .contains("1 code files without a header comment")
+        );
         assert_eq!(
             built.corpus_lines,
             [
@@ -444,15 +542,26 @@ mod tests {
             .lines()
             .next()
             .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-            .and_then(|record| record.get("id").and_then(serde_json::Value::as_str).map(String::from))
+            .and_then(|record| {
+                record
+                    .get("id")
+                    .and_then(serde_json::Value::as_str)
+                    .map(String::from)
+            })
             .unwrap_or_default();
         fixture.write("flags.jsonl", &format!("{{\"id\":\"{id}\",\"note\":\"opens with filler\",\"spans\":[]}}\n{{\"id\":\"gone\",\"note\":\"old\",\"spans\":[]}}\n{{\"id\":\"also-gone\",\"note\":\"older\",\"spans\":[]}}\n"))?;
         let second = build_training_set(&fixture.inputs(), &fixture.root.join("out"))?;
-        assert_eq!(fixture.read("out/train.jsonl")?.lines().count(), train.lines().count() - 1);
+        assert_eq!(
+            fixture.read("out/train.jsonl")?.lines().count(),
+            train.lines().count() - 1
+        );
         assert_eq!(fixture.read("out/slop.jsonl")?.lines().count(), 1);
         assert_eq!(
             second.warnings,
-            ["warning: flag also-gone matched no example and was NOT applied: older", "warning: flag gone matched no example and was NOT applied: old"]
+            [
+                "warning: flag also-gone matched no example and was NOT applied: older",
+                "warning: flag gone matched no example and was NOT applied: old"
+            ]
         );
         assert_ne!(first.report, second.report);
         Ok(())
@@ -461,8 +570,11 @@ mod tests {
     #[test]
     fn a_missing_input_is_an_error_naming_the_file() -> Result<(), DataError> {
         let fixture = Fixture::new("missing")?;
-        fs::remove_file(fixture.root.join("store/chat_0.md")).map_err(DataError::io(&fixture.root))?;
-        let error = build_training_set(&fixture.inputs(), &fixture.root.join("out")).err().map(|error| error.to_string());
+        fs::remove_file(fixture.root.join("store/chat_0.md"))
+            .map_err(DataError::io(&fixture.root))?;
+        let error = build_training_set(&fixture.inputs(), &fixture.root.join("out"))
+            .err()
+            .map(|error| error.to_string());
         assert!(error.is_some_and(|message| message.contains("chat_0.md")));
         Ok(())
     }
@@ -471,9 +583,16 @@ mod tests {
     fn a_capped_source_says_so() {
         let report = corpus::SourceReport {
             name: "kubernetes-website".to_string(),
-            outcome: corpus::SourceOutcome::Used { examples: 10, before_cap: 40, licence: corpus::Licence::CreativeCommons },
+            outcome: corpus::SourceOutcome::Used {
+                examples: 10,
+                before_cap: 40,
+                licence: corpus::Licence::CreativeCommons,
+            },
         };
-        assert_eq!(corpus_line(&report), "  kubernetes-website         10 examples  CC-BY  (capped from 40)");
+        assert_eq!(
+            corpus_line(&report),
+            "  kubernetes-website         10 examples  CC-BY  (capped from 40)"
+        );
     }
 
     #[test]
@@ -508,9 +627,18 @@ mod tests {
 
     #[test]
     fn classifies_notes_and_chapters() {
-        assert!(matches!(classify(Path::new("book/WORKLOG.md")), CorpusFile::File(BookFile::Notes)));
-        assert!(matches!(classify(Path::new("book/ch01.md")), CorpusFile::File(BookFile::Chapter)));
-        assert!(matches!(classify(Path::new("lab/topk.rs")), CorpusFile::File(BookFile::Code)));
+        assert!(matches!(
+            classify(Path::new("book/WORKLOG.md")),
+            CorpusFile::File(BookFile::Notes)
+        ));
+        assert!(matches!(
+            classify(Path::new("book/ch01.md")),
+            CorpusFile::File(BookFile::Chapter)
+        ));
+        assert!(matches!(
+            classify(Path::new("lab/topk.rs")),
+            CorpusFile::File(BookFile::Code)
+        ));
         assert!(matches!(
             classify(Path::new("lab/notes.txt")),
             CorpusFile::Ignored

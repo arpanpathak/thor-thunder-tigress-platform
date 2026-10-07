@@ -262,7 +262,10 @@ pub fn prose_only(text: &str) -> String {
     for regex in patterns.into_iter().flatten() {
         let blank_text = String::from_utf8_lossy(&bytes).into_owned();
         for found in regex.find_iter(&blank_text) {
-            for byte in bytes[found.range()].iter_mut().filter(|byte| **byte != b'\n') {
+            for byte in bytes[found.range()]
+                .iter_mut()
+                .filter(|byte| **byte != b'\n')
+            {
                 *byte = b' ';
             }
         }
@@ -338,24 +341,40 @@ mod tests {
 
     #[test]
     fn finds_one_phrase_from_each_listed_category() {
-        assert_eq!(categories("Great question! Let's delve into it."), vec![
-            Category::FlatteryFillerOpener,
-            Category::EmptyDepthWords
-        ]);
-        assert_eq!(categories("Here’s the thing: it works."), vec![Category::DramaticSetup]);
-        assert_eq!(categories("In summary, use iterators."), vec![Category::WrapUpRepeat]);
+        assert_eq!(
+            categories("Great question! Let's delve into it."),
+            vec![Category::FlatteryFillerOpener, Category::EmptyDepthWords]
+        );
+        assert_eq!(
+            categories("Here’s the thing: it works."),
+            vec![Category::DramaticSetup]
+        );
+        assert_eq!(
+            categories("In summary, use iterators."),
+            vec![Category::WrapUpRepeat]
+        );
     }
 
     #[test]
     fn finds_rhythm_tricks() {
-        assert_eq!(categories("Simple. Powerful. Effective."), vec![Category::RhythmTrick]);
-        assert_eq!(categories("Not because it is fast. Because it is clear."), vec![Category::RhythmTrick]);
-        assert_eq!(categories("It's not just a parser, it's a mindset."), vec![Category::RhythmTrick]);
+        assert_eq!(
+            categories("Simple. Powerful. Effective."),
+            vec![Category::RhythmTrick]
+        );
+        assert_eq!(
+            categories("Not because it is fast. Because it is clear."),
+            vec![Category::RhythmTrick]
+        );
+        assert_eq!(
+            categories("It's not just a parser, it's a mindset."),
+            vec![Category::RhythmTrick]
+        );
     }
 
     #[test]
     fn ignores_phrases_inside_code() {
-        let text = "Run this:\n```rust\n// great question\nlet x = 1;\n```\nand `delve into` is a name.";
+        let text =
+            "Run this:\n```rust\n// great question\nlet x = 1;\n```\nand `delve into` is a name.";
         assert_eq!(check(text).hits, []);
     }
 

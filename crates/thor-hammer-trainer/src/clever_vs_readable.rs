@@ -85,10 +85,7 @@ pub fn examples(
     skip_reasons: &mut Vec<SkipReason>,
 ) -> Result<Vec<Example>, DataError> {
     let mut examples = Vec::new();
-    for line in sft_jsonl
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-    {
+    for line in sft_jsonl.lines().filter(|line| !line.trim().is_empty()) {
         let record: SftRecord = serde_json::from_str(line)?;
         let origin = format!(
             "clever_vs_readable_sft.jsonl#{}/{}",
@@ -114,10 +111,7 @@ pub fn examples(
 /// Every DPO record, parsed to check its shape.
 pub fn preference_pairs(dpo_jsonl: &str) -> Result<Vec<PreferencePair>, DataError> {
     let mut pairs = Vec::new();
-    for line in dpo_jsonl
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-    {
+    for line in dpo_jsonl.lines().filter(|line| !line.trim().is_empty()) {
         pairs.push(serde_json::from_str(line)?);
     }
     Ok(pairs)

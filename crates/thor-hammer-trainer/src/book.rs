@@ -85,13 +85,14 @@ pub fn examples(chapter_markdown: &str, origin: &str) -> Vec<Example> {
             true => sections(&section.body, &SUBSECTION_MARKERS, &section.heading),
             false => vec![section],
         };
-        for training_section in training_sections
-            .into_iter()
-            .filter(Section::has_text)
-        {
+        for training_section in training_sections.into_iter().filter(Section::has_text) {
             examples.push(Example {
                 instruction: String::new(),
-                response: passage(&chapter, &training_section.heading, training_section.body.trim()),
+                response: passage(
+                    &chapter,
+                    &training_section.heading,
+                    training_section.body.trim(),
+                ),
                 source: Source::Book,
                 origin: origin.to_string(),
             });
@@ -172,10 +173,7 @@ fn passage(chapter: &str, heading: &str, body: &str) -> String {
 fn strip_numbering(heading: &str) -> String {
     let is_numbering =
         |character: char| character.is_ascii_digit() || character == '.' || character == ':';
-    heading
-        .trim_start_matches(is_numbering)
-        .trim()
-        .to_string()
+    heading.trim_start_matches(is_numbering).trim().to_string()
 }
 
 #[cfg(test)]
@@ -184,7 +182,10 @@ mod tests {
 
     #[test]
     fn a_chapter_without_a_heading_is_named_after_its_file() {
-        assert_eq!(chapter_title("Only text, no heading.", "src/ch20-memory_and-context.md"), "ch20 memory and context");
+        assert_eq!(
+            chapter_title("Only text, no heading.", "src/ch20-memory_and-context.md"),
+            "ch20 memory and context"
+        );
         assert_eq!(file_stem(""), "");
     }
 
@@ -193,7 +194,14 @@ mod tests {
     fn first_lines(examples: &[Example]) -> Vec<String> {
         examples
             .iter()
-            .map(|example| example.response.lines().take(3).collect::<Vec<&str>>().join("|"))
+            .map(|example| {
+                example
+                    .response
+                    .lines()
+                    .take(3)
+                    .collect::<Vec<&str>>()
+                    .join("|")
+            })
             .collect()
     }
 
@@ -206,18 +214,24 @@ mod tests {
             "# An LRU cache||## Summary",
         ];
         assert_eq!(first_lines(&examples), expected);
-        assert!(examples.iter().all(|example| example.instruction.is_empty()));
         assert!(
-            examples[1]
-                .response
-                .contains("# not a heading")
+            examples
+                .iter()
+                .all(|example| example.instruction.is_empty())
         );
+        assert!(examples[1].response.contains("# not a heading"));
     }
 
     #[test]
     fn a_chapter_that_starts_at_level_two_takes_its_title_from_there() {
-        let examples = examples("## Appendix A: Keywords\n\nReserved words.\n", "src/appendix-01-keywords.md");
-        assert_eq!(first_lines(&examples), ["# Appendix A: Keywords||Reserved words."]);
+        let examples = examples(
+            "## Appendix A: Keywords\n\nReserved words.\n",
+            "src/appendix-01-keywords.md",
+        );
+        assert_eq!(
+            first_lines(&examples),
+            ["# Appendix A: Keywords||Reserved words."]
+        );
     }
 
     #[test]
@@ -227,7 +241,11 @@ mod tests {
             "# Big\n\n## Long\n\nIntro.\n\n### First half\n\n{paragraph}\n\n### Second half\n\n{paragraph}\n"
         );
         let examples = examples(&chapter, "big.md");
-        let expected = ["# Big||## Long", "# Big||## First half", "# Big||## Second half"];
+        let expected = [
+            "# Big||## Long",
+            "# Big||## First half",
+            "# Big||## Second half",
+        ];
         assert_eq!(first_lines(&examples), expected);
     }
 }

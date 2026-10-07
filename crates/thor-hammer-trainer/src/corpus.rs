@@ -86,7 +86,6 @@ const SKIPPED_TREES: [&str; 12] = [
     "kubernetes-website/content/en/docs/reference/config-api",
 ];
 
-
 /// How deep to look for a `book.toml` below a source root.
 const MAX_BOOK_DEPTH: usize = 4;
 
@@ -99,7 +98,13 @@ const NAVIGATION_FILES: [&str; 2] = ["SUMMARY.md", "README.md"];
 
 /// Creative Commons terms that rule a licence out: no commercial use, no
 /// derived works, or derived works under the same licence.
-const RESTRICTING_TERMS: [&str; 5] = ["NonCommercial", "NoDerivatives", "NoDerivs", "ShareAlike", "Non-Commercial"];
+const RESTRICTING_TERMS: [&str; 5] = [
+    "NonCommercial",
+    "NoDerivatives",
+    "NoDerivs",
+    "ShareAlike",
+    "Non-Commercial",
+];
 
 /// The licence of one fetched source, decided from the text of its licence file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -133,10 +138,13 @@ impl Licence {
         let creative_commons = text.contains("Creative Commons")
             || text.contains("Attribution")
             || text.contains("CC0 1.0 Universal");
-        let restricted = creative_commons && RESTRICTING_TERMS.iter().any(|term| text.contains(term));
+        let restricted =
+            creative_commons && RESTRICTING_TERMS.iter().any(|term| text.contains(term));
         match text {
             _ if text.contains("Mozilla Public License") => Licence::MozillaPublic,
-            _ if text.contains("PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2") => Licence::PythonSoftwareFoundation,
+            _ if text.contains("PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2") => {
+                Licence::PythonSoftwareFoundation
+            }
             _ if restricted => Licence::CreativeCommonsRestricted,
             _ if text.contains("Apache License") => Licence::Apache,
             _ if text.contains("Permission is hereby granted") || text.contains("MIT License") => {
@@ -266,7 +274,10 @@ pub fn examples(root: &Path, manifest_path: &Path) -> Result<Corpus, DataError> 
     for row in read_manifest(manifest_path)? {
         let source_dir = root.join(&row.name);
         if row.licence.permits_reuse() && row.kind == CODE_KIND {
-            reports.push(SourceReport { name: row.name, outcome: SourceOutcome::CodeOnly });
+            reports.push(SourceReport {
+                name: row.name,
+                outcome: SourceOutcome::CodeOnly,
+            });
             continue;
         }
         if !row.licence.permits_reuse() {
@@ -294,7 +305,11 @@ pub fn examples(root: &Path, manifest_path: &Path) -> Result<Corpus, DataError> 
                 continue;
             }
             let text = clean(&fs::read_to_string(&file).map_err(DataError::io(&file))?);
-            produced.extend(book::examples(&text, &origin).into_iter().map(as_corpus_example));
+            produced.extend(
+                book::examples(&text, &origin)
+                    .into_iter()
+                    .map(as_corpus_example),
+            );
         }
         let before_cap = produced.len();
         let kept = cap_tokens(produced, MAX_SOURCE_TOKENS);
@@ -416,7 +431,11 @@ fn book_source_in(book_toml: &str) -> String {
 }
 
 /// Collects every `.md` file under `root`, skipping hidden directories.
-fn collect_markdown(root: &Path, keep_readme: bool, files: &mut Vec<PathBuf>) -> Result<(), DataError> {
+fn collect_markdown(
+    root: &Path,
+    keep_readme: bool,
+    files: &mut Vec<PathBuf>,
+) -> Result<(), DataError> {
     if !root.is_dir() {
         return Ok(());
     }
@@ -441,7 +460,8 @@ fn collect_markdown(root: &Path, keep_readme: bool, files: &mut Vec<PathBuf>) ->
                     let is_markdown = path
                         .extension()
                         .is_some_and(|extension| extension == "md" || extension == "markdown");
-                    let is_navigation = NAVIGATION_FILES.contains(&name) && !(keep_readme && name == "README.md");
+                    let is_navigation =
+                        NAVIGATION_FILES.contains(&name) && !(keep_readme && name == "README.md");
                     if is_markdown && !is_navigation {
                         files.push(path);
                     }
@@ -504,8 +524,16 @@ static BLOCK_START: LazyLock<Option<Regex>> =
 /// a line that continues the paragraph or list item above it. Lines inside
 /// code blocks are kept exactly, so `grid[i][j]` is never read as a link.
 fn tidy_prose(text: &str) -> String {
-    let patterns = LINK_DEFINITION.as_ref().zip(REFERENCE_LINK.as_ref()).zip(BLOCK_START.as_ref());
-    patterns.map_or(text.to_string(), |((definition, reference), block_start)| tidy_with(text, definition, reference, block_start))
+    let patterns = LINK_DEFINITION
+        .as_ref()
+        .zip(REFERENCE_LINK.as_ref())
+        .zip(BLOCK_START.as_ref());
+    patterns.map_or(
+        text.to_string(),
+        |((definition, reference), block_start)| {
+            tidy_with(text, definition, reference, block_start)
+        },
+    )
 }
 
 /// [`tidy_prose`] with its patterns compiled.
@@ -551,9 +579,44 @@ fn tidy_with(text: &str, definition: &Regex, reference: &Regex, block_start: &Re
 /// and `<T>` are angle brackets too, and a rule that stripped every `<...>` would
 /// quietly delete Rust generics out of the training data.
 const HTML_ELEMENTS: [&str; 38] = [
-    "a", "b", "blockquote", "br", "caption", "code", "dd", "div", "dl", "dt", "em", "figcaption",
-    "figure", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "iframe", "img", "li", "ol", "p",
-    "pre", "source", "span", "strong", "sub", "sup", "table", "tbody", "td", "th", "thead", "tr",
+    "a",
+    "b",
+    "blockquote",
+    "br",
+    "caption",
+    "code",
+    "dd",
+    "div",
+    "dl",
+    "dt",
+    "em",
+    "figcaption",
+    "figure",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
+    "i",
+    "iframe",
+    "img",
+    "li",
+    "ol",
+    "p",
+    "pre",
+    "source",
+    "span",
+    "strong",
+    "sub",
+    "sup",
+    "table",
+    "tbody",
+    "td",
+    "th",
+    "thead",
+    "tr",
 ];
 
 /// Removes HTML tags but keeps the text between them, then decodes the entities
@@ -593,7 +656,10 @@ fn strip_html(line: &str) -> String {
 
 /// True when `tag` names a known HTML element, ignoring any attributes.
 fn is_html_tag(tag: &str) -> bool {
-    let body = tag.strip_prefix("</").or_else(|| tag.strip_prefix('<')).unwrap_or(tag);
+    let body = tag
+        .strip_prefix("</")
+        .or_else(|| tag.strip_prefix('<'))
+        .unwrap_or(tag);
     let name: String = body
         .chars()
         .take_while(|character| character.is_ascii_alphanumeric())
@@ -669,7 +735,12 @@ fn strip_shortcodes(line: &str) -> String {
             .find("}}")
             .map(|offset| start + offset + 2)
             .unwrap_or(rest.len());
-        kept.push_str(&rest[start..closing].chars().map(|_| ' ').collect::<String>());
+        kept.push_str(
+            &rest[start..closing]
+                .chars()
+                .map(|_| ' ')
+                .collect::<String>(),
+        );
         rest = &rest[closing..];
     }
     kept.push_str(rest);
@@ -682,20 +753,30 @@ mod tests {
 
     #[test]
     fn removes_heading_anchors() {
-        assert_eq!(clean("# Processes and the Kernel {#processes}\n\nText.\n"), "# Processes and the Kernel\n\nText.");
+        assert_eq!(
+            clean("# Processes and the Kernel {#processes}\n\nText.\n"),
+            "# Processes and the Kernel\n\nText."
+        );
     }
 
     #[test]
     fn a_page_without_a_heading_takes_its_front_matter_title() {
-        let cleaned = clean("---\ntitle: \"Pod Lifecycle\"\nweight: 30\n---\nPods follow a lifecycle.\n");
-        assert!(cleaned.starts_with("# Pod Lifecycle\n\nPods follow"), "{cleaned}");
+        let cleaned =
+            clean("---\ntitle: \"Pod Lifecycle\"\nweight: 30\n---\nPods follow a lifecycle.\n");
+        assert!(
+            cleaned.starts_with("# Pod Lifecycle\n\nPods follow"),
+            "{cleaned}"
+        );
     }
 
     #[test]
     fn tidies_book_prose_but_leaves_code_alone() {
         let markdown = "Use raw identifiers, as in the [\u{201c}Raw\nIdentifiers\u{201d}][raw]<!-- ignore --> section.\n\n[raw]: #raw\n\n- `as`: casting, or rename\n  items in `use`.\n\n```rust\nlet x = grid[i][j]; // [a]: b\n```\n";
         let cleaned = clean(markdown);
-        assert!(cleaned.contains("as in the \u{201c}Raw Identifiers\u{201d} section."), "{cleaned}");
+        assert!(
+            cleaned.contains("as in the \u{201c}Raw Identifiers\u{201d} section."),
+            "{cleaned}"
+        );
         assert!(!cleaned.contains("[raw]: #raw"));
         assert!(!cleaned.contains("ignore"));
         assert!(cleaned.contains("- `as`: casting, or rename items in `use`."));
@@ -710,7 +791,10 @@ mod tests {
             source: Source::Corpus,
             origin: String::new(),
         };
-        let all: Vec<Example> = ["a", "b", "c", "d"].iter().map(|text| section(text)).collect();
+        let all: Vec<Example> = ["a", "b", "c", "d"]
+            .iter()
+            .map(|text| section(text))
+            .collect();
         let kept = cap_tokens(all.clone(), 20);
         assert_eq!(kept.len(), 2);
         let positions: Vec<usize> = kept
@@ -732,7 +816,9 @@ mod tests {
             Licence::Mit
         );
         assert_eq!(
-            Licence::classify("Copyright 2009 The Go Authors. Redistribution and use in source and binary forms"),
+            Licence::classify(
+                "Copyright 2009 The Go Authors. Redistribution and use in source and binary forms"
+            ),
             Licence::Bsd
         );
         assert_eq!(
@@ -744,7 +830,9 @@ mod tests {
             Licence::MozillaPublic
         );
         assert_eq!(
-            Licence::classify("A. HISTORY OF THE SOFTWARE PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2"),
+            Licence::classify(
+                "A. HISTORY OF THE SOFTWARE PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2"
+            ),
             Licence::PythonSoftwareFoundation
         );
         assert!(Licence::PythonSoftwareFoundation.permits_reuse());
@@ -763,11 +851,15 @@ mod tests {
             Licence::CreativeCommons
         );
         assert_eq!(
-            Licence::classify("CC0 1.0 Universal Statement of Purpose The laws of most jurisdictions"),
+            Licence::classify(
+                "CC0 1.0 Universal Statement of Purpose The laws of most jurisdictions"
+            ),
             Licence::CreativeCommons
         );
         assert_eq!(
-            Licence::classify("MIT License Permission is hereby granted || Attribution-NonCommercial 4.0 International"),
+            Licence::classify(
+                "MIT License Permission is hereby granted || Attribution-NonCommercial 4.0 International"
+            ),
             Licence::CreativeCommonsRestricted
         );
     }
@@ -787,7 +879,10 @@ mod tests {
 
     impl Tree {
         fn new(name: &str) -> Self {
-            Self { root: std::env::temp_dir().join(format!("thor-hammer-corpus-{name}-{}", std::process::id())) }
+            Self {
+                root: std::env::temp_dir()
+                    .join(format!("thor-hammer-corpus-{name}-{}", std::process::id())),
+            }
         }
 
         fn write(&self, path: &str, text: &str) -> Result<(), DataError> {
@@ -807,7 +902,8 @@ mod tests {
     #[test]
     fn walks_books_plain_sources_and_skips_what_it_should() -> Result<(), DataError> {
         let tree = Tree::new("walk");
-        let section = "# Title\n\n## Part\n\nEnough words to make a section that is kept as an example.\n";
+        let section =
+            "# Title\n\n## Part\n\nEnough words to make a section that is kept as an example.\n";
         tree.write("corpus/mybook/guide/book.toml", "[book]\nsrc = \"text\"\n")?;
         tree.write("corpus/mybook/guide/text/ch01.md", section)?;
         tree.write("corpus/mybook/guide/text/SUMMARY.md", section)?;
@@ -820,14 +916,37 @@ mod tests {
         let manifest = "source\tkind\tcommit\tlicence_file\tlicence\nmybook\tbook\tabc\tLICENSE\tMIT License\naosa-500lines\tbook\tabc\tLICENSE\tMIT License\neng-practices\tdocs\tabc\tLICENSE\tMIT License\nnot-fetched\tbook\tabc\tLICENSE\tMIT License\nbroken line\n";
         tree.write("manifest.tsv", manifest)?;
         let corpus = examples(&tree.root.join("corpus"), &tree.root.join("manifest.tsv"))?;
-        let origins: Vec<&str> = corpus.examples.iter().map(|example| example.origin.as_str()).collect();
-        assert_eq!(origins, ["mybook/guide/text/ch01.md", "aosa-500lines/ok/chapter.markdown"]);
+        let origins: Vec<&str> = corpus
+            .examples
+            .iter()
+            .map(|example| example.origin.as_str())
+            .collect();
+        assert_eq!(
+            origins,
+            [
+                "mybook/guide/text/ch01.md",
+                "aosa-500lines/ok/chapter.markdown"
+            ]
+        );
         let outcomes: Vec<(&str, bool)> = corpus
             .reports
             .iter()
-            .map(|report| (report.name.as_str(), matches!(report.outcome, SourceOutcome::NoMarkdown)))
+            .map(|report| {
+                (
+                    report.name.as_str(),
+                    matches!(report.outcome, SourceOutcome::NoMarkdown),
+                )
+            })
             .collect();
-        assert_eq!(outcomes, [("mybook", false), ("aosa-500lines", false), ("eng-practices", true), ("not-fetched", true)]);
+        assert_eq!(
+            outcomes,
+            [
+                ("mybook", false),
+                ("aosa-500lines", false),
+                ("eng-practices", true),
+                ("not-fetched", true)
+            ]
+        );
         Ok(())
     }
 
@@ -847,19 +966,38 @@ mod tests {
         .into_iter()
         .map(Licence::name)
         .collect();
-        assert_eq!(names, ["MIT", "Apache-2.0", "BSD", "CC-BY", "CC with NC/ND/SA terms", "MPL-2.0", "PSF-2.0", "unrecognised", "missing"]);
+        assert_eq!(
+            names,
+            [
+                "MIT",
+                "Apache-2.0",
+                "BSD",
+                "CC-BY",
+                "CC with NC/ND/SA terms",
+                "MPL-2.0",
+                "PSF-2.0",
+                "unrecognised",
+                "missing"
+            ]
+        );
     }
 
     #[test]
     fn keeps_an_unclosed_tag_and_an_unclosed_front_matter() {
         assert_eq!(strip_html("a < b"), "a < b");
-        assert_eq!(strip_front_matter("---\ntitle: x\nno end"), "---\ntitle: x\nno end");
+        assert_eq!(
+            strip_front_matter("---\ntitle: x\nno end"),
+            "---\ntitle: x\nno end"
+        );
     }
 
     #[test]
     fn reads_the_source_directory_from_book_toml() {
         assert_eq!(book_source_in("[book]\nsrc = \"src\"\n"), "src");
-        assert_eq!(book_source_in("[book]\ntitle = \"x\"\n"), DEFAULT_BOOK_SOURCE);
+        assert_eq!(
+            book_source_in("[book]\ntitle = \"x\"\n"),
+            DEFAULT_BOOK_SOURCE
+        );
         assert_eq!(book_source_in("[book]\nsrc = 'book-src'\n"), "book-src");
     }
 
@@ -889,7 +1027,10 @@ mod tests {
 
     #[test]
     fn keeps_rust_generics() {
-        assert_eq!(strip_html("a Vec<i32> and a HashMap<K, V>"), "a Vec<i32> and a HashMap<K, V>");
+        assert_eq!(
+            strip_html("a Vec<i32> and a HashMap<K, V>"),
+            "a Vec<i32> and a HashMap<K, V>"
+        );
         assert_eq!(strip_html("`Result<T, E>`"), "`Result<T, E>`");
     }
 

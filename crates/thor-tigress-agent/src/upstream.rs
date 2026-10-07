@@ -44,7 +44,10 @@ impl Endpoint {
     /// An endpoint at `address` (`host:port`), sending `authorization` when given.
     #[must_use]
     pub fn new(address: String, authorization: Option<String>) -> Self {
-        Endpoint { address, authorization }
+        Endpoint {
+            address,
+            authorization,
+        }
     }
 
     /// The `host:port` it is reached at.
@@ -137,7 +140,11 @@ impl UpstreamResponse {
 fn read_response(mut reader: Box<dyn BufRead + Send>, address: &str) -> Outcome<UpstreamResponse> {
     let mut status_line = String::new();
     reader.read_line(&mut status_line)?;
-    let Some(status) = status_line.split_whitespace().nth(1).and_then(|code| code.parse().ok()) else {
+    let Some(status) = status_line
+        .split_whitespace()
+        .nth(1)
+        .and_then(|code| code.parse().ok())
+    else {
         return Err(AgentError::Upstream(format!("{address}: no status line")));
     };
     let mut chunked = false;
@@ -159,7 +166,11 @@ fn read_response(mut reader: Box<dyn BufRead + Send>, address: &str) -> Outcome<
     } else {
         Box::new(reader)
     };
-    Ok(UpstreamResponse { status, content_type, body })
+    Ok(UpstreamResponse {
+        status,
+        content_type,
+        body,
+    })
 }
 
 /// Removes HTTP chunked transfer encoding from a body as it is read.
@@ -171,7 +182,11 @@ struct Dechunk {
 
 impl Dechunk {
     fn new(inner: Box<dyn BufRead + Send>) -> Self {
-        Dechunk { inner, remaining: 0, done: false }
+        Dechunk {
+            inner,
+            remaining: 0,
+            done: false,
+        }
     }
 
     /// Reads the next chunk's size line; `false` once the body is over.
@@ -182,7 +197,8 @@ impl Dechunk {
         let mut line = String::new();
         let size = match self.inner.read_line(&mut line)? {
             0 => 0,
-            _ => chunk_size(&line).ok_or_else(|| AgentError::Upstream("bad chunk size".to_string()))?,
+            _ => chunk_size(&line)
+                .ok_or_else(|| AgentError::Upstream("bad chunk size".to_string()))?,
         };
         self.remaining = size;
         self.done = size == 0;
@@ -217,19 +233,36 @@ mod tests {
 
     #[test]
     fn dechunks_in_small_reads_and_stays_ended() -> Outcome {
-        let mut body = Dechunk::new(Box::new(std::io::Cursor::new("3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n")));
+        let mut body = Dechunk::new(Box::new(std::io::Cursor::new(
+            "3\r\nabc\r\n2\r\nde\r\n0\r\n\r\n",
+        )));
         let mut buffer = [0_u8; 3];
-        let sizes = [body.read(&mut buffer)?, body.read(&mut buffer)?, body.read(&mut buffer)?, body.read(&mut buffer)?];
+        let sizes = [
+            body.read(&mut buffer)?,
+            body.read(&mut buffer)?,
+            body.read(&mut buffer)?,
+            body.read(&mut buffer)?,
+        ];
         assert_eq!(sizes, [3, 2, 0, 0]);
         let mut partial = Dechunk::new(Box::new(std::io::Cursor::new("5\r\nhello\r\n0\r\n\r\n")));
         let mut small = [0_u8; 2];
-        assert_eq!([partial.read(&mut small)?, partial.read(&mut small)?, partial.read(&mut small)?], [2, 2, 1]);
+        assert_eq!(
+            [
+                partial.read(&mut small)?,
+                partial.read(&mut small)?,
+                partial.read(&mut small)?
+            ],
+            [2, 2, 1]
+        );
         Ok(())
     }
 
     #[test]
     fn a_gone_client_stops_the_relay() -> Outcome {
-        let server = crate::testing::FakeServer::start(vec!["HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok".to_string()])?;
+        let server = crate::testing::FakeServer::start(vec![
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok"
+                .to_string(),
+        ])?;
         let response = Endpoint::new(server.address(), None).get("/")?;
         assert!(response.relay(&mut crate::testing::Gone).is_err());
         Ok(())
@@ -243,7 +276,9 @@ mod tests {
 
     #[test]
     fn removes_chunked_encoding() -> Outcome {
-        let response = parsed("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6;x=1\r\n world\r\n0\r\n\r\n")?;
+        let response = parsed(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6;x=1\r\n world\r\n0\r\n\r\n",
+        )?;
         assert_eq!(response.text()?, "hello world");
         Ok(())
     }
@@ -252,20 +287,29 @@ mod tests {
     fn reads_status_and_content_type() -> Outcome {
         let response = parsed("HTTP/1.1 404 Not Found\r\nContent-Type: Text/Plain\r\n\r\nnope")?;
         assert!(!response.is_ok());
-        assert_eq!((response.status, response.content_type.as_str()), (404, "text/plain"));
+        assert_eq!(
+            (response.status, response.content_type.as_str()),
+            (404, "text/plain")
+        );
         assert_eq!(response.text()?, "nope");
         Ok(())
     }
 
     #[test]
     fn content_type_defaults_to_json() -> Outcome {
-        assert_eq!(parsed("HTTP/1.1 200 OK\r\n\r\n{}")?.content_type, "application/json");
+        assert_eq!(
+            parsed("HTTP/1.1 200 OK\r\n\r\n{}")?.content_type,
+            "application/json"
+        );
         Ok(())
     }
 
     #[test]
     fn a_missing_status_line_is_an_upstream_error() {
-        assert!(parsed("garbage").is_err_and(|error| error.to_string() == "upstream: test: no status line"));
+        assert!(
+            parsed("garbage")
+                .is_err_and(|error| error.to_string() == "upstream: test: no status line")
+        );
     }
 
     #[test]
@@ -285,7 +329,8 @@ mod tests {
     #[test]
     fn relay_copies_status_type_and_body() -> Outcome {
         let mut client = Vec::new();
-        parsed("HTTP/1.1 201 Created\r\nContent-Type: text/event-stream\r\n\r\ndata: x\n\n")?.relay(&mut client)?;
+        parsed("HTTP/1.1 201 Created\r\nContent-Type: text/event-stream\r\n\r\ndata: x\n\n")?
+            .relay(&mut client)?;
         let text = String::from_utf8_lossy(&client);
         assert!(text.starts_with("HTTP/1.1 201 Upstream\r\nAccess-Control-Allow-Origin: *\r\nContent-Type: text/event-stream"));
         assert!(text.ends_with("\r\n\r\ndata: x\n\n"));
@@ -307,6 +352,10 @@ mod tests {
     #[test]
     fn an_unreachable_server_is_an_upstream_error() {
         let endpoint = Endpoint::new("127.0.0.1:1".to_string(), None);
-        assert!(endpoint.get("/").is_err_and(|error| error.to_string().starts_with("upstream: 127.0.0.1:1:")));
+        assert!(
+            endpoint
+                .get("/")
+                .is_err_and(|error| error.to_string().starts_with("upstream: 127.0.0.1:1:"))
+        );
     }
 }
