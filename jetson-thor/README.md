@@ -122,7 +122,9 @@ ssh thor 'bash -lc "cd ~/Projects/edgechat && cargo install --path ."'
 ## Thor Tigress Cub: chat in the browser
 
 `web/` holds the chat page (`index.html`, one file with the cub art inline, no
-outside scripts), the art (`cub.svg`) and `serve.sh`. `serve.sh install`
+outside scripts) and the art (`cub.svg`). `model-serving/serve.sh` serves the
+models and the page; how to load, unload and try models is in the book,
+chapter "Model serving". `serve.sh install`
 creates two user services that start at boot: `thor-chat` (llama.cpp's
 `llama-server` with Nemotron on `127.0.0.1:8079`) and `thor-tigress-agent`
 (the page, the key check, web search and the API on `127.0.0.1:8080`).
@@ -131,10 +133,11 @@ chapter "Web chat: Thor Tigress Cub".
 
 | Setting | Value |
 |---|---|
-| Model | Nemotron 3 Nano 30B-A3B Q8_0 |
-| People at once | 4 (`USERS`) |
-| Context per person | 1,048,576 tokens (`CONTEXT`) |
-| Measured | 53 tok/s, first token 0.2 s |
+| Models | Nemotron 3 Nano 30B-A3B Q8_0, loaded; Nemotron 3.5 Lightning 30B-A3B Q8_0, listed in the picker, loaded only when picked |
+| People at once | Nano 4 (`USERS`); Lightning 1 (`LIGHTNING_USERS`) |
+| Context per person | Nano 1,048,576 tokens (`CONTEXT`); Lightning 262,144 (`LIGHTNING_CONTEXT`) |
+| Measured | Nano 53 tok/s, first token 0.2 s; Lightning 52.5 tok/s |
+| Model names | `nemotron` / `nemotron-think` (Nano), `lightning`; others refused |
 
 Change settings in `~/.config/thor-chat/env` (e.g. `USERS=8`), then
 `./serve.sh install`. The page has Web and Think switches, a stop key (Esc),
@@ -142,10 +145,19 @@ highlighted code with copy, twelve themes and an optional system prompt in
 Settings (none by default).
 
 ```bash
+cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving
 ./serve.sh logs          # follow the server log
 ./serve.sh key           # require an access key; the page asks for it once
 ./serve.sh uninstall     # stop and remove the service
+./serve.sh models        # every model: id, loaded or not, aliases
+./serve.sh memory        # memory available and what is loaded
+./serve.sh load NAME     # load a model; undone if free memory falls below 8 GB
+./serve.sh unload NAME   # free a model's memory
+./serve.sh reload        # pick up models added to ~/.config/thor-chat/models.local.ini
 ```
+
+Trying a new model step by step, the memory budget and models worth trying:
+book, chapter "Model serving".
 
 ### Access key
 
@@ -153,7 +165,7 @@ With a key set, the page loads for anyone but the chat API refuses requests
 without the key. It is on now, because the chat is public through Funnel.
 
 ```bash
-cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/web
+cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving
 ./serve.sh key && systemctl --user restart thor-chat thor-tigress-agent   # new key; the old one stops working
 cat ~/.config/thor-chat/api-key                        # show the current key
 rm ~/.config/thor-chat/api-key && systemctl --user restart thor-chat thor-tigress-agent   # no key: open to anyone

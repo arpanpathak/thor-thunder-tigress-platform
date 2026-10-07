@@ -9,7 +9,7 @@ that speaks the OpenAI or Anthropic API.
 | | |
 |---|---|
 | Address | `https://arpanpathak.taildb9a39.ts.net` |
-| Model | Nemotron 3 Nano 30B-A3B, Q8_0, 1M-token context |
+| Models | Nemotron 3 Nano 30B-A3B, Q8_0, 1M-token context (`nemotron`); Nemotron 3.5 Lightning 30B-A3B, Q8_0, 256K-token context, one reply at a time, loaded on its first request (`lightning`) |
 | Speed | about 53 tokens/s per reply; thinks before answering unless told not to (below) |
 | OpenAI API | `/v1/models`, `/v1/chat/completions` |
 | Anthropic API | `/v1/messages` (Claude Code) |
@@ -64,7 +64,12 @@ K=$(cat ~/.config/thor-chat/api-key)
 curl -s https://arpanpathak.taildb9a39.ts.net/v1/models -H "Authorization: Bearer $K"
 ```
 
-It lists one model. `401` means the key is wrong or no longer valid.
+It lists two models. `401` means the key is wrong or no longer valid.
+
+Every request must name a model. `nemotron` and `nemotron-think` go to the
+Nano, `lightning` to Lightning, and the full ids from `/v1/models` work too.
+A missing or unknown name gets `400` (chapter "Web chat", section "Two
+models").
 
 ## Claude Code
 
@@ -91,7 +96,7 @@ setting.
 |---|---|
 | `CLAUDE_CONFIG_DIR=$HOME/.claude-thor` | its own settings, history and memory; without it both commands share `~/.claude`, so a setting changed in one applies to the other and `/resume` lists both |
 | `ANTHROPIC_AUTH_TOKEN` | the key, sent as `Authorization: Bearer` |
-| `ANTHROPIC_*_MODEL=nemotron` | every model slot goes to the Thor; the server ignores the name |
+| `ANTHROPIC_*_MODEL=nemotron` | every model slot goes to the Nano; use `lightning` for Lightning, other names are refused |
 | `CLAUDE_CODE_MAX_CONTEXT_TOKENS` | the real window; Claude Code assumes 200K for a model it doesn't know |
 | `MAX_THINKING_TOKENS=0` | Claude Code then sends no `thinking` field, so the Thor turns thinking off |
 
@@ -181,7 +186,7 @@ Leave out `extra_body` to let it think first.
 
 <figure>
 <img src="figures/agent-wiring.svg" alt="Agents call the .ts.net address through Tailscale Funnel with the key in a header; thor-tigress-agent checks it and passes requests to llama-server. A machine with SSH access reaches the same server through an SSH tunnel.">
-<figcaption><b>Figure 9.1</b> How agents reach the Thor.</figcaption>
+<figcaption><b>Figure 10.1</b> How agents reach the Thor.</figcaption>
 </figure>
 
 | Path | What `thor-tigress-agent` does |

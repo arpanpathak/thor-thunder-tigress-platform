@@ -13,6 +13,7 @@
 # The Jetson Thor
 
 - [Access and syncing](ch07-thor-access.md)
+- [Model serving](ch21-model-serving.md)
 - [Local models](ch08-local-models.md)
 - [Web chat: Thor Tigress Cub](ch09-web-chat.md)
 - [Bring your own agent](ch16-bring-your-own-agent.md)

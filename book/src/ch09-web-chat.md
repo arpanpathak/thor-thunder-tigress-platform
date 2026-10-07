@@ -3,7 +3,8 @@
 # Web chat: Thor Tigress Cub
 
 The Thor Tigress Cub is the browser face of the Thor: a chat page that talks to
-Nemotron 3 Nano on the Jetson AGX Thor, can search the web before it answers,
+Nemotron 3 Nano or Nemotron 3.5 Lightning on the Jetson AGX Thor, can search
+the web before it answers,
 and can show its reasoning. It is one HTML file in front of one small Rust
 server, and everything it calls runs on the Thor.
 
@@ -30,7 +31,7 @@ This chapter covers
 
 <figure>
 <img src="figures/cub-welcome.png" alt="The chat page in its light theme: the cub in the middle, a greeting, and four suggested prompts">
-<figcaption><b>Figure 8.1</b> The first screen, in the light Cub theme.</figcaption>
+<figcaption><b>Figure 9.1</b> The first screen, in the light Cub theme.</figcaption>
 </figure>
 
 A new conversation opens on the cub, a greeting that names the model the
@@ -40,9 +41,11 @@ Enter.
 
 The header holds, from left to right:
 
-- **Thor Tigress Cub** and the model chip. The dot is the server's state:
+- **Thor Tigress Cub** and the model picker. The dot is the server's state:
   green when `/v1/models` answers, red when the key is missing or the server
-  can't be reached.
+  can't be reached. The picker lists what `/v1/models` returns, remembers the
+  choice in the browser, and sends it as `model` with every message. With one
+  model served it is greyed out. See "Two models" below.
 - **Web**: lets the model search before it answers (below).
 - **Think**: lets the model reason before it answers (below).
 - **+** starts a new conversation; the old one is discarded.
@@ -52,7 +55,7 @@ The header holds, from left to right:
 
 <figure>
 <img src="figures/cub-conversation.png" alt="A conversation in the dark theme: a question, a folded 'thought' line, an answer with a highlighted Rust code block, a stats line, and a reply in progress shown as three dots">
-<figcaption><b>Figure 8.2</b> A reply with folded reasoning, highlighted code and the stats line, and the next reply starting.</figcaption>
+<figcaption><b>Figure 9.2</b> A reply with folded reasoning, highlighted code and the stats line, and the next reply starting.</figcaption>
 </figure>
 
 Replies stream in as Nemotron writes them. Until the first word arrives, the
@@ -102,7 +105,7 @@ the sources before trusting a detail.
 
 <figure>
 <img src="figures/cub-invite.png" alt="The invite screen: the cub, 'The cub is invite-only for now', a box to paste an access key, and a link to ask for one">
-<figcaption><b>Figure 8.3</b> What someone without a key sees.</figcaption>
+<figcaption><b>Figure 9.3</b> What someone without a key sees.</figcaption>
 </figure>
 
 When the server refuses the page (no key, or an old one), the page says so
@@ -114,17 +117,17 @@ in Settings.
 
 <figure>
 <img class="phone" src="figures/cub-phone.png" alt="The chat page on a phone in the dark theme">
-<figcaption><b>Figure 8.4</b> The same page on a 390-pixel-wide phone.</figcaption>
+<figcaption><b>Figure 9.4</b> The same page on a 390-pixel-wide phone.</figcaption>
 </figure>
 
-On narrow screens the name and model chip step aside so the switches and the
-message box keep their room.
+On narrow screens the name steps aside and the model picker shrinks, so the
+switches and the message box keep their room.
 
 ### About page
 
 <figure>
 <img src="figures/cub-about.png" alt="The About page in the dark theme: the cub, the headline 'A 30B model on a desk-sized Thor', the buttons Open the chat and Use it from your agent, and the facts strip">
-<figcaption><b>Figure 8.5</b> The About page at <code>/about.html</code>, for people who arrive from a shared link.</figcaption>
+<figcaption><b>Figure 9.5</b> The About page at <code>/about.html</code>, for people who arrive from a shared link.</figcaption>
 </figure>
 
 `/about.html` explains the project to someone who hasn't seen it: the model
@@ -155,14 +158,14 @@ nowhere else. Another browser or device starts empty.
 
 <figure>
 <img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor, which calls llama-server and SearXNG on localhost.">
-<figcaption><b>Figure 8.6</b> How a request reaches Nemotron.</figcaption>
+<figcaption><b>Figure 9.6</b> How a request reaches Nemotron.</figcaption>
 </figure>
 
 | Part | Where | What it does |
 |---|---|---|
 | `jetson-thor/web/index.html` | this repository | the whole page: markup, styles, the cub, the script; no build step |
 | `thor-tigress-agent` | `crates/thor-tigress-agent` | serves the page, checks the key, runs the web-search loop, passes `/v1/*` to llama-server |
-| `llama-server` | `~/.local/src/llama.cpp` on the Thor | runs Nemotron 3 Nano 30B-A3B Q8_0, four replies at a time, 1M tokens each |
+| `llama-server` | `~/.local/src/llama.cpp` on the Thor | router mode: Nemotron 3 Nano 30B-A3B Q8_0 (four replies at a time, 1M tokens each) and Nemotron 3.5 Lightning 30B-A3B Q8_0 (one reply, 256K tokens) |
 | SearXNG | `~/.local/src/searxng`, user service `searxng` | meta search engine with JSON output |
 | Tailscale Funnel | the Thor | HTTPS at a `.ts.net` address; no ports open on the home router |
 
@@ -177,7 +180,7 @@ connection:
 | `GET /`, `/thor-tigress-cub/` | the page (no key needed) |
 | `GET /about.html`, `/cub.svg`, `/cub.png` | the About page and the art; a fixed list, nothing else in the folder is served |
 | `GET /health` | `{"status":"ok"}` (no key needed) |
-| `GET /v1/models` | the served model, from llama-server |
+| `GET /v1/models` | the served models, from llama-server |
 | `POST /v1/chat/completions` | streamed through; with `thor_web_search: true`, the search loop; without `stream: true`, plain JSON |
 | `POST /v1/messages` | Anthropic's API, for Claude Code (chapter "Bring your own agent") |
 | `OPTIONS *` | CORS preflight, so pages and tools on other sites may call the API with a key |
@@ -191,7 +194,7 @@ site could borrow (chapter "Security").
 ```bash
 cd ~/Projects/thor-thunder-tigress-platform
 cargo install --path crates/thor-tigress-agent
-cd jetson-thor/web
+cd jetson-thor/model-serving
 ./serve.sh install       # thor-chat and thor-tigress-agent services, start at boot
 ./serve.sh logs          # follow both logs
 ```
@@ -205,10 +208,44 @@ cd jetson-thor/web
 | `USERS` | 4 | replies generated at once; a fifth waits |
 | `CONTEXT` | 1,048,576 | tokens per reply; memory for all four is reserved at start (57.8 GB measured); what this costs and how to change it: chapter "Memory, context and slots" |
 | `MODEL` | Nemotron 3 Nano 30B-A3B Q8_0 | any GGUF with a chat template |
+| `LIGHTNING` | Nemotron 3.5 Lightning 30B-A3B Q8_0 | the second model |
+| `LIGHTNING_USERS` / `LIGHTNING_CONTEXT` | 1 / 262,144 | its own replies at once and tokens per reply |
 | `PORT` / `MODEL_PORT` / `SEARCH_PORT` | 8080 / 8079 / 8888 | |
 
 SearXNG runs as the `searxng` user service from `~/.local/src/searxng`, with
 settings in `~/.config/searxng/settings.yml` (JSON output on).
+
+## Two models
+
+`serve.sh run` starts llama-server in router mode. It writes
+`~/.config/thor-chat/models.ini` with one section per model and routes each
+request by its `model` field. Loading, unloading and adding models are in
+chapter "Model serving".
+
+| Model id (what the picker shows) | Also answers to | At start | Replies at once | Tokens per reply |
+|---|---|---|---|---|
+| `NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0` | `nemotron`, `nemotron-think`, the GGUF path | loaded | 4 | 1,048,576 |
+| `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0` | `lightning` | not loaded; picking it loads it (about 13 s) | 1 | 262,144 |
+
+Any other name is refused with `400`, and so is a request without `model`.
+Before router mode the name was ignored.
+
+Measured on 2026-10-06, both loaded:
+
+| | Nano | Lightning |
+|---|---|---|
+| generation, same Rust prompt, thinking off, 600 tokens | 53.5 tok/s | 52.5 tok/s |
+| short reply through the agent | 48.0 tok/s | 49.1 tok/s |
+
+Both models were loaded 32 seconds after a restart, with 26 GB of memory
+still available. Lightning has since been unloaded (its answers were
+disappointing) and no longer loads at start.
+
+Lightning gets one reply at 256K tokens because both models at four replies
+of 1M tokens do not fit in the Thor's 122 GB. That was tried: memory ran out
+on the first reply, the OOM killer stopped `thor-chat`, and the chat was down
+for three minutes. While someone else is talking to Lightning, a second
+Lightning message waits; the Nano's four slots are separate.
 
 ## Share it
 
@@ -254,7 +291,7 @@ off any reply being written, so wait until none is:
 ssh thor 'cd ~/Projects/thor-thunder-tigress-platform &&
   cargo install --path crates/thor-tigress-agent --locked &&
   K=$(cat ~/.config/thor-chat/api-key) &&
-  until [ "$(curl -s 127.0.0.1:8079/slots -H "Authorization: Bearer $K" |
+  until [ "$(curl -s "127.0.0.1:8079/slots?model=nemotron" -H "Authorization: Bearer $K" |
              python3 -c "import sys,json;print(sum(s[\"is_processing\"] for s in json.load(sys.stdin)))")" = 0 ];
   do sleep 2; done &&
   systemctl --user restart thor-tigress-agent'
@@ -266,7 +303,7 @@ ssh thor 'cd ~/Projects/thor-thunder-tigress-platform &&
 |---|---|---|
 | Red dot, "server not reachable" | Funnel off, the Thor asleep, or `thor-tigress-agent` stopped | `curl https://<thor>.<tailnet>.ts.net/health` |
 | Invite screen with a key pasted | the key was changed | `cat ~/.config/thor-chat/api-key` on the Thor |
-| Replies slower than ~53 tok/s | other people are chatting; four replies share the memory bandwidth | `curl 127.0.0.1:8079/slots` on the Thor |
+| Replies slower than ~53 tok/s | other people are chatting; four replies share the memory bandwidth | `./serve.sh models`, then `curl "127.0.0.1:8079/slots?model=nemotron"` on the Thor (add `-H "Authorization: Bearer $K"`) |
 | A long wait before anything | all four slots busy, or a long conversation being read | the same |
 | "searched" missing with Web on | the model chose not to search, or SearXNG is down | `systemctl --user status searxng` |
 | Error under a reply | the message from the server, shown as is | `./serve.sh logs` |

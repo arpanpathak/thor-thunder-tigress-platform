@@ -35,7 +35,7 @@ code.
 
 <figure>
 <img src="figures/slots.svg" alt="Any number of people send requests with the same key. llama-server keeps a queue and four slots; each request borrows a free slot for one reply, up to 1,048,576 tokens, and gives it back. All slots share one copy of the model weights.">
-<figcaption><b>Figure 13.1</b> People, slots and the model.</figcaption>
+<figcaption><b>Figure 14.1</b> People, slots and the model.</figcaption>
 </figure>
 
 - **A conversation lives in the browser,** not on the Thor. Every message sends
@@ -58,7 +58,7 @@ time they are reading or typing.
 
 <figure>
 <img src="figures/memory-map.svg" alt="A 128 GB bar: about 32 GB model weights, 24 GiB reserved for the context of four slots of one million tokens, the rest of the 73 GB in use by buffers, the OS and other programs, and about 49 GB available. Below, the arithmetic: 6 KiB per token, 6 GiB per slot, 24 GiB reserved.">
-<figcaption><b>Figure 13.2</b> The Thor's memory while serving, from the measurements below.</figcaption>
+<figcaption><b>Figure 14.2</b> The Thor's memory while serving, from the measurements below.</figcaption>
 </figure>
 
 The Thor's CPU and GPU share 128 GB. Measured while serving on 2026-10-06:
@@ -98,7 +98,7 @@ per slot.
 
 <figure>
 <img src="figures/kv-per-token.svg" alt="Memory per token of context: Nemotron 3 Nano 6 KiB, Llama 3 8B 128 KiB, Llama 3 70B 320 KiB. For one million tokens: 6 GiB, 128 GiB, 320 GiB.">
-<figcaption><b>Figure 13.3</b> Memory per token of context, from each model's published layer counts.</figcaption>
+<figcaption><b>Figure 14.3</b> Memory per token of context, from each model's published layer counts.</figcaption>
 </figure>
 
 A model built only from attention layers keeps keys and values in every layer.
@@ -130,7 +130,7 @@ Check it yourself on the Thor:
 
 ```bash
 K=$(cat ~/.config/thor-chat/api-key)
-curl -s 127.0.0.1:8079/slots -H "Authorization: Bearer $K" |
+curl -s "127.0.0.1:8079/slots?model=nemotron" -H "Authorization: Bearer $K" |
   python3 -c "import sys,json;[print(s['id'],s['n_ctx'],s['is_processing'],s.get('n_prompt_tokens')) for s in json.load(sys.stdin)]"
 ```
 
@@ -145,7 +145,7 @@ All settings live in `~/.config/thor-chat/env` on the Thor; the file doesn't
 exist yet, so the defaults apply. After a change:
 
 ```bash
-cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/web
+cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving
 ./serve.sh install                       # rewrites the service with the new settings and restarts it
 journalctl --user -u thor-chat -n 20     # "n_slots = …, n_ctx_slot = …" and "model loaded"
 ```

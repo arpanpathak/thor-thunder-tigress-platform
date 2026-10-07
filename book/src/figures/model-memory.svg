@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 285" width="960" height="285" role="img" aria-label="A bar of the Thor's 122.8 GB: Nemotron 3 Nano 57.8 GB, Lightning 35.4 GB, OS and other programs 4.8 GB, 24.8 GB available. Measured on 2026-10-06.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .idle { fill: #FFFFFF; stroke: #8A99AB; stroke-width: 2; stroke-dasharray: 6 5; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="285" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">The Thor's memory with both models loaded (122.8 GB)</text>
+  <rect x="30.0" y="70" width="423.6" height="56" fill="#1E88A8"/>
+  <text x="241.8" y="96" class="name" text-anchor="middle" style="fill:#FFFFFF">Nemotron 3 Nano</text>
+  <text x="241.8" y="114" class="num" text-anchor="middle" style="fill:#FFFFFF">57.8 GB</text>
+  <rect x="453.6" y="70" width="259.4" height="56" fill="#4E8A16"/>
+  <text x="583.3" y="96" class="name" text-anchor="middle" style="fill:#FFFFFF">Lightning</text>
+  <text x="583.3" y="114" class="num" text-anchor="middle" style="fill:#FFFFFF">35.4 GB</text>
+  <rect x="713.1" y="70" width="35.2" height="56" fill="#8A99AB"/>
+  <rect x="748.2" y="70" width="181.8" height="56" fill="#F4F7FA" stroke="#8A99AB" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="839.1" y="96" class="name" text-anchor="middle" style="fill:#1D2733">available</text>
+  <text x="839.1" y="114" class="num" text-anchor="middle" style="fill:#1D2733">24.8 GB</text>
+  <text x="30" y="160" class="num">Nano 57.8 GB</text><text x="200" y="160" class="note">what llama-server reported at start with 4 slots × 1,048,576 tokens (chapter "Memory, context and slots")</text>
+  <text x="30" y="182" class="num">Lightning 35.4 GB</text><text x="200" y="182" class="note">MemAvailable rose from 24.8 to 60.2 GB on ./serve.sh unload lightning, 2026-10-06</text>
+  <text x="30" y="204" class="num">OS and others 4.8 GB</text><text x="200" y="204" class="note">the remainder</text>
+  <text x="30" y="226" class="num">Available 24.8 GB</text><text x="200" y="226" class="note">keep at least 8 GB free; below that the OOM killer may stop thor-chat</text>
+  <text x="30" y="262" class="warn">Tried and failed: Lightning at 4 × 1M next to the Nano ran out of memory on its first reply.</text>
+</svg>

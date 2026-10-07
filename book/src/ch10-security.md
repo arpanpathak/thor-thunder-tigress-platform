@@ -25,14 +25,15 @@ address; GitHub never sees a key or a message. The `.ts.net` name resolves
 to Tailscale's Funnel relays, not to your home: the home IP address is not
 published anywhere (chapter "Bring your own domain" lists every address).
 The Thor serves a fixed list of files (the page, the About page, the art);
-`serve.sh` and everything else in the folder answers `404`.
+everything else in the folder answers `404`. `serve.sh` lives in another
+folder, `jetson-thor/model-serving/`.
 
 
 ## How the key is checked
 
 <figure>
 <img src="figures/key-flow.svg" alt="One key file on the Thor. Browsers and agents send the key in a header over HTTPS through Tailscale Funnel; thor-tigress-agent compares it and answers 401 when it is wrong; otherwise it forwards with its own key to llama-server, which checks again.">
-<figcaption><b>Figure 11.1</b> How the access key is checked.</figcaption>
+<figcaption><b>Figure 12.1</b> How the access key is checked.</figcaption>
 </figure>
 
 1. `./serve.sh key` writes 24 random bytes from `/dev/urandom`, base64

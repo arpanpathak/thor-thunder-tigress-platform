@@ -88,7 +88,7 @@ Thor.
 
 <figure>
 <img src="figures/opencode-tunnel.svg" alt="opencode on your machine calls 127.0.0.1:8079 and 127.0.0.1:8888; an SSH tunnel carries both to llama-server and SearXNG on the Thor.">
-<figcaption><b>Figure 7.1</b> OpenCode on your machine, the model on the Thor.</figcaption>
+<figcaption><b>Figure 8.1</b> OpenCode on your machine, the model on the Thor.</figcaption>
 </figure>
 
 It uses the SSH tunnel from the section above.

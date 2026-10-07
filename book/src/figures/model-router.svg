@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" role="img" aria-label="Clients send requests with a model name to thor-tigress-agent on port 8080, which passes them to the llama-server router on 8079. The router sends each request to the model instance with that name or alias: Nemotron 3 Nano and Nemotron 3.5 Lightning are loaded; a model added in models.local.ini stays unloaded until asked for. The router reads its presets from ~/.config/thor-chat at start and on reload.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .warn { fill: #D9542B; font-size: 12px; }
+    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .idle { fill: #FFFFFF; stroke: #8A99AB; stroke-width: 2; stroke-dasharray: 6 5; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    </marker>
+  </defs>
+  <rect width="960" height="470" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">How a request reaches a model</text>
+  <rect x="30" y="90" width="170" height="70" rx="10" class="outside"/>
+  <text x="115.0" y="116" class="name" text-anchor="middle">Web chat</text>
+  <text x="115.0" y="136" class="note" text-anchor="middle">picker sends model</text>
+  <rect x="30" y="200" width="170" height="70" rx="10" class="outside"/>
+  <text x="115.0" y="226" class="name" text-anchor="middle">Claude Code,</text>
+  <text x="115.0" y="244" class="name" text-anchor="middle">OpenCode</text>
+  <text x="115.0" y="262" class="note" text-anchor="middle">model: "nemotron"</text>
+  <rect x="30" y="310" width="170" height="70" rx="10" class="outside"/>
+  <text x="115.0" y="336" class="name" text-anchor="middle">curl, SDKs</text>
+  <text x="115.0" y="356" class="note" text-anchor="middle">any id or alias</text>
+  <rect x="260" y="180" width="170" height="110" rx="10" class="box built"/>
+  <text x="345.0" y="206" class="name" text-anchor="middle">thor-tigress-agent</text>
+  <text x="345.0" y="226" class="note" text-anchor="middle">:8080</text>
+  <text x="345.0" y="243" class="note" text-anchor="middle">key check, web search</text>
+  <text x="345.0" y="260" class="note" text-anchor="middle">passes model through</text>
+  <path class="flow" d="M200,125 L222,125 Q232,125 232,135 L232,225 Q232,235 242,235 L258,235" marker-end="url(#arrow)"/>
+  <path class="flow" d="M200,235 L258,235" marker-end="url(#arrow)"/>
+  <path class="flow" d="M200,345 L222,345 Q232,345 232,335 L232,245 Q232,235 242,235 L258,235" marker-end="url(#arrow)"/>
+  <rect x="490" y="170" width="190" height="130" rx="10" class="box built"/>
+  <text x="585.0" y="196" class="name" text-anchor="middle">llama-server router</text>
+  <text x="585.0" y="216" class="note" text-anchor="middle">:8079</text>
+  <text x="585.0" y="233" class="note" text-anchor="middle">routes by model or alias</text>
+  <text x="585.0" y="250" class="note" text-anchor="middle">--models-max 2</text>
+  <text x="585.0" y="267" class="note" text-anchor="middle">unknown name: 400</text>
+  <path class="flow" d="M430,235 L488,235" marker-end="url(#arrow)"/>
+  <rect x="740" y="60" width="190" height="80" rx="10" class="box built"/>
+  <text x="835.0" y="86" class="name" text-anchor="middle">Nemotron 3 Nano</text>
+  <text x="835.0" y="106" class="note" text-anchor="middle">loaded · 4 × 1M</text>
+  <text x="835.0" y="123" class="note" text-anchor="middle">nemotron, nemotron-think</text>
+  <rect x="740" y="160" width="190" height="80" rx="10" class="box built"/>
+  <text x="835.0" y="186" class="name" text-anchor="middle">Nemotron 3.5 Lightning</text>
+  <text x="835.0" y="206" class="note" text-anchor="middle">loaded · 1 × 256K</text>
+  <text x="835.0" y="223" class="note" text-anchor="middle">lightning</text>
+  <rect x="740" y="260" width="190" height="80" rx="10" class="idle"/>
+  <text x="835.0" y="286" class="name" text-anchor="middle">a model you add</text>
+  <text x="835.0" y="306" class="note" text-anchor="middle">unloaded until asked for</text>
+  <text x="835.0" y="323" class="note" text-anchor="middle">models.local.ini</text>
+  <path class="flow" d="M680,215 L700,215 Q710,215 710,205 L710,110 Q710,100 720,100 L738,100" marker-end="url(#arrow)"/>
+  <path class="flow" d="M680,225 L700,225 Q710,225 710,215 L710,210 Q710,200 720,200 L738,200" marker-end="url(#arrow)"/>
+  <path class="flow" d="M680,245 L700,245 Q710,245 710,255 L710,290 Q710,300 720,300 L738,300" marker-end="url(#arrow)"/>
+  <rect x="490" y="360" width="190" height="80" rx="10" class="planned"/>
+  <text x="585.0" y="386" class="name" text-anchor="middle">~/.config/thor-chat/</text>
+  <text x="585.0" y="406" class="note" text-anchor="middle">env → models.ini</text>
+  <text x="585.0" y="423" class="note" text-anchor="middle">+ models.local.ini</text>
+  <path class="flow" d="M585,360 L585,302" marker-end="url(#arrow)"/>
+  <text x="597" y="326" class="label">read at start</text>
+  <text x="597" y="342" class="label">and on ./serve.sh reload</text>
+  <text x="720" y="378" class="note">Each loaded model is its own</text>
+  <text x="720" y="395" class="note">llama-server process on a private port.</text>
+  <text x="720" y="412" class="warn">Loading a third unloads the least</text>
+  <text x="720" y="429" class="warn">recently used one first.</text>
+</svg>

@@ -52,13 +52,15 @@ unwanted traffic; it does nothing for a leaked key, which works on any name.
 | What | Where | Change it with |
 |---|---|---|
 | access key | `~/.config/thor-chat/api-key`, mode 600 | `./serve.sh key`, then restart both services |
-| service settings (`USERS`, `CONTEXT`, `MODEL`, ports) | `~/.config/thor-chat/env`; absent now, so defaults apply | edit, then `./serve.sh install` |
-| llama-server service | `~/.config/systemd/user/thor-chat.service` → `serve.sh run` | written by `./serve.sh install` |
-| page and API service | `~/.config/systemd/user/thor-tigress-agent.service` → `serve.sh agent` | written by `./serve.sh install` |
+| service settings (`USERS`, `CONTEXT`, `MODEL`, `LIGHTNING`, `LIGHTNING_USERS`, `LIGHTNING_CONTEXT`, ports) | `~/.config/thor-chat/env`; absent now, so defaults apply | edit, then `./serve.sh install` |
+| llama-server service | `~/.config/systemd/user/thor-chat.service` → `jetson-thor/model-serving/serve.sh run` | written by `./serve.sh install` |
+| page and API service | `~/.config/systemd/user/thor-tigress-agent.service` → `jetson-thor/model-serving/serve.sh agent` | written by `./serve.sh install` |
 | web search service | `~/.config/systemd/user/searxng.service`, settings `~/.config/searxng/settings.yml` | edit, then `systemctl --user restart searxng` |
 | `thor-tigress-agent` binary | `~/.cargo/bin/thor-tigress-agent` | `cargo install --path crates/thor-tigress-agent --locked` |
 | llama-server binary | `~/.local/src/llama.cpp/build/bin/llama-server` (built from commit `8216c84`, 2026-10-05) | pull and rebuild llama.cpp |
 | the model | `~/models/gguf/Nemotron-3-Nano-30B-A3B/NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf` | `MODEL=` in the env file |
+| the second model | `~/models/gguf/Nemotron-3.5-Lightning-30B-A3B/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0.gguf` (unsloth GGUF, 35.0 GB) | `LIGHTNING=` in the env file |
+| model presets | `~/.config/thor-chat/models.ini` | rewritten by `serve.sh run` on every start; edit the env file instead |
 | the page, About page, art | `jetson-thor/web/` in this repository | edit in your clone; `thor-sync` copies it; no restart |
 | user services at boot without a login | systemd "linger" for the user: `Linger=yes` | `loginctl enable-linger` |
 | Tailscale | system service `tailscaled` (version 1.102.4) | `sudo tailscale up …` |
@@ -108,14 +110,16 @@ contains the name, so the chat needs no change.
 1. `tailscaled` (system service) starts, joins the tailnet and restores Funnel
    for `arpanpathak.taildb9a39.ts.net` → `127.0.0.1:8080`.
 2. Because of linger, the user's systemd starts without anyone logging in:
-   `thor-chat` (llama-server, loads the model), `searxng`, and
+   `thor-chat` (llama-server, loads the Nano), `searxng`, and
    `thor-tigress-agent` (ordered after `thor-chat`).
 3. Each service restarts itself 5 seconds after a crash (`Restart=on-failure`).
 
 Measured: the last start of `thor-chat` (2026-10-05 05:17:55) loaded the model
 and listened 6 seconds later, with the model file already in memory cache.
 **Not measured yet:** the time from power-on to the first answer, when the
-32 GB model file has to come from disk.
+two model files (33 GB and 35 GB) have to come from disk. With both files in
+the memory cache, a restart on 2026-10-06 had both models loaded in 32
+seconds.
 
 After a reboot, check from the Thor:
 
@@ -135,7 +139,7 @@ Signs: someone uninvited is chatting, or the key was pasted somewhere public.
 
 ```bash
 ssh thor
-cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/web
+cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving
 ./serve.sh key
 systemctl --user restart thor-chat thor-tigress-agent
 cat ~/.config/thor-chat/api-key
