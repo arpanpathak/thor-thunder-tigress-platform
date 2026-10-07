@@ -3,7 +3,7 @@
 # What a context window is
 
 Chapter "Memory, context and slots" has the arithmetic: 6 KiB of keys and values
-per token, 24 GiB for four slots at a million tokens, and about 1,050 tokens a
+per token, a pool of 24 GiB holding the windows, and about 1,050 tokens a
 second spent reading a prompt. This chapter is the same subject without the
 arithmetic: what fills one window, why the model reads everything again for each
 message, and what happens when a conversation reaches the end of it.
@@ -22,7 +22,7 @@ This chapter covers
 ## One budget per reply
 
 <figure>
-<img src="figures/context-window.svg" alt="One reply's window holds the system prompt, the whole conversation so far, anything pasted in, and the reply being written, up to 1,048,576 tokens. The model keeps nothing between requests, so the browser re-sends everything. Four slots run four replies at once, each with its own window, and a request longer than the window is refused.">
+<img src="figures/context-window.svg" alt="One reply's window holds the system prompt, the whole conversation so far, anything pasted in, and the reply being written, up to 1,048,576 tokens. The model keeps nothing between requests, so the browser re-sends everything. The windows share one pool of memory: how many run at once is a setting, and a request longer than its window is refused.">
 <figcaption><b>Figure 26.1</b> Everything one reply may hold.</figcaption>
 </figure>
 
@@ -61,8 +61,8 @@ To write the next token, the attention layers compare it with every token before
 it. Each earlier token leaves two short vectors behind, a **key** and a
 **value**, and keeping them instead of recomputing them is the **KV cache**. It
 grows with the conversation, one entry per token per attention layer. The sum is
-in chapter "Memory, context and slots": 6 KiB per token, 6 GiB per slot at a
-million tokens, 24 GiB across four slots.
+in chapter "Memory, context and slots": 6 KiB per token, 6 GiB for a window of a
+million tokens, and 24 GiB for the pool of them.
 
 Nemotron 3 Nano is a hybrid. Six of its 52 layers work by attention; the rest
 carry one state of fixed size, however long the conversation runs. A model built
@@ -95,9 +95,13 @@ quietly; the page shows the error. Four ways out:
 Some clients have a fifth: a sliding window, where the browser sends only the
 last messages. That trades the start of the conversation for room at the end.
 
-## Four slots
+## How many replies run at once
 
-The window belongs to a reply. Four replies run at the same moment, each with
-its own window, all sharing one copy of the model. A fifth request waits in the
-queue. On this machine the four are shared by the page and by every agent using
-the API.
+A window belongs to a reply. Every reply that runs at the same time needs a
+window of its own, and all of them come out of one pool of memory. The count is
+therefore a setting, and memory sets its ceiling: four windows of a million
+tokens each take 24 GiB, and the same 24 GiB also pays for eight windows of
+524,288 or sixteen of 262,144. Requests beyond that number wait in the queue.
+The windows are shared by the page and by every coding agent using the API, and
+chapter "Memory, context and slots" has the table of shapes and the measured
+numbers behind it.

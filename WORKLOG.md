@@ -92,6 +92,16 @@ there as untracked.
   slots" where the measurements are, and drops the desk metaphor from the
   figure title. Phrasing that read as filler ("checked against the code, not
   taken on trust", "the feature, not a cost") is gone.
+- Rewritten a second time the same day, against Joseph Williams' *Style:
+  Lessons in Clarity and Grace*: characters in subject position, actions in
+  verbs, old information before new, 15–20 word sentences with varied length,
+  no hedging. The launch note now opens with the board on the desk, and the
+  four-reply framing is gone. The live machine runs `--ctx-size 4194304` across
+  `--parallel 4`, so the number of replies at once follows from the memory
+  pool; the note gives the four shapes of that pool and names memory as the
+  ceiling. A new section sets out what comes next: the launch, and the agentic
+  canvas with roleplay, a therapy room, immigration paperwork, creative
+  writing, music and vector graphics.
 
 ### Deployed to the Thor
 
