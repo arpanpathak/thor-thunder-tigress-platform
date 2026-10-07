@@ -51,16 +51,17 @@ unwanted traffic; it does nothing for a leaked key, which works on any name.
 
 | What | Where | Change it with |
 |---|---|---|
-| access key | `~/.config/thor-chat/api-key`, mode 600 | `./serve.sh key`, then restart both services |
-| service settings (`USERS`, `CONTEXT`, `MODEL`, `LIGHTNING`, `LIGHTNING_USERS`, `LIGHTNING_CONTEXT`, ports) | `~/.config/thor-chat/env`; absent now, so defaults apply | edit, then `./serve.sh install` |
-| llama-server service | `~/.config/systemd/user/thor-chat.service` → `jetson-thor/model-serving/serve.sh run` | written by `./serve.sh install` |
-| page and API service | `~/.config/systemd/user/thor-tigress-agent.service` → `jetson-thor/model-serving/serve.sh agent` | written by `./serve.sh install` |
+| access key | `~/.config/thor-chat/api-key`, mode 600 | `thor-tigress-serve key`, then restart both services |
+| service settings (`MODEL`, `USERS`, `CONTEXT`, `MODELS_MAX`, `MIN_FREE_GB`, ports) | `~/.config/thor-chat/env`; empty now, so defaults apply | edit, then `thor-tigress-serve install` |
+| the model command | `~/.local/bin/thor-tigress-serve` → `jetson-thor/model-serving/thor-tigress-serve` | written by `thor-tigress-serve install` |
+| llama-server service | `~/.config/systemd/user/thor-chat.service` → `jetson-thor/model-serving/thor-tigress-serve run` | written by `thor-tigress-serve install` |
+| page and API service | `~/.config/systemd/user/thor-tigress-agent.service` → `jetson-thor/model-serving/thor-tigress-serve agent` | written by `thor-tigress-serve install` |
 | web search service | `~/.config/systemd/user/searxng.service`, settings `~/.config/searxng/settings.yml` | edit, then `systemctl --user restart searxng` |
 | `thor-tigress-agent` binary | `~/.cargo/bin/thor-tigress-agent` | `cargo install --path crates/thor-tigress-agent --locked` |
 | llama-server binary | `~/.local/src/llama.cpp/build/bin/llama-server` (built from commit `8216c84`, 2026-10-05) | pull and rebuild llama.cpp |
 | the model | `~/models/gguf/Nemotron-3-Nano-30B-A3B/NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf` | `MODEL=` in the env file |
-| the second model | `~/models/gguf/Nemotron-3.5-Lightning-30B-A3B/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0.gguf` (unsloth GGUF, 35.0 GB) | `LIGHTNING=` in the env file |
-| model presets | `~/.config/thor-chat/models.ini` | rewritten by `serve.sh run` on every start; edit the env file instead |
+| other models | `~/models/gguf/<name>/*.gguf`; Nemotron 3.5 Lightning (35.0 GB) is there, not loaded | `thor-tigress-serve`: load, unload; `list-latest`: download |
+| the router's model list | `~/.config/thor-chat/models.ini` and `models.local.ini` | written by `thor-tigress-serve`; don't edit |
 | the page, About page, art | `jetson-thor/web/` in this repository | edit in your clone; `thor-sync` copies it; no restart |
 | user services at boot without a login | systemd "linger" for the user: `Linger=yes` | `loginctl enable-linger` |
 | Tailscale | system service `tailscaled` (version 1.102.4) | `sudo tailscale up …` |
@@ -139,8 +140,7 @@ Signs: someone uninvited is chatting, or the key was pasted somewhere public.
 
 ```bash
 ssh thor
-cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving
-./serve.sh key
+thor-tigress-serve key
 systemctl --user restart thor-chat thor-tigress-agent
 cat ~/.config/thor-chat/api-key
 ```

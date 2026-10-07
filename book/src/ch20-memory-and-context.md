@@ -145,8 +145,7 @@ All settings live in `~/.config/thor-chat/env` on the Thor; the file doesn't
 exist yet, so the defaults apply. After a change:
 
 ```bash
-cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving
-./serve.sh install                       # rewrites the service with the new settings and restarts it
+thor-tigress-serve install                       # rewrites the service with the new settings and restarts it
 journalctl --user -u thor-chat -n 20     # "n_slots = …, n_ctx_slot = …" and "model loaded"
 ```
 
@@ -164,8 +163,9 @@ A restart cuts replies in progress; do it when the slots are idle (chapter
 | `--no-reasoning-preserve` | drops old reasoning from the history | none | conversations with **Think** on grow more slowly | no |
 | a smaller model file (e.g. 4-bit instead of 8-bit) | the weights | 32 GB → about 18 GB | faster: fewer bytes read per token; somewhat lower quality | no |
 
-`serve.sh` passes `USERS`, `CONTEXT` and `MODEL`; the other flags would be
-added to the `run()` function in `serve.sh`.
+`thor-tigress-serve` passes `USERS`, `CONTEXT` and `MODEL`. The other flags
+would go in the default model's section, in the `presets` function of
+`jetson-thor/model-serving/thor-tigress-serve`.
 
 ### Same memory, different shapes
 

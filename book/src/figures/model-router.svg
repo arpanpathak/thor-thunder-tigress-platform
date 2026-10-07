@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" role="img" aria-label="Clients send requests with a model name to thor-tigress-agent on port 8080, which passes them to the llama-server router on 8079. The router sends each request to the model instance with that name or alias: Nemotron 3 Nano and Nemotron 3.5 Lightning are loaded; a model added in models.local.ini stays unloaded until asked for. The router reads its presets from ~/.config/thor-chat at start and on reload.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470" role="img" aria-label="Clients send requests with a model name to thor-tigress-agent on port 8080, which passes them to the llama-server router on 8079. The router sends each request to the model process with that name or alias. Nemotron 3 Nano is loaded; Nemotron 3.5 Lightning and other GGUF files under ~/models/gguf stay on disk until loaded with thor-tigress-serve, which writes the router's model list in ~/.config/thor-chat.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
@@ -57,14 +57,14 @@
   <text x="835.0" y="86" class="name" text-anchor="middle">Nemotron 3 Nano</text>
   <text x="835.0" y="106" class="note" text-anchor="middle">loaded · 4 × 1M</text>
   <text x="835.0" y="123" class="note" text-anchor="middle">nemotron, nemotron-think</text>
-  <rect x="740" y="160" width="190" height="80" rx="10" class="box built"/>
+  <rect x="740" y="160" width="190" height="80" rx="10" class="idle"/>
   <text x="835.0" y="186" class="name" text-anchor="middle">Nemotron 3.5 Lightning</text>
-  <text x="835.0" y="206" class="note" text-anchor="middle">loaded · 1 × 256K</text>
-  <text x="835.0" y="223" class="note" text-anchor="middle">lightning</text>
+  <text x="835.0" y="206" class="note" text-anchor="middle">on disk · not loaded</text>
+  <text x="835.0" y="223" class="note" text-anchor="middle">thor-tigress-serve: 2 load</text>
   <rect x="740" y="260" width="190" height="80" rx="10" class="idle"/>
-  <text x="835.0" y="286" class="name" text-anchor="middle">a model you add</text>
-  <text x="835.0" y="306" class="note" text-anchor="middle">unloaded until asked for</text>
-  <text x="835.0" y="323" class="note" text-anchor="middle">models.local.ini</text>
+  <text x="835.0" y="286" class="name" text-anchor="middle">a model you load</text>
+  <text x="835.0" y="306" class="note" text-anchor="middle">from ~/models/gguf</text>
+  <text x="835.0" y="323" class="note" text-anchor="middle">thor-tigress-serve load</text>
   <path class="flow" d="M680,215 L700,215 Q710,215 710,205 L710,110 Q710,100 720,100 L738,100" marker-end="url(#arrow)"/>
   <path class="flow" d="M680,225 L700,225 Q710,225 710,215 L710,210 Q710,200 720,200 L738,200" marker-end="url(#arrow)"/>
   <path class="flow" d="M680,245 L700,245 Q710,245 710,255 L710,290 Q710,300 720,300 L738,300" marker-end="url(#arrow)"/>
@@ -73,10 +73,10 @@
   <text x="585.0" y="406" class="note" text-anchor="middle">env → models.ini</text>
   <text x="585.0" y="423" class="note" text-anchor="middle">+ models.local.ini</text>
   <path class="flow" d="M585,360 L585,302" marker-end="url(#arrow)"/>
-  <text x="597" y="326" class="label">read at start</text>
-  <text x="597" y="342" class="label">and on ./serve.sh reload</text>
+  <text x="597" y="326" class="label">written by</text>
+  <text x="597" y="342" class="label">thor-tigress-serve</text>
   <text x="720" y="378" class="note">Each loaded model is its own</text>
   <text x="720" y="395" class="note">llama-server process on a private port.</text>
-  <text x="720" y="412" class="warn">Loading a third unloads the least</text>
-  <text x="720" y="429" class="warn">recently used one first.</text>
+  <text x="720" y="412" class="warn">thor-tigress-serve refuses a third;</text>
+  <text x="720" y="429" class="warn">the router alone would evict one.</text>
 </svg>

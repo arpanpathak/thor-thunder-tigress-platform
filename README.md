@@ -100,9 +100,11 @@ Built on a Jetson Orin NX 16 GB; training targets a Jetson AGX Thor 128 GB
 [`jetson-thor/README.md`](jetson-thor/README.md); syncing uses
 [thor-sync](https://github.com/arpanpathak/thor-sync).
 
-Model serving on the Thor (llama.cpp's llama-server in router mode, Nemotron 3
-Nano loaded; Nemotron 3.5 Lightning set up but switched off) is run by
-[`jetson-thor/model-serving/serve.sh`](jetson-thor/model-serving/serve.sh):
-`./serve.sh models`, `memory`, `load NAME`, `unload NAME`, `reload`. How to
-try a new model, the memory budget and models worth trying are in the book,
-chapter "Model serving".
+Models on the Thor are served by llama.cpp's llama-server in router mode
+and managed with one command,
+[`thor-tigress-serve`](jetson-thor/model-serving/thor-tigress-serve).
+Run alone, it lists the models with a key each; type `2 load` or `1 unload`.
+`thor-tigress-serve list-latest` adds the newest models on Hugging Face to
+download. Nemotron 3 Nano is loaded; Nemotron 3.5 Lightning is on disk. The
+book's chapter "Model serving" has the memory checks and models worth
+trying.

@@ -25,7 +25,7 @@ address; GitHub never sees a key or a message. The `.ts.net` name resolves
 to Tailscale's Funnel relays, not to your home: the home IP address is not
 published anywhere (chapter "Bring your own domain" lists every address).
 The Thor serves a fixed list of files (the page, the About page, the art);
-everything else in the folder answers `404`. `serve.sh` lives in another
+everything else in the folder answers `404`. `thor-tigress-serve` lives in another
 folder, `jetson-thor/model-serving/`.
 
 
@@ -36,8 +36,8 @@ folder, `jetson-thor/model-serving/`.
 <figcaption><b>Figure 12.1</b> How the access key is checked.</figcaption>
 </figure>
 
-1. `./serve.sh key` writes 24 random bytes from `/dev/urandom`, base64
-   encoded with `/`, `+` and `=` removed, to `~/.config/thor-chat/api-key`
+1. `thor-tigress-serve key` writes 24 random bytes from the operating system
+   (`os.urandom`), as 48 hex characters, to `~/.config/thor-chat/api-key`
    (mode 600, readable only by the Thor's user).
 2. Both programs read that file when they start: `thor-tigress-agent`
    (`--key-file`) and llama-server (`--api-key-file`). A new key needs a
@@ -71,7 +71,7 @@ There is one key, shared by everyone invited. It is stored on the Thor in
 they paste it.
 
 - **Don't put it in chats, repositories or screenshots.** If it leaks, make a
-  new one: `./serve.sh key && systemctl --user restart thor-chat thor-tigress-agent`.
+  new one: `thor-tigress-serve key && systemctl --user restart thor-chat thor-tigress-agent`.
   Everyone then needs the new key.
 - **Give it out for a limited time.** Changing the key is how access ends.
 - **Anyone with the key can keep the GPU busy.** There are no per-person
@@ -83,7 +83,7 @@ they paste it.
   in a program that runs as your user.
 - **Prefer private (`tailscale serve`) for people you know.** Public
   (`funnel`) lets anyone with the link see the page and try keys.
-- **Read the logs after sharing widely.** `./serve.sh logs` on the Thor shows
+- **Read the logs after sharing widely.** `thor-tigress-serve logs` on the Thor shows
   the requests, including each refused one.
 
 What to do when the key leaks, when someone abuses the chat, or when the

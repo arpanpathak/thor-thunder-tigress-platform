@@ -9,7 +9,7 @@ that speaks the OpenAI or Anthropic API.
 | | |
 |---|---|
 | Address | `https://arpanpathak.taildb9a39.ts.net` |
-| Models | Nemotron 3 Nano 30B-A3B, Q8_0, 1M-token context (`nemotron`); Nemotron 3.5 Lightning is set up but switched off (chapter "Model serving") |
+| Models | Nemotron 3 Nano 30B-A3B, Q8_0, 1M-token context (`nemotron`); others can be loaded with `thor-tigress-serve` (chapter "Model serving") |
 | Speed | about 53 tokens/s per reply; thinks before answering unless told not to (below) |
 | OpenAI API | `/v1/models`, `/v1/chat/completions` |
 | Anthropic API | `/v1/messages` (Claude Code) |
@@ -67,10 +67,9 @@ curl -s https://arpanpathak.taildb9a39.ts.net/v1/models -H "Authorization: Beare
 It lists one model. `401` means the key is wrong or no longer valid.
 
 Every request must name a model. `nemotron` and `nemotron-think` go to the
-Nano, and the full id from `/v1/models` works too. `lightning` works only
-while Lightning is switched on.
-A missing or unknown name gets `400` (chapter "Web chat", section "Two
-models").
+Nano, and the full id from `/v1/models` works too. Another model loaded with
+`thor-tigress-serve` answers to its id. A missing or unknown name gets `400`
+(chapter "Model serving").
 
 ## Claude Code
 

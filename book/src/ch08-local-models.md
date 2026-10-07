@@ -177,7 +177,7 @@ opencode run "add a unit test"     # one task, then exit
 Check the tunnel: `curl -s 127.0.0.1:8079/health` (must print `{"status":"ok"}`).
 
 Each running session uses one of the Thor's chat slots while it generates.
-After a new access key (`./serve.sh key` on the Thor), copy it again with the
+After a new access key (`thor-tigress-serve key` on the Thor), copy it again with the
 `ssh thor cat …` line above.
 
 ## Ollama

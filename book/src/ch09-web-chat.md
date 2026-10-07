@@ -194,59 +194,52 @@ site could borrow (chapter "Security").
 ```bash
 cd ~/Projects/thor-thunder-tigress-platform
 cargo install --path crates/thor-tigress-agent
-cd jetson-thor/model-serving
-./serve.sh install       # thor-chat and thor-tigress-agent services, start at boot
-./serve.sh logs          # follow both logs
+jetson-thor/model-serving/thor-tigress-serve install   # both services, started at boot; puts thor-tigress-serve on your PATH
+thor-tigress-serve logs                                 # follow both logs
 ```
 
-`serve.sh install` writes two systemd user services: `thor-chat`
+`thor-tigress-serve install` writes two systemd user services: `thor-chat`
 (llama-server) and `thor-tigress-agent` (the page and API). Settings go in
-`~/.config/thor-chat/env`, then `./serve.sh install` again:
+`~/.config/thor-chat/env`, then `thor-tigress-serve install` again:
 
 | Setting | Default | Notes |
 |---|---|---|
 | `USERS` | 4 | replies generated at once; a fifth waits |
 | `CONTEXT` | 1,048,576 | tokens per reply; memory for all four is reserved at start (57.8 GB measured); what this costs and how to change it: chapter "Memory, context and slots" |
 | `MODEL` | Nemotron 3 Nano 30B-A3B Q8_0 | any GGUF with a chat template |
-| `LIGHTNING` | Nemotron 3.5 Lightning 30B-A3B Q8_0 | the second model |
-| `LIGHTNING_USERS` / `LIGHTNING_CONTEXT` | 1 / 262,144 | its own replies at once and tokens per reply |
+| `MODELS_MAX` / `MIN_FREE_GB` | 2 / 8 | models in memory at once; memory kept free (chapter "Model serving") |
 | `PORT` / `MODEL_PORT` / `SEARCH_PORT` | 8080 / 8079 / 8888 | |
 
 SearXNG runs as the `searxng` user service from `~/.local/src/searxng`, with
 settings in `~/.config/searxng/settings.yml` (JSON output on).
 
-## Two models
+## More than one model
 
-`serve.sh run` starts llama-server in router mode. It writes
-`~/.config/thor-chat/models.ini` with one section per model and routes each
-request by its `model` field. Loading, unloading and adding models are in
-chapter "Model serving".
+llama-server runs in router mode and sends each request to the model its
+`model` field names. The page's picker lists the loaded models; with one, it
+is greyed out. Loading and unloading models is in chapter "Model serving".
 
-| Model id (what the picker shows) | Also answers to | At start | Replies at once | Tokens per reply |
-|---|---|---|---|---|
-| `NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0` | `nemotron`, `nemotron-think`, the GGUF path | loaded | 4 | 1,048,576 |
-| `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0` | `lightning` | switched off (`LIGHTNING=none`): not listed, not loaded | 1 | 262,144 |
+| Model id | Also answers to | Replies at once | Tokens per reply |
+|---|---|---|---|
+| `NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0` (the default) | `nemotron`, `nemotron-think`, the GGUF path | 4 | 1,048,576 |
+| a model loaded from disk | its id only | 1 | 65,536 |
 
 Any other name is refused with `400`, and so is a request without `model`.
 Before router mode the name was ignored.
 
-Measured on 2026-10-06, both loaded:
+Nemotron 3.5 Lightning ran next to the Nano on 2026-10-06, with one reply at
+256K tokens. Measured then:
 
 | | Nano | Lightning |
 |---|---|---|
 | generation, same Rust prompt, thinking off, 600 tokens | 53.5 tok/s | 52.5 tok/s |
 | short reply through the agent | 48.0 tok/s | 49.1 tok/s |
 
-Both models were loaded 32 seconds after a restart, with 26 GB of memory
-still available. Lightning has since been switched off (its answers were
-disappointing): it is out of memory and off the list, so the picker shows the
-Nano alone, greyed out.
-
-Lightning gets one reply at 256K tokens because both models at four replies
-of 1M tokens do not fit in the Thor's 122 GB. That was tried: memory ran out
-on the first reply, the OOM killer stopped `thor-chat`, and the chat was down
-for three minutes. While someone else is talking to Lightning, a second
-Lightning message waits; the Nano's four slots are separate.
+Both were loaded 32 seconds after a restart, with 26 GB of memory still
+available. Lightning was unloaded the same day because its answers were
+disappointing; it is on disk. Both models at four replies of 1M tokens don't
+fit in the Thor's 122 GB: that was tried, memory ran out on the first reply,
+and the chat was down for three minutes.
 
 ## Share it
 
@@ -262,7 +255,7 @@ Then pick one:
 | | Command | Who can open it |
 |---|---|---|
 | Private | `sudo tailscale serve --bg 8080` | devices on your tailnet; share the Thor from the Tailscale admin console |
-| Public | `./serve.sh key`, then `sudo tailscale funnel --bg 8080` | anyone with the link; the model only for those with the key |
+| Public | `thor-tigress-serve key`, then `sudo tailscale funnel --bg 8080` | anyone with the link; the model only for those with the key |
 
 A new public address can take a few minutes to resolve everywhere. For a
 shorter address on your own domain, see chapter "Bring your own domain".
@@ -270,7 +263,7 @@ shorter address on your own domain, see chapter "Bring your own domain".
 ## Access keys
 
 ```bash
-./serve.sh key && systemctl --user restart thor-chat thor-tigress-agent    # new key
+thor-tigress-serve key && systemctl --user restart thor-chat thor-tigress-agent    # new key
 cat ~/.config/thor-chat/api-key                                            # show it
 ```
 
@@ -304,10 +297,10 @@ ssh thor 'cd ~/Projects/thor-thunder-tigress-platform &&
 |---|---|---|
 | Red dot, "server not reachable" | Funnel off, the Thor asleep, or `thor-tigress-agent` stopped | `curl https://<thor>.<tailnet>.ts.net/health` |
 | Invite screen with a key pasted | the key was changed | `cat ~/.config/thor-chat/api-key` on the Thor |
-| Replies slower than ~53 tok/s | other people are chatting; four replies share the memory bandwidth | `./serve.sh models`, then `curl "127.0.0.1:8079/slots?model=nemotron"` on the Thor (add `-H "Authorization: Bearer $K"`) |
+| Replies slower than ~53 tok/s | other people are chatting; four replies share the memory bandwidth | `thor-tigress-serve models`, then `curl "127.0.0.1:8079/slots?model=nemotron"` on the Thor (add `-H "Authorization: Bearer $K"`) |
 | A long wait before anything | all four slots busy, or a long conversation being read | the same |
 | "searched" missing with Web on | the model chose not to search, or SearXNG is down | `systemctl --user status searxng` |
-| Error under a reply | the message from the server, shown as is | `./serve.sh logs` |
+| Error under a reply | the message from the server, shown as is | `thor-tigress-serve logs` |
 
 ## Not done yet
 

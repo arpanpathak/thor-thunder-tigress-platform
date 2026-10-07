@@ -18,6 +18,31 @@ there as untracked.
 
 ## 2026-10-06
 
+### Model serving: one command (thor-tigress-serve)
+
+- `serve.sh` is replaced by `jetson-thor/model-serving/thor-tigress-serve`,
+  one Python file using only the standard library, symlinked into
+  `~/.local/bin` on the Thor. Run alone, it lists the models with a key
+  each; you type "2 load" or "1 unload". `list-latest` adds the newest
+  unsloth and ggml-org chat GGUFs that this llama.cpp can run and that fit;
+  you type "5 download". The `models`, `memory`, `load NAME`, `unload NAME`
+  and `reload` commands are gone, as are the `LIGHTNING*` settings.
+- Every GGUF under `~/models/gguf` is listed as "on disk". Loading one adds it
+  to `models.local.ini` (1 slot, 64K context); unloading takes it off the
+  router's list again, so the web picker only shows what is loaded.
+- `load` refuses when `MODELS_MAX` models are already loaded, instead of
+  letting llama-server evict the least recently used one (possibly the
+  Nano). It also refuses when the file plus 2 GB wouldn't leave
+  `MIN_FREE_GB` free.
+- Tested on the Thor end to end with LFM2.5-VL-3B (2.9 GB): downloaded,
+  loaded in 2 s, answered at 70 tok/s through the agent, unloaded (4.6 GB
+  freed), deleted. The guards were tested with `MIN_FREE_GB=200`,
+  `MODELS_MAX=1` and "n" to unloading the default.
+- The Thor's units now run `thor-tigress-serve run` and `agent`, repointed
+  without a restart. The commands they will run were compared with the
+  running processes: identical, and `models.ini` was byte for byte the same.
+  `~/.config/thor-chat/env` is empty again.
+
 ### Later the same evening
 
 - **Thinking panel, second fix.** The first fix (87793db) still moved the
@@ -153,6 +178,6 @@ pointed at the Thor, lasso. See `git log` from 72423d3 to 627358f.
   the user's approval of that exact change.
 - No long GPU jobs on the Thor unless asked, and only in a time window the
   user gave.
-- Draft changes to `jetson-thor/model-serving/serve.sh` outside the repo: thor-sync
+- Draft changes to `jetson-thor/model-serving/thor-tigress-serve` outside the repo: thor-sync
   puts them on the Thor at once, and the next restart runs them.
 - No Cloudflare. No AI attribution in commits.

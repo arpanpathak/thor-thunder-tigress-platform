@@ -2,414 +2,237 @@
 
 # Model serving
 
-The Thor serves Nemotron 3 Nano. Nemotron 3.5 Lightning is set up as a
-second model but switched off (`LIGHTNING=none`), so it is neither loaded
-nor listed. This chapter shows how to see what is loaded, take a model out of
-memory, put it back, try a model nobody has run here before, and make a new
-model the default. It also lists the models worth trying as of October 2026,
-with their sizes and whether they fit.
-
-Everything here runs on the Thor, from the folder `serve.sh` is in:
-
-```bash
-ssh thor
-cd ~/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving
-```
-
-`jetson-thor/model-serving/serve.sh` runs both services: `serve.sh run` is
-the model server, `serve.sh agent` the page and API, which it serves from
-`jetson-thor/web/`.
+One command manages the models on the Thor: `thor-tigress-serve`. It shows
+the models in a numbered list. You type a key and what to do with it: load,
+unload, or download.
 
 <div class="covers">
 
 This chapter covers
 
-- what runs: one llama-server router and one process per loaded model
-- the five commands: `models`, `memory`, `load`, `unload`, `reload`
-- trying a new model safely, step by step, and removing it again
-- making a model the default, or leaving one out for good
-- the memory budget, measured, and how to estimate a model's cost and speed
-- models to try, with real file sizes and where each fits
+- the list, and the three actions
+- trying a new model from Hugging Face, start to finish
+- the checks that keep the chat from running out of memory
+- settings, and changing the default model
+- what runs underneath
+- the memory budget, measured, and models worth trying
 - what goes wrong and how to tell
 
 </div>
 
-## What runs
+## The list
 
-<figure>
-<img src="figures/model-router.svg" alt="Clients send requests with a model name to thor-tigress-agent on port 8080, which passes them to the llama-server router on 8079. The router sends each request to the model instance with that name or alias.">
-<figcaption><b>Figure 7.1</b> How a request reaches a model.</figcaption>
-</figure>
+On the Thor (`ssh thor`):
 
-`thor-chat` runs `serve.sh run`, which starts llama-server in **router
-mode**. The router holds no model itself. For each model it loads, it starts
-a separate llama-server process on a private port and forwards requests to
-it by the request's `model` field.
+```text
+$ thor-tigress-serve
 
-| Part | Where | What it does |
+Thor: 59.4 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
+
+  key  model                                          state                 size
+  1    Nemotron 3 Nano 30B A3B · Q8_0                 loaded             33.6 GB  default (nemotron)
+  2    Nemotron 3.5 Lightning 30B A3B · Q8_0          on disk            35.0 GB
+  3    Qwen3.6 27B · Q4_K_M                           on disk            16.8 GB
+
+Type a key and an action: "2 load", "1 unload", "5 download". Enter alone quits.
+>
+```
+
+| State | Meaning | Actions |
 |---|---|---|
-| `thor-chat` | systemd user service → `serve.sh run` | the router on `127.0.0.1:8079` |
-| one llama-server per loaded model | children of the router, private ports | the model's weights, context and slots |
-| `~/.config/thor-chat/env` | optional | settings: `MODEL`, `LIGHTNING`, `USERS`, `CONTEXT`, `MIN_FREE_GB`, `MODELS_MAX`, … |
-| `~/.config/thor-chat/models.ini` | written by `serve.sh` at every start and `reload` | the presets the router reads; don't edit it, it is overwritten |
-| `~/.config/thor-chat/models.local.ini` | yours, optional | models you are trying; appended to `models.ini` |
-| `~/models/gguf/` | model files | one folder per model |
-| `thor-tigress-agent` | `:8080` | passes `model` through unchanged; the web chat, Claude Code and OpenCode all go through it |
+| `loaded` | in memory; the web chat's picker offers it | `unload` |
+| `on disk` | a GGUF file under `~/models/gguf/`, not in memory, not offered by the chat | `load` |
+| `on Hugging Face` | shown by `thor-tigress-serve list-latest`; not downloaded yet | `download` |
 
-The router's rules, read from llama.cpp's source (`tools/server/server-models.cpp`,
-commit `8216c84`):
+The default model (the Nano) is always key 1. Every GGUF under
+`~/models/gguf/` shows up without any setup, so Nemotron 3.5 Lightning is
+one `2 load` away. It was unloaded on 2026-10-06 because its answers were
+disappointing.
 
-- **Names.** A request must name a model by its id or one of its aliases.
-  No name gives `400 model name is missing from the request`. An unknown
-  name gives `400 model 'x' not found`.
-- **Autoload.** A request for a model that isn't loaded loads it first. The
-  request waits, about 12 to 32 seconds here.
-- **At most `MODELS_MAX` loaded** (default 2). Loading one more first
-  unloads the **least recently used** model. That can be the Nano, which is
-  everyone's default.
-- **Reload.** `GET /models?reload=1` re-reads `models.ini`. New sections are
-  listed but not loaded. Removed sections are unloaded and dropped. A
-  running model whose section changed is **unloaded**. An unchanged one
-  keeps running.
+`l`, `u` and `d` work as short forms. After each action the list is shown
+again; Enter alone quits.
 
-The models listed today:
+## Try a new model, start to finish
 
-| Id | Aliases | At start | Slots × context | Memory when loaded |
-|---|---|---|---|---|
-| `NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0` | `nemotron`, `nemotron-think`, its file path | loaded | 4 × 1,048,576 | 57.8 GB |
-| `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0` | `lightning` | switched off: `LIGHTNING=none` in `~/.config/thor-chat/env` | 1 × 262,144 | 35.4 GB |
+This is the run of 2026-10-06, with the smallest model in the list, to test
+the command. The model was deleted afterwards.
 
-Lightning was taken out of memory and off the list on 2026-10-06 because its
-answers were disappointing. The file stays in `~/models/gguf/`. To bring it
-back, delete the `LIGHTNING=none` line, run `./serve.sh reload`, and it is
-listed again; picking it loads it in about 13 seconds.
-
-## The five commands
-
-### See what is there: `models`
+**1. See what is new.** `list-latest` adds the newest chat models from the
+unsloth and ggml-org GGUF collections on Hugging Face:
 
 ```text
-$ ./serve.sh models
-NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0              loaded                   /home/arpanpathak/models/gguf/Nemotron-3-Nano-30B-A3B/NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf, nemotron, nemotron-think
+$ thor-tigress-serve list-latest
+asking Hugging Face for the newest models…
+  …
+  4    Clef · Q8_0                                    on Hugging Face    28.7 GB  2026-10-02 · apache-2.0 · ggml-org/Clef-GGUF
+  5    Clef Flash · Q8_0                              on Hugging Face     9.7 GB  2026-10-02 · apache-2.0 · ggml-org/Clef-Flash-GGUF
+  …
+  9    GLM 4.5 Air · Q4_K_M                           on Hugging Face    63.6 GB  2026-08-25 · mit · ggml-org/GLM-4.5-Air-GGUF
+  …
+  12   LFM2.5 VL 3B · Q8_0                            on Hugging Face     2.9 GB  2026-08-12 · other · unsloth/LFM2.5-VL-3B-GGUF
 ```
 
-The `unload`, `load` and `reload` examples below were run while Lightning
-was still listed.
+Each line shows the date the GGUF was published, the licence and the
+repository. The list is already filtered:
 
-The states are `loaded`, `loading`, `unloaded`, `sleeping`, and
-`unloaded (failed, exit N)` when the model's process died. The cause of a
-failure is in `journalctl --user -u thor-chat`.
+- **Chat models only.** Embedding, image and video models are left out.
+- **Architectures this llama.cpp can run.** They are read from
+  `~/.local/src/llama.cpp/src/llama-arch.cpp`.
+- **Models that fit the Thor alone.** Anything bigger is left out.
+- **One quant per model.** The best of Q8_0, Q6_K, Q5_K_M, Q4_K_M and
+  MXFP4 that fits in the memory free right now; if none fits, the smallest.
+  A model that fits only without the Nano says "fits only after unloading
+  the default".
 
-### See the memory: `memory`
+**2. Download.** `12 download` saves it to
+`~/models/gguf/LFM2.5-VL-3B/` with curl. An interrupted download resumes
+when you run the same action again. The Thor downloads at about 69 MB/s.
 
 ```text
-$ ./serve.sh memory
-MemTotal:        122.8 GB
-MemAvailable:     60.3 GB
-loaded:        NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0
+> 12 download
+downloading LFM2.5-VL-3B-Q8_0.gguf into /home/arpanpathak/models/gguf/LFM2.5-VL-3B
+downloaded 2.9 GB; it is now on disk, type its key and load to try it
 ```
 
-The Thor's CPU and GPU share one memory. A process's own size (RSS) leaves
-out its GPU buffers: the Nano's process shows 2.3 GB while it really costs
-57.8 GB. The honest measure of what a model costs is how much
-`MemAvailable` changes when it loads or unloads.
-
-### Take a model out of memory: `unload`
+**3. Load.** It is now `on disk`, with a new key:
 
 ```text
-$ ./serve.sh unload lightning
-{"success":true}
-$ ./serve.sh memory
-MemTotal:        122.8 GB
-MemAvailable:     60.2 GB
-loaded:        NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0
+> 2 load
+loaded in 2 s; sending one token to commit its memory
+ready: 54.8 GB free
 ```
 
-Measured on 2026-10-06: available memory went from 24.8 to 60.2 GB, so
-Lightning costs 35.4 GB. Any reply Lightning was writing is cut off.
+The web chat's picker offers it from now on, and so does the API under its
+id (`LFM2.5-VL-3B-Q8_0`). A reply through the agent ran at 70 tok/s.
 
-`unload` doesn't keep a model out. The next request that names it loads it
-again: someone picking it in the web chat, or a tool sending `lightning`.
-To keep it out until you say otherwise, see "Leave a model out" below.
-
-### Put it back: `load`
+**4. Unload.** It leaves memory and the chat's list, and is `on disk` again:
 
 ```text
-$ ./serve.sh load lightning
-lightning loaded in 13 s; committing its memory with one token
-MemTotal:        122.8 GB
-MemAvailable:     25.3 GB
-loaded:        NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0
-loaded:        NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0
+> 1 unload
+unloaded: 4.6 GB freed, 59.4 GB free
+off the chat page's list; still on disk
 ```
 
-`load` does more than ask the router:
+**5. Delete it** when you are done with it: `rm -r ~/models/gguf/LFM2.5-VL-3B`.
 
-1. It refuses a name the router doesn't know (exit code 2).
-2. It asks the router to load the model and waits for `loaded`.
-3. It sends the model a one-token request. On the Thor, memory is committed
-   when it is first used, so a model can look loaded with plenty free and
-   still run out on its first reply. That is what took the chat down on
-   2026-10-06 (see "What went wrong once").
-4. Throughout, if `MemAvailable` falls below `MIN_FREE_GB` (default 8), it
-   unloads the model again and exits with code 1.
+## The checks
 
-The guard was tested by forcing it with an impossible floor:
+Running out of memory takes the whole chat down (see "What went wrong once"
+below), so `load` checks before and while it loads:
 
-```text
-$ MIN_FREE_GB=200 ./serve.sh load lightning
-free memory fell below 200 GB while loading; lightning unloaded
-$ ./serve.sh models | grep Lightning
-NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0       unloaded (failed, exit 1) lightning
-```
-
-"failed" there only records that the process was stopped mid-load. The next
-`load` clears it.
-
-The guard checks once a second. It can't stop a load that eats the last
-8 GB in under a second, and it doesn't watch later replies, which use more
-context than the warm-up. The budget below is what keeps you safe; the
-guard is the second line.
-
-### Pick up new presets: `reload`
-
-```text
-$ ./serve.sh reload
-NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0              loaded                   /home/…/NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf, nemotron, nemotron-think
-NVIDIA-Nemotron-3.5-Lightning-30B-A3B-Q8_0       loaded                   lightning
-my-model                                         unloaded                 mine
-```
-
-(From a test on 2026-10-06 with a test section in `models.local.ini`. The
-test used a different model; its id and alias are shown here as the
-placeholders the steps below use.)
-
-`reload` rewrites `models.ini` from the settings and `models.local.ini`,
-then asks the router to re-read it. No restart, no reply cut off, unless you
-changed the section of a model that is running: that model is unloaded.
-
-## Try a new model, step by step
-
-The steps use `my-model` as the id and `mine` as the alias. Put in the
-model you want to try.
-
-### 1. Check that it fits
-
-Find the file size first (see "Models to try" for many already looked up),
-then compare it with the budget:
-
-| What stays loaded | Available | Room for a new model (keeping 8 GB free) |
+| Check | When | Measured on 2026-10-06 |
 |---|---|---|
-| Nano only (today) | 60.3 GB measured | about 52 GB |
-| Nano and Lightning | 24.8 GB measured | about 16 GB |
-| nothing (unload both; the chat is down for anyone not using the new model) | about 118 GB, computed: 60.2 + 57.8 | about 110 GB |
+| no more than `MODELS_MAX` loaded | before | "not loaded: 1 loaded already, the most at once is 1 (MODELS_MAX); unload one first" |
+| file size + 2 GB fits while keeping `MIN_FREE_GB` free | before | with `MIN_FREE_GB=200`: "not loaded: needs about 5 GB, only 0 GB can be used while keeping 200 GB free" |
+| free memory stays above `MIN_FREE_GB` | while loading, every second | undoes the load |
+| the same, while the model writes one token | after loading | undoes the load |
 
-A model needs its file size, plus its context, plus about 2 GB of working
-buffers. How much context costs depends on the architecture (next section),
-so **start with one slot and a small context**, measure, then grow.
+The last check exists because the Thor commits memory when it is first
+used. A model can look loaded with memory to spare and still run out on its
+first reply.
 
-### 2. Check that llama.cpp knows the architecture
+The first check matters because llama-server, when asked to load one model
+too many, silently unloads the one used least recently. That can be the
+Nano, everyone's default. `thor-tigress-serve` refuses instead.
 
-The architecture is in the GGUF's metadata, and Hugging Face shows it:
+Unloading the default asks first:
 
-```bash
-REPO=owner/Some-Model-GGUF          # the Hugging Face repository
-curl -s https://huggingface.co/api/models/$REPO |
-  python3 -c "import sys,json; print(json.load(sys.stdin)['gguf']['architecture'])"
-# for example: nemotron_h_moe
-grep -c '"nemotron_h_moe"' ~/.local/src/llama.cpp/src/llama-arch.cpp
-# 1: known. 0: rebuild llama.cpp first (below).
+```text
+> 1 unload
+This is the default model: the chat stops answering until it is loaded again. Unload? [y/N]
 ```
 
-Every model in the table below was checked this way against the Thor's
-llama.cpp (commit `8216c84`, 2026-10-05).
+These checks can't catch everything. A model given a long context can still
+grow past the limit later, when a long conversation fills it. Models loaded
+from disk get one reply at a time and 64K tokens of context for that reason.
 
-### 3. Download it
+## Settings
 
-List the files in a repository with their sizes:
+In `~/.config/thor-chat/env`, one `KEY=value` per line. The file is empty
+on the Thor today, so the defaults apply.
 
-```bash
-curl -s https://huggingface.co/api/models/$REPO/tree/main |
-  python3 -c "import sys,json; [print(f['path'], round(f.get('size',0)/1e9,1), 'GB') for f in json.load(sys.stdin)]"
-```
+| Setting | Default | What it does |
+|---|---|---|
+| `MODEL` | `~/models/gguf/Nemotron-3-Nano-30B-A3B/NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf` | the default model, always key 1, loaded at start, also called `nemotron` and `nemotron-think` |
+| `USERS` | 4 | the default model's replies at once |
+| `CONTEXT` | 1,048,576 | the default model's tokens per reply |
+| `MODELS_MAX` | 2 | models in memory at once |
+| `MIN_FREE_GB` | 8 | memory `load` keeps free |
+| `PORT`, `MODEL_PORT`, `SEARCH_PORT` | 8080, 8079, 8888 | the page and API, llama-server, SearXNG |
 
-Then download into its own folder. `-C -` resumes a broken download:
-
-```bash
-mkdir -p ~/models/gguf/my-model && cd ~/models/gguf/my-model
-curl -L -C - -O https://huggingface.co/$REPO/resolve/main/FILE.gguf
-```
-
-The Thor downloads at about 69 MB/s (measured), so 35 GB takes about 9
-minutes. Big models come in parts (`…-00001-of-00003.gguf`, in a folder named
-after the quant). Download every part into one folder; the preset names the
-first part.
-
-Check the size against the listing before using the file: `ls -l`.
-
-### 4. Add it to `models.local.ini`
-
-```ini
-[my-model]
-model = /home/arpanpathak/models/gguf/my-model/FILE.gguf
-alias = mine
-parallel = 1
-ctx-size = 65536
-load-on-startup = false
-```
-
-| Key | Meaning |
-|---|---|
-| `[name]` | the id: what `models` prints, what the web chat's picker shows, what requests send |
-| `model` | absolute path to the GGUF (the first part, if split) |
-| `alias` | other names, comma-separated; must not clash with any other id or alias |
-| `parallel` | slots: replies at once |
-| `ctx-size` | tokens for **all** slots together; each slot gets `ctx-size / parallel` |
-| `load-on-startup` | `false` while trying it: a restart of `thor-chat` won't load it |
-
-Any llama-server option works as a key, without the dashes:
-`cache-type-k = q8_0`, `n-gpu-layers = 999`, `chat-template-file = …`.
-`n-gpu-layers = 999`, `flash-attn = on` and `jinja = true` already come from
-the `[*]` section.
-
-### 5. Make it known: `reload`
-
-```bash
-./serve.sh reload
-```
-
-It appears as `unloaded`. **It also appears in the web chat's model picker
-for everyone, at once.** Anyone who picks it loads it, and with
-`MODELS_MAX=2` that unloads whichever loaded model was used least recently.
-Try models when nobody else is chatting, or keep the test short.
-
-### 6. Make room, then load it
-
-With Lightning unloaded there are about 52 GB of room. If Lightning is
-loaded and the budget says the new model doesn't fit next to it, unload it
-first:
-
-```bash
-./serve.sh unload lightning
-./serve.sh load mine
-```
-
-`load` prints the time it took and the memory after one token. The memory
-the model really costs is the drop in `MemAvailable`.
-
-### 7. Measure it
-
-The same prompt used for the Nano and Lightning:
-
-```bash
-K=$(cat ~/.config/thor-chat/api-key)
-curl -s 127.0.0.1:8079/v1/chat/completions -H "Authorization: Bearer $K" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"mine","messages":[{"role":"user","content":"Write a Rust function that returns the median of a slice of f64, with a test."}],"chat_template_kwargs":{"enable_thinking":false},"max_tokens":600}' |
-  python3 -c "import sys,json; t=json.load(sys.stdin)['timings']; print(round(t['predicted_per_second'],1),'tok/s')"
-```
-
-| Model | tok/s, measured 2026-10-06 |
-|---|---|
-| Nemotron 3 Nano, Q8_0 | 53.5 |
-| Nemotron 3.5 Lightning, Q8_0 | 52.5 |
-
-Write your result in the table in `WORKLOG.md` with the date, quant, slots
-and context. A speed without those settings can't be compared.
-
-### 8. Take it away again
-
-```bash
-./serve.sh unload mine
-# delete its section from ~/.config/thor-chat/models.local.ini, then:
-./serve.sh reload
-rm -r ~/models/gguf/my-model      # only if you won't try it again
-```
-
-Steps 4, 5 and 8 were run on 2026-10-06 with a test section. The model was
-listed, then gone after the second reload. The models already loaded stayed
-loaded throughout.
-
-## Change what is served for good
-
-### Make a model the default or the second model
-
-`MODEL` is the model listed first, which the page picks for people who never
-chose. `LIGHTNING` is the second. Point either at another file in
-`~/.config/thor-chat/env`:
-
-```bash
-MODEL=/home/arpanpathak/models/gguf/my-model/FILE.gguf
-USERS=2
-CONTEXT=131072
-```
-
-Then restart. A restart cuts off every reply being written, so wait until
-no slot is busy:
+A change to `MODEL`, `USERS`, `CONTEXT` or `MODELS_MAX` takes effect when
+`thor-chat` restarts. That cuts off every reply being written, so wait until
+nobody is mid-reply:
 
 ```bash
 K=$(cat ~/.config/thor-chat/api-key)
 until [ "$(curl -s "127.0.0.1:8079/slots?model=nemotron" -H "Authorization: Bearer $K" |
            python3 -c "import sys,json;print(sum(s['is_processing'] for s in json.load(sys.stdin)))")" = 0 ]; do sleep 2; done
 systemctl --user restart thor-chat
-./serve.sh memory
 ```
 
+To make another model the default, point `MODEL` at its file and restart.
 The aliases `nemotron` and `nemotron-think` follow `MODEL`, so Claude Code
-and OpenCode keep working when the default changes. They will then get the
-new model under the old name.
+and OpenCode keep working; they get the new model under the old name.
 
-### Leave a model out
+## The other commands
 
-```bash
-echo 'LIGHTNING=none' >> ~/.config/thor-chat/env
-./serve.sh reload        # unloads Lightning and drops it from the list
-```
+| Command | What it does |
+|---|---|
+| `thor-tigress-serve install` | writes the two services (`thor-chat`, `thor-tigress-agent`), starts them at boot, and puts `thor-tigress-serve` in `~/.local/bin` |
+| `thor-tigress-serve uninstall` | stops and removes both services |
+| `thor-tigress-serve key` | writes a new access key; restart both services to use it |
+| `thor-tigress-serve logs` | follows both logs |
 
-This is the Thor's setting since 2026-10-06. The web chat then lists one
-model, and its picker is greyed out.
+The services run `thor-tigress-serve run` and `thor-tigress-serve agent`;
+you don't run those by hand. On a fresh Thor, the first install is run from
+the repository: `jetson-thor/model-serving/thor-tigress-serve install`.
 
-A missing file has the same effect. To bring it back, delete the line and
-`reload`, then `./serve.sh load lightning`.
+## What runs
 
-### Load Lightning at start again
+<figure>
+<img src="figures/model-router.svg" alt="Clients send requests with a model name to thor-tigress-agent on port 8080, which passes them to the llama-server router on 8079. The router sends each request to the model process with that name or alias.">
+<figcaption><b>Figure 7.1</b> How a request reaches a model.</figcaption>
+</figure>
 
-Lightning's section says `load-on-startup = false`. To load it at every
-start, change that line in `serve.sh` (the `presets` function) to `true`.
+| Part | What it is |
+|---|---|
+| `thor-chat` | systemd user service: `thor-tigress-serve run`, llama-server in router mode on `127.0.0.1:8079` |
+| one llama-server per loaded model | started by the router on a private port |
+| `thor-tigress-agent` | systemd user service: `thor-tigress-serve agent`, the page, key check, web search and API on `:8080`; passes `model` through unchanged |
+| `~/.config/thor-chat/models.ini` | the router's list of models; written by `thor-tigress-serve`, don't edit it |
+| `~/.config/thor-chat/models.local.ini` | the models loaded from disk; written by `load`, emptied by `unload` |
+| `jetson-thor/model-serving/thor-tigress-serve` | the command: one Python file, standard library only |
 
-### More than two at once
+The router's rules, from llama.cpp's source
+(`tools/server/server-models.cpp`, commit `8216c84`):
 
-`MODELS_MAX=3` in the env file, then restart `thor-chat`. With the Nano and
-Lightning loaded, a third model has about 16 GB. Only small models fit (see
-the table).
-
-### Free memory when idle
-
-llama-server can unload a model after a quiet period and reload it on the
-next request (`--sleep-idle-seconds N`, or `sleep-idle-seconds = N` in a
-preset section). It isn't used here: the first message after a quiet
-period would wait 12 to 32 seconds.
-
-### Stop everything
-
-```bash
-systemctl --user stop thor-chat     # all models out of memory; the chat answers 502
-systemctl --user start thor-chat    # the Nano back in about 15 s
-```
+- **Names.** Every request names a model by id or alias. A missing name gets
+  `400 model name is missing from the request`. An unknown one gets
+  `400 model 'x' not found`.
+- **Autoload.** A request for a listed model that isn't loaded loads it.
+- **Limit.** Past `--models-max`, it unloads the least recently used model.
+- **Reload.** `GET /models?reload=1` re-reads `models.ini`. A running model
+  whose section is unchanged keeps running.
 
 ## The memory budget
 
 <figure>
 <img src="figures/model-memory.svg" alt="A bar of the Thor's 122.8 GB: Nemotron 3 Nano 57.8 GB, Lightning 35.4 GB, OS and other programs 4.8 GB, 24.8 GB available.">
-<figcaption><b>Figure 7.2</b> Where the memory goes with both models loaded (measured before Lightning was unloaded).</figcaption>
+<figcaption><b>Figure 7.2</b> Where the memory went with both Nemotrons loaded, 2026-10-06.</figcaption>
 </figure>
 
 | Part | Size | How we know |
 |---|---|---|
 | Nemotron 3 Nano, 4 × 1,048,576 | 57.8 GB | llama-server's own report at start (chapter "Memory, context and slots") |
-| Nemotron 3.5 Lightning, 1 × 262,144 | 35.4 GB | `MemAvailable` before and after `unload`, 2026-10-06 |
+| Nemotron 3.5 Lightning, 1 × 262,144 | 35.4 GB | free memory before and after unloading it |
 | OS, agent, SearXNG | 4.8 GB | the remainder |
-| available | 24.8 GB | `./serve.sh memory` |
+| free with the Nano alone | about 59 to 60 GB | the list's header |
+
+A process's own size (RSS) is no use here: the CPU and GPU share one
+memory, and RSS leaves out the GPU buffers. The Nano's process shows 2.3 GB
+while it costs 57.8 GB. What a model costs is the change in free memory when
+it loads, which `load` and `unload` print.
 
 ### Estimate a model before downloading it
 
@@ -417,21 +240,16 @@ systemctl --user start thor-chat    # the Nano back in about 15 s
 memory ≈ file size + context + about 2 GB
 ```
 
-Context costs very different amounts per token depending on the
-architecture:
+What context costs per token depends on the architecture:
 
 - **Hybrid Mamba models** (Nemotron 3 Nano, Lightning, Nemotron 3 Super)
   keep a full key/value cache for a few attention layers only. A million
   tokens costs a few GB per slot, which is why the Nano holds 4 × 1M.
 - **Models with mostly sliding-window or linear attention** (gpt-oss, the
-  `qwen35` architecture of Qwen3.6-27B and Qwen3.8-27B, whose llama.cpp code
-  loads gated delta net layers; Gemma 4) are cheap per token on most layers.
+  `qwen35` architecture, whose llama.cpp code loads gated delta net layers,
+  and Gemma 4) are cheap per token on most layers.
 - **Dense models with full attention on every layer** (Devstral Small 2)
   can cost more for the context than for the weights at long context.
-
-The safe way is the one in "Try a new model": one slot, 64K tokens, load,
-read the drop in `MemAvailable`, then grow `ctx-size` and `parallel` while
-watching `./serve.sh memory`.
 
 ### Estimate its speed
 
@@ -445,48 +263,46 @@ tok/s ≈ 180 / (active parameters in billions × bytes per parameter)
 bytes per parameter: Q8_0 ≈ 1.06, Q6_K ≈ 0.82, Q4_K_M ≈ 0.60, MXFP4 ≈ 0.53, IQ2 ≈ 0.30
 ```
 
-This is an estimate, calibrated on one model. MoE routing, attention over a
-long context, and several people chatting at once all lower it. A dense
-27B model at Q8_0 reads 29 GB per token, so about 6 tok/s. That's why the
-fast models in the table are mixtures of experts with few active parameters.
+This is an estimate calibrated on one model. A dense 27B model at Q8_0
+reads 29 GB per token, so about 6 tok/s. That's why the fast models below
+are mixtures of experts with few active parameters.
 
-## Models to try
+## Models worth trying
 
-As of 2026-10-06. Sizes come from the Hugging Face file listings of the
-GGUF repositories named (unsloth unless noted). Architectures come from
-the GGUF metadata, and every one was found in the Thor's llama.cpp.
-**Speeds are estimates** from the formula above; only the two Nemotrons have
-been measured. "Fits" uses the budget in step 1: **A** next to the Nano and
-Lightning, **B** next to the Nano alone (today's state), **C** alone.
+As of 2026-10-06. Sizes come from Hugging Face's file listings (unsloth GGUFs
+unless noted), and every architecture was found in the Thor's llama.cpp.
+**Speeds are estimates** from the formula above; only the Nemotrons were
+measured. "Fits": **A** next to the Nano with 16 GB to spare, **B** next to
+the Nano (about 50 GB), **C** alone. `list-latest` shows what is new since.
 
-### Same class as Lightning: about 30B total, about 3B active
+### About 30B total, about 3B active
 
-| Model | Total / active | Context | Licence | Quant, size | Fits | Est. tok/s |
+| Model | Total / active | Context | Licence | Quant, size | Fits | tok/s |
 |---|---|---|---|---|---|---|
-| Nemotron 3 Nano (served) | 30B / 3B | 1M | NVIDIA Nemotron Open Model License | Q8_0, 33.6 GB | served | 53.5 measured |
-| Nemotron 3.5 Lightning (listed, unloaded) | 30B / 3B | 1M | OpenMDW-1.1 | Q8_0, 35.0 GB | B | 52.5 measured |
+| Nemotron 3 Nano (the default) | 30B / 3B | 1M | NVIDIA Nemotron Open Model License | Q8_0, 33.6 GB | loaded | 53.5 measured |
+| Nemotron 3.5 Lightning (on disk) | 30B / 3B | 1M | OpenMDW-1.1 | Q8_0, 35.0 GB | B | 52.5 measured |
 | Qwen3.6-35B-A3B | 34.7B / 3B | 256K | Apache-2.0 | Q8_0, 36.9 GB; Q4_K_XL, 22.4 GB | B | 55 (Q8_0) |
-| gpt-oss-20b (OpenAI; ggml-org GGUF) | 20.9B / 3.6B | 128K | Apache-2.0 | MXFP4, 12.1 GB | **A** | 90 |
+| gpt-oss-20b (OpenAI; ggml-org GGUF) | 20.9B / 3.6B | 128K | Apache-2.0 | MXFP4, 12.1 GB | A | 90 |
 
 ### Dense, 12B to 27B: strong per parameter, slow here
 
-| Model | Params | Context | Licence | Quant, size | Fits | Est. tok/s |
+| Model | Params | Context | Licence | Quant, size | Fits | tok/s |
 |---|---|---|---|---|---|---|
-| Qwen3.8-27B | 27.3B | 256K | Apache-2.0 | Q8_0, 29.0 GB; Q4_K_XL, 17.6 GB; Q4_K_M, 16.5 GB | B (Q4_K_M: A only with a tiny context) | 6 (Q8_0), 11 (Q4_K_M) |
+| Qwen3.8-27B | 27.3B | 256K | Apache-2.0 | Q8_0, 29.0 GB; Q4_K_M, 16.5 GB | B | 6 (Q8_0), 11 (Q4_K_M) |
 | Devstral Small 2 (Mistral) | 23.6B | 384K | Apache-2.0 | Q8_0, 25.1 GB; Q4_K_M, 14.3 GB | B; Q4_K_M: A | 7 (Q8_0), 13 (Q4_K_M) |
-| Gemma 4 12B | 11.9B | 256K | Apache-2.0 | Q8_0, 13.1 GB | **A** | 14 |
+| Gemma 4 12B | 11.9B | 256K | Apache-2.0 | Q8_0, 13.1 GB | A | 14 |
 
-### Large mixtures of experts: only alone, or instead of Lightning at low quants
+### Large mixtures of experts: alone, or next to the Nano at low quants
 
-| Model | Total / active | Context | Licence | Quant, size | Fits | Est. tok/s |
+| Model | Total / active | Context | Licence | Quant, size | Fits | tok/s |
 |---|---|---|---|---|---|---|
 | Qwen3-Coder-Next | 80B / 3B | 256K | Apache-2.0 | Q4_K_M, 48.5 GB; Q8_0, 84.8 GB | Q4_K_M: B, barely; Q8_0: C | 100 (Q4_K_M), 55 (Q8_0) |
 | gpt-oss-120b (OpenAI; ggml-org GGUF) | 116.8B / 5.1B | 128K | Apache-2.0 | MXFP4, 63.4 GB | C | 65 |
 | Mistral Small 4 | 119B / 6B | 1M | Apache-2.0 | Q4_K_M, 73.8 GB | C | 50 |
-| Nemotron 3 Super | 120.7B / 12B | 1M | NVIDIA Nemotron Open Model License | Q4_K_M, 82.5 GB; IQ2_XXS, 52.7 GB | C | 25 (Q4_K_M) |
+| Nemotron 3 Super | 120.7B / 12B | 1M | NVIDIA Nemotron Open Model License | Q4_K_M, 82.5 GB | C | 25 |
 | Qwen3.8-Flash-Next | 125B / 6B (+51B n-gram embedding) | 256K | Qwen Community 1.0 | UD-Q2_K_XL, 78.9 GB | C | 65; 2-bit loses quality |
 | DeepSeek-V4-Flash-0731 | 284B / not stated in the GGUF card | 1M | MIT | UD-IQ1_M, 86.9 GB | C | not estimated; 1-bit loses a lot |
-| GLM-5.3-Flash | 320B / 18B | 1M | MIT | UD-IQ1_M, 97.6 GB | C, barely, tiny context | 33; 1-bit loses a lot |
+| GLM-5.3-Flash | 320B / 18B | 1M | MIT | UD-IQ1_M, 97.6 GB | C, barely | 33; 1-bit loses a lot |
 
 ### Too big for 128 GB at any quant
 
@@ -495,16 +311,20 @@ Lightning, **B** next to the Nano alone (today's state), **C** alone.
 | GLM-5.3 | 754B | UD-IQ1_M, 228.5 GB |
 | Kimi K3 | 2.78T | UD-IQ1_M, 648.9 GB |
 
-Rankings and benchmark claims come from the model makers and from roundups
-such as [Thunder Compute's October 2026 list](https://www.thundercompute.com/blog/best-open-source-llms)
+The models in `list-latest` are the ones unsloth and ggml-org publish. A
+model from another repository can be tried by putting its GGUF under
+`~/models/gguf/<name>/`; it then shows as `on disk`.
+
+Benchmark claims come from the model makers and from roundups such as
+[Thunder Compute's October 2026 list](https://www.thundercompute.com/blog/best-open-source-llms)
 and [vdf.ai's local coding comparison](https://vdf.ai/blog/best-local-llm-for-coding/).
-Nothing in this table was measured on our tasks. The way to know is step 7
-plus spark on the answers.
+Nothing here was measured on our tasks.
 
-## Update llama.cpp for a new architecture
+## A newer llama.cpp
 
-If step 2 printed 0, the model needs a newer llama.cpp. Not run while writing
-this chapter; it rebuilds the binary every model uses:
+`list-latest` leaves out models whose architecture this llama.cpp doesn't
+know. To get them, rebuild it. This wasn't run while writing this chapter,
+and it rebuilds the binary every model uses:
 
 ```bash
 cd ~/.local/src/llama.cpp
@@ -519,26 +339,21 @@ commit in chapter "Operations".
 
 | You see | Cause | Do |
 |---|---|---|
-| `400 model name is missing from the request` | a client sends no `model` | send `nemotron`, `lightning` or an id |
-| `400 model 'x' not found` | a name that is no id or alias | `./serve.sh models` |
-| `400 model is not loaded` | sent with autoload off | `./serve.sh load NAME` |
-| `unloaded (failed, exit 1)` | the process died: bad path, unknown architecture, out of memory, or stopped by `load`'s guard | `journalctl --user -u thor-chat -n 50` |
-| a loaded model unloaded by itself | a third model was loaded and `MODELS_MAX` evicted the least recently used; or `reload` after its section changed | `./serve.sh models`; `./serve.sh load NAME` |
-| `thor-chat … oom-kill` in the journal | memory ran out; the whole router restarts | `./serve.sh memory`; lower `ctx-size`/`parallel`, or unload something |
-| the first message to a model takes 15 to 30 s | it was unloaded and is being loaded | normal; `./serve.sh load NAME` beforehand |
-| a model you are trying shows in everyone's picker | every section in `models.ini` is listed | expected; remove the section and `reload` when done |
+| `400 model name is missing from the request` | a client sends no `model` | send `nemotron` or an id from the list |
+| `400 model 'x' not found` | a name that is no id or alias, or a model that is only on disk | load it first |
+| `failed to load; see: journalctl …` | bad file, unknown architecture, or out of memory | `journalctl --user -u thor-chat -n 50` |
+| `thor-chat … oom-kill` in the journal | memory ran out; the router and all models restart | load fewer or smaller models |
+| the first reply from a model takes 15 to 30 s | someone asked for a listed model that wasn't loaded, so it loaded first | normal |
+| `the model server said: …` | `thor-chat` isn't running or is restarting | `systemctl --user status thor-chat` |
 
 ## What went wrong once
 
 On 2026-10-06, Lightning was first tried with the Nano's settings (4 × 1M)
-on a test port, next to the live Nano. Both loaded, and memory still looked
-fine. On the first reply memory ran out, and the kernel's OOM killer stopped
-`thor-chat`. systemd restarted it on a `serve.sh` that tried to load both at
-4 × 1M, which ran out again and kept failing. The chat was down from 20:49
-to 20:52 until the old script was put back.
+next to the live Nano. Both loaded and memory still looked fine. On the first
+reply it ran out, and the kernel's OOM killer stopped `thor-chat`. systemd
+restarted it on a script that loaded both at 4 × 1M again, so it kept
+failing. The chat was down from 20:49 to 20:52.
 
-Three things came out of it:
-
-- Lightning got one slot of 256K.
-- `load` sends a token and watches memory.
-- The rule: **work out the budget before loading anything, and start small.**
+The checks in `load` (the memory floor, the one-token warm-up, refusing
+instead of evicting) and the small default context for models loaded from
+disk come from that.
