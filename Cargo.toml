@@ -5,5 +5,6 @@ members = [
     "crates/thor-lasso-distiller",
     "crates/thor-spark-safety-eval",
     "crates/thor-tigress-agent",
+    "crates/thor-tigress-keyring",
     "crates/thor-tigress-reinforcer-frontend",
 ]

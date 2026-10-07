@@ -34,6 +34,8 @@ pub enum Status {
     BadRequest,
     /// 404: no such page.
     NotFound,
+    /// 500: the server's own keyring or settings failed.
+    ServerError,
     /// 502: the model server or the search engine failed.
     BadGateway,
 }
@@ -60,6 +62,7 @@ impl Status {
             Status::Unauthorized => "401 Unauthorized",
             Status::BadRequest => "400 Bad Request",
             Status::NotFound => "404 Not Found",
+            Status::ServerError => "500 Internal Server Error",
             Status::BadGateway => "502 Bad Gateway",
         }
     }
@@ -118,6 +121,7 @@ pub fn unauthorized(stream: &mut dyn Write) -> Outcome {
 pub fn failure(stream: &mut dyn Write, error: &AgentError) -> Outcome {
     let status = match error {
         AgentError::BadRequest(_) | AgentError::Json(_) => Status::BadRequest,
+        AgentError::Keyring(_) => Status::ServerError,
         AgentError::Upstream(_) => Status::BadGateway,
         AgentError::Io(_) | AgentError::Config(_) => return Ok(()),
     };

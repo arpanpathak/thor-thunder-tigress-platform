@@ -17,6 +17,8 @@ pub enum AgentError {
     BadRequest(String),
     /// The model server or the search engine answered with an error.
     Upstream(String),
+    /// The encrypted keyring could not be read or written.
+    Keyring(String),
     /// The command line or a setting is wrong.
     Config(String),
 }
@@ -35,6 +37,7 @@ impl fmt::Display for AgentError {
             AgentError::Json(error) => write!(formatter, "json: {error}"),
             AgentError::BadRequest(message) => write!(formatter, "bad request: {message}"),
             AgentError::Upstream(message) => write!(formatter, "upstream: {message}"),
+            AgentError::Keyring(message) => write!(formatter, "keyring: {message}"),
             AgentError::Config(message) => write!(formatter, "config: {message}"),
         }
     }
@@ -45,7 +48,10 @@ impl std::error::Error for AgentError {
         match self {
             AgentError::Io(error) => Some(error),
             AgentError::Json(error) => Some(error),
-            AgentError::BadRequest(_) | AgentError::Upstream(_) | AgentError::Config(_) => None,
+            AgentError::BadRequest(_)
+            | AgentError::Upstream(_)
+            | AgentError::Keyring(_)
+            | AgentError::Config(_) => None,
         }
     }
 }
@@ -59,6 +65,17 @@ impl From<io::Error> for AgentError {
 impl From<serde_json::Error> for AgentError {
     fn from(error: serde_json::Error) -> Self {
         AgentError::Json(error)
+    }
+}
+
+impl From<thor_tigress_keyring::error::KeyringError> for AgentError {
+    fn from(error: thor_tigress_keyring::error::KeyringError) -> Self {
+        match error {
+            thor_tigress_keyring::error::KeyringError::Invalid(message) => {
+                AgentError::BadRequest(message)
+            }
+            other => AgentError::Keyring(other.to_string()),
+        }
     }
 }
 
@@ -87,6 +104,7 @@ mod tests {
             AgentError::from(io::Error::other("disk")),
             AgentError::bad_request("no body"),
             AgentError::Upstream("502".to_string()),
+            AgentError::Keyring("wrong passphrase".to_string()),
             AgentError::Config("--listen needs a value".to_string()),
         ];
         let shown: Vec<String> = errors.iter().map(ToString::to_string).collect();
@@ -96,6 +114,7 @@ mod tests {
                 "i/o: disk",
                 "bad request: no body",
                 "upstream: 502",
+                "keyring: wrong passphrase",
                 "config: --listen needs a value"
             ]
         );

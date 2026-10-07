@@ -14,6 +14,8 @@ Services:
                                            services, started at boot
   thor-tigress-serve uninstall             stop and remove both services
   thor-tigress-serve key                   create a new access key
+  thor-tigress-serve keyring-init          make the encrypted keyring and its passphrase
+  thor-tigress-serve keyring CMD ...       run thor-tigress-keyring on that keyring
   thor-tigress-serve logs                  follow both logs
 
 The services run "thor-tigress-serve run" (llama-server in router mode on
@@ -70,6 +72,9 @@ DEFAULTS = {
     "SEARCH_PORT": "8888",
     "SERVER": str(LLAMA / "build" / "bin" / "llama-server"),
     "AGENT": str(HOME / ".cargo" / "bin" / "thor-tigress-agent"),
+    "KEYRING_BIN": str(HOME / ".cargo" / "bin" / "thor-tigress-keyring"),
+    "KEYRING": str(CONFIG / "keyring"),
+    "KEYRING_PASSPHRASE": str(CONFIG / "keyring-passphrase"),
 }
 
 TRY_CONTEXT = 65536
@@ -516,7 +521,17 @@ def agent(values):
     os.execv(values["AGENT"], [values["AGENT"], "--listen", f"127.0.0.1:{values['PORT']}",
                                "--model", f"127.0.0.1:{values['MODEL_PORT']}", *engines,
                                "--search", f"127.0.0.1:{values['SEARCH_PORT']}",
-                               "--web", str(WEB), "--key-file", str(CONFIG / "api-key")])
+                               "--web", str(WEB), "--key-file", str(CONFIG / "api-key"),
+                               *keyring_arguments(values)])
+
+
+def keyring_arguments(values):
+    """--keyring and its passphrase, only when both are there, so the agent starts either way."""
+    keyring = Path(values["KEYRING"])
+    passphrase = Path(values["KEYRING_PASSPHRASE"])
+    if keyring.exists() and passphrase.exists():
+        return ["--keyring", str(keyring), "--keyring-passphrase-file", str(passphrase)]
+    return []
 
 
 def unit(name, description, command, after, limits=""):
@@ -570,13 +585,41 @@ def key(values):
     print(f"new key written to {path}\napply it: systemctl --user restart thor-chat thor-tigress-agent")
 
 
+def keyring_init(values):
+    """Makes the encrypted keyring and the passphrase the agent reads; both mode 600."""
+    CONFIG.mkdir(parents=True, exist_ok=True)
+    if Path(values["KEYRING"]).exists():
+        print(f"{values['KEYRING']} is already there; use \"keyring keys\" to see who is in it")
+        return
+    passphrase = Path(values["KEYRING_PASSPHRASE"])
+    if not passphrase.exists():
+        passphrase.write_text(os.urandom(24).hex() + "\n")
+        passphrase.chmod(0o600)
+    subprocess.run([values["KEYRING_BIN"], "--keyring", values["KEYRING"],
+                    "--passphrase-file", str(passphrase), "init"], check=True)
+    print(f"keyring at {values['KEYRING']}\n"
+          "people ask on the invite screen, then: thor-tigress-serve keyring requests\n"
+          "approve one with: thor-tigress-serve keyring approve EMAIL\n"
+          "apply it: systemctl --user restart thor-tigress-agent")
+
+
+def keyring(values, rest):
+    """Runs thor-tigress-keyring on the keyring these services use."""
+    if not Path(values["KEYRING"]).exists():
+        sys.exit("no keyring yet; run: thor-tigress-serve keyring-init")
+    command = [values["KEYRING_BIN"], "--keyring", values["KEYRING"],
+               "--passphrase-file", values["KEYRING_PASSPHRASE"]]
+    os.execv(values["KEYRING_BIN"], command + rest)
+
+
 def logs(values):
     os.execvp("journalctl", ["journalctl", "--user", "-u", "thor-chat", "-u", "thor-edge-llm", "-u", "thor-tigress-agent", "-f"])
 
 
 COMMANDS = {
     "list": list_here, "list-latest": list_latest,
-    "install": install, "uninstall": uninstall, "key": key, "logs": logs, "run": run, "agent": agent, "edge": edge,
+    "install": install, "uninstall": uninstall, "key": key, "keyring-init": keyring_init,
+    "logs": logs, "run": run, "agent": agent, "edge": edge,
 }
 COMMANDS_WITH_NAME = {"load": load_command, "unload": unload_command, "download": download_command}
 
@@ -584,6 +627,8 @@ COMMANDS_WITH_NAME = {"load": load_command, "unload": unload_command, "download"
 def main():
     values = settings()
     command, *rest = sys.argv[1:] or ["help"]
+    if command == "keyring":
+        return keyring(values, rest)
     if command in COMMANDS and not rest:
         return COMMANDS[command](values)
     if command in COMMANDS_WITH_NAME and len(rest) == 1:

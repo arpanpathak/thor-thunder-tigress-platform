@@ -1,20 +1,31 @@
-//! The server's settings, from the command line and the key file.
+//! The server's settings, from the command line, the key file and the keyring.
 //!
 //! ```text
 //! thor-tigress-agent [--listen 127.0.0.1:8080] [--model 127.0.0.1:8079]
 //!                    [--engine MODEL=HOST:PORT]... [--search 127.0.0.1:8888]
 //!                    [--web DIR] [--key-file FILE]
+//!                    [--keyring FILE] [--keyring-passphrase-file FILE]
 //! ```
 //!
 //! `--engine` names a model another engine serves, such as TensorRT
 //! Edge-LLM; requests for it go there, everything else to `--model`.
+//!
+//! `--key-file` is the one key this server sends to llama-server. When
+//! `--keyring` names an encrypted registry, the personal keys in it are what
+//! visitors may use, and `--key-file` still lets the operator in. The
+//! keyring's passphrase comes from `--keyring-passphrase-file` or the
+//! `THOR_KEYRING_PASSPHRASE` environment variable.
 
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::{Mutex, MutexGuard},
+    time::SystemTime,
 };
 
 use serde::Deserialize;
+use thor_tigress_keyring::{error::KeyringError, store::Keyring};
+use zeroize::Zeroizing;
 
 use crate::{
     error::{AgentError, Outcome},
@@ -32,6 +43,9 @@ const DEFAULT_SEARCH: &str = "127.0.0.1:8888";
 
 /// The key file, relative to `$HOME`.
 const KEY_FILE: &str = ".config/thor-chat/api-key";
+
+/// Where the keyring's passphrase is read from unless a file is given.
+const KEYRING_ENV: &str = "THOR_KEYRING_PASSPHRASE";
 
 /// How a key is sent in an `Authorization` header.
 pub const BEARER: &str = "Bearer ";
@@ -79,33 +93,127 @@ impl Upstreams {
     }
 }
 
+/// The people whose personal keys the chat accepts, read from the encrypted
+/// keyring and reloaded when the file changes.
+pub struct People {
+    path: PathBuf,
+    passphrase: Zeroizing<String>,
+    state: Mutex<Loaded>,
+}
+
+/// The active keys, and the keyring file's timestamp when they were read.
+#[derive(Default)]
+struct Loaded {
+    keys: Vec<String>,
+    modified: Option<SystemTime>,
+}
+
+impl People {
+    /// Reads the keyring at `path`, so a wrong passphrase or a missing file is
+    /// caught at startup, not on the first visitor.
+    ///
+    /// # Errors
+    ///
+    /// [`AgentError::Keyring`] when the file cannot be read or opened.
+    pub fn new(path: PathBuf, passphrase: Zeroizing<String>) -> Outcome<Self> {
+        let keyring = Keyring::open(&path, &passphrase)?;
+        let loaded = Loaded {
+            keys: keyring.active_keys(),
+            modified: modified(&path),
+        };
+        Ok(People {
+            path,
+            passphrase,
+            state: Mutex::new(loaded),
+        })
+    }
+
+    /// Whether `sent` carries the key of someone the keyring calls active.
+    #[must_use]
+    pub fn admit(&self, sent: Option<&str>) -> bool {
+        let Some(sent) = sent.and_then(|value| value.strip_prefix(BEARER)) else {
+            return false;
+        };
+        let mut loaded = self.lock();
+        if let Err(error) = self.refresh(&mut loaded) {
+            eprintln!("keyring: {error}");
+        }
+        loaded.keys.iter().any(|key| same_secret(sent, key))
+    }
+
+    /// Records a request from the registration form, so the author can approve
+    /// it with `thor-tigress-keyring approve`.
+    ///
+    /// # Errors
+    ///
+    /// [`KeyringError`] when the keyring cannot be read, or when the name or
+    /// email is not acceptable.
+    pub fn request(&self, name: &str, email: &str) -> Result<(), KeyringError> {
+        let mut loaded = self.lock();
+        let mut keyring = Keyring::open(&self.path, &self.passphrase)?;
+        keyring.request(name, email)?;
+        loaded.modified = None;
+        Ok(())
+    }
+
+    fn refresh(&self, loaded: &mut Loaded) -> Result<(), KeyringError> {
+        let modified = modified(&self.path);
+        if modified.is_some() && modified == loaded.modified {
+            return Ok(());
+        }
+        let keyring = Keyring::open(&self.path, &self.passphrase)?;
+        loaded.keys = keyring.active_keys();
+        loaded.modified = modified;
+        Ok(())
+    }
+
+    fn lock(&self) -> MutexGuard<'_, Loaded> {
+        match self.state.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        }
+    }
+}
+
 /// The settings of a running server.
 pub struct Config {
     /// The address to listen on, `host:port`.
     pub listen: String,
     /// The folder holding the page, the About page and the art.
     pub web: PathBuf,
-    /// The access key; `None` lets every request through.
+    /// The single access key; `None` lets every request through when there is
+    /// no keyring either.
     pub key: Option<String>,
+    /// The personal keys in the encrypted keyring, when one is configured.
+    pub people: Option<People>,
     /// Where model and search requests go.
     pub upstreams: Upstreams,
 }
 
 impl Config {
-    /// Reads the options in `arguments` (without the program name) and the
-    /// key file they point to.
+    /// Reads the options in `arguments` (without the program name), the key
+    /// file they point to, and the keyring they name.
     ///
     /// # Errors
     ///
-    /// `AgentError::Config` for an unknown option or one without a value.
+    /// `AgentError::Config` for an unknown option or one without a value, and
+    /// `AgentError::Keyring` when the keyring cannot be opened.
     pub fn from_args(arguments: impl IntoIterator<Item = String>) -> Outcome<Self> {
         let options = Options::parse(arguments)?;
         let key = read_key(&options.key_file);
         let authorization = key.as_ref().map(|key| format!("{BEARER}{key}"));
+        let people = match &options.keyring {
+            Some(path) => {
+                let passphrase = keyring_passphrase(&options, std::env::var(KEYRING_ENV).ok())?;
+                Some(People::new(path.clone(), passphrase)?)
+            }
+            None => None,
+        };
         Ok(Config {
             listen: options.listen,
             web: options.web,
             key,
+            people,
             upstreams: Upstreams {
                 model: Endpoint::new(options.model, authorization),
                 engines: options
@@ -122,15 +230,39 @@ impl Config {
     }
 
     /// Whether a request carrying the `Authorization` value `sent` may use
-    /// the model.
+    /// the model: a personal key from the keyring, or the single key.
     #[must_use]
     pub fn admits(&self, sent: Option<&str>) -> bool {
+        if self
+            .people
+            .as_ref()
+            .is_some_and(|people| people.admit(sent))
+        {
+            return true;
+        }
         match (&self.key, sent) {
-            (None, _) => true,
+            (None, _) => self.people.is_none(),
             (Some(_), None) => false,
             (Some(key), Some(sent)) => sent
                 .strip_prefix(BEARER)
                 .is_some_and(|given| same_secret(given, key)),
+        }
+    }
+
+    /// Records a request for access from the registration form.
+    ///
+    /// # Errors
+    ///
+    /// [`AgentError::BadRequest`] when no keyring is configured (registration
+    /// is closed), and [`AgentError::Keyring`] when the keyring cannot be
+    /// written.
+    pub fn request_access(&self, name: &str, email: &str) -> Outcome {
+        match &self.people {
+            Some(people) => {
+                people.request(name, email)?;
+                Ok(())
+            }
+            None => Err(AgentError::bad_request("registration is closed")),
         }
     }
 }
@@ -143,6 +275,8 @@ struct Options {
     search: String,
     web: PathBuf,
     key_file: PathBuf,
+    keyring: Option<PathBuf>,
+    keyring_passphrase_file: Option<PathBuf>,
 }
 
 impl Default for Options {
@@ -157,6 +291,8 @@ impl Default for Options {
             search: DEFAULT_SEARCH.to_string(),
             web: PathBuf::from("."),
             key_file: home.join(KEY_FILE),
+            keyring: None,
+            keyring_passphrase_file: None,
         }
     }
 }
@@ -184,6 +320,10 @@ impl Options {
             "--search" => self.search = value,
             "--web" => self.web = PathBuf::from(value),
             "--key-file" => self.key_file = PathBuf::from(value),
+            "--keyring" => self.keyring = Some(PathBuf::from(value)),
+            "--keyring-passphrase-file" => {
+                self.keyring_passphrase_file = Some(PathBuf::from(value))
+            }
             unknown => return Err(AgentError::Config(format!("unknown option {unknown}"))),
         }
 
@@ -203,12 +343,41 @@ fn engine(value: &str) -> Outcome<(String, String)> {
     }
 }
 
+/// The keyring's passphrase: the file's first line, or the environment.
+fn keyring_passphrase(options: &Options, from_env: Option<String>) -> Outcome<Zeroizing<String>> {
+    if let Some(path) = &options.keyring_passphrase_file {
+        let text = fs::read_to_string(path)
+            .map_err(|error| AgentError::Config(format!("{}: {error}", path.display())))?;
+        let line = text.lines().next().unwrap_or_default().trim();
+        if line.is_empty() {
+            return Err(AgentError::Config(format!(
+                "{}: the passphrase is empty",
+                path.display()
+            )));
+        }
+        return Ok(Zeroizing::new(line.to_string()));
+    }
+    match from_env {
+        Some(value) if !value.is_empty() => Ok(Zeroizing::new(value)),
+        _ => Err(AgentError::Config(
+            "--keyring needs --keyring-passphrase-file or THOR_KEYRING_PASSPHRASE".to_string(),
+        )),
+    }
+}
+
 /// The key in `path`; `None` when the file is missing or empty, which means
 /// no key is required.
 fn read_key(path: &Path) -> Option<String> {
     let text = fs::read_to_string(path).ok()?;
     let key = text.trim();
     (!key.is_empty()).then(|| key.to_string())
+}
+
+/// When `path` was last changed, or `None` when it is not there.
+fn modified(path: &Path) -> Option<SystemTime> {
+    fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .ok()
 }
 
 /// Compares two secrets in time that depends only on their length, so the
@@ -225,6 +394,39 @@ fn same_secret(given: &str, expected: &str) -> bool {
 mod tests {
     use super::*;
 
+    const PASS: &str = "keyring passphrase";
+
+    struct Folder {
+        path: PathBuf,
+    }
+
+    impl Folder {
+        fn new(name: &str) -> Result<Self, AgentError> {
+            let path = std::env::temp_dir()
+                .join(format!("thor-agent-config-{name}-{}", std::process::id()));
+            fs::create_dir_all(&path)
+                .map_err(|error| AgentError::Config(format!("{}: {error}", path.display())))?;
+            Ok(Self { path })
+        }
+
+        fn keyring(&self) -> PathBuf {
+            self.path.join("keyring")
+        }
+
+        fn passphrase(&self) -> Result<PathBuf, AgentError> {
+            let path = self.path.join("passphrase");
+            fs::write(&path, format!("{PASS}\n"))
+                .map_err(|error| AgentError::Config(format!("{}: {error}", path.display())))?;
+            Ok(path)
+        }
+    }
+
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
     fn args(list: &[&str]) -> Vec<String> {
         list.iter().map(ToString::to_string).collect()
     }
@@ -235,6 +437,23 @@ mod tests {
         Ok(config)
     }
 
+    fn with_people(folder: &Folder) -> Outcome<(Config, Keyring)> {
+        let mut keyring = Keyring::create(folder.keyring(), PASS)?;
+        keyring.request("Ada", "ada@example.com")?;
+        keyring.approve("ada@example.com")?;
+        let passphrase = folder.passphrase()?.display().to_string();
+        let keyring_path = folder.keyring().display().to_string();
+        let config = Config::from_args(args(&[
+            "--key-file",
+            "/nonexistent",
+            "--keyring",
+            &keyring_path,
+            "--keyring-passphrase-file",
+            &passphrase,
+        ]))?;
+        Ok((config, keyring))
+    }
+
     #[test]
     fn defaults_point_at_localhost() -> Outcome {
         let config = Config::from_args(args(&["--key-file", "/nonexistent"]))?;
@@ -242,6 +461,7 @@ mod tests {
         assert_eq!(config.upstreams.model.address(), "127.0.0.1:8079");
         assert_eq!(config.upstreams.search.address(), "127.0.0.1:8888");
         assert_eq!(config.key, None);
+        assert!(config.people.is_none());
         Ok(())
     }
 
@@ -358,5 +578,104 @@ mod tests {
         assert!(!same_secret("abd", "abc"));
         assert!(!same_secret("ab", "abc"));
         assert!(!same_secret("", "abc"));
+    }
+
+    #[test]
+    fn a_keyring_lets_each_person_in() -> Outcome {
+        let folder = Folder::new("people")?;
+        let (config, keyring) = with_people(&folder)?;
+        let ada = keyring
+            .find("ada@example.com")
+            .and_then(|person| person.key.clone());
+        let ada = ada.ok_or_else(|| AgentError::Config("ada has no key".to_string()))?;
+        assert!(config.admits(Some(&format!("Bearer {ada}"))));
+        assert!(!config.admits(Some("Bearer not-a-key")));
+        assert!(!config.admits(None));
+        assert!(!config.admits(Some("nonsense")));
+
+        config.request_access("Bob", "bob@example.com")?;
+        let mut reopened = Keyring::open(folder.keyring(), PASS)?;
+        assert!(reopened.find("bob@example.com").is_some());
+
+        let bob = reopened.approve("bob@example.com")?;
+        assert!(config.admits(Some(&format!("Bearer {bob}"))));
+        Ok(())
+    }
+
+    #[test]
+    fn a_keyring_that_goes_away_is_reported_and_keeps_the_old_keys() -> Outcome {
+        let folder = Folder::new("gone")?;
+        let (config, _keyring) = with_people(&folder)?;
+        fs::remove_file(folder.keyring())?;
+        assert!(!config.admits(Some("Bearer anything")));
+        Ok(())
+    }
+
+    #[test]
+    fn keyring_settings_have_to_be_complete() -> Outcome {
+        let folder = Folder::new("settings")?;
+        let missing = folder.path.join("nowhere").display().to_string();
+        let name = folder.keyring().display().to_string();
+        let passphrase = folder.passphrase()?.display().to_string();
+        assert!(matches!(
+            Config::from_args(args(&[
+                "--key-file",
+                "/none",
+                "--keyring",
+                &missing,
+                "--keyring-passphrase-file",
+                &passphrase,
+            ])),
+            Err(AgentError::Keyring(_))
+        ));
+        assert!(matches!(
+            Config::from_args(args(&["--key-file", "/none", "--keyring", &name])),
+            Err(AgentError::Config(_))
+        ));
+
+        let empty = folder.path.join("empty");
+        fs::write(&empty, "\n")
+            .map_err(|error| AgentError::Config(format!("{}: {error}", empty.display())))?;
+        let empty = empty.display().to_string();
+        let options = Options {
+            keyring: Some(PathBuf::from(&name)),
+            keyring_passphrase_file: Some(PathBuf::from(&empty)),
+            ..Options::default()
+        };
+        assert!(matches!(
+            keyring_passphrase(&options, Some("from-the-env".to_string())),
+            Err(AgentError::Config(_))
+        ));
+        let from_env = Options {
+            keyring: Some(PathBuf::from(&name)),
+            ..Options::default()
+        };
+        assert!(keyring_passphrase(&from_env, Some("from-the-env".to_string())).is_ok());
+        assert!(matches!(
+            keyring_passphrase(&from_env, Some(String::new())),
+            Err(AgentError::Config(_))
+        ));
+        assert!(matches!(
+            keyring_passphrase(
+                &Options {
+                    keyring: Some(PathBuf::from(&name)),
+                    keyring_passphrase_file: Some(PathBuf::from(&missing)),
+                    ..Options::default()
+                },
+                None,
+            ),
+            Err(AgentError::Config(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn registration_is_closed_without_a_keyring() -> Outcome {
+        let config = with_key(None)?;
+        assert!(matches!(
+            config.request_access("Ada", "ada@example.com"),
+            Err(AgentError::BadRequest(_))
+        ));
+        Ok(())
     }
 }

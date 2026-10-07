@@ -7,6 +7,8 @@ description = "Front server for the Thor chat: serves the page, checks the acces
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
+thor-tigress-keyring = { path = "../thor-tigress-keyring" }
+zeroize = "1.9.1"
 
 [[bin]]
 name = "thor-tigress-agent"

@@ -21,3 +21,6 @@ pub const MESSAGES: &str = "/v1/messages";
 
 /// Anthropic: token counting.
 pub const COUNT_TOKENS: &str = "/v1/messages/count_tokens";
+
+/// The registration form: a name and an email, and no access key.
+pub const REQUEST: &str = "/request";

@@ -16,6 +16,96 @@ repository and on GitHub Pages. It never deletes on the Thor either, so
 folders removed here (`jetson-thor/landing/`, `jetson-thor/site/`) linger
 there as untracked.
 
+## 2026-10-07
+
+### Per-person keys: thor-tigress-keyring, and the registration form
+
+- New crate `thor-tigress-keyring` (library and binary). One encrypted file,
+  `~/.config/thor-chat/keyring` (mode 600): a magic line, a random salt, a
+  random nonce, and the JSON records sealed with XChaCha20-Poly1305 under a key
+  Argon2id stretches from the passphrase. A record is a name, an email, a
+  status (`requested`/`active`/`revoked`), the key and the time. Commands:
+  `init`, `request NAME EMAIL`, `requests`, `approve EMAIL`, `keys`,
+  `show EMAIL`, `revoke EMAIL|KEY`, `export`. The passphrase comes from
+  `--passphrase-file`, `THOR_KEYRING_PASSPHRASE` or a line on standard input;
+  every write uses a fresh nonce and a temporary file renamed into place. New
+  dependencies, asked for first: argon2, chacha20poly1305, getrandom, zeroize.
+- `thor-tigress-agent`: `--keyring FILE` and `--keyring-passphrase-file FILE`.
+  The keyring's active keys let visitors in; they are decrypted in memory and
+  reloaded when the file changes, so approving someone needs no restart.
+  `--key-file` stays the one key the agent sends to llama-server, so personal
+  keys never reach it. `POST /request` (no key) records the registration form;
+  an email already waiting is not added twice.
+- `jetson-thor/web/index.html`: the invite screen now has a name and email form
+  that posts to `/request`, and links to DM on LinkedIn and X. The single-key
+  field stays for people who already have one.
+- `thor-tigress-serve`: `keyring-init` makes the keyring and a random passphrase
+  file; `keyring CMD ...` runs the Rust tool on the same files; `agent` passes
+  both to the agent when they exist.
+- Measured on yahboom, 2026-10-07: 360 tests pass in the workspace; clippy
+  clean; spark finds 0 problems in 77 files. End to end on real files: init,
+  request, approve (a 48-hex key), the agent's `/health` ok, `/request`
+  recorded a second person and answered 400 for a bad email, `/v1/models`
+  answered 401 without a key and 502 with one (no llama-server on this
+  machine), and `revoke` emptied `export`. Coverage on the CI metric: keyring
+  99.5%, agent 98.6% lines; `llvm-cov show` reports no uncovered lines, the
+  same phantom-line gap the other crates show with this toolchain.
+- `revoke-all` was added on 2026-10-07, so the launch note's "one command
+  invalidates every key" is true rather than a plan: it marks every active key
+  revoked, keeps the records, and takes effect on the next request. With it,
+  the keyring runs 28 tests.
+- Still open: no per-person rate limits; the keyring is only as safe as the
+  passphrase file beside it; `POST /request` is unmetered (gap 13 in the
+  operations chapter).
+
+### The book: launch note, keys and the context window
+
+- Three new chapters, written to be checked against the code:
+  - "Launch note: what we store, and what we do not": conversations in the
+    browser, the Thor's disk holding only the keyring, why there are no rate
+    limits, one-command revocation, and the limits of that promise.
+  - "Keys, and the cryptography under them": Argon2id (why a passphrase is
+    stretched and not hashed, salt, the parameters), XChaCha20-Poly1305 (AEAD,
+    a fresh nonce, associated data, one refusal for two mistakes), the keys
+    themselves (24 random bytes, constant-time compare, wipe on drop), atomic
+    writes, what encryption here does not protect, and the RustCrypto crates by
+    name.
+  - "What the context window is": the window as a fixed budget per reply, why
+    every message re-sends the whole history, what KV means with the
+    key/value/query picture, what fills it, and what to do when it is full.
+- Eight new SVG figures in the house style: the storage map, the keyring file's
+  bytes, the KDF, the seal and open, the key's life, the request flow, the
+  window, and the KV cache. The single-key flow figure was replaced by
+  `keyring-flow.svg`, and `key-flow.svg` was removed.
+- Corrected the chapters the change made wrong: the web chat's invite screen and
+  access-key sections, the security chapter (Figure 12.1 and the three keys),
+  the operations runbook (the leaked-key steps now revoke keys instead of
+  rotating everyone) and its gap table (gap 1 closed, gap 13 added), the agent
+  chapter's "Get a key", and the About page's invite section.
+- Verified: `mdbook build book` clean; 35 SVGs parse as XML; every figure
+  reference resolves.
+
+### Deployed to the Thor
+
+- Order: backed up the old agent (`~/.cargo/bin/thor-tigress-agent.bak-2026-10-07`),
+  installed `thor-tigress-keyring` then `thor-tigress-agent`
+  (`cargo install --locked --force`), ran `thor-tigress-serve keyring-init`
+  (`~/.config/thor-chat/keyring` and `keyring-passphrase`, both mode 600), then
+  restarted `thor-tigress-agent`. `api-key` was not touched, on purpose.
+- Verified on the Thor, 2026-10-07 02:55 PDT: the agent logs "access key
+  required, keyring on"; `/health` 200; the **old shared key still answers
+  `/v1/models` with 200**, so saved browser sessions and agents keep working;
+  no key and a bogus key both get 401; the invite page carries the form and the
+  About page the DM links; `POST /request` with a bad email gets 400; the
+  waiting list is empty. Over the internet: the `.ts.net` page is 200 and
+  `/v1/models` is 401, and `https://voltforge.tech/thor-tigress-cub` forwards
+  (the trailing-slash form 404s, as GitHub Pages does).
+- Rollback if needed: restore the `.bak` binary, remove `keyring` and
+  `keyring-passphrase` (both new), restart.
+- Next: a first real request from a phone, then `keyring approve EMAIL`. The old
+  shared key stays valid until `api-key` is rotated, which is the step that
+  retires it.
+
 ## 2026-10-06
 
 ### Qwen3.6-35B-A3B on TensorRT Edge-LLM, live in the chat

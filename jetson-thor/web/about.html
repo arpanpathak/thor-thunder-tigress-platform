@@ -66,6 +66,7 @@
             font-weight: 600; text-decoration: none; border: 1px solid var(--border); color: var(--text); background: var(--panel); }
   .button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
   .button:hover { transform: translateY(-1px); }
+  .ask { display: flex; gap: 10px; flex-wrap: wrap; }
   .art { position: relative; display: grid; place-items: center; }
   .art::before { content: ""; position: absolute; inset: 8% 10%; border-radius: 50%;
                  background: radial-gradient(circle, var(--glow), transparent 68%); }
@@ -216,9 +217,13 @@ openbatrangs --openai-url https://arpanpathak.taildb9a39.ts.net/v1 \
       <img src="/cub.svg" alt="">
       <div>
         <h2>Invite-only, for now</h2>
-        <p>The Thor is one machine with four reply slots, shared by everyone. Access is given to people who ask, for a
-          limited time. Sign-in with GitHub is next; until then the author hands out keys.</p>
-        <a class="button primary" href="https://github.com/arpanpathak">Ask Arpan for access</a>
+        <p>The Thor is one machine with four reply slots, shared by everyone. To ask, give your name and email on the
+          <a href="/thor-tigress-cub/">invite screen</a>, then send a message so we know it is a person asking. The
+          author approves by hand and sends back a key of your own. No sign-in, no third party.</p>
+        <div class="ask">
+          <a class="button primary" href="https://www.linkedin.com/in/arpan-pathak-272341424/">DM on LinkedIn</a>
+          <a class="button" href="https://x.com/arpanpathak1996">DM on X</a>
+        </div>
       </div>
     </div>
   </section>

@@ -3,6 +3,8 @@
 
 use std::{fs, io::Write, path::Path};
 
+use serde::Deserialize;
+
 use crate::{
     chat,
     config::Config,
@@ -61,6 +63,8 @@ pub enum Route {
     Messages,
     /// `POST /v1/messages/count_tokens`.
     CountTokens,
+    /// `POST /request`: the registration form, no key needed.
+    Request,
     /// Anything else.
     NotFound,
 }
@@ -78,6 +82,7 @@ impl Route {
             ("POST", paths::CHAT_COMPLETIONS) => Route::ChatCompletions,
             ("POST", paths::MESSAGES) => Route::Messages,
             ("POST", paths::COUNT_TOKENS) => Route::CountTokens,
+            ("POST", paths::REQUEST) => Route::Request,
             _ => Route::NotFound,
         }
     }
@@ -130,10 +135,31 @@ pub fn answer(client: &mut dyn Write, request: &Request, config: &Config) -> Out
             .serving_body(&request.body)
             .post(paths::COUNT_TOKENS, &request.body)?
             .relay(client),
+        Route::Request => request_access(client, &request.body, config),
         Route::NotFound => {
             response::respond(client, Status::NotFound, ContentType::Text, b"not found")
         }
     }
+}
+
+/// Records a registration form's name and email in the keyring. It is open,
+/// because it is how someone without a key asks for one; an email that is
+/// already waiting is not added twice.
+fn request_access(client: &mut dyn Write, body: &[u8], config: &Config) -> Outcome {
+    #[derive(Deserialize)]
+    struct Form {
+        name: String,
+        email: String,
+    }
+
+    let form: Form = serde_json::from_slice(body)?;
+    config.request_access(&form.name, &form.email)?;
+    response::respond(
+        client,
+        Status::Ok,
+        ContentType::Json,
+        br#"{"status":"recorded"}"#,
+    )
 }
 
 fn send_file(client: &mut dyn Write, folder: &Path, file: StaticFile) -> Outcome {
@@ -170,6 +196,7 @@ mod tests {
             ("POST", "/v1/chat/completions", Route::ChatCompletions),
             ("POST", "/v1/messages", Route::Messages),
             ("POST", "/v1/messages/count_tokens", Route::CountTokens),
+            ("POST", "/request", Route::Request),
             ("GET", "/about.html", file("about.html")),
             ("GET", "/thor-tigress-cub/cub.svg", file("cub.svg")),
             ("GET", "/cub.png", file("cub.png")),
@@ -351,6 +378,69 @@ mod tests {
             seen[0].starts_with("GET /v1/models")
                 && seen[1].starts_with("POST /v1/messages/count_tokens")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn the_registration_form_needs_no_key_and_records_a_request() -> Outcome {
+        use thor_tigress_keyring::store::Keyring;
+
+        let folder = std::env::temp_dir().join(format!(
+            "thor-agent-request-{}-{}",
+            std::process::id(),
+            rand_suffix()
+        ));
+        fs::create_dir_all(&folder)?;
+        let keyring = folder.join("keyring");
+        let passphrase = folder.join("passphrase");
+        fs::write(&passphrase, "keyring passphrase\n")?;
+        Keyring::create(&keyring, "keyring passphrase")?;
+        let config = Config::from_args([
+            "--web".to_string(),
+            folder.display().to_string(),
+            "--model".to_string(),
+            "127.0.0.1:1".to_string(),
+            "--key-file".to_string(),
+            "/nonexistent".to_string(),
+            "--keyring".to_string(),
+            keyring.display().to_string(),
+            "--keyring-passphrase-file".to_string(),
+            passphrase.display().to_string(),
+        ])?;
+
+        let mut registered = request("POST", "/request", None);
+        registered.body = br#"{"name":"Ada Lovelace","email":"ada@example.com"}"#.to_vec();
+        let mut client = Vec::new();
+        answer(&mut client, &registered, &config)?;
+        let said = String::from_utf8_lossy(&client).into_owned();
+        assert!(said.starts_with("HTTP/1.1 200"), "{said}");
+        assert!(said.ends_with(r#"{"status":"recorded"}"#), "{said}");
+        let reopened = Keyring::open(&keyring, "keyring passphrase")?;
+        assert!(reopened.find("ada@example.com").is_some());
+
+        let mut not_json = request("POST", "/request", None);
+        not_json.body = b"not json".to_vec();
+        assert!(matches!(
+            answer(&mut Vec::new(), &not_json, &config),
+            Err(crate::error::AgentError::Json(_))
+        ));
+
+        let mut no_email = request("POST", "/request", None);
+        no_email.body = br#"{"name":"Ada","email":"not-an-address"}"#.to_vec();
+        assert!(matches!(
+            answer(&mut Vec::new(), &no_email, &config),
+            Err(crate::error::AgentError::BadRequest(_))
+        ));
+
+        let closed = setup(Vec::new(), Some("k"))?;
+        let mut asked = request("POST", "/request", None);
+        asked.body = br#"{"name":"Ada","email":"ada@example.com"}"#.to_vec();
+        assert!(matches!(
+            answer(&mut Vec::new(), &asked, &closed.config),
+            Err(crate::error::AgentError::BadRequest(_))
+        ));
+        fs::remove_dir_all(&closed.folder)?;
+        fs::remove_dir_all(&folder)?;
         Ok(())
     }
 }

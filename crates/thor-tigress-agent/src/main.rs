@@ -53,7 +53,7 @@ fn main() -> ExitCode {
 fn serve(config: Config) -> Outcome<Infallible> {
     let listener = TcpListener::bind(&config.listen)?;
     eprintln!(
-        "listening on {}, model {}, search {}, access key {}",
+        "listening on {}, model {}, search {}, access key {}, keyring {}",
         config.listen,
         config.upstreams.model.address(),
         config.upstreams.search.address(),
@@ -61,7 +61,8 @@ fn serve(config: Config) -> Outcome<Infallible> {
             "required"
         } else {
             "off"
-        }
+        },
+        if config.people.is_some() { "on" } else { "off" }
     );
     let config = Arc::new(config);
 

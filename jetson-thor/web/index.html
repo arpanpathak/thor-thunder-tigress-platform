@@ -172,6 +172,17 @@
   .gate input { flex: 1; min-width: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; }
   .gate .primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; border-radius: 10px; }
   .gate small { color: var(--muted); }
+  .gate .step { color: var(--muted); font-size: 14px; margin: 20px 0 0; }
+  .gate .register { display: grid; grid-template-columns: 1fr 1fr; }
+  .gate .register .primary { grid-column: 1 / -1; }
+  .gate .dm { display: inline-flex; gap: 10px; }
+  .gate .dm a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .gate .dm a:hover { text-decoration: underline; }
+  .gate .outcome { display: block; margin-top: 10px; }
+  @media (max-width: 520px) {
+    .gate .register { grid-template-columns: 1fr; }
+    .gate .register .primary { grid-column: auto; }
+  }
 
   .msg { margin: 0 0 22px; }
   .msg.assistant { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; }
@@ -685,6 +696,9 @@ function render() {
     const gate = element("div", "gate");
     const hero = element("div", "hero");
     hero.append(cub());
+    gate.append(hero, element("h1", "", "The cub is invite-only for now"),
+      element("p", "", "One Jetson Thor, four reply slots, shared by everyone who has a key."));
+
     const form = element("form");
     const field = element("input");
     field.type = "password"; field.placeholder = "Paste your access key"; field.autocomplete = "off";
@@ -697,12 +711,44 @@ function render() {
       store.set("settings", settings);
       connect();
     });
-    const ask = element("a", "", "Ask Arpan for one");
-    ask.href = "https://github.com/arpanpathak"; ask.target = "_blank"; ask.rel = "noreferrer";
+    gate.append(element("p", "step", "Already have a key?"), form);
+
+    const register = element("form", "register");
+    const who = element("input");
+    who.placeholder = "Your name"; who.autocomplete = "name"; who.maxLength = 80;
+    const mail = element("input");
+    mail.type = "email"; mail.placeholder = "you@example.com"; mail.autocomplete = "email"; mail.maxLength = 200;
+    const ask = element("button", "primary", "Request access");
+    register.append(who, mail, ask);
+    const outcome = element("small", "outcome");
+    register.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      outcome.textContent = "Sending…";
+      try {
+        const response = await fetch(`${API}request`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: who.value.trim(), email: mail.value.trim() }),
+        });
+        outcome.textContent = response.ok
+          ? "Request recorded. Now DM Arpan on LinkedIn or X so he can send your key."
+          : `Could not record it: ${response.status} ${await response.text()}`;
+      } catch {
+        outcome.textContent = "The Thor did not answer. Try again in a moment.";
+      }
+    });
+
+    const dm = element("span", "dm");
+    const linkedin = element("a", "", "DM on LinkedIn");
+    linkedin.href = "https://www.linkedin.com/in/arpan-pathak-272341424/";
+    const twitter = element("a", "", "DM on X");
+    twitter.href = "https://x.com/arpanpathak1996";
+    [linkedin, twitter].forEach((link) => { link.target = "_blank"; link.rel = "noreferrer"; });
+    dm.append(linkedin, twitter);
+
     const note = element("small");
-    note.append("No key? ", ask, ". Access is invite-only and given for a limited time.");
-    gate.append(hero, element("h1", "", "The cub is invite-only for now"),
-      element("p", "", "One Jetson Thor, four reply slots, shared by everyone who has a key."), form, note);
+    note.append("No key? Give your name and email, then DM Arpan. He approves you by hand and sends the key back: ");
+    note.append(dm, ".");
+    gate.append(element("p", "step", "New here? Ask for a key"), register, outcome, note);
     thread.append(gate);
     setTimeout(() => field.focus(), 0);
     return;
