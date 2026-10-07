@@ -92,7 +92,12 @@ there as untracked.
   answer round. Chapter "Tool calling" gained "Calls written as text" and the
   test rows; the README section was updated.
 - Deployed to the Thor again, 2026-10-07: rebuilt and reinstalled, service
-  restarted, `/health` ok.
+  restarted, `/health` ok. A live Web-on request ("search the latest Rust
+  release, read the announcement, name the page") then searched twice, read the
+  GitHub releases page and `blog.rust-lang.org/releases/latest/`, and answered
+  "Rust 1.99.0, announced on October 1 2026 … stabilization of C-variadic
+  functions", naming the page. The raw stream held 0 occurrences of
+  `<tool_call`.
 
 ### Per-person keys: thor-tigress-keyring, and the registration form
 
