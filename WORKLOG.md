@@ -337,6 +337,9 @@ pointed at the Thor, lasso. See `git log` from 72423d3 to 627358f.
 ## Rules learned the hard way
 
 - Do only what was asked; no adjacent edits, commits or pushes.
+- Large edits are harmful. Change the fewest lines that do the job; never
+  rewrite a file or a chapter whole when a targeted edit will do. Do not
+  overstep the boundary of the request, and stop as soon as it is done.
 - Never change the live chat's prompts, sampling or served model without
   the user's approval of that exact change.
 - No long GPU jobs on the Thor unless asked, and only in a time window the
