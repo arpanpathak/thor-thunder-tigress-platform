@@ -729,8 +729,17 @@ function updateLast() {
   const thread = $("thread");
   const last = thread.lastElementChild;
   const fresh = renderMessage(messages[messages.length - 1]);
-  const openBefore = last && last.querySelector("details.thinking")?.open;
-  if (openBefore && fresh.querySelector("details.thinking")) fresh.querySelector("details.thinking").open = true;
+  // Keep the same thinking element while the answer streams: replacing it on
+  // every frame swallowed clicks, so it could not be opened until the end.
+  const kept = last && last.querySelector("details.thinking");
+  const drawn = fresh.querySelector("details.thinking");
+  if (kept && drawn) {
+    const [keptSummary, drawnSummary] = [kept.querySelector("summary"), drawn.querySelector("summary")];
+    if (keptSummary.textContent !== drawnSummary.textContent) keptSummary.textContent = drawnSummary.textContent;
+    const [keptText, drawnText] = [kept.querySelector(".text"), drawn.querySelector(".text")];
+    if (keptText.textContent !== drawnText.textContent) keptText.textContent = drawnText.textContent;
+    drawn.replaceWith(kept);
+  }
   if (last) last.replaceWith(fresh); else thread.append(fresh);
   if (stick) $("scroller").scrollTop = $("scroller").scrollHeight;
 }
