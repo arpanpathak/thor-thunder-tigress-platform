@@ -169,8 +169,8 @@ nowhere else. Another browser or device starts empty.
 ## How it fits together
 
 <figure>
-<img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor, which calls llama-server and SearXNG on localhost.">
-<figcaption><b>Figure 9.6</b> How a request reaches Nemotron.</figcaption>
+<img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor at :8080, which holds the key, the picker and the APIs and calls SearXNG at :8888. The picker's model id decides the engine: llama.cpp at :8079 for the GGUF models, or TensorRT Edge-LLM at :8081 for Qwen3.6 35B A3B.">
+<figcaption><b>Figure 9.6</b> How a request reaches a model, on either engine.</figcaption>
 </figure>
 
 | Part | Where | What it does |

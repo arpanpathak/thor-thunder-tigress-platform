@@ -2,11 +2,30 @@
 
 # The cub is open
 
-I keep a language model on a desk in my apartment. It runs on one small board,
-a Jetson AGX Thor, with 128 GB of memory shared between its processor and its
-graphics chip. The model is Nemotron 3 Nano: thirty billion parameters at eight
-bits, answering at about 53 tokens a second, in English, Rust, or whatever else
-you paste at it. The chat page lives at
+I keep a small server on a desk in my apartment, and it has become the most
+interesting thing in the room. It is a Jetson AGX Thor: one board with 128 GB of
+memory shared between its processor and its graphics chip, warm to the touch
+while it works. It runs two engines and holds four models, two of them in
+memory at a time. A conversation can use whichever of them you pick.
+
+```text
+$ thor-tigress-serve list
+
+Thor: 59.3 GB free of 122.8 GB · keeps 8 GB free · at most 2 models loaded
+
+  key  model                                          state                 size
+  1    Nemotron 3 Nano 30B A3B · Q8_0                 loaded             33.6 GB  default (nemotron)
+  2    Nemotron 3.5 Lightning 30B A3B · Q8_0          on disk            35.0 GB
+  3    Qwen3.6 27B · Q4_K_M                           on disk            16.8 GB
+  4    Qwen3.6 35B A3B NVFP4                          loaded             23.4 GB  TensorRT Edge-LLM · :8081
+```
+
+The two loaded models answer today. `thor-tigress-serve load 2` brings a third
+one into memory when the memory allows, and the page's picker offers it from
+then on. The default, the Nano, answers at about 53 tokens a second and holds a
+million tokens of conversation; Qwen3.6 35B A3B runs on TensorRT Edge-LLM
+instead of llama.cpp, and chapter "Model comparison" sets the two side by side
+on the same questions. The chat page is at
 [`voltforge.tech/thor-tigress-cub`](https://voltforge.tech/thor-tigress-cub),
 and a Tailscale tunnel carries each message from there to the desk and the
 answer back.
@@ -18,8 +37,8 @@ message on [LinkedIn](https://www.linkedin.com/in/arpan-pathak-272341424/) or
 the key back. No sign-up, no password, nobody in the middle taking notes.
 
 <figure>
-<img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor, which calls llama-server and SearXNG on localhost.">
-<figcaption><b>Figure 24.1</b> The road a message takes, from the link to the model. Chapter "Web chat: Thor Tigress Cub" draws the same road with more detail.</figcaption>
+<img src="figures/cub-architecture.svg" alt="The browser opens voltforge.tech, whose forwarding page sends it to the .ts.net address; from then on every request goes through Tailscale Funnel to thor-tigress-agent on the Thor at :8080, which holds the key, the picker and the APIs and calls SearXNG at :8888. The picker's model id decides the engine: llama.cpp at :8079 for the GGUF models, or TensorRT Edge-LLM at :8081 for Qwen3.6 35B A3B.">
+<figcaption><b>Figure 24.1</b> The road a message takes, from the link to whichever model the picker names, on either engine.</figcaption>
 </figure>
 
 <figure>
@@ -40,7 +59,7 @@ three things:
 | Where | What | Until |
 |---|---|---|
 | your browser | the conversation, the settings, your key | you clear site data or press **+** |
-| the Thor's memory | the conversation a slot is answering, so the next message on it is not read twice | the model server restarts |
+| the Thor's memory | the conversation a window is answering, so the next message on it is not read twice | the model process restarts or unloads |
 | the Thor's disk | one encrypted file: the name, email, status and key from the invite screen | the record is deleted |
 
 The chat server writes one file, the keyring, and a keyring record has no field
@@ -72,9 +91,9 @@ asks for no login.
    `x-api-key`.
 4. `thor-tigress-agent` compares the key against every active key in the
    keyring, in constant time. A key that matches nothing leaves with `401`
-   before the model is reached.
-5. A request that matches travels to llama-server under the service key, and
-   llama-server checks that one again. Personal keys never go that far.
+   before a model is reached.
+5. A request that matches travels to the model you picked under the service key,
+   and the model server checks that one again. Personal keys never go that far.
 
 The keyring itself is sealed with Argon2id and XChaCha20-Poly1305. Chapter
 "Keys, and the cryptography under them" opens the file and explains both
@@ -82,23 +101,27 @@ algorithms, along with the four things they cannot protect.
 
 ## How many people it can serve
 
-The board holds one copy of the weights, 32 GB, and a pool of memory for
-conversations. How that pool is cut is a setting. Today it is cut like this:
+Each loaded model keeps its own weights and its own pool of windows. The Nano
+takes 33.6 GB of weights and about 24 GiB for four million-token windows; the
+two together measured 57.8 GB while the chat was serving, against 128 GB on the
+board. How that pool is cut is a setting. Today it is cut like this:
 
-| Replies writing at once | Tokens each | Pool |
+| Windows open at once | Tokens each | Pool |
 |---|---|---|
 | 4 | 1,048,576 | 24 GiB |
 | 8 | 524,288 | 24 GiB |
 | 16 | 262,144 | 24 GiB |
 | 32 | 131,072 | 24 GiB |
 
-The arithmetic is `replies × tokens × 6 KiB`, and memory is the ceiling: ask for
-longer conversations and fewer of them fit at once, ask for more at once and
-each one is shorter. One conversation can reach a million tokens, which is about
-three novels. How many people hold a key has no limit at all, because a slot
-belongs to a reply, not to a person. When all the slots are busy, the next
-request waits in the queue. Chapter "Memory, context and slots" has the
-measurements behind the table and the settings that cut the pool differently.
+The arithmetic is `windows × tokens × 6 KiB`, and memory is the ceiling: ask for
+longer conversations and fewer fit at once, ask for more at once and each one is
+shorter. One conversation can reach a million tokens, about three novels.
+`MODELS_MAX` caps how many models sit in memory at the same time, and both
+`load` and `install` refuse a change that would eat the free-memory reserve.
+How many people hold a key has no limit at all, because a window belongs to a
+reply, not to a person. When every window is busy, the next request waits in the
+queue. Chapter "Memory, context and slots" has the measurements behind the
+table and the flags that cut the pool differently.
 
 There is no daily allowance and no per-person quota. Someone with a key can keep
 the board occupied for as long as they keep asking, and the answer to that is a
@@ -109,18 +132,19 @@ which in a cold room is a small consolation.
 
 | Piece | What it does | Listens on |
 |---|---|---|
-| `llama-server` (llama.cpp, router mode) | Nemotron 3 Nano 30B-A3B, 8-bit, million-token windows, four slots today | `127.0.0.1:8079` |
-| `thor-tigress-agent` | the page, the OpenAI and Anthropic APIs, the keys, the invite form | `127.0.0.1:8080` |
+| `llama-server`, router mode | one process per loaded GGUF model: the Nano, Lightning and Qwen 27B | `127.0.0.1:8079` |
+| TensorRT Edge-LLM | a second engine, for Qwen3.6 35B A3B in NVFP4 and its successors | `127.0.0.1:8081` |
+| `thor-tigress-agent` | the page, the model picker, the OpenAI and Anthropic APIs, the keys, the invite form | `127.0.0.1:8080` |
 | SearXNG | web search, when **Web** is on | `127.0.0.1:8888` |
-| TensorRT Edge-LLM | a second model on its own engine, when one is set | `127.0.0.1:8081` |
 | Tailscale Funnel | HTTPS from the internet to port 8080, and to nothing else | public |
 
 On the Thor, everything lives under `~/.config/thor-chat/`:
 
 | File | Contents |
 |---|---|
-| `env` | `MODEL`, `USERS`, `CONTEXT`, `MODELS_MAX`, ports |
-| `api-key` | the key the agent and llama-server use between themselves |
+| `models.ini` | the router's list of models, written by `thor-tigress-serve` |
+| `env` | `MODEL`, `USERS`, `CONTEXT`, `MODELS_MAX`, `EDGE_MODEL`, ports |
+| `api-key` | the key the agent and the model servers use between themselves |
 | `keyring` | who may chat, sealed |
 | `keyring-passphrase` | what opens the keyring |
 
@@ -138,17 +162,16 @@ The crates sit in the repository under Apache-2.0: `thor-tigress-agent` for the
 server, `thor-tigress-keyring` for the registry, `thor-spark-safety-eval` for
 the prose and code checker, `thor-hammer-trainer` for the training set,
 `thor-tigress-reinforcer-frontend` for the review page, and
-`thor-lasso-distiller` for conversations drawn out of books. Chapters "Access
-and syncing", "Model serving" and "Operations: recovery and hardening" walk
+`thor-lasso-distiller` for conversations drawn out of books. Chapters "Model
+serving", "TensorRT Edge-LLM" and "Operations: recovery and hardening" walk
 through running the whole thing yourself, on this board or another one.
 
 ## What comes next
 
 The launch is close, and the cub is the first piece of it.
 
-Next comes an agentic canvas: a sandbox where the model works on a canvas
-instead of a chat box, with tools it may reach for. The uses I am building
-toward:
+Next comes an agentic canvas: a sandbox where a model works on a canvas instead
+of a chat box, with tools it may reach for. The uses I am building toward:
 
 | | |
 |---|---|
@@ -174,7 +197,7 @@ canvas is amber.
   further. Every request also costs the board an Argon2id run.
 - A key is a password. Anyone holding one chats as the person it was sent to,
   until the key is revoked.
-- The slots serve the page and every coding agent together.
+- The windows serve the page and every coding agent together.
 - There is one board. It can be busy, offline, or out of memory, and when it is
   down the forwarding page still loads.
 
@@ -197,3 +220,5 @@ private.
   conversation has a limit at all.
 - [Memory, context and slots](ch20-memory-and-context.md) measures that limit on
   this board.
+- [Model serving](ch21-model-serving.md) lists the models, loads and unloads
+  them, and explains the picker.
