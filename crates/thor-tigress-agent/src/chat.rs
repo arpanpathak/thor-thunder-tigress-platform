@@ -401,106 +401,127 @@ fn search_loop(
     upstreams: &Upstreams,
     model: &Endpoint,
 ) -> Outcome {
-    let mut allowed = Allowed::from_text(&user_text(&fields));
-    let mut ran: Vec<String> = Vec::new();
-    let mut ledger = Ledger::new();
+    let mut research = Research::new(&user_text(&fields));
 
-    for round_number in 1..=MAX_ROUNDS {
-        offer_tools(&mut fields, true);
-        require_tool(&mut fields, round_number == 1);
-        let round = stream_round(client, &fields, model)?;
+    match tool_rounds(client, &mut fields, upstreams, model, &mut research)? {
+        Ending::Replied => return Ok(()),
+        Ending::Exhausted => (),
+    }
 
-        if round.calls.is_empty() {
-            return Ok(());
+    ask(&mut fields, &research.ledger);
+
+    match answer_rounds(client, &mut fields, upstreams, model, &mut research)? {
+        Ending::Replied => Ok(()),
+        Ending::Exhausted => note(client, &research.ledger),
+    }
+}
+
+/// How a set of rounds ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ending {
+    /// The model stopped asking for tools, so what it wrote is the answer.
+    Replied,
+    /// The rounds ran out.
+    Exhausted,
+}
+
+/// The tool rounds: the model may search and read until it answers on its own,
+/// the rounds run out, or the search budget is spent.
+fn tool_rounds(
+    client: &mut dyn Write,
+    fields: &mut Fields,
+    upstreams: &Upstreams,
+    model: &Endpoint,
+    research: &mut Research,
+) -> Outcome<Ending> {
+    for round in 1..=MAX_ROUNDS {
+        prepare(fields, Phase::of_tool_round(round));
+        let reply = stream_round(client, fields, model)?;
+
+        if reply.calls.is_empty() {
+            return Ok(Ending::Replied);
         }
 
-        let results = run_calls(
-            client,
-            &round.calls,
-            upstreams,
-            &mut allowed,
-            &mut ran,
-            &mut ledger,
-        )?;
-        append_round(&mut fields, &round, &results)?;
-        if ledger.searches_left(MAX_SEARCHES) == 0 {
-            break;
+        let results = research.run(client, &reply.calls, upstreams)?;
+        append_round(fields, &reply, &results)?;
+
+        if research.out_of_searches() {
+            return Ok(Ending::Exhausted);
         }
     }
 
-    offer_tools(&mut fields, false);
-    require_tool(&mut fields, false);
-    retract_system(&mut fields, SEARCH_HINT);
-    append_system(&mut fields, ANSWER_NUDGE);
+    Ok(Ending::Exhausted)
+}
+
+/// Sets up the answer rounds: the tools go away, the search hint comes back out
+/// of the system line, and the numbered sources arrive with the ask as the last
+/// user turn — the turn a model that kept calling tools reads.
+fn ask(fields: &mut Fields, ledger: &Ledger) {
+    prepare(fields, Phase::Answering);
+    retract_system(fields, SEARCH_HINT);
+    append_system(fields, ANSWER_NUDGE);
+
     if !ledger.is_empty() {
-        append_system(
-            &mut fields,
-            &format!(
-                "Sources found, with the numbers to cite:\n{}",
-                ledger.list(MAX_CITED)
-            ),
-        );
+        append_system(fields, &numbered_sources(ledger));
     }
-    append_user(&mut fields, ANSWER_ASK);
 
+    append_user(fields, ANSWER_ASK);
+}
+
+/// The answer rounds: no tools are offered, so the model writes. A call written
+/// anyway is run like any other, because the text is streamed as it arrives and
+/// stopping at the first sentence of a summary would end the answer with no
+/// links in it.
+fn answer_rounds(
+    client: &mut dyn Write,
+    fields: &mut Fields,
+    upstreams: &Upstreams,
+    model: &Endpoint,
+    research: &mut Research,
+) -> Outcome<Ending> {
     for _ in 0..ANSWER_ROUNDS {
-        let round = stream_round(client, &fields, model)?;
+        let reply = stream_round(client, fields, model)?;
 
-        if round.calls.is_empty() {
-            if !round.content.trim().is_empty() {
-                return Ok(());
-            }
+        if reply.calls.is_empty() && !reply.content.trim().is_empty() {
+            return Ok(Ending::Replied);
+        }
+        if reply.calls.is_empty() {
             continue;
         }
 
-        let results = run_calls(
-            client,
-            &round.calls,
-            upstreams,
-            &mut allowed,
-            &mut ran,
-            &mut ledger,
-        )?;
-        append_round(&mut fields, &round, &results)?;
+        let results = research.run(client, &reply.calls, upstreams)?;
+        append_round(fields, &reply, &results)?;
     }
 
-    let note = if ledger.is_empty() {
-        "The tool rounds are over and no round wrote an answer. Ask again, or narrow the question."
-            .to_string()
+    Ok(Ending::Exhausted)
+}
+
+/// The numbered source list the answer cites from.
+fn numbered_sources(ledger: &Ledger) -> String {
+    format!(
+        "Sources found, with the numbers to cite:\n{}",
+        ledger.list(MAX_CITED)
+    )
+}
+
+/// Sends the last-resort line: the rounds are over and no round wrote an answer.
+/// When the search found anything, it names what the answer could have used, so
+/// the page ends with sources rather than with an excuse.
+fn note(client: &mut dyn Write, ledger: &Ledger) -> Outcome {
+    let head = "The tool rounds are over and no round wrote an answer.";
+    let text = if ledger.is_empty() {
+        format!("{head} Ask again, or narrow the question.")
     } else {
         format!(
-            "The tool rounds are over and no round wrote an answer. These are the sources the \
-             search turned up:\n{}",
+            "{head} These are the sources the search turned up:\n{}",
             ledger.list(MAX_LISTED)
         )
     };
+
     response::send_event(
         client,
-        &json!({ "choices": [{ "delta": { "content": note } }] }).to_string(),
-    )?;
-    Ok(())
-}
-
-/// Runs a round's tool calls, skipping any that already ran.
-fn run_calls(
-    client: &mut dyn Write,
-    calls: &[ToolCall],
-    upstreams: &Upstreams,
-    allowed: &mut Allowed,
-    ran: &mut Vec<String>,
-    ledger: &mut Ledger,
-) -> Outcome<Vec<String>> {
-    calls
-        .iter()
-        .map(|call| {
-            let signature = format!("{}\u{1}{}", call.name, call.arguments);
-            if ran.contains(&signature) {
-                return Ok("That tool call already ran in this answer. Use its result.".to_string());
-            }
-            ran.push(signature);
-            run_tool(client, call, upstreams, allowed, ledger)
-        })
-        .collect()
+        &json!({ "choices": [{ "delta": { "content": text } }] }).to_string(),
+    )
 }
 
 /// The text of the user's own messages: one of the two places a fetchable
@@ -570,43 +591,80 @@ fn append_user(fields: &mut Fields, line: &str) {
 /// system line writes a tool call even when the request offers no tools, which
 /// is the loop that ends with no answer at all.
 fn retract_system(fields: &mut Fields, line: &str) {
+    let Some(system) = system_line(fields).map(str::to_string) else {
+        return;
+    };
+    let kept = system
+        .split("\n\n")
+        .filter(|part| part.trim() != line)
+        .collect::<Vec<_>>()
+        .join("\n\n");
+
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return;
     };
-    let Some(system) = messages
-        .first_mut()
-        .filter(|message| message.get("role").and_then(Value::as_str) == Some("system"))
-    else {
-        return;
-    };
-    let Some(content) = system.get("content").and_then(Value::as_str) else {
-        return;
-    };
-
-    let after = content.replacen(&format!("{line}\n\n"), "", 1);
-    let after = after.replacen(&format!("\n\n{line}"), "", 1);
-    let after = if after == line { String::new() } else { after };
-    system["content"] = Value::String(after);
-}
-
-fn offer_tools(fields: &mut Fields, offered: bool) {
-    if offered {
-        fields.insert(
-            TOOLS.to_string(),
-            Tool::ALL.map(Tool::definition).into_iter().collect(),
-        );
-    } else {
-        fields.remove(TOOLS);
+    if let Some(first) = messages.first_mut() {
+        first["content"] = Value::String(kept);
     }
 }
 
-/// Sets `tool_choice: "required"` on the first round, and clears it after, so
-/// the model has to call a tool once and then chooses for itself.
-fn require_tool(fields: &mut Fields, required: bool) {
-    if required {
-        fields.insert(TOOL_CHOICE.to_string(), Value::String(REQUIRED.to_string()));
-    } else {
-        fields.remove(TOOL_CHOICE);
+/// The conversation's system line, when its first message is one holding text.
+/// The request keeps at most one, so one lookup is all the callers need.
+fn system_line(fields: &Fields) -> Option<&str> {
+    fields
+        .get(MESSAGES)?
+        .as_array()?
+        .first()
+        .filter(|message| message.get("role").and_then(Value::as_str) == Some("system"))?
+        .get("content")?
+        .as_str()
+}
+
+/// What one request offers the model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    /// The tools are offered, and this round has to call one.
+    Opening,
+    /// The tools are offered; the model chooses for itself.
+    Searching,
+    /// No tools at all: the model writes the answer.
+    Answering,
+}
+
+impl Phase {
+    /// The phase for tool round `round`, counting from one. The first round is
+    /// the one that requires a call, so that both models look something up
+    /// before they answer.
+    fn of_tool_round(round: usize) -> Phase {
+        match round {
+            1 => Phase::Opening,
+            _ => Phase::Searching,
+        }
+    }
+}
+
+/// Writes the phase's tool fields onto the request: the tool list, and the
+/// `tool_choice` that makes the first call mandatory.
+fn prepare(fields: &mut Fields, phase: Phase) {
+    match phase {
+        Phase::Opening | Phase::Searching => {
+            fields.insert(
+                TOOLS.to_string(),
+                Tool::ALL.map(Tool::definition).into_iter().collect(),
+            );
+        }
+        Phase::Answering => {
+            fields.remove(TOOLS);
+        }
+    }
+
+    match phase {
+        Phase::Opening => {
+            fields.insert(TOOL_CHOICE.to_string(), Value::String(REQUIRED.to_string()));
+        }
+        Phase::Searching | Phase::Answering => {
+            fields.remove(TOOL_CHOICE);
+        }
     }
 }
 
@@ -627,73 +685,161 @@ fn append_round(fields: &mut Fields, round: &Round, results: &[String]) -> Outco
     Ok(())
 }
 
-/// Runs one tool call; its result is text for the model.
-fn run_tool(
-    client: &mut dyn Write,
-    call: &ToolCall,
-    upstreams: &Upstreams,
-    allowed: &mut Allowed,
-    ledger: &mut Ledger,
-) -> Outcome<String> {
-    match Tool::named(&call.name) {
-        Some(Tool::WebSearch) => web_search(client, call, &upstreams.search, allowed, ledger),
-        Some(Tool::FetchPage) => fetch_page(client, call, &*upstreams.web, allowed, ledger),
-        None => Ok(format!("Unknown tool {}.", call.name)),
-    }
+/// The state the rounds share: where a page may come from, the calls already
+/// run, and the sources found with the budgets that bound them.
+struct Research {
+    /// The hosts this answer may read a page from: those a search returned, and
+    /// those the user's own message wrote.
+    allowed: Allowed,
+    /// The calls already run, keyed by [`signature`].
+    ran: Vec<String>,
+    /// Every source found, numbered from 1, with the search and page budgets.
+    ledger: Ledger,
 }
 
-/// A research round: one search per sub-question the model asked for, widened by
-/// `kind` when it asked for one. Its sources also become the addresses this
-/// answer may read a page from, and every source keeps one number to cite.
-fn web_search(
-    client: &mut dyn Write,
-    call: &ToolCall,
-    searxng: &Endpoint,
-    allowed: &mut Allowed,
-    ledger: &mut Ledger,
-) -> Outcome<String> {
-    let Some(plan) = call.search_plan() else {
-        return Ok("The search needs a non-empty query.".to_string());
-    };
+/// The nudge for a call that already ran in this answer.
+const ALREADY_RAN: &str = "That tool call already ran in this answer. Use its result.";
 
-    let mut blocks: Vec<String> = Vec::new();
-    for query in &plan.queries {
-        if ledger.searches_left(MAX_SEARCHES) == 0 {
-            blocks.push(format!(
-                "The search budget is spent ({MAX_SEARCHES} searches). Answer with what you have."
-            ));
-            break;
+impl Research {
+    /// A research that may read from the addresses in `text`, the user's own
+    /// message; a search adds the hosts its results came from.
+    fn new(text: &str) -> Research {
+        Research {
+            allowed: Allowed::from_text(text),
+            ran: Vec::new(),
+            ledger: Ledger::new(),
         }
-        ledger.count_search();
-
-        let hits = match search::search(searxng, query, plan.range) {
-            Ok(hits) => hits,
-            Err(error) => {
-                blocks.push(format!("The search \"{query}\" failed: {error}"));
-                continue;
-            }
-        };
-        for result in &hits.results {
-            allowed.add_url(&result.url);
-        }
-        send_thor(
-            client,
-            &ThorEvent::Search {
-                query,
-                results: sources(&hits.results),
-            },
-        )?;
-
-        blocks.push(search_block(query, &hits, ledger));
     }
 
-    blocks.push(format!(
-        "Searches used {} of {MAX_SEARCHES}; pages read {} of {MAX_READS}; sources numbered 1 to {}.",
-        ledger.searches(),
-        ledger.reads(),
-        ledger.len()
-    ));
-    Ok(blocks.join("\n\n"))
+    /// Runs a round's calls in order. Every call gets text back for the model,
+    /// whether it ran, repeated one already run, or named no tool at all.
+    fn run(
+        &mut self,
+        client: &mut dyn Write,
+        calls: &[ToolCall],
+        upstreams: &Upstreams,
+    ) -> Outcome<Vec<String>> {
+        calls
+            .iter()
+            .map(|call| self.run_one(client, call, upstreams))
+            .collect()
+    }
+
+    /// Runs one call. A call that repeats one already run is not run again: the
+    /// model is told so and asked to use what it has, which is what stops a
+    /// model looping on the same search.
+    fn run_one(
+        &mut self,
+        client: &mut dyn Write,
+        call: &ToolCall,
+        upstreams: &Upstreams,
+    ) -> Outcome<String> {
+        let signature = signature(call);
+        if self.ran.contains(&signature) {
+            return Ok(ALREADY_RAN.to_string());
+        }
+        self.ran.push(signature);
+
+        match Tool::named(&call.name) {
+            Some(Tool::WebSearch) => self.search(client, call, &upstreams.search),
+            Some(Tool::FetchPage) => self.read(client, call, &*upstreams.web),
+            None => Ok(format!("Unknown tool {}.", call.name)),
+        }
+    }
+
+    /// Whether the search budget is spent.
+    fn out_of_searches(&self) -> bool {
+        self.ledger.searches_left(MAX_SEARCHES) == 0
+    }
+
+    /// A research round: one search per sub-question the model asked for, widened
+    /// by `kind` when it asked for one. Its sources also become the addresses
+    /// this answer may read a page from, and every source keeps one number to
+    /// cite.
+    fn search(
+        &mut self,
+        client: &mut dyn Write,
+        call: &ToolCall,
+        searxng: &Endpoint,
+    ) -> Outcome<String> {
+        let Some(plan) = call.search_plan() else {
+            return Ok("The search needs a non-empty query.".to_string());
+        };
+
+        let mut blocks: Vec<String> = Vec::new();
+        for query in &plan.queries {
+            if self.ledger.searches_left(MAX_SEARCHES) == 0 {
+                blocks.push(format!(
+                    "The search budget is spent ({MAX_SEARCHES} searches). Answer with what you have."
+                ));
+                break;
+            }
+            self.ledger.count_search();
+
+            let hits = match search::search(searxng, query, plan.range) {
+                Ok(hits) => hits,
+                Err(error) => {
+                    blocks.push(format!("The search \"{query}\" failed: {error}"));
+                    continue;
+                }
+            };
+            for result in &hits.results {
+                self.allowed.add_url(&result.url);
+            }
+            send_thor(
+                client,
+                &ThorEvent::Search {
+                    query,
+                    results: sources(&hits.results),
+                },
+            )?;
+
+            blocks.push(search_block(query, &hits, &mut self.ledger));
+        }
+
+        blocks.push(format!(
+            "Searches used {} of {MAX_SEARCHES}; pages read {} of {MAX_READS}; sources numbered 1 to {}.",
+            self.ledger.searches(),
+            self.ledger.reads(),
+            self.ledger.len()
+        ));
+        Ok(blocks.join("\n\n"))
+    }
+
+    /// Reads one page and its same-site links, up to what is left of the page
+    /// budget. Rule 1 of the fetch design is enforced inside
+    /// [`fetch::read_recursive`], and every page read is sent to the page so the
+    /// answer can list its sources.
+    fn read(&mut self, client: &mut dyn Write, call: &ToolCall, web: &dyn Web) -> Outcome<String> {
+        let Some(raw) = call.url_argument() else {
+            return Ok("The fetch needs an address.".to_string());
+        };
+        let url = match Url::parse(&raw) {
+            Ok(url) => url,
+            Err(error) => return Ok(error.to_string()),
+        };
+        let left = self.ledger.reads_left(MAX_READS);
+        if left == 0 {
+            return Ok(format!(
+                "The page budget is spent ({MAX_READS} pages). Answer with what you have."
+            ));
+        }
+        let report =
+            match fetch::read_recursive(web, &url, &self.allowed, left.min(fetch::MAX_PAGES)) {
+                Ok(report) => report,
+                Err(error) => return Ok(format!("Could not read the page: {error}")),
+            };
+        self.ledger.count_reads(report.pages.len());
+        for page in &report.pages {
+            self.ledger.add_page(&page.url, &page.title);
+            let event = ThorEvent::Read {
+                url: &page.url,
+                title: &page.title,
+            };
+            send_thor(client, &event)?;
+        }
+        Ok(report.text)
+    }
 }
 
 /// One query's results, under the numbers the ledger gave them, and the engines
@@ -723,44 +869,9 @@ fn search_block(query: &str, hits: &search::Hits, ledger: &mut Ledger) -> String
     block
 }
 
-/// Reads one page and its same-site links, up to what is left of the page
-/// budget. Rule 1 of the fetch design is enforced inside
-/// [`fetch::read_recursive`], and every page read is sent to the page so the
-/// answer can list its sources.
-fn fetch_page(
-    client: &mut dyn Write,
-    call: &ToolCall,
-    web: &dyn Web,
-    allowed: &Allowed,
-    ledger: &mut Ledger,
-) -> Outcome<String> {
-    let Some(raw) = call.url_argument() else {
-        return Ok("The fetch needs an address.".to_string());
-    };
-    let url = match Url::parse(&raw) {
-        Ok(url) => url,
-        Err(error) => return Ok(error.to_string()),
-    };
-    let left = ledger.reads_left(MAX_READS);
-    if left == 0 {
-        return Ok(format!(
-            "The page budget is spent ({MAX_READS} pages). Answer with what you have."
-        ));
-    }
-    let report = match fetch::read_recursive(web, &url, allowed, left.min(fetch::MAX_PAGES)) {
-        Ok(report) => report,
-        Err(error) => return Ok(format!("Could not read the page: {error}")),
-    };
-    ledger.count_reads(report.pages.len());
-    for page in &report.pages {
-        ledger.add_page(&page.url, &page.title);
-        let event = ThorEvent::Read {
-            url: &page.url,
-            title: &page.title,
-        };
-        send_thor(client, &event)?;
-    }
-    Ok(report.text)
+/// The key a call is remembered by: its name and its arguments.
+fn signature(call: &ToolCall) -> String {
+    format!("{}\u{1}{}", call.name, call.arguments)
 }
 
 fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
@@ -1684,7 +1795,8 @@ mod tests {
     fn text_beside_a_call_on_the_answer_round_does_not_end_the_answer() -> Outcome {
         let call = call_event("other", "{}");
         let mixed = json!({ "choices": [{ "delta": { "content": "Here are the jobs. <tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
-        let reply = r#"{"choices":[{"delta":{"content":"and the links: https://jobs.example/1"}}]}"#;
+        let reply =
+            r#"{"choices":[{"delta":{"content":"and the links: https://jobs.example/1"}}]}"#;
         let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
         responses.push(event_stream(&[&mixed]));
         responses.push(event_stream(&[reply]));
@@ -1701,12 +1813,12 @@ mod tests {
         assert!(search.requests()?[0].contains("q=x"));
         let sent = events(&client);
         assert!(
-            sent.iter().any(|event| event.contains("Here are the jobs.")),
+            sent.iter()
+                .any(|event| event.contains("Here are the jobs.")),
             "{sent:?}"
         );
         assert!(
-            sent
-                .iter()
+            sent.iter()
                 .any(|event| event.contains("and the links: https://jobs.example/1")),
             "{sent:?}"
         );
@@ -1796,12 +1908,30 @@ mod tests {
     }
 
     #[test]
-    fn the_first_round_requires_a_tool() {
+    fn only_the_first_tool_round_forces_a_call() {
+        assert_eq!(Phase::of_tool_round(1), Phase::Opening);
+        assert_eq!(Phase::of_tool_round(2), Phase::Searching);
+        assert_eq!(Phase::of_tool_round(MAX_ROUNDS), Phase::Searching);
+    }
+
+    #[test]
+    fn the_phases_offer_the_tools_and_only_the_first_forces_a_call() {
+        let tools = |fields: &Fields| fields.contains_key(TOOLS);
+        let forced = |fields: &Fields| fields.contains_key(TOOL_CHOICE);
+
         let mut fields = Fields::new();
-        require_tool(&mut fields, true);
+        prepare(&mut fields, Phase::Opening);
+        assert!(tools(&fields));
+        assert!(forced(&fields));
         assert_eq!(fields[TOOL_CHOICE], json!("required"));
-        require_tool(&mut fields, false);
-        assert!(!fields.contains_key(TOOL_CHOICE));
+
+        prepare(&mut fields, Phase::Searching);
+        assert!(tools(&fields));
+        assert!(!forced(&fields));
+
+        prepare(&mut fields, Phase::Answering);
+        assert!(!tools(&fields));
+        assert!(!forced(&fields));
     }
 
     #[test]
