@@ -100,10 +100,7 @@ impl Client {
         let mut raw = Vec::new();
         reader.read_to_end(&mut raw).map_err(server)?;
         let text = String::from_utf8_lossy(&raw).into_owned();
-        let body = match chunked {
-            true => dechunk(&text),
-            false => text,
-        };
+        let body = if chunked { dechunk(&text) } else { text };
 
         match status.split_whitespace().nth(1) {
             Some("200") => Ok(body),

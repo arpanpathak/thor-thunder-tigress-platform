@@ -82,9 +82,10 @@ pub fn examples(chapter_markdown: &str, origin: &str) -> Vec<Example> {
     let mut examples = Vec::new();
 
     for section in sections(chapter_markdown, &SECTION_MARKERS, &chapter) {
-        let training_sections = match section.is_too_long() {
-            true => sections(&section.body, &SUBSECTION_MARKERS, &section.heading),
-            false => vec![section],
+        let training_sections = if section.is_too_long() {
+            sections(&section.body, &SUBSECTION_MARKERS, &section.heading)
+        } else {
+            vec![section]
         };
 
         for training_section in training_sections.into_iter().filter(Section::has_text) {
@@ -151,10 +152,10 @@ fn chapter_title(chapter_markdown: &str, origin: &str) -> String {
     };
     let title_line = first_with("# ").or_else(|| first_with("## "));
 
-    match title_line {
-        Some(title) => strip_numbering(title),
-        None => file_stem(origin).replace(['-', '_'], " "),
-    }
+    title_line.map_or_else(
+        || file_stem(origin).replace(['-', '_'], " "),
+        strip_numbering,
+    )
 }
 
 /// The file name without folders and extension, `ch13-lru-cache` for `src/ch13-lru-cache.md`.
@@ -168,9 +169,10 @@ fn file_stem(origin: &str) -> &str {
 /// One section as a passage that reads on its own: the chapter title, the
 /// section heading when it differs, then the text.
 fn passage(chapter: &str, heading: &str, body: &str) -> String {
-    match heading == chapter {
-        true => format!("# {chapter}\n\n{body}"),
-        false => format!("# {chapter}\n\n## {heading}\n\n{body}"),
+    if heading == chapter {
+        format!("# {chapter}\n\n{body}")
+    } else {
+        format!("# {chapter}\n\n## {heading}\n\n{body}")
     }
 }
 

@@ -108,10 +108,10 @@ impl Workspace {
     ///
     /// `ReviewError::NotFound` for a name no open dataset has.
     pub fn dataset(&self, name: Option<&str>) -> Outcome<&Dataset> {
-        let found = match name {
-            Some(wanted) => self.datasets.iter().find(|dataset| dataset.name == wanted),
-            None => self.datasets.first(),
-        };
+        let found = name.map_or_else(
+            || self.datasets.first(),
+            |wanted| self.datasets.iter().find(|dataset| dataset.name == wanted),
+        );
         found.ok_or_else(|| ReviewError::NotFound(format!("dataset {}", name.unwrap_or_default())))
     }
 

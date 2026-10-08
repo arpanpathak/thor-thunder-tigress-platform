@@ -190,16 +190,17 @@ pub fn plan(passages: Vec<Passage>, turns: usize) -> Vec<Vec<Passage>> {
 /// The messages that ask the teacher for the next question.
 pub fn question_prompt(previous_questions: &[String], passage: &Passage) -> Vec<Message> {
     let shown: String = passage.text.chars().take(MAX_PROMPT_PASSAGE).collect();
-    let earlier = match previous_questions.is_empty() {
-        true => "This is the first question of the conversation.".to_string(),
-        false => format!(
+    let earlier = if previous_questions.is_empty() {
+        "This is the first question of the conversation.".to_string()
+    } else {
+        format!(
             "The engineer already asked, in order:\n{}\nWrite their next, follow-up question.",
             previous_questions
                 .iter()
                 .map(|question| format!("- {question}"))
                 .collect::<Vec<String>>()
                 .join("\n")
-        ),
+        )
     };
     vec![
         Message {
@@ -540,7 +541,7 @@ mod tests {
             "yes",
         ];
         thread::spawn(move || {
-            replies.iter().for_each(|reply| {
+            for reply in &replies {
                 if let Ok((mut stream, _)) = listener.accept() {
                     let mut buffer = [0u8; 16_384];
                     let _ = stream.read(&mut buffer);
@@ -552,7 +553,7 @@ mod tests {
                         body.len()
                     );
                 }
-            });
+            }
         });
         let client = Client {
             address,

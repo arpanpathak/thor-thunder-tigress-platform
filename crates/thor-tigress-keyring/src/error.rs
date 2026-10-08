@@ -131,11 +131,10 @@ mod tests {
             KeyringError::Sealed,
             serde_json::from_str::<u8>("x")
                 .err()
-                .map(|source| KeyringError::Json {
+                .map_or(KeyringError::KeyLength, |source| KeyringError::Json {
                     path: "keyring".into(),
                     source,
-                })
-                .unwrap_or(KeyringError::KeyLength),
+                }),
             KeyringError::Kdf(argon2::Error::MemoryTooLittle),
             KeyringError::Random(getrandom::Error::UNEXPECTED),
             KeyringError::Exists {

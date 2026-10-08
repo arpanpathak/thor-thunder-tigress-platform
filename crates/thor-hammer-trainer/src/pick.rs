@@ -271,10 +271,10 @@ pub fn render_queue(picked: &[&Section]) -> String {
     let mut queue = String::from("# Sections to teach from\n\n");
 
     for section in picked {
-        let body = match section.language {
-            Some(language) => format!("````{language}\n{}\n````", section.text),
-            None => section.text.chars().take(MAX_QUEUE_CHARS).collect(),
-        };
+        let body = section.language.map_or_else(
+            || section.text.chars().take(MAX_QUEUE_CHARS).collect(),
+            |language| format!("````{language}\n{}\n````", section.text),
+        );
         let _ = write!(
             queue,
             "## {}\n\n<!-- source: {}; section: {}; licence: {} -->\n\n{}\n\n",

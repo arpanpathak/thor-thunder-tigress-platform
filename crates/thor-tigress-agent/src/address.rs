@@ -143,10 +143,8 @@ impl fmt::Display for Url {
 
 /// The authority and path of an address, split at the first `/` or `?`.
 fn split_auth_path(rest: &str) -> (&str, &str) {
-    match rest.find(['/', '?']) {
-        Some(at) => (&rest[..at], &rest[at..]),
-        None => (rest, "/"),
-    }
+    rest.find(['/', '?'])
+        .map_or((rest, "/"), |at| (&rest[..at], &rest[at..]))
 }
 
 /// The path as stored: always leading with `/`.

@@ -450,21 +450,20 @@ fn collect_markdown(
             if is_hidden {
                 continue;
             }
-            match path.is_dir() {
-                true => pending.push(path),
-                false => {
-                    let name = path
-                        .file_name()
-                        .and_then(|name| name.to_str())
-                        .unwrap_or_default();
-                    let is_markdown = path
-                        .extension()
-                        .is_some_and(|extension| extension == "md" || extension == "markdown");
-                    let is_navigation =
-                        NAVIGATION_FILES.contains(&name) && !(keep_readme && name == "README.md");
-                    if is_markdown && !is_navigation {
-                        files.push(path);
-                    }
+            if path.is_dir() {
+                pending.push(path)
+            } else {
+                let name = path
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or_default();
+                let is_markdown = path
+                    .extension()
+                    .is_some_and(|extension| extension == "md" || extension == "markdown");
+                let is_navigation =
+                    NAVIGATION_FILES.contains(&name) && !(keep_readme && name == "README.md");
+                if is_markdown && !is_navigation {
+                    files.push(path);
                 }
             }
         }
@@ -565,12 +564,19 @@ fn tidy_with(text: &str, definition: &Regex, reference: &Regex, block_start: &Re
     }
     lines
         .into_iter()
-        .map(|(is_code, line)| match is_code {
-            true => line,
-            false => reference.replace_all(&line, "$1").into_owned(),
-        })
+        .map(|(is_code, line)| tidy_line(is_code, line, reference))
         .collect::<Vec<String>>()
         .join("\n")
+}
+
+/// The pattern text of a line: one inside a code fence is left as it is, one of
+/// prose has its citations replaced.
+fn tidy_line(is_code: bool, line: String, reference: &Regex) -> String {
+    if is_code {
+        line
+    } else {
+        reference.replace_all(&line, "$1").into_owned()
+    }
 }
 
 /// The HTML element names the sources actually use.
@@ -631,23 +637,20 @@ fn strip_html(line: &str) -> String {
     let mut rest = line;
     while let Some(start) = rest.find('<') {
         kept.push_str(&rest[..start]);
-        match rest[start..].find('>') {
-            Some(offset) => {
-                let tag = &rest[start..start + offset + 1];
-                if is_html_tag(tag) {
-                    if tag.starts_with("<br") || tag.starts_with("</p") || tag == "<p>" {
-                        kept.push(' ');
-                    }
-                } else {
-                    kept.push_str(tag);
+        if let Some(offset) = rest[start..].find('>') {
+            let tag = &rest[start..start + offset + 1];
+            if is_html_tag(tag) {
+                if tag.starts_with("<br") || tag.starts_with("</p") || tag == "<p>" {
+                    kept.push(' ');
                 }
-                rest = &rest[start + offset + 1..];
+            } else {
+                kept.push_str(tag);
             }
-            None => {
-                kept.push_str(&rest[start..]);
-                rest = "";
-                break;
-            }
+            rest = &rest[start + offset + 1..];
+        } else {
+            kept.push_str(&rest[start..]);
+            rest = "";
+            break;
         }
     }
     kept.push_str(rest);
@@ -662,7 +665,7 @@ fn is_html_tag(tag: &str) -> bool {
         .unwrap_or(tag);
     let name: String = body
         .chars()
-        .take_while(|character| character.is_ascii_alphanumeric())
+        .take_while(char::is_ascii_alphanumeric)
         .collect::<String>()
         .to_ascii_lowercase();
     !name.is_empty() && HTML_ELEMENTS.contains(&name.as_str())
@@ -733,8 +736,7 @@ fn strip_shortcodes(line: &str) -> String {
         kept.push_str(&rest[..start]);
         let closing = rest[start..]
             .find("}}")
-            .map(|offset| start + offset + 2)
-            .unwrap_or(rest.len());
+            .map_or(rest.len(), |offset| start + offset + 2);
         kept.push_str(
             &rest[start..closing]
                 .chars()

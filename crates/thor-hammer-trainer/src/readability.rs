@@ -58,12 +58,11 @@ fn remove_html_comments(markdown: &str) -> String {
 
     while let Some(comment_start) = remaining.find(COMMENT_START) {
         kept.push_str(&remaining[..comment_start]);
-        remaining = match remaining[comment_start..].find(COMMENT_END) {
-            Some(comment_length) => {
-                &remaining[comment_start + comment_length + COMMENT_END.len()..]
-            }
-            None => "",
-        };
+        remaining = remaining[comment_start..]
+            .find(COMMENT_END)
+            .map_or("", |end| {
+                &remaining[comment_start + end + COMMENT_END.len()..]
+            });
     }
     kept.push_str(remaining);
     kept
