@@ -34,9 +34,15 @@ use crate::{
     upstream::Endpoint,
 };
 
-/// Tool rounds per answer; after them the model gets one round without tools,
-/// so it has to answer.
-const MAX_ROUNDS: usize = 4;
+/// Tool rounds per answer; a job hunt with several titles can need more than a
+/// couple. After them the model gets [`ANSWER_ROUNDS`] rounds without tools, so
+/// it has to write the answer.
+const MAX_ROUNDS: usize = 6;
+
+/// Rounds without tools at the end. The model usually answers on the first; a
+/// second is there for the two ways it fails: a round that is only a tool call,
+/// which is run, and a round with no text at all.
+const ANSWER_ROUNDS: usize = 2;
 
 /// Tool calls kept per round; more are ignored.
 const MAX_CALLS: usize = 8;
@@ -323,9 +329,10 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 }
 
 /// Asks the model, runs the tools it calls, and asks again, until it answers
-/// without a tool call or the tool rounds run out. A model that still wants a
-/// tool after [`MAX_ROUNDS`] gets one last round with no tools, so the answer is
-/// always plain text and never a leaked tool call.
+/// without a tool call or the tool rounds run out. After them the model gets a
+/// few rounds with no tools, and a call it writes even then is run: job hunting
+/// can need several searches, and a reply that is only a tool call is not an
+/// answer.
 ///
 /// The first round requires a call, so both models look something up before
 /// they answer; later rounds leave the choice to the model. A call that repeats
@@ -349,36 +356,56 @@ fn search_loop(
             return Ok(());
         }
 
-        let results = round
-            .calls
-            .iter()
-            .map(|call| {
-                let signature = format!("{}\u{1}{}", call.name, call.arguments);
-                if ran.contains(&signature) {
-                    return Ok(
-                        "That tool call already ran in this answer. Use its result.".to_string()
-                    );
-                }
-                ran.push(signature);
-                run_tool(client, call, upstreams, &mut allowed)
-            })
-            .collect::<Outcome<Vec<String>>>()?;
+        let results = run_calls(client, &round.calls, upstreams, &mut allowed, &mut ran)?;
         append_round(&mut fields, &round, &results)?;
     }
 
     offer_tools(&mut fields, false);
     require_tool(&mut fields, false);
     append_system(&mut fields, ANSWER_NUDGE);
-    let final_round = stream_round(client, &fields, model)?;
-    if final_round.content.trim().is_empty() {
-        let note = "The tool rounds are over and the model did not write an answer. \
-                    The results above are what the tools returned.";
-        response::send_event(
-            client,
-            &json!({ "choices": [{ "delta": { "content": note } }] }).to_string(),
-        )?;
+
+    for _ in 0..ANSWER_ROUNDS {
+        let round = stream_round(client, &fields, model)?;
+
+        if round.calls.is_empty() {
+            if !round.content.trim().is_empty() {
+                return Ok(());
+            }
+            continue;
+        }
+
+        let results = run_calls(client, &round.calls, upstreams, &mut allowed, &mut ran)?;
+        append_round(&mut fields, &round, &results)?;
     }
+
+    let note = "I ran out of tool rounds without a written answer. \
+                The results above are what the tools returned; ask again, or narrow the question.";
+    response::send_event(
+        client,
+        &json!({ "choices": [{ "delta": { "content": note } }] }).to_string(),
+    )?;
     Ok(())
+}
+
+/// Runs a round's tool calls, skipping any that already ran.
+fn run_calls(
+    client: &mut dyn Write,
+    calls: &[ToolCall],
+    upstreams: &Upstreams,
+    allowed: &mut Allowed,
+    ran: &mut Vec<String>,
+) -> Outcome<Vec<String>> {
+    calls
+        .iter()
+        .map(|call| {
+            let signature = format!("{}\u{1}{}", call.name, call.arguments);
+            if ran.contains(&signature) {
+                return Ok("That tool call already ran in this answer. Use its result.".to_string());
+            }
+            ran.push(signature);
+            run_tool(client, call, upstreams, allowed)
+        })
+        .collect()
 }
 
 /// The text of the user's own messages: one of the two places a fetchable
@@ -1041,11 +1068,48 @@ mod tests {
     }
 
     #[test]
-    fn a_call_on_the_answer_round_is_stripped() -> Outcome {
+    fn a_call_on_the_answer_round_is_run() -> Outcome {
         let call = call_event("other", "{}");
         let leaked = json!({ "choices": [{ "delta": { "content": "<tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
+        let reply = r#"{"choices":[{"delta":{"content":"the answer"}}]}"#;
         let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
         responses.push(event_stream(&[&leaked]));
+        responses.push(event_stream(&[reply]));
+        let model = FakeServer::start(responses)?;
+        let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
+        let mut client = Vec::new();
+        answer(
+            &mut client,
+            br#"{"messages":[],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+        let seen = model.requests()?;
+        assert_eq!(seen.len(), MAX_ROUNDS + 2);
+        assert!(
+            seen[MAX_ROUNDS + 1].contains("No results."),
+            "{}",
+            seen[MAX_ROUNDS + 1]
+        );
+        assert!(search.requests()?[0].contains("q=x"));
+        let sent = events(&client);
+        assert!(
+            !sent.iter().any(|event| event.contains("<tool_call")),
+            "{sent:?}"
+        );
+        assert!(
+            sent.iter().any(|event| event.contains("the answer")),
+            "{sent:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_fallback_is_sent_when_no_round_writes_an_answer() -> Outcome {
+        let call = call_event("other", "{}");
+        let empty = r#"{"choices":[{"delta":{}}]}"#;
+        let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
+        responses.push(event_stream(&[empty]));
+        responses.push(event_stream(&[empty]));
         let model = FakeServer::start(responses)?;
         let mut client = Vec::new();
         answer(
@@ -1055,12 +1119,8 @@ mod tests {
         )?;
         let sent = events(&client);
         assert!(
-            !sent.iter().any(|event| event.contains("<tool_call")),
-            "{sent:?}"
-        );
-        assert!(
             sent.iter()
-                .any(|event| event.contains("did not write an answer")),
+                .any(|event| event.contains("ran out of tool rounds")),
             "{sent:?}"
         );
         Ok(())

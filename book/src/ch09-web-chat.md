@@ -103,7 +103,7 @@ With **Web** on, the server gives the model two tools. The first round requires
 a tool call, so the model looks before it answers; each search goes to SearXNG
 on the Thor, which queries several search engines and returns titles, links,
 dates and snippets, filtered to a range when the model asks for one (`day`,
-`week`, `month` or `year`). The model then reads what it needs: up to four
+`week`, `month` or `year`). The model then reads what it needs: up to six
 rounds, with `fetch_page_content_recursive` to open a cited page and the links
 on that page's own site. The page lists every query and source above the answer
 under "searched: …", and every page read under "read: …".

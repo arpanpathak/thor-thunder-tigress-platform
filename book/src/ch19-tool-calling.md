@@ -32,7 +32,7 @@ This chapter covers
 ## How a tool call works
 
 <figure>
-<img src="figures/tool-loop.svg" alt="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron or Qwen calls web_search, which asks SearXNG and the search engines for recent results with dates, or calls fetch_page_content_recursive, which checks that every hop is a public https address and reads a page and its own links. After at most four rounds the model has to answer.">
+<img src="figures/tool-loop.svg" alt="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron or Qwen calls web_search, which asks SearXNG and the search engines for recent results with dates, or calls fetch_page_content_recursive, which checks that every hop is a public https address and reads a page and its own links. After at most six tool rounds the model has to answer.">
 <figcaption><b>Figure 18.1</b> The tool loop in <code>thor-tigress-agent</code>.</figcaption>
 </figure>
 
@@ -48,9 +48,11 @@ This chapter covers
 5. A call that repeats one already run is not run again; the model is told so and
    asked to use what it has. That is what stops a model looping on the same
    search.
-6. Steps 3 to 5 repeat at most four times. The tools are offered on every one of
-   those rounds. A fifth request is sent without tools, with a line telling the
-   model to answer now, so the reader always gets plain text.
+6. Steps 3 to 5 repeat at most six times. The tools are offered on every one of
+   those rounds. After them the model gets up to two rounds without tools, with a
+   line telling it to answer; a call it writes anyway is run, and then it is
+   asked once more. That is what keeps a long hunt — several job titles, several
+   pages — from ending in a tool call or in nothing.
 7. Every token is streamed to the page as it is written, and each tool use is
    sent as an event the page lists under "searched: …" or "read: …".
 
@@ -97,7 +99,7 @@ safety rule lives.
 | Backend | SearXNG on `127.0.0.1:8888`, which asks several search engines |
 | Results given to the model | the first 6 |
 | Per result | title, address, date when the engine sends one, and the engine's snippet, cut to 400 characters |
-| Rounds | at most four rounds of tool calls per answer |
+| Rounds | at most six tool rounds, then up to two rounds without tools to write the answer |
 | Network reach | only `127.0.0.1:8888`; the server itself never contacts the internet for a search |
 
 SearXNG's JSON answer carries a `publishedDate` on news and other dated

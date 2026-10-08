@@ -91,6 +91,16 @@ there as untracked.
   shown), a call split across chunks, a repeated call, and a call leaked on the
   answer round. Chapter "Tool calling" gained "Calls written as text" and the
   test rows; the README section was updated.
+- Second report, same day: a search for several job titles ended in the fallback
+  "I ran out of tool rounds without a written answer". Cause: four tool rounds
+  is too few for a hunt, and the single answer round was itself a tool call,
+  which the filter dropped, so there was nothing left to show.
+- Follow-up fix: tool rounds raised to six (`MAX_ROUNDS`), and the end is now a
+  phase of up to two rounds without tools (`ANSWER_ROUNDS`) in place of one. A
+  call the model writes in that phase is run, its result is added, and it is
+  asked again; the fallback is sent only when two rounds yield no text at all.
+  Agent tests 138; the round count in the book, the README and the tool-loop
+  figure was updated to six.
 - Deployed to the Thor again, 2026-10-07: rebuilt and reinstalled, service
   restarted, `/health` ok. A live Web-on request ("search the latest Rust
   release, read the announcement, name the page") then searched twice, read the
