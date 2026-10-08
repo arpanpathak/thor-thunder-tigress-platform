@@ -28,16 +28,17 @@ use crate::{
     fetch::{self, Allowed},
     http::Web,
     paths,
+    research::{Kind, Ledger, MAX_QUERIES_PER_CALL, MAX_READS, MAX_SEARCHES},
     response::{self, DONE, EVENT_PREFIX},
     search::{self, SearchResult, TimeRange},
     tooltext::Sieve,
     upstream::Endpoint,
 };
 
-/// Tool rounds per answer; a job hunt with several titles can need more than a
-/// couple. After them the model gets [`ANSWER_ROUNDS`] rounds without tools, so
-/// it has to write the answer.
-const MAX_ROUNDS: usize = 6;
+/// Tool rounds per answer. Deep research is not round count — it is the
+/// widening, the budget and the ledger below — but a hunt with sub-questions
+/// does need room, so there are eight.
+const MAX_ROUNDS: usize = 8;
 
 /// Rounds without tools at the end. The model usually answers on the first; a
 /// second is there for the two ways it fails: a round that is only a tool call,
@@ -47,24 +48,32 @@ const ANSWER_ROUNDS: usize = 2;
 /// Tool calls kept per round; more are ignored.
 const MAX_CALLS: usize = 8;
 
+/// The most sources named in the note before the answer round.
+const MAX_CITED: usize = 40;
+
 /// The page's switch for web search; removed before the model sees the request.
 const WEB_SEARCH_SWITCH: &str = "thor_web_search";
 
-/// The line added under the switch. It names the tools so a model that would
-/// answer from memory still reaches for one, and says what `time_range` is for.
+/// The line added under the switch. It asks for a plan, names the two kinds
+/// that find postings and the people behind them, and asks for citations.
 const SEARCH_HINT: &str = concat!(
-    "Web search is available. Use the web_search tool for current events, jobs, ",
-    "prices, releases, or facts you are not certain of; set its time_range to day, ",
-    "week, month or year when the answer depends on what is recent. Use the ",
-    "fetch_page_content_recursive tool to read a page from the results when the ",
-    "snippet is not enough."
+    "Web research is available, and answering without it is a guess. Plan first: break the ",
+    "question into the sub-questions that have to be true for the answer, then run one ",
+    "web_search per sub-question, using its `queries` list to search several at once. Use ",
+    "kind jobs for postings and kind people for the recruiter and the hiring manager ",
+    "behind them — people posts are often where a job is first mentioned. Set time_range to ",
+    "day, week, month or year when the answer depends on what is recent. Read the most ",
+    "promising results with fetch_page_content_recursive before you decide, and follow a ",
+    "posting to the company's own page. Cite what you use with the [n] number each source is ",
+    "given, and answer with headings when the answer has parts."
 );
 
-/// The line added before the last round, when the model must stop calling
+/// The line added before the answer rounds, when the model must stop calling
 /// tools and write the answer.
 const ANSWER_NUDGE: &str = concat!(
-    "The tool rounds are over. Answer the user's question now, in plain text, ",
-    "using what the tool results above say. Do not write a tool call."
+    "The tool rounds are over. Write the answer now, in plain text, from the sources ",
+    "above: the facts, the dates, the companies, and the people when the question is ",
+    "about hiring. Cite each claim with its [n] number. Do not write a tool call."
 );
 
 /// The request field asking for a streamed answer.
@@ -137,11 +146,25 @@ impl Tool {
     fn definition(self) -> Value {
         let (description, parameters) = match self {
             Tool::WebSearch => (
-                "Search the web. Returns titles, addresses, dates and short snippets of the top results. Set time_range to day, week, month or year when the answer depends on what is recent, such as jobs or other new postings.",
+                concat!(
+                    "Research the web. Returns titles, addresses, dates and short snippets, each ",
+                    "with a number to cite. `query` is the sub-question to search; `queries` ",
+                    "adds up to three more, so one call can fan out over the parts of a ",
+                    "question. `kind` widens the search: \"jobs\" looks for postings, ",
+                    "\"people\" for the recruiter and hiring manager behind one, whose posts ",
+                    "often mention a role first. `time_range` keeps results recent: day, ",
+                    "week, month or year."
+                ),
                 json!({
                     "type": "object",
                     "properties": {
-                        "query": { "type": "string", "description": "What to search for" },
+                        "query": { "type": "string", "description": "The sub-question to search for" },
+                        "queries": {
+                            "type": "array",
+                            "items": { "type": "string" },
+                            "description": "Up to three more sub-questions to search in the same call"
+                        },
+                        "kind": { "type": "string", "enum": Kind::ALL.map(Kind::as_str), "description": "How to widen the search" },
                         "time_range": { "type": "string", "enum": ["day", "week", "month", "year"], "description": "Keep results no older than this" }
                     },
                     "required": ["query"],
@@ -160,12 +183,28 @@ impl Tool {
     }
 }
 
-/// The arguments of one `web_search` call.
+/// The arguments of one `web_search` call: a sub-question, more sub-questions,
+/// how to widen them, and how recent the answers must be.
 #[derive(Deserialize)]
 struct SearchArguments {
-    query: String,
+    #[serde(default)]
+    query: Option<String>,
+    #[serde(default)]
+    queries: Option<Vec<String>>,
+    #[serde(default)]
+    kind: Option<String>,
     #[serde(default)]
     time_range: Option<String>,
+}
+
+/// One `web_search` call, worked out: the queries to run and the recency asked
+/// for. The queries are already widened by `kind` and capped.
+#[derive(Debug, PartialEq, Eq)]
+struct SearchPlan {
+    /// The searches to run, in order.
+    queries: Vec<String>,
+    /// The recency to ask SearXNG for.
+    range: Option<TimeRange>,
 }
 
 /// The arguments of one `fetch_page_content_recursive` call.
@@ -330,14 +369,16 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 
 /// Asks the model, runs the tools it calls, and asks again, until it answers
 /// without a tool call or the tool rounds run out. After them the model gets a
-/// few rounds with no tools, and a call it writes even then is run: job hunting
-/// can need several searches, and a reply that is only a tool call is not an
-/// answer.
+/// few rounds with no tools, and a call it writes even then is run: a research
+/// question can need several searches, and a reply that is only a tool call is
+/// not an answer.
 ///
 /// The first round requires a call, so both models look something up before
 /// they answer; later rounds leave the choice to the model. A call that repeats
 /// one already run is answered with a nudge instead of run again, so a model
-/// that loops cannot loop forever.
+/// that loops cannot loop forever. [`Ledger`] holds every source found, gives it
+/// a number to cite, and holds the search and page budgets; the numbers go to
+/// the model again before the answer rounds.
 fn search_loop(
     client: &mut dyn Write,
     mut fields: Fields,
@@ -346,6 +387,7 @@ fn search_loop(
 ) -> Outcome {
     let mut allowed = Allowed::from_text(&user_text(&fields));
     let mut ran: Vec<String> = Vec::new();
+    let mut ledger = Ledger::new();
 
     for round_number in 1..=MAX_ROUNDS {
         offer_tools(&mut fields, true);
@@ -356,13 +398,29 @@ fn search_loop(
             return Ok(());
         }
 
-        let results = run_calls(client, &round.calls, upstreams, &mut allowed, &mut ran)?;
+        let results = run_calls(
+            client,
+            &round.calls,
+            upstreams,
+            &mut allowed,
+            &mut ran,
+            &mut ledger,
+        )?;
         append_round(&mut fields, &round, &results)?;
     }
 
     offer_tools(&mut fields, false);
     require_tool(&mut fields, false);
     append_system(&mut fields, ANSWER_NUDGE);
+    if !ledger.is_empty() {
+        append_system(
+            &mut fields,
+            &format!(
+                "Sources found, with the numbers to cite:\n{}",
+                ledger.list(MAX_CITED)
+            ),
+        );
+    }
 
     for _ in 0..ANSWER_ROUNDS {
         let round = stream_round(client, &fields, model)?;
@@ -374,7 +432,14 @@ fn search_loop(
             continue;
         }
 
-        let results = run_calls(client, &round.calls, upstreams, &mut allowed, &mut ran)?;
+        let results = run_calls(
+            client,
+            &round.calls,
+            upstreams,
+            &mut allowed,
+            &mut ran,
+            &mut ledger,
+        )?;
         append_round(&mut fields, &round, &results)?;
     }
 
@@ -394,6 +459,7 @@ fn run_calls(
     upstreams: &Upstreams,
     allowed: &mut Allowed,
     ran: &mut Vec<String>,
+    ledger: &mut Ledger,
 ) -> Outcome<Vec<String>> {
     calls
         .iter()
@@ -403,7 +469,7 @@ fn run_calls(
                 return Ok("That tool call already ran in this answer. Use its result.".to_string());
             }
             ran.push(signature);
-            run_tool(client, call, upstreams, allowed)
+            run_tool(client, call, upstreams, allowed, ledger)
         })
         .collect()
 }
@@ -502,46 +568,95 @@ fn run_tool(
     call: &ToolCall,
     upstreams: &Upstreams,
     allowed: &mut Allowed,
+    ledger: &mut Ledger,
 ) -> Outcome<String> {
     match Tool::named(&call.name) {
-        Some(Tool::WebSearch) => web_search(client, call, &upstreams.search, allowed),
-        Some(Tool::FetchPage) => fetch_page(client, call, &*upstreams.web, allowed),
+        Some(Tool::WebSearch) => web_search(client, call, &upstreams.search, allowed, ledger),
+        Some(Tool::FetchPage) => fetch_page(client, call, &*upstreams.web, allowed, ledger),
         None => Ok(format!("Unknown tool {}.", call.name)),
     }
 }
 
-/// A search, with the recency it asked for; its sources also become the
-/// addresses this answer may read a page from.
+/// A research round: one search per sub-question the model asked for, widened by
+/// `kind` when it asked for one. Its sources also become the addresses this
+/// answer may read a page from, and every source keeps one number to cite.
 fn web_search(
     client: &mut dyn Write,
     call: &ToolCall,
     searxng: &Endpoint,
     allowed: &mut Allowed,
+    ledger: &mut Ledger,
 ) -> Outcome<String> {
-    let Some((query, range)) = call.search_arguments() else {
+    let Some(plan) = call.search_plan() else {
         return Ok("The search needs a non-empty query.".to_string());
     };
 
-    let results = search::search(searxng, &query, range).unwrap_or_default();
-    for result in &results {
-        allowed.add_url(&result.url);
+    let mut blocks: Vec<String> = Vec::new();
+    for query in &plan.queries {
+        if ledger.searches_left(MAX_SEARCHES) == 0 {
+            blocks.push(format!(
+                "The search budget is spent ({MAX_SEARCHES} searches). Answer with what you have."
+            ));
+            break;
+        }
+        ledger.count_search();
+
+        let results = match search::search(searxng, query, plan.range) {
+            Ok(results) => results,
+            Err(error) => {
+                blocks.push(format!("The search \"{query}\" failed: {error}"));
+                continue;
+            }
+        };
+        for result in &results {
+            allowed.add_url(&result.url);
+        }
+        send_thor(
+            client,
+            &ThorEvent::Search {
+                query,
+                results: sources(&results),
+            },
+        )?;
+
+        blocks.push(search_block(query, &results, ledger));
     }
-    let event = ThorEvent::Search {
-        query: &query,
-        results: sources(&results),
-    };
-    send_thor(client, &event)?;
-    Ok(search::as_tool_text(&results))
+
+    blocks.push(format!(
+        "Searches used {} of {MAX_SEARCHES}; pages read {} of {MAX_READS}; sources numbered 1 to {}.",
+        ledger.searches(),
+        ledger.reads(),
+        ledger.len()
+    ));
+    Ok(blocks.join("\n\n"))
 }
 
-/// Reads one page and its same-site links. Rule 1 of the fetch design is
-/// enforced inside [`fetch::read_recursive`], and every page read is sent to
-/// the page so the answer can list its sources.
+/// One query's results, under the numbers the ledger gave them.
+fn search_block(query: &str, results: &[SearchResult], ledger: &mut Ledger) -> String {
+    if results.is_empty() {
+        return format!("Query: {query}\nNo results.");
+    }
+
+    let entries: Vec<String> = results
+        .iter()
+        .map(|result| {
+            let number = ledger.add(result);
+            search::as_entry(result, number)
+        })
+        .collect();
+    format!("Query: {query}\n{}", entries.join("\n\n"))
+}
+
+/// Reads one page and its same-site links, up to what is left of the page
+/// budget. Rule 1 of the fetch design is enforced inside
+/// [`fetch::read_recursive`], and every page read is sent to the page so the
+/// answer can list its sources.
 fn fetch_page(
     client: &mut dyn Write,
     call: &ToolCall,
     web: &dyn Web,
     allowed: &Allowed,
+    ledger: &mut Ledger,
 ) -> Outcome<String> {
     let Some(raw) = call.url_argument() else {
         return Ok("The fetch needs an address.".to_string());
@@ -550,11 +665,19 @@ fn fetch_page(
         Ok(url) => url,
         Err(error) => return Ok(error.to_string()),
     };
-    let report = match fetch::read_recursive(web, &url, allowed) {
+    let left = ledger.reads_left(MAX_READS);
+    if left == 0 {
+        return Ok(format!(
+            "The page budget is spent ({MAX_READS} pages). Answer with what you have."
+        ));
+    }
+    let report = match fetch::read_recursive(web, &url, allowed, left.min(fetch::MAX_PAGES)) {
         Ok(report) => report,
         Err(error) => return Ok(format!("Could not read the page: {error}")),
     };
+    ledger.count_reads(report.pages.len());
     for page in &report.pages {
+        ledger.add_page(&page.url, &page.title);
         let event = ThorEvent::Read {
             url: &page.url,
             title: &page.title,
@@ -727,16 +850,44 @@ impl ToolCall {
         serde_json::from_str(&self.arguments).ok()
     }
 
-    /// The `query` and `time_range` of a search, trimmed; `None` when the
-    /// query is missing or empty. An unknown range is treated as none.
-    fn search_arguments(&self) -> Option<(String, Option<TimeRange>)> {
+    /// The searches one call asks for: the `query`, plus every `queries` entry,
+    /// each widened by `kind`, capped at [`MAX_QUERIES_PER_CALL`] and without
+    /// repeats. `None` when no query is given. An unknown `time_range` or `kind`
+    /// is treated as absent.
+    fn search_plan(&self) -> Option<SearchPlan> {
         let arguments: SearchArguments = self.arguments()?;
-        let query = arguments.query.trim();
-        (!query.is_empty()).then(|| {
-            (
-                query.to_string(),
-                arguments.time_range.as_deref().and_then(TimeRange::of),
-            )
+
+        let mut base: Vec<String> = Vec::new();
+        for query in arguments.query.as_deref().into_iter().chain(
+            arguments
+                .queries
+                .as_deref()
+                .unwrap_or_default()
+                .iter()
+                .map(String::as_str),
+        ) {
+            let query = query.trim();
+            if !query.is_empty() && !base.iter().any(|seen| seen == query) {
+                base.push(query.to_string());
+            }
+        }
+        if base.is_empty() {
+            return None;
+        }
+
+        let kind = Kind::of(arguments.kind.as_deref());
+        let mut queries: Vec<String> = Vec::new();
+        for query in base.iter().flat_map(|query| kind.widen(query)) {
+            if queries.len() == MAX_QUERIES_PER_CALL {
+                break;
+            }
+            if !queries.contains(&query) {
+                queries.push(query);
+            }
+        }
+        Some(SearchPlan {
+            queries,
+            range: arguments.time_range.as_deref().and_then(TimeRange::of),
         })
     }
 
@@ -873,8 +1024,11 @@ mod tests {
         assert_eq!(round.content, "ok");
         assert_eq!(round.calls.len(), 1);
         assert_eq!(
-            round.calls[0].search_arguments(),
-            Some(("rust".to_string(), None))
+            round.calls[0].search_plan(),
+            Some(SearchPlan {
+                queries: vec!["rust".to_string()],
+                range: None
+            })
         );
         Ok(())
     }
@@ -890,26 +1044,80 @@ mod tests {
     }
 
     #[test]
+    fn a_search_plan_holds_the_queries_and_the_recency() {
+        let plan = |arguments: &str| {
+            ToolCall {
+                arguments: arguments.to_string(),
+                ..ToolCall::default()
+            }
+            .search_plan()
+        };
+
+        assert_eq!(
+            plan(r#"{"query":"  rust  "}"#),
+            Some(SearchPlan {
+                queries: vec!["rust".to_string()],
+                range: None
+            })
+        );
+        assert_eq!(
+            plan(r#"{"query":"jobs","time_range":"week"}"#),
+            Some(SearchPlan {
+                queries: vec!["jobs".to_string()],
+                range: Some(TimeRange::Week)
+            })
+        );
+        assert_eq!(
+            plan(r#"{"query":"jobs","time_range":"forever"}"#),
+            Some(SearchPlan {
+                queries: vec!["jobs".to_string()],
+                range: None
+            })
+        );
+        assert_eq!(
+            plan(r#"{"query":"rust","queries":["rust","tokio","  ","axum"]}"#),
+            Some(SearchPlan {
+                queries: vec!["rust".to_string(), "tokio".to_string(), "axum".to_string()],
+                range: None
+            })
+        );
+        assert_eq!(
+            plan(r#"{"query":"rust engineer","kind":"jobs"}"#),
+            Some(SearchPlan {
+                queries: vec![
+                    "rust engineer job posting".to_string(),
+                    "rust engineer hiring".to_string(),
+                    "rust engineer careers".to_string(),
+                ],
+                range: None
+            })
+        );
+        assert_eq!(
+            plan(r#"{"query":"synthires","kind":"people"}"#).map(|plan| plan.queries.len()),
+            Some(MAX_QUERIES_PER_CALL)
+        );
+        assert_eq!(
+            plan(r#"{"queries":["only this"]}"#),
+            Some(SearchPlan {
+                queries: vec!["only this".to_string()],
+                range: None
+            })
+        );
+        assert_eq!(
+            plan(r#"{"queries":["a","b"],"kind":"people"}"#).map(|plan| plan.queries.len()),
+            Some(MAX_QUERIES_PER_CALL)
+        );
+        assert_eq!(plan(r#"{"query":"  "}"#), None);
+        assert_eq!(plan(r#"{"q":"rust"}"#), None);
+        assert_eq!(plan("not json"), None);
+    }
+
+    #[test]
     fn a_tool_call_must_carry_its_argument() {
         let call = |arguments: &str| ToolCall {
             arguments: arguments.to_string(),
             ..ToolCall::default()
         };
-        assert_eq!(
-            call(r#"{"query":"  rust  "}"#).search_arguments(),
-            Some(("rust".to_string(), None))
-        );
-        assert_eq!(
-            call(r#"{"query":"jobs","time_range":"week"}"#).search_arguments(),
-            Some(("jobs".to_string(), Some(TimeRange::Week)))
-        );
-        assert_eq!(
-            call(r#"{"query":"jobs","time_range":"forever"}"#).search_arguments(),
-            Some(("jobs".to_string(), None))
-        );
-        assert_eq!(call(r#"{"query":"  "}"#).search_arguments(), None);
-        assert_eq!(call(r#"{"q":"rust"}"#).search_arguments(), None);
-        assert_eq!(call("not json").search_arguments(), None);
         assert_eq!(
             call(r#"{"url":" https://example.com/ "}"#)
                 .url_argument()
@@ -918,6 +1126,149 @@ mod tests {
         );
         assert_eq!(call(r#"{"url":"  "}"#).url_argument(), None);
         assert_eq!(call("[]").url_argument(), None);
+    }
+
+    #[test]
+    fn a_search_call_with_several_queries_fans_out() -> Outcome {
+        let call = call_event(
+            "web_search",
+            r#"{"query":"rust jobs","queries":["tokio jobs"]}"#,
+        );
+        let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
+        let search = FakeServer::start(vec![
+            json_response(
+                r#"{"results":[{"title":"A","url":"https://a"},{"title":"B","url":"https://b"}]}"#,
+            ),
+            json_response(
+                r#"{"results":[{"title":"B again","url":"https://b"},{"title":"C","url":"https://c"}]}"#,
+            ),
+        ])?;
+        let mut client = Vec::new();
+        answer(
+            &mut client,
+            br#"{"messages":[{"role":"user","content":"jobs"}],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+
+        let asked = search.requests()?;
+        assert_eq!(asked.len(), 2);
+        assert!(asked[0].contains("q=rust+jobs"));
+        assert!(asked[1].contains("q=tokio+jobs"));
+
+        let seen = model.requests()?;
+        assert!(seen[1].contains("[1] A"), "{}", seen[1]);
+        assert!(seen[1].contains("[2] B"), "{}", seen[1]);
+        assert!(seen[1].contains("[3] C"), "{}", seen[1]);
+        assert!(seen[1].contains("Searches used 2 of 12"), "{}", seen[1]);
+
+        let sent = events(&client);
+        assert_eq!(
+            sent.iter()
+                .filter(|event| event.contains(r#""search""#))
+                .count(),
+            2
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn a_people_search_is_widened_towards_recruiters() -> Outcome {
+        let call = call_event(
+            "web_search",
+            r#"{"query":"synthires rust","kind":"people"}"#,
+        );
+        let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
+        let search = FakeServer::start(vec![
+            json_response(r#"{"results":[]}"#);
+            MAX_QUERIES_PER_CALL
+        ])?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"who hires"}],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+
+        let asked = search.requests()?;
+        assert_eq!(asked.len(), MAX_QUERIES_PER_CALL);
+        assert!(
+            asked[0].contains("q=synthires+rust+recruiter"),
+            "{}",
+            asked[0]
+        );
+        assert!(asked[1].contains("hiring+manager"), "{}", asked[1]);
+        assert!(asked[2].contains("we+are+hiring"), "{}", asked[2]);
+        assert!(asked[3].contains("linkedin.com"), "{}", asked[3]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_search_budget_stops_the_thirteenth_query() -> Outcome {
+        let wide = |round: usize| {
+            call_event(
+                "web_search",
+                &format!(r#"{{"queries":["q{round}a","q{round}b","q{round}c","q{round}d"]}}"#),
+            )
+        };
+        let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+        let mut responses: Vec<String> =
+            (1..=4).map(|round| event_stream(&[&wide(round)])).collect();
+        responses.push(event_stream(&[reply]));
+        let model = FakeServer::start(responses)?;
+        let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#); MAX_SEARCHES])?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"hunt"}],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+
+        assert_eq!(search.requests()?.len(), MAX_SEARCHES);
+        let seen = model.requests()?;
+        assert_eq!(seen.len(), 5);
+        assert!(seen[4].contains("budget is spent"), "{}", seen[4]);
+        assert!(seen[4].contains("Searches used 12 of 12"), "{}", seen[4]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_answer_round_is_given_the_source_numbers() -> Outcome {
+        let calls: Vec<String> = (1..=MAX_ROUNDS)
+            .map(|round| call_event("web_search", &format!(r#"{{"query":"q{round}"}}"#)))
+            .collect();
+        let mut responses: Vec<String> = calls
+            .iter()
+            .map(|call| event_stream(&[call.as_str()]))
+            .collect();
+        responses.push(event_stream(&[
+            r#"{"choices":[{"delta":{"content":"done"}}]}"#,
+        ]));
+        let model = FakeServer::start(responses)?;
+        let search = FakeServer::start(vec![
+            json_response(
+                r#"{"results":[{"title":"Rust","url":"https://r"}]}"#
+            );
+            MAX_ROUNDS
+        ])?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+
+        let seen = model.requests()?;
+        assert_eq!(seen.len(), MAX_ROUNDS + 1);
+        assert!(
+            seen[MAX_ROUNDS].contains("Sources found, with the numbers to cite"),
+            "{}",
+            seen[MAX_ROUNDS]
+        );
+        assert!(
+            seen[MAX_ROUNDS].contains("[1] Rust — https://r"),
+            "{}",
+            seen[MAX_ROUNDS]
+        );
+        Ok(())
     }
 
     #[test]
@@ -1030,7 +1381,7 @@ mod tests {
                 .all(|request| request.contains(r#""tools""#))
         );
         assert!(!seen[MAX_ROUNDS].contains(r#""tools""#));
-        assert!(seen[MAX_ROUNDS].contains("Answer the user's question now"));
+        assert!(seen[MAX_ROUNDS].contains(ANSWER_NUDGE));
         assert!(seen[1].contains("Unknown tool other."));
         assert!(seen[2].contains("already ran"), "{}", seen[2]);
         Ok(())
@@ -1038,7 +1389,7 @@ mod tests {
 
     #[test]
     fn a_call_written_as_text_runs_and_is_not_shown() -> Outcome {
-        let text = "<tool_call>\n<function=web_search>\n<parameter=query>\nrust jobs\n</parameter>\n</function>\n</tool_call>";
+        let text = "Let me look.\n<tool_call>\n<function=web_search>\n<parameter=query>\nrust jobs\n</parameter>\n</function>\n</tool_call>\nDone.";
         let call = json!({ "choices": [{ "delta": { "content": text } }] }).to_string();
         let reply = r#"{"choices":[{"delta":{"content":"Here is the answer"}}]}"#;
         let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
@@ -1060,10 +1411,95 @@ mod tests {
             "{sent:?}"
         );
         assert!(
+            sent.iter().any(|event| event.contains("Let me look.")),
+            "{sent:?}"
+        );
+        assert!(
             sent.iter()
                 .any(|event| event.contains("Here is the answer")),
             "{sent:?}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn a_tag_the_model_leaves_open_is_flushed_at_the_end_of_the_round() -> Outcome {
+        let call = call_event("web_search", r#"{"query":"rust"}"#);
+        let partial =
+            json!({ "choices": [{ "delta": { "content": "almost <tool" } }] }).to_string();
+        let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[&partial])])?;
+        let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
+        let mut client = Vec::new();
+        answer(
+            &mut client,
+            br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+        let sent = events(&client);
+        assert!(
+            sent.iter().any(|event| event.contains("almost ")),
+            "{sent:?}"
+        );
+        assert!(sent.iter().any(|event| event.contains("<tool")), "{sent:?}");
+        Ok(())
+    }
+
+    #[test]
+    fn a_query_that_fails_is_reported_and_the_others_still_run() -> Outcome {
+        let call = call_event("web_search", r#"{"query":"good","queries":["bad"]}"#);
+        let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
+        let search = FakeServer::start(vec![json_response(
+            r#"{"results":[{"title":"Good","url":"https://good"}]}"#,
+        )])?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+        let seen = model.requests()?;
+        assert!(seen[1].contains("bad"), "{}", seen[1]);
+        assert!(seen[1].contains("failed"), "{}", seen[1]);
+        assert!(seen[1].contains("[1] Good"), "{}", seen[1]);
+        assert!(seen[1].contains("Searches used 2 of 12"), "{}", seen[1]);
+        Ok(())
+    }
+
+    #[test]
+    fn the_page_budget_stops_after_twelve_pages() -> Outcome {
+        let links = "<a href=\"/a\">a</a><a href=\"/b\">b</a><a href=\"/c\">c</a><a href=\"/d\">d</a><a href=\"/e\">e</a><a href=\"/f\">f</a>";
+        let page = |name: &str| fetched("text/html", &format!("<title>{name}</title>{links}"));
+        let web = FakeWeb::new(vec![
+            ("https://docs.example/a", page("A")),
+            ("https://docs.example/b", page("B")),
+            ("https://docs.example/c", page("C")),
+            ("https://docs.example/d", page("D")),
+            ("https://docs.example/e", page("E")),
+            ("https://docs.example/f", page("F")),
+        ]);
+
+        let fetch_call = |url: &str| {
+            call_event(
+                "fetch_page_content_recursive",
+                &format!(r#"{{"url":"{url}"}}"#),
+            )
+        };
+        let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+        let mut responses = vec![
+            event_stream(&[&fetch_call("https://docs.example/a")]),
+            event_stream(&[&fetch_call("https://docs.example/b")]),
+            event_stream(&[&fetch_call("https://docs.example/c")]),
+        ];
+        responses.push(event_stream(&[reply]));
+        let model = FakeServer::start(responses)?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"read https://docs.example/a https://docs.example/b https://docs.example/c"}],"thor_web_search":true}"#,
+            &upstreams_with(&model, &idle()?, web),
+        )?;
+        let seen = model.requests()?;
+        assert!(seen[3].contains("page budget is spent"), "{}", seen[3]);
+        assert!(seen[3].contains("(12 pages)"), "{}", seen[3]);
         Ok(())
     }
 

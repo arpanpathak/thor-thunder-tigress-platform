@@ -12,6 +12,7 @@
 //! | [`request`], [`response`] | reading requests, writing answers |
 //! | [`routes`] | which request goes where |
 //! | [`chat`], [`messages`], [`search`] | the model and search work |
+//! | [`research`] | how a question becomes searches, and the source ledger |
 //! | [`address`], [`fetch`], [`html`], [`http`] | reading a cited page and its links |
 //! | [`tooltext`] | tool calls the model writes as text |
 //! | [`upstream`] | calling llama-server and SearXNG |
@@ -29,6 +30,7 @@ mod messages;
 mod models;
 mod paths;
 mod request;
+mod research;
 mod response;
 mod routes;
 mod search;

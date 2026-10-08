@@ -48,7 +48,7 @@ This chapter covers
 5. A call that repeats one already run is not run again; the model is told so and
    asked to use what it has. That is what stops a model looping on the same
    search.
-6. Steps 3 to 5 repeat at most six times. The tools are offered on every one of
+6. Steps 3 to 5 repeat at most eight times. The tools are offered on every one of
    those rounds. After them the model gets up to two rounds without tools, with a
    line telling it to answer; a call it writes anyway is run, and then it is
    asked once more. That is what keeps a long hunt — several job titles, several
@@ -79,8 +79,8 @@ instead. It holds back anything that could be a tool-call tag, parses a complete
 block in either the XML form above or the JSON form
 (`{"name": …, "arguments": …}`), and returns it to the loop as if the engine had
 sent it in `tool_calls`. The tags never reach the page, a tag split across two
-chunks is held back until it is complete, and a call the model writes on the
-answer round is dropped rather than shown.
+chunks is held back until it is complete, and a call written on the answer round
+is run like any other rather than shown.
 
 This also closes a hole rule 6 leaves open. A page could carry a hidden
 `<tool_call>` and the model could echo it; the call is run, but only under the
@@ -93,18 +93,51 @@ safety rule lives.
 
 ## `web_search`
 
-| Property | Value (`crates/thor-tigress-agent/src/search.rs`) |
+| Property | Value (`crates/thor-tigress-agent/src/search.rs`, `research.rs`) |
 |---|---|
-| Arguments | `query`, a string; `time_range`, optional |
+| Arguments | `query`, a string; `queries`, up to three more; `kind`, `general`, `jobs` or `people`; `time_range`, optional |
 | Backend | SearXNG on `127.0.0.1:8888`, which asks several search engines |
-| Results given to the model | the first 6 |
+| Results given to the model | the first 6 per query, each numbered once for the whole answer |
 | Per result | title, address, date when the engine sends one, and the engine's snippet, cut to 400 characters |
-| Rounds | at most six tool rounds, then up to two rounds without tools to write the answer |
+| Budget per answer | 12 searches, 12 pages read, 4 queries per call |
+| Rounds | at most eight tool rounds, then up to two rounds without tools to write the answer |
 | Network reach | only `127.0.0.1:8888`; the server itself never contacts the internet for a search |
 
 SearXNG's JSON answer carries a `publishedDate` on news and other dated
 results. The tool text keeps it, so the model can tell a posting from last
 week from one from 2023.
+
+### Deep research: sub-questions, kinds, and a budget
+
+One query is rarely enough for a real question. The switch turns on a research
+loop, and the loop gives the model the parts it needs:
+
+- **`queries`.** A call may carry up to three more sub-questions, and all of them
+  are searched in that one round. "Senior Rust jobs" plus "remote" plus "AI
+  inference" is one call, not three rounds.
+- **`kind`.** A search is widened by what it is looking for. `jobs` adds the
+  angles that find a posting (`… job posting`, `… hiring`, `… careers`); `people`
+  looks for the people behind one (`… recruiter`, `… "hiring manager"`, `…
+  "we are hiring"`, `… site:linkedin.com`), because a role is often mentioned in
+  a recruiter's or a hiring manager's own post before it reaches a job board.
+- **The ledger.** Every source is added to a ledger (`research.rs`) that gives it
+  a number, from 1, when it is first seen. The same address found by two queries
+  keeps one number, and the number never changes, so the answer can cite `[7]`
+  for a source found in the second round. Before the answer rounds the whole
+  list is sent back to the model as "Sources found, with the numbers to cite".
+- **Budgets.** An answer may run 12 searches and read 12 pages. Every tool result
+  ends with the line `Searches used 3 of 12; pages read 1 of 12`, so the model
+  spends the budget instead of discovering it is gone. A call that asks for more
+  is answered with "The search budget is spent" and the model answers with what
+  it has.
+- **A plan first.** The system line under the **Web** switch asks for the plan
+  before the searches: break the question into the sub-questions that must be
+  true, search each, read the most promising pages, then answer with headings and
+  a citation for each claim.
+
+The result is the shape of an answer you would want from a person: the posting,
+the company, the date, the recruiter who posted it, and the link to each, with
+the numbers to check.
 
 ### Recency: `time_range`
 
@@ -371,6 +404,7 @@ The modules, and what each holds:
 | `html.rs` | HTML to text, the title, the same-site links, the cuts |
 | `http.rs` | the `Web` trait, the ureq client, the limits, the fixed headers |
 | `fetch.rs` | rule 1, the crawl, redirects, the limits per answer, the untrusted label |
+| `research.rs` | the kinds a query is widened into, the source ledger, the budgets |
 | `tooltext.rs` | tool calls written as text: the filter, the XML and JSON parsers |
 | `chat.rs` | the two tool definitions, the loop, `tool_choice: "required"`, the answer round, the events |
 
@@ -389,6 +423,13 @@ The modules, and what each holds:
 | a page with a pdf content type | refused by type |
 | a page with no title | the host is used as its title |
 | the search with `time_range: "day"` | `time_range=day` reaches SearXNG |
+| a search with `queries` | every query reaches SearXNG, in one round |
+| a search with `kind: "people"` | the widened queries name a recruiter, a hiring manager and LinkedIn |
+| the same address in two queries | one number, the one it was given first |
+| the thirteenth search | refused with the budget line, and the other eleven stand |
+| a page budget of 12 | the thirteenth page is refused |
+| a query SearXNG rejects | that query is reported; the rest of the round still runs |
+| the answer rounds | the numbered source list is in the request |
 | the first Web round | `tool_choice: "required"` is sent; later rounds are not |
 | the fetch tool over a fake web | the read event, the text, and the numbered pages |
 | a call written as text | run like a structured one; the tags never reach the page |

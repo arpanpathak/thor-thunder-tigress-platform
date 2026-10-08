@@ -346,4 +346,55 @@ mod tests {
         assert_eq!(parse("not a call"), None);
         assert_eq!(parse(r#"{"arguments": {}}"#), None);
     }
+
+    #[test]
+    fn a_json_call_may_carry_a_string_or_no_arguments() {
+        let (_, calls) = one(
+            r#"<tool_call>{"name":"web_search","arguments":"{\"query\":\"rust\"}"}</tool_call>"#,
+        );
+        assert_eq!(calls[0].arguments, r#"{"query":"rust"}"#);
+
+        let (_, calls) = one(r#"<tool_call>{"name":"web_search"}</tool_call>"#);
+        assert_eq!(calls[0].arguments, "{}");
+
+        let (_, calls) = one(r#"<tool_call>{"name":"  "}</tool_call>"#);
+        assert_eq!(calls, []);
+    }
+
+    #[test]
+    fn an_xml_call_without_a_name_or_a_whole_parameter_is_not_a_call() {
+        let (_, calls) = one("<tool_call><function=></function></tool_call>");
+        assert_eq!(calls, []);
+
+        let (_, calls) = one("<tool_call><function=x><parameter=q</tool_call>");
+        assert_eq!(calls[0].arguments, "{}");
+
+        let (_, calls) = one("<tool_call><function=x><parameter=q>v</tool_call>");
+        assert_eq!(calls[0].arguments, r#"{"q":"v"}"#);
+    }
+
+    #[test]
+    fn an_empty_parameter_name_is_left_out() {
+        let (_, calls) =
+            one("<tool_call><function=x><parameter=>v</parameter></function></tool_call>");
+        assert_eq!(calls[0].arguments, "{}");
+    }
+
+    #[test]
+    fn an_opening_tag_that_never_finishes_is_flushed() {
+        let mut sieve = Sieve::new();
+        assert_eq!(sieve.push("x <tool_call"), "x ");
+        assert!(!sieve.is_open());
+        assert_eq!(sieve.finish(), "<tool_call");
+    }
+
+    #[test]
+    fn a_block_that_never_closes_lets_its_text_through_once_it_is_too_long() {
+        let mut sieve = Sieve::new();
+        let huge = format!("<tool_call>{}", "x".repeat(MAX_PENDING + 10));
+        let visible = sieve.push(&huge);
+        assert!(visible.starts_with("xxx"));
+        assert!(!sieve.is_open());
+        assert_eq!(sieve.take_calls(), []);
+    }
 }

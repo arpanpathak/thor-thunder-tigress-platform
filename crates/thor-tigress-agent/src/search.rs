@@ -16,9 +16,6 @@ const MAX_SNIPPET: usize = 400;
 /// SearXNG's search path; `format=json` asks for JSON instead of a page.
 const SEARCH: &str = "/search";
 
-/// What the model reads when a search finds nothing.
-const NO_RESULTS: &str = "No results.";
-
 /// How recent a search is asked to be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimeRange {
@@ -150,29 +147,18 @@ impl Found {
     }
 }
 
-/// The results as the text the model reads: one numbered entry per result, with
-/// the date when the engine gave one.
+/// One result as the model reads it, under `number`, the number the answer
+/// cites it by.
 #[must_use]
-pub fn as_tool_text(results: &[SearchResult]) -> String {
-    if results.is_empty() {
-        return NO_RESULTS.to_string();
-    }
-
-    let entries: Vec<String> = results
-        .iter()
-        .zip(1..)
-        .map(|(result, number)| {
-            let date = result
-                .published
-                .as_deref()
-                .map_or(String::new(), |date| format!("published: {date}\n"));
-            format!(
-                "[{number}] {}\n{}\n{date}{}",
-                result.title, result.url, result.snippet
-            )
-        })
-        .collect();
-    entries.join("\n\n")
+pub fn as_entry(result: &SearchResult, number: usize) -> String {
+    let date = result
+        .published
+        .as_deref()
+        .map_or(String::new(), |date| format!("published: {date}\n"));
+    format!(
+        "[{number}] {}\n{}\n{date}{}",
+        result.title, result.url, result.snippet
+    )
 }
 
 /// Percent-encodes `text` for a query string.
@@ -203,26 +189,27 @@ mod tests {
     }
 
     #[test]
-    fn numbers_results_for_the_model_with_dates_when_there_are_any() {
-        let results = [
-            SearchResult {
-                title: "Announcing Rust 1.99.0".to_string(),
-                url: "https://blog.rust-lang.org/".to_string(),
-                snippet: "The Rust team is happy".to_string(),
-                published: Some("2026-10-06T00:00:00".to_string()),
-            },
-            SearchResult {
-                title: "A job".to_string(),
-                url: "https://jobs.example/1".to_string(),
-                snippet: "hiring".to_string(),
-                published: None,
-            },
-        ];
+    fn a_result_is_numbered_for_the_model_with_its_date() {
+        let dated = SearchResult {
+            title: "Announcing Rust 1.99.0".to_string(),
+            url: "https://blog.rust-lang.org/".to_string(),
+            snippet: "The Rust team is happy".to_string(),
+            published: Some("2026-10-06T00:00:00".to_string()),
+        };
+        let plain = SearchResult {
+            title: "A job".to_string(),
+            url: "https://jobs.example/1".to_string(),
+            snippet: "hiring".to_string(),
+            published: None,
+        };
         assert_eq!(
-            as_tool_text(&results),
-            "[1] Announcing Rust 1.99.0\nhttps://blog.rust-lang.org/\npublished: 2026-10-06T00:00:00\nThe Rust team is happy\n\n[2] A job\nhttps://jobs.example/1\nhiring"
+            as_entry(&dated, 7),
+            "[7] Announcing Rust 1.99.0\nhttps://blog.rust-lang.org/\npublished: 2026-10-06T00:00:00\nThe Rust team is happy"
         );
-        assert_eq!(as_tool_text(&[]), NO_RESULTS);
+        assert_eq!(
+            as_entry(&plain, 2),
+            "[2] A job\nhttps://jobs.example/1\nhiring"
+        );
     }
 
     #[test]

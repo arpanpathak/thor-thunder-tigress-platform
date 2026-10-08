@@ -125,7 +125,7 @@ fn urls_in(text: &str) -> Vec<&str> {
     found
 }
 
-/// Reads `start` and the same-site links under it.
+/// Reads `start` and the same-site links under it, at most `limit` pages.
 ///
 /// # Security
 ///
@@ -139,7 +139,12 @@ fn urls_in(text: &str) -> Vec<&str> {
 /// [`AgentError::Refused`] when `start` was not seen in a search result or the
 /// user's message; [`AgentError::Fetch`] when the first page cannot be read.
 /// A later page that fails is left out of the text instead.
-pub fn read_recursive(web: &dyn Web, start: &Url, allowed: &Allowed) -> Outcome<Report> {
+pub fn read_recursive(
+    web: &dyn Web,
+    start: &Url,
+    allowed: &Allowed,
+    limit: usize,
+) -> Outcome<Report> {
     if !allowed.allows(start) {
         return Err(AgentError::Refused(format!(
             "{}: not in this answer's search results",
@@ -147,6 +152,7 @@ pub fn read_recursive(web: &dyn Web, start: &Url, allowed: &Allowed) -> Outcome<
         )));
     }
 
+    let limit = limit.max(1);
     let mut queue: VecDeque<(Url, usize)> = VecDeque::new();
     queue.push_back((start.clone(), 0));
     let mut visited: Vec<String> = Vec::new();
@@ -154,7 +160,7 @@ pub fn read_recursive(web: &dyn Web, start: &Url, allowed: &Allowed) -> Outcome<
     let mut notes: Vec<String> = Vec::new();
 
     while let Some((url, depth)) = queue.pop_front() {
-        if pages.len() >= MAX_PAGES {
+        if pages.len() >= limit {
             break;
         }
         if visited.contains(&url.as_string()) {
@@ -372,7 +378,7 @@ mod tests {
             ),
             ("https://example.com/b", page(200, "text/plain", "beta")),
         ]);
-        let report = read_recursive(&fake, &start, &allowed(&["example.com"]))?;
+        let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
         assert_eq!(
             report.pages,
             [
@@ -397,6 +403,42 @@ mod tests {
     }
 
     #[test]
+    fn a_page_budget_stops_the_crawl_early() -> Outcome {
+        let start = url("https://example.com/")?;
+        let pages = [
+            (
+                "https://example.com/",
+                page(
+                    200,
+                    "text/html",
+                    "<title>Start</title><a href=\"/a\">A</a><a href=\"/b\">B</a>",
+                ),
+            ),
+            (
+                "https://example.com/a",
+                page(200, "text/html", "<title>A</title>"),
+            ),
+            (
+                "https://example.com/b",
+                page(200, "text/html", "<title>B</title>"),
+            ),
+        ];
+        let fake = Fake::with(&pages);
+        let report = read_recursive(&fake, &start, &allowed(&["example.com"]), 2)?;
+        assert_eq!(report.pages.len(), 2);
+        assert_eq!(fake.asked().len(), 2);
+
+        let none = Fake::with(&pages);
+        assert_eq!(
+            read_recursive(&none, &start, &allowed(&["example.com"]), 0)?
+                .pages
+                .len(),
+            1
+        );
+        Ok(())
+    }
+
+    #[test]
     fn the_crawl_stops_at_two_hops_and_six_pages() -> Outcome {
         let start = url("https://example.com/")?;
         let mut pages = vec![(
@@ -415,7 +457,7 @@ mod tests {
         for (url, fetched) in pages {
             fake.pages.insert(url, fetched);
         }
-        let report = read_recursive(&fake, &start, &allowed(&["example.com"]))?;
+        let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
         assert!(report.pages.len() <= MAX_PAGES, "{:?}", report.pages);
         assert!(
             !fake
@@ -440,7 +482,7 @@ mod tests {
                 page(200, "text/plain", "leaf"),
             );
         }
-        let report = read_recursive(&fake, &start, &allowed(&["example.com"]))?;
+        let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
         assert_eq!(report.pages.len(), MAX_PAGES);
         assert_eq!(fake.asked().len(), MAX_PAGES);
         Ok(())
@@ -458,7 +500,7 @@ mod tests {
             ("https://example.com/loop", forever),
         ]);
         assert!(
-            read_recursive(&fake, &start, &allowed(&["example.com"]))
+            read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)
                 .is_err_and(|error| error.to_string().contains("too many redirects"))
         );
         let mut once = page(302, "text/html", "");
@@ -470,14 +512,14 @@ mod tests {
                 page(200, "text/plain", "arrived"),
             ),
         ]);
-        let report = read_recursive(&fake, &start, &allowed(&["example.com"]))?;
+        let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
         assert_eq!(report.pages[0].url, "https://example.com/final");
         assert!(report.text.contains("arrived"));
         let mut bad = page(302, "text/html", "");
         bad.location = Some("//:bad".to_string());
         let fake = Fake::with(&[("https://example.com/", bad)]);
         assert!(
-            read_recursive(&fake, &start, &allowed(&["example.com"]))
+            read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)
                 .is_err_and(|error| error.to_string().contains("bad redirect"))
         );
         Ok(())
@@ -490,7 +532,7 @@ mod tests {
             "https://example.com/",
             page(200, "text/html", "<a href=\"/missing\">x</a>"),
         )]);
-        let report = read_recursive(&fake, &start, &allowed(&["example.com"]))?;
+        let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
         assert_eq!(report.pages.len(), 1);
         assert!(
             report
@@ -506,9 +548,9 @@ mod tests {
     fn the_first_page_must_be_read_and_the_host_must_be_allowed() -> Outcome {
         let start = url("https://example.com/")?;
         let empty = Fake::default();
-        assert!(read_recursive(&empty, &start, &allowed(&["example.com"])).is_err());
+        assert!(read_recursive(&empty, &start, &allowed(&["example.com"]), MAX_PAGES).is_err());
         assert!(
-            read_recursive(&empty, &start, &Allowed::new()).is_err_and(|error| {
+            read_recursive(&empty, &start, &Allowed::new(), MAX_PAGES).is_err_and(|error| {
                 error
                     .to_string()
                     .contains("not in this answer's search results")
@@ -525,7 +567,7 @@ mod tests {
             page(200, "application/pdf", "%PDF"),
         )]);
         assert!(
-            read_recursive(&fake, &start, &allowed(&["example.com"]))
+            read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)
                 .is_err_and(|error| { error.to_string().contains("is not a text page") })
         );
         assert_eq!(kind_of("text/markdown", &start).ok(), Some(Kind::Text));
@@ -543,7 +585,7 @@ mod tests {
             "https://example.com/",
             page(200, "text/html", "<a href=\"/\">again</a>"),
         )]);
-        let report = read_recursive(&fake, &start, &allowed(&["example.com"]))?;
+        let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
         assert_eq!(report.pages.len(), 1);
         assert_eq!(fake.asked().len(), 1);
         Ok(())
@@ -570,7 +612,7 @@ mod tests {
         for (url, fetched) in pages {
             fake.pages.insert(url, fetched);
         }
-        let report = read_recursive(&fake, &start, &allowed(&["example.com"]))?;
+        let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
         assert!(report.text.ends_with("[...]\n") || report.text.len() < MAX_TOTAL);
         assert!(report.text.chars().count() <= MAX_TOTAL);
         Ok(())

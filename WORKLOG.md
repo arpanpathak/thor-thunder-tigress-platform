@@ -114,6 +114,32 @@ there as untracked.
   functions", naming the page. The raw stream held 0 occurrences of
   `<tool_call`.
 
+### Deep research: sub-questions, kinds, and a ledger
+
+- Asked not to "just make it 6-8". The round count alone is not research, so
+  this is the machinery around it.
+- New module `research.rs`. `Kind` widens one query into the few that find what
+  a hunt needs: `jobs` for postings, `people` for the recruiter and the hiring
+  manager behind one, whose own posts often name a role first. `Ledger` gives
+  every source one number, from 1, keeps that number when the same address turns
+  up again, and holds the budgets: 12 searches and 12 pages per answer.
+- `web_search` gained `queries` (up to three more sub-questions, searched in the
+  same round) and `kind`. Each query's hits are numbered from the ledger, so the
+  answer can cite `[7]` for a source found in the second round; every tool result
+  ends with `Searches used 3 of 12; pages read 1 of 12`; a call over the budget
+  is answered with the budget line instead of running.
+- `fetch_page_content_recursive` now takes the pages left in the budget, so a
+  reading-heavy answer cannot run away. `read_recursive` takes the limit as an
+  argument, defaulted to six by `MAX_PAGES` for a single call.
+- The system line under the switch now asks for the plan before the searches:
+  sub-questions, one search each, the people as well as the postings, read the
+  best pages, then answer with headings and a citation per claim. Before the
+  answer rounds the whole numbered source list is added to the system message.
+- Rounds raised to eight, with the two answer rounds unchanged.
+- Tests: 160 in the agent, 439 in the workspace. Chapter "Tool calling" gained
+  "Deep research: sub-questions, kinds, and a budget"; the README and the
+  tool-loop figure follow.
+
 ### Per-person keys: thor-tigress-keyring, and the registration form
 
 - New crate `thor-tigress-keyring` (library and binary). One encrypted file,

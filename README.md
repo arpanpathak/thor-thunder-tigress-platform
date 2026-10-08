@@ -69,7 +69,10 @@ chosen model:
 
 - **`web_search`** asks SearXNG for titles, addresses, dates and snippets, with
   an optional `time_range` (`day`, `week`, `month`, `year`) for jobs and other
-  recent postings.
+  recent postings. One call can fan out over several sub-questions (`queries`),
+  and `kind: "jobs"` widens a search towards postings while `kind: "people"`
+  looks for the recruiter and the hiring manager behind one. Every source gets
+  one number to cite, and an answer is budgeted at 12 searches and 12 pages.
 - **`fetch_page_content_recursive`** opens one address a search returned, or one
   the user wrote, follows that page's own links up to two hops, and returns the
   text: six pages at most, 12,000 characters a page, 24,000 in all.
