@@ -144,7 +144,12 @@ there as untracked.
   the model's own query first and skips an angle it already covers, the search
   budget is 16 with an early stop when it is gone, and the answer ask is a user
   turn.
-- Tests: 160 in the agent, 439 in the workspace. Chapter "Tool calling" gained
+- `search` now returns `Hits`: the results and SearXNG's `unresponsive_engines`.
+  When the engines are suspended or showing a CAPTCHA the tool text says so, so
+  the model can explain a thin answer instead of guessing. Found the hard way:
+  the first live research run returned 0 results for all 16 searches because my
+  own testing had got DuckDuckGo a CAPTCHA and Brave and Google suspended.
+- Tests: 163 in the agent, 442 in the workspace. Chapter "Tool calling" gained
   "Deep research: sub-questions, kinds, and a budget"; the README and the
   tool-loop figure follow.
 

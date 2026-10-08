@@ -72,6 +72,18 @@ pub struct SearchResult {
 struct Answer {
     #[serde(default)]
     results: Vec<Found>,
+    /// The engines that did not answer, as `[name, reason]` pairs.
+    #[serde(default)]
+    unresponsive_engines: Vec<(String, Option<String>)>,
+}
+
+/// What one query answered: the results, and the engines that failed.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Hits {
+    /// The results, best first, at most [`MAX_RESULTS`].
+    pub results: Vec<SearchResult>,
+    /// The engines that did not answer, as `name (reason)`.
+    pub down: Vec<String>,
 }
 
 /// One result in SearXNG's answer; any field may be missing or `null`.
@@ -87,15 +99,14 @@ struct Found {
 /// Searches `query` on the SearXNG instance at `searxng`, keeping results no
 /// older than `range` when one is given.
 ///
+/// An empty [`Hits::results`] with a non-empty [`Hits::down`] is not "nothing
+/// exists": it is the engines saying no, and the model is told so.
+///
 /// # Errors
 ///
 /// `AgentError::Upstream` when SearXNG can't be reached or answers with an
 /// error; `AgentError::Json` when its answer isn't JSON.
-pub fn search(
-    searxng: &Endpoint,
-    query: &str,
-    range: Option<TimeRange>,
-) -> Outcome<Vec<SearchResult>> {
+pub fn search(searxng: &Endpoint, query: &str, range: Option<TimeRange>) -> Outcome<Hits> {
     let when = range.map_or(String::new(), |range| {
         format!("&time_range={}", range.as_str())
     });
@@ -109,12 +120,22 @@ pub fn search(
     }
 
     let answer: Answer = serde_json::from_str(&response.text()?)?;
-    Ok(answer
-        .results
-        .into_iter()
-        .filter_map(Found::into_result)
-        .take(MAX_RESULTS)
-        .collect())
+    Ok(Hits {
+        results: answer
+            .results
+            .into_iter()
+            .filter_map(Found::into_result)
+            .take(MAX_RESULTS)
+            .collect(),
+        down: answer
+            .unresponsive_engines
+            .into_iter()
+            .map(|(engine, reason)| match reason {
+                Some(reason) => format!("{engine} ({reason})"),
+                None => engine,
+            })
+            .collect(),
+    })
 }
 
 impl Found {
@@ -244,6 +265,7 @@ mod tests {
             "rust tokio",
             Some(TimeRange::Day),
         )?;
+        let found = found.results;
         let request = server.requests()?;
         assert!(
             request[0].starts_with("GET /search?q=rust+tokio&format=json&time_range=day HTTP/1.1")
@@ -263,7 +285,7 @@ mod tests {
         let server = FakeServer::start(vec![json_response("{ }")])?;
         let found = search(&Endpoint::new(server.address(), None), "q", None)?;
         server.requests()?;
-        assert_eq!(found, []);
+        assert_eq!(found, Hits::default());
         Ok(())
     }
 
@@ -273,6 +295,33 @@ mod tests {
         let outcome = search(&Endpoint::new(server.address(), None), "q", None);
         server.requests()?;
         assert!(outcome.is_err_and(|error| error.to_string() == "upstream: search returned 503"));
+        Ok(())
+    }
+
+    #[test]
+    fn engines_that_did_not_answer_are_reported() -> Outcome {
+        let server = FakeServer::start(vec![json_response(
+            &json!({
+                "results": [{ "title": "one", "url": "https://e/1" }],
+                "unresponsive_engines": [
+                    ["duckduckgo", "CAPTCHA"],
+                    ["brave", "Suspended: too many requests"],
+                    ["wikipedia", null]
+                ]
+            })
+            .to_string(),
+        )])?;
+        let hits = search(&Endpoint::new(server.address(), None), "q", None)?;
+        server.requests()?;
+        assert_eq!(hits.results.len(), 1);
+        assert_eq!(
+            hits.down,
+            [
+                "duckduckgo (CAPTCHA)".to_string(),
+                "brave (Suspended: too many requests)".to_string(),
+                "wikipedia".to_string()
+            ]
+        );
         Ok(())
     }
 }

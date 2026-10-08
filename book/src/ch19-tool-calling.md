@@ -105,7 +105,11 @@ safety rule lives.
 
 SearXNG's JSON answer carries a `publishedDate` on news and other dated
 results. The tool text keeps it, so the model can tell a posting from last
-week from one from 2023.
+week from one from 2023. Its answer also names the engines that did not
+answer, and that name goes into the tool text too: `No results.` from three
+suspended engines is not the same fact as `No results.` from a working
+search, and a model that is told the difference can say so instead of
+guessing.
 
 ### Deep research: sub-questions, kinds, and a budget
 
@@ -435,6 +439,7 @@ The modules, and what each holds:
 | the thirteenth search | refused with the budget line, and the other eleven stand |
 | a page budget of 12 | the thirteenth page is refused |
 | a query SearXNG rejects | that query is reported; the rest of the round still runs |
+| a search whose engines are suspended | the tool text names them, so the answer can say why it is thin |
 | the answer rounds | the numbered source list is in the request |
 | the first Web round | `tool_choice: "required"` is sent; later rounds are not |
 | the fetch tool over a fake web | the read event, the text, and the numbered pages |

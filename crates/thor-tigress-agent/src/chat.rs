@@ -622,25 +622,25 @@ fn web_search(
         }
         ledger.count_search();
 
-        let results = match search::search(searxng, query, plan.range) {
-            Ok(results) => results,
+        let hits = match search::search(searxng, query, plan.range) {
+            Ok(hits) => hits,
             Err(error) => {
                 blocks.push(format!("The search \"{query}\" failed: {error}"));
                 continue;
             }
         };
-        for result in &results {
+        for result in &hits.results {
             allowed.add_url(&result.url);
         }
         send_thor(
             client,
             &ThorEvent::Search {
                 query,
-                results: sources(&results),
+                results: sources(&hits.results),
             },
         )?;
 
-        blocks.push(search_block(query, &results, ledger));
+        blocks.push(search_block(query, &hits, ledger));
     }
 
     blocks.push(format!(
@@ -652,20 +652,31 @@ fn web_search(
     Ok(blocks.join("\n\n"))
 }
 
-/// One query's results, under the numbers the ledger gave them.
-fn search_block(query: &str, results: &[SearchResult], ledger: &mut Ledger) -> String {
-    if results.is_empty() {
-        return format!("Query: {query}\nNo results.");
-    }
+/// One query's results, under the numbers the ledger gave them, and the engines
+/// that did not answer. "No results" from three dead engines is not the same as
+/// "nothing exists", and the model is told which it is.
+fn search_block(query: &str, hits: &search::Hits, ledger: &mut Ledger) -> String {
+    let mut block = if hits.results.is_empty() {
+        format!("Query: {query}\nNo results.")
+    } else {
+        let entries: Vec<String> = hits
+            .results
+            .iter()
+            .map(|result| {
+                let number = ledger.add(result);
+                search::as_entry(result, number)
+            })
+            .collect();
+        format!("Query: {query}\n{}", entries.join("\n\n"))
+    };
 
-    let entries: Vec<String> = results
-        .iter()
-        .map(|result| {
-            let number = ledger.add(result);
-            search::as_entry(result, number)
-        })
-        .collect();
-    format!("Query: {query}\n{}", entries.join("\n\n"))
+    if !hits.down.is_empty() {
+        block.push_str(&format!(
+            "\nEngines that did not answer: {}.",
+            hits.down.join(", ")
+        ));
+    }
+    block
 }
 
 /// Reads one page and its same-site links, up to what is left of the page
@@ -1488,6 +1499,28 @@ mod tests {
         assert!(seen[1].contains("failed"), "{}", seen[1]);
         assert!(seen[1].contains("[1] Good"), "{}", seen[1]);
         assert!(seen[1].contains("Searches used 2 of 16"), "{}", seen[1]);
+        Ok(())
+    }
+
+    #[test]
+    fn engines_that_did_not_answer_reach_the_model() -> Outcome {
+        let call = call_event("web_search", r#"{"query":"rust"}"#);
+        let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
+        let search = FakeServer::start(vec![json_response(
+            r#"{"results":[],"unresponsive_engines":[["duckduckgo","CAPTCHA"],["brave",null]]}"#,
+        )])?;
+        answer(
+            &mut Vec::new(),
+            br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+        let seen = model.requests()?;
+        assert!(
+            seen[1].contains("Engines that did not answer: duckduckgo (CAPTCHA), brave."),
+            "{}",
+            seen[1]
+        );
         Ok(())
     }
 

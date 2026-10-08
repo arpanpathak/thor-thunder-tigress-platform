@@ -72,7 +72,9 @@ chosen model:
   recent postings. One call can fan out over several sub-questions (`queries`),
   and `kind: "jobs"` widens a search towards postings while `kind: "people"`
   looks for the recruiter and the hiring manager behind one. Every source gets
-  one number to cite, and an answer is budgeted at 16 searches and 12 pages.
+  one number to cite, and an answer is budgeted at 16 searches and 12 pages. An
+  engine that was suspended or showed a CAPTCHA is named in the result, so a thin
+  answer can say why.
 - **`fetch_page_content_recursive`** opens one address a search returned, or one
   the user wrote, follows that page's own links up to two hops, and returns the
   text: six pages at most, 12,000 characters a page, 24,000 in all.
