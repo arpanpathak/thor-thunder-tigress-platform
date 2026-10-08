@@ -16,6 +16,11 @@ if (settings.thinkbudget === undefined) settings.thinkbudget = String(DEFAULT_TH
 let messages = store.get("messages", []);
 let modelName = "";
 let models = [];
+// Which engine serves each model, from /v1/models. Shown in the picker only when more
+// than one engine is answering, so the same model on llama.cpp and on TensorRT Edge-LLM
+// can be told apart before it is chosen.
+const ENGINE_NAMES = { llamacpp: "llama.cpp", "tensorrt-edgellm": "TensorRT" };
+let modelEngines = {};
 let controller = null;
 
 // ---- DOM helpers ----
@@ -590,8 +595,10 @@ function showServer(state, text) {
 
 function showModels() {
   const picker = $("model");
+  const engines = new Set(models.map((id) => modelEngines[id]).filter(Boolean));
   picker.replaceChildren(...models.map((id) => {
-    const option = element("option", "", modelLabel(id));
+    const engine = ENGINE_NAMES[modelEngines[id]] || modelEngines[id];
+    const option = element("option", "", modelLabel(id) + (engines.size > 1 && engine ? ` (${engine})` : ""));
     option.value = id;
     return option;
   }));
@@ -612,6 +619,7 @@ async function connect() {
     needsKey = response.status === 401;
     const data = needsKey ? {} : await response.json();
     models = (data.data || []).map((model) => model.id);
+    modelEngines = Object.fromEntries((data.data || []).map((model) => [model.id, model.owned_by]));
     if (needsKey) showServer("bad", "access key needed");
     else if (models.length) showModels();
     else showServer("bad", "no model served");
@@ -632,6 +640,16 @@ $("model").addEventListener("change", () => {
 // tag, so an overlong think ends with an answer. The message is empty on
 // purpose: a sentence there is injected into the model's own text, and the
 // model then answers the sentence instead of the question.
+//
+// The two budget fields are llama-server options. TensorRT Edge-LLM refuses a
+// body field it does not know with "Extra inputs are not permitted", so they are
+// sent to llama-server only. Turning Think on for a model an engine serves still
+// works, through chat_template_kwargs; it just has no cap on its thinking.
+function servedByLlamaCpp() {
+  const engine = modelEngines[chosenModel()];
+  return !engine || engine === "llamacpp";
+}
+
 function chatRequest(history, thinking) {
   const body = {
     model: chosenModel(), messages: history, stream: true,
@@ -644,7 +662,7 @@ function chatRequest(history, thinking) {
     body.temperature = Number(settings.temperature);
   }
   const budget = Number(settings.thinkbudget);
-  if (thinking && settings.thinkbudget !== "" && Number.isInteger(budget) && budget >= 0) {
+  if (servedByLlamaCpp() && thinking && settings.thinkbudget !== "" && Number.isInteger(budget) && budget >= 0) {
     body.reasoning_budget_tokens = budget;
     body.reasoning_budget_message = "";
   }
