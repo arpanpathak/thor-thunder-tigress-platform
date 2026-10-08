@@ -303,10 +303,9 @@ fn examples(suggestions: &[Suggestion]) -> usize {
 /// `ReviewError::Io` or `ReviewError::Json` for unreadable files,
 /// `ReviewError::Io` when the flags can't be written.
 pub fn apply(suggestions: &Path, flags: &Path) -> Outcome {
-    let added = apply_to(
-        &jsonl::read_lines(suggestions)?,
-        &mut FlagStore::open(flags)?,
-    )?;
+    let lines = jsonl::read_lines(suggestions)?;
+    let mut store = FlagStore::open(flags)?;
+    let added = apply_to(&lines, &mut store)?;
     println!("applied {added} suggestions to {}", flags.display());
     Ok(())
 }
@@ -452,14 +451,12 @@ mod tests {
                 spans: Vec::new(),
             },
         );
-        let added = apply_to(
-            &[
-                suggestion("a", "x"),
-                suggestion("b", "wrap_up_repeat"),
-                suggestion("b", "other"),
-            ],
-            &mut store,
-        )?;
+        let suggestions = [
+            suggestion("a", "x"),
+            suggestion("b", "wrap_up_repeat"),
+            suggestion("b", "other"),
+        ];
+        let added = apply_to(&suggestions, &mut store)?;
         assert_eq!(added, 1);
         assert_eq!(store.get("a").map(|flag| flag.note.as_str()), Some("mine"));
         assert_eq!(

@@ -267,10 +267,8 @@ mod tests {
 
     #[test]
     fn a_gone_client_stops_the_relay() -> Outcome {
-        let server = crate::testing::FakeServer::start(vec![
-            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok"
-                .to_string(),
-        ])?;
+        let raw = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok";
+        let server = crate::testing::FakeServer::start(vec![raw.to_string()])?;
         let response = Endpoint::new(server.address(), None).get("/")?;
         assert!(response.relay(&mut crate::testing::Gone).is_err());
         Ok(())
@@ -284,9 +282,8 @@ mod tests {
 
     #[test]
     fn removes_chunked_encoding() -> Outcome {
-        let response = parsed(
-            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6;x=1\r\n world\r\n0\r\n\r\n",
-        )?;
+        let raw = "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n6;x=1\r\n world\r\n0\r\n\r\n";
+        let response = parsed(raw)?;
         assert_eq!(response.text()?, "hello world");
         Ok(())
     }

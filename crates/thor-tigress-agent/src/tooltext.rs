@@ -207,14 +207,17 @@ fn parse_xml(block: &str) -> Option<TextCall> {
         };
         let key = rest[start..start + gt].trim().to_string();
         let value_at = start + gt + 1;
-        let value = if let Some(end) = find_ci(&rest[value_at..], "</parameter>") {
-            let value = rest[value_at..value_at + end].trim().to_string();
-            rest = &rest[value_at + end + "</parameter>".len()..];
-            value
-        } else {
-            let value = rest[value_at..].trim().to_string();
-            rest = "";
-            value
+        let value = match find_ci(&rest[value_at..], "</parameter>") {
+            Some(end) => {
+                let value = rest[value_at..value_at + end].trim().to_string();
+                rest = &rest[value_at + end + "</parameter>".len()..];
+                value
+            }
+            None => {
+                let value = rest[value_at..].trim().to_string();
+                rest = "";
+                value
+            }
         };
         if !key.is_empty() {
             arguments.insert(key, Value::String(value));

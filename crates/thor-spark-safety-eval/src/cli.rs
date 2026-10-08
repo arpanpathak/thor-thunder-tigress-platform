@@ -431,10 +431,8 @@ mod tests {
     #[test]
     fn checks_rust_files_and_skips_build_output() -> Outcome {
         let folder = Folder::new("rs")?;
-        folder.file(
-            "src/good.rs",
-            "/// Adds.\npub fn add(a: i32, b: i32) -> i32 { a + b }\n",
-        )?;
+        let good = "/// Adds.\npub fn add(a: i32, b: i32) -> i32 { a + b }\n";
+        folder.file("src/good.rs", good)?;
         folder.file("src/bad.rs", "fn a() { b().unwrap(); }\n")?;
         folder.file("src/broken.rs", "fn a( {\n")?;
         folder.file("target/skip.rs", "fn a() { b().unwrap(); }\n")?;

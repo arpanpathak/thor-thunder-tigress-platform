@@ -119,9 +119,8 @@ mod tests {
     #[test]
     fn relays_llama_server_as_it_is_without_engines_or_on_an_error() -> Outcome {
         let alone = FakeServer::start(vec![json_response(r#"{"data":[{"id":"nano"}]}"#)])?;
-        let failing = FakeServer::start(vec![
-            "HTTP/1.1 503 Busy\r\nContent-Length: 4\r\n\r\nbusy".to_string(),
-        ])?;
+        let busy = "HTTP/1.1 503 Busy\r\nContent-Length: 4\r\n\r\nbusy".to_string();
+        let failing = FakeServer::start(vec![busy])?;
         let mut relayed = Vec::new();
         let mut refused = Vec::new();
         list(&mut relayed, &upstreams(&alone, &[]))?;

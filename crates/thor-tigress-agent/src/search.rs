@@ -257,14 +257,9 @@ mod tests {
             0,
             json!({"title": "no address", "url": null, "publishedDate": "  "}),
         );
-        let server = FakeServer::start(vec![json_response(
-            &json!({ "results": results }).to_string(),
-        )])?;
-        let found = search(
-            &Endpoint::new(server.address(), None),
-            "rust tokio",
-            Some(TimeRange::Day),
-        )?;
+        let answer = json!({ "results": results }).to_string();
+        let server = FakeServer::start(vec![json_response(&answer)])?;
+        let found = search(&Endpoint::new(server.address(), None), "rust tokio", Some(TimeRange::Day))?;
         let found = found.results;
         let request = server.requests()?;
         assert!(
@@ -300,17 +295,16 @@ mod tests {
 
     #[test]
     fn engines_that_did_not_answer_are_reported() -> Outcome {
-        let server = FakeServer::start(vec![json_response(
-            &json!({
-                "results": [{ "title": "one", "url": "https://e/1" }],
-                "unresponsive_engines": [
-                    ["duckduckgo", "CAPTCHA"],
-                    ["brave", "Suspended: too many requests"],
-                    ["wikipedia", null]
-                ]
-            })
-            .to_string(),
-        )])?;
+        let answer = json!({
+            "results": [{ "title": "one", "url": "https://e/1" }],
+            "unresponsive_engines": [
+                ["duckduckgo", "CAPTCHA"],
+                ["brave", "Suspended: too many requests"],
+                ["wikipedia", null]
+            ]
+        })
+        .to_string();
+        let server = FakeServer::start(vec![json_response(&answer)])?;
         let hits = search(&Endpoint::new(server.address(), None), "q", None)?;
         server.requests()?;
         assert_eq!(hits.results.len(), 1);

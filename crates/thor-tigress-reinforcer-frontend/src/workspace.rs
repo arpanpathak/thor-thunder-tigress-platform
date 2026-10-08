@@ -108,10 +108,10 @@ impl Workspace {
     ///
     /// `ReviewError::NotFound` for a name no open dataset has.
     pub fn dataset(&self, name: Option<&str>) -> Outcome<&Dataset> {
-        let found = name.map_or_else(
-            || self.datasets.first(),
-            |wanted| self.datasets.iter().find(|dataset| dataset.name == wanted),
-        );
+        let found = match name {
+            Some(wanted) => self.datasets.iter().find(|dataset| dataset.name == wanted),
+            None => self.datasets.first(),
+        };
         found.ok_or_else(|| ReviewError::NotFound(format!("dataset {}", name.unwrap_or_default())))
     }
 
@@ -159,10 +159,8 @@ mod tests {
     #[test]
     fn opens_what_exists_and_lists_what_is_missing() -> Outcome {
         let folder = TempDir::new()?;
-        folder.file(
-            "train.jsonl",
-            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
-        )?;
+        let line = "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n";
+        folder.file("train.jsonl", line)?;
         folder.file("teacher.jsonl", "{\"id\":\"t\",\"source\":\"teacher\",\"origin\":\"trpl/src/a.md\"}\n{\"id\":\"u\",\"source\":\"teacher\",\"origin\":\"x\"}\n")?;
         let workspace = Workspace::open(&[
             spec(&folder, "train"),

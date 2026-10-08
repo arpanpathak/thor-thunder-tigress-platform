@@ -92,6 +92,10 @@ mod tests {
     #[test]
     fn names_known_books_and_humanizes_the_rest() {
         assert_eq!(collection_title("trpl"), "The Rust Programming Language");
+        assert_eq!(
+            collection_title("cracking-the-systems-programming-interview"),
+            "Cracking the Systems Programming Interview"
+        );
         assert_eq!(collection_title("new-book_draft"), "New book draft");
     }
 

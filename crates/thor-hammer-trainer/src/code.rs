@@ -99,10 +99,9 @@ fn header_comment(source_code: &str, header_marker: &str) -> Option<String> {
         .collect();
     let header = header_lines.join("\n").trim().to_string();
 
-    if header.is_empty() {
-        None
-    } else {
-        Some(header)
+    match header.is_empty() {
+        true => None,
+        false => Some(header),
     }
 }
 

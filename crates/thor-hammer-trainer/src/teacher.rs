@@ -406,14 +406,8 @@ mod tests {
             FormatError::EmptySection,
         ];
         assert!(errors.iter().all(|error| !error.to_string().is_empty()));
-        assert_eq!(
-            parse(
-                "<!-- source: s; topic: heaps -->\n### User\nQ\n### Assistant\nA",
-                "x"
-            )?
-            .section,
-            None
-        );
+        let text = "<!-- source: s; topic: heaps -->\n### User\nQ\n### Assistant\nA";
+        assert_eq!(parse(text, "x")?.section, None);
         assert_eq!(parse("<!-- source: s -->\n### User\nQ\n### Assistant\nA\n### Rejected\nR\n### Rejected\nR", "x").err(), Some(FormatError::RejectedNotLast));
         Ok(())
     }

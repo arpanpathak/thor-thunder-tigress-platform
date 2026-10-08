@@ -423,10 +423,8 @@ mod tests {
     #[test]
     fn a_record_changed_into_invalid_text_after_indexing_is_refused() -> Outcome {
         let folder = TempDir::new()?;
-        let path = folder.file(
-            "train.jsonl",
-            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
-        )?;
+        let line = "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n";
+        let path = folder.file("train.jsonl", line)?;
         let index = Index::open(&path)?;
         std::fs::write(&path, [0xff_u8; 64]).map_err(ReviewError::io(&path))?;
         assert!(
@@ -549,13 +547,9 @@ mod tests {
     fn searches_the_whole_record_ignoring_case() -> Outcome {
         let folder = TempDir::new()?;
         let index = index_of(&folder, LINES)?;
-        assert_eq!(
-            index.matching(
-                &filter(|f| f.query = Some("PAGE TABLE".to_string())),
-                &Ids::new()
-            )?,
-            [2]
-        );
+        let spec = filter(|f| f.query = Some("PAGE TABLE".to_string()));
+        let found = index.matching(&spec, &Ids::new())?;
+        assert_eq!(found, [2]);
         Ok(())
     }
 
@@ -567,13 +561,9 @@ mod tests {
             "\n"
         );
         let index = index_of(&folder, line)?;
-        assert_eq!(
-            index.matching(
-                &filter(|f| f.query = Some("say \"hi\"".to_string())),
-                &Ids::new()
-            )?,
-            [0]
-        );
+        let spec = filter(|f| f.query = Some("say \"hi\"".to_string()));
+        let found = index.matching(&spec, &Ids::new())?;
+        assert_eq!(found, [0]);
         Ok(())
     }
 
@@ -581,13 +571,9 @@ mod tests {
     fn knows_which_book_a_record_came_from() -> Outcome {
         let folder = TempDir::new()?;
         let index = index_of(&folder, BOOKS)?;
-        assert_eq!(
-            index.matching(
-                &filter(|f| f.collection = Some("trpl".to_string())),
-                &Ids::new()
-            )?,
-            [0, 1]
-        );
+        let spec = filter(|f| f.collection = Some("trpl".to_string()));
+        let found = index.matching(&spec, &Ids::new())?;
+        assert_eq!(found, [0, 1]);
         assert_eq!(
             index.collections(),
             [

@@ -75,15 +75,11 @@ mod tests {
     #[test]
     fn opens_with_missing_flag_and_slop_files() -> Outcome {
         let folder = TempDir::new()?;
-        let training = folder.file(
-            "train.jsonl",
-            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
-        )?;
-        let app = App::open(
-            &training,
-            &folder.path().join("flags.jsonl"),
-            &folder.path().join("slop.jsonl"),
-        )?;
+        let line = "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n";
+        let training = folder.file("train.jsonl", line)?;
+        let flags = folder.path().join("flags.jsonl");
+        let slop = folder.path().join("slop.jsonl");
+        let app = App::open(&training, &flags, &slop)?;
         assert_eq!(app.index.len(), 1);
         assert_eq!(app.flagged_ids()?.len(), 0);
         assert!(app.slop_ids.is_empty());

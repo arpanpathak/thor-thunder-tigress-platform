@@ -425,11 +425,8 @@ mod tests {
         );
         assert!(!printed.contains("1/2 conversations"));
         let mut again = Vec::new();
-        main_with(
-            &folder.arguments(&["--books", "trpl", "--dry-run"]),
-            None,
-            &mut again,
-        )?;
+        let arguments = folder.arguments(&["--books", "trpl", "--dry-run"]);
+        main_with(&arguments, None, &mut again)?;
         assert!(String::from_utf8_lossy(&again).contains("1 already in"));
         Ok(())
     }

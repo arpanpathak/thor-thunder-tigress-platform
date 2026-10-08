@@ -117,9 +117,8 @@ mod tests {
 
     #[test]
     fn reads_method_path_and_body() -> Outcome {
-        let request = parse(
-            "POST /v1/chat/completions?x=1 HTTP/1.1\r\nHost: t\r\nContent-Length: 2\r\n\r\n{}",
-        )?;
+        let raw = "POST /v1/chat/completions?x=1 HTTP/1.1\r\nHost: t\r\nContent-Length: 2\r\n\r\n{}";
+        let request = parse(raw)?;
         assert_eq!(
             request,
             Request {

@@ -165,104 +165,130 @@ fn command(program: &str, arguments: &[&str], file: &Path, folder: &Path) -> Com
 }
 
 fn plan(block: &Block, folder: &Path) -> Plan {
-    let code = block.code.as_str();
-
     match block.language {
-        Language::Python => {
-            let file = folder.join("example.py");
-            let runs = code.contains("assert ") || code.contains("__main__");
-            Plan {
-                build: command("python3", &["-m", "py_compile"], &file, folder),
-                run: runs.then(|| command("python3", &[], &file, folder)),
-                file,
-            }
-        }
-        Language::Go => {
-            let file = folder.join("example.go");
-            let runs = code.contains("package main") && code.contains("func main()");
-            Plan {
-                build: command("go", &["vet"], &file, folder),
-                run: runs.then(|| command("go", &["run"], &file, folder)),
-                file,
-            }
-        }
-        Language::Cpp => {
-            let file = folder.join("example.cpp");
-            let program = folder.join("example-cpp");
-            let flags = ["-std=c++20", "-Wall", "-Wextra", "-Werror"];
+        Language::Python => python(block, folder),
+        Language::Go => go(block, folder),
+        Language::Cpp => cpp(block, folder),
+        Language::Java => java(block, folder),
+        Language::JavaScript => javascript(block, folder),
+        Language::Shell => shell(folder),
+        Language::Yaml => yaml(folder),
+        Language::Json => json(folder),
+    }
+}
 
-            if code.contains("int main") {
-                let mut build = command("g++", &flags, &file, folder);
-                build.arg("-o").arg(&program);
-                Plan {
-                    build,
-                    run: Some(Command::new(&program)),
-                    file,
-                }
-            } else {
-                let mut build = command("g++", &flags, &file, folder);
-                build.arg("-fsyntax-only");
-                Plan {
-                    build,
-                    run: None,
-                    file,
-                }
-            }
-        }
-        Language::Java => {
-            let class = JAVA_CLASS
-                .as_ref()
-                .and_then(|pattern| pattern.captures(code))
-                .and_then(|captures| captures.get(1))
-                .map_or("Main", |name| name.as_str());
-            let file = folder.join(format!("{class}.java"));
-            let run = code.contains("static void main").then(|| {
-                let mut run = Command::new("java");
-                run.arg("-cp").arg(folder).arg(class).current_dir(folder);
-                run
-            });
-            let mut build = Command::new("javac");
-            build.arg("-d").arg(folder).arg(&file).current_dir(folder);
-            Plan { file, build, run }
-        }
-        Language::JavaScript => {
-            let module = code
-                .lines()
-                .any(|line| line.starts_with("import ") || line.starts_with("export "));
-            let file = folder.join(if module { "example.mjs" } else { "example.js" });
-            Plan {
-                build: command("node", &["--check"], &file, folder),
-                run: code
-                    .contains("assert")
-                    .then(|| command("node", &[], &file, folder)),
-                file,
-            }
-        }
-        Language::Shell => {
-            let file = folder.join("example.sh");
-            Plan {
-                build: command("bash", &["-n"], &file, folder),
-                run: None,
-                file,
-            }
-        }
-        Language::Yaml => {
-            let file = folder.join("example.yaml");
-            let load = "import sys, yaml; list(yaml.safe_load_all(open(sys.argv[1])))";
-            Plan {
-                build: command("python3", &["-c", load], &file, folder),
-                run: None,
-                file,
-            }
-        }
-        Language::Json => {
-            let file = folder.join("example.json");
-            Plan {
-                build: command("python3", &["-m", "json.tool"], &file, folder),
-                run: None,
-                file,
-            }
-        }
+/// Python: compile the file, and run it when it carries its own checks.
+fn python(block: &Block, folder: &Path) -> Plan {
+    let file = folder.join("example.py");
+    let runs = block.code.contains("assert ") || block.code.contains("__main__");
+    Plan {
+        build: command("python3", &["-m", "py_compile"], &file, folder),
+        run: runs.then(|| command("python3", &[], &file, folder)),
+        file,
+    }
+}
+
+/// Go: `go vet`, and `go run` when the block is a whole program.
+fn go(block: &Block, folder: &Path) -> Plan {
+    let file = folder.join("example.go");
+    let runs = block.code.contains("package main") && block.code.contains("func main()");
+    Plan {
+        build: command("go", &["vet"], &file, folder),
+        run: runs.then(|| command("go", &["run"], &file, folder)),
+        file,
+    }
+}
+
+/// C++: build and link a program, or only check the syntax of a fragment.
+fn cpp(block: &Block, folder: &Path) -> Plan {
+    let file = folder.join("example.cpp");
+    let program = folder.join("example-cpp");
+    let flags = ["-std=c++20", "-Wall", "-Wextra", "-Werror"];
+
+    if !block.code.contains("int main") {
+        let mut build = command("g++", &flags, &file, folder);
+        build.arg("-fsyntax-only");
+
+        return Plan {
+            build,
+            run: None,
+            file,
+        };
+    }
+
+    let mut build = command("g++", &flags, &file, folder);
+    build.arg("-o").arg(&program);
+    Plan {
+        build,
+        run: Some(Command::new(&program)),
+        file,
+    }
+}
+
+/// Java: `javac` a file named after its class, and run the class when it has a
+/// `main`.
+fn java(block: &Block, folder: &Path) -> Plan {
+    let class = JAVA_CLASS
+        .as_ref()
+        .and_then(|pattern| pattern.captures(&block.code))
+        .and_then(|captures| captures.get(1))
+        .map_or("Main", |name| name.as_str());
+    let file = folder.join(format!("{class}.java"));
+    let run = block.code.contains("static void main").then(|| {
+        let mut run = Command::new("java");
+        run.arg("-cp").arg(folder).arg(class).current_dir(folder);
+        run
+    });
+    let mut build = Command::new("javac");
+    build.arg("-d").arg(folder).arg(&file).current_dir(folder);
+    Plan { file, build, run }
+}
+
+/// JavaScript: `node --check`, and run the block when it asserts something.
+fn javascript(block: &Block, folder: &Path) -> Plan {
+    let module = block
+        .code
+        .lines()
+        .any(|line| line.starts_with("import ") || line.starts_with("export "));
+    let file = folder.join(if module { "example.mjs" } else { "example.js" });
+    Plan {
+        build: command("node", &["--check"], &file, folder),
+        run: block
+            .code
+            .contains("assert")
+            .then(|| command("node", &[], &file, folder)),
+        file,
+    }
+}
+
+/// Shell: parse the script without running it.
+fn shell(folder: &Path) -> Plan {
+    let file = folder.join("example.sh");
+    Plan {
+        build: command("bash", &["-n"], &file, folder),
+        run: None,
+        file,
+    }
+}
+
+/// YAML: load every document with Python's YAML parser.
+fn yaml(folder: &Path) -> Plan {
+    let file = folder.join("example.yaml");
+    let load = "import sys, yaml; list(yaml.safe_load_all(open(sys.argv[1])))";
+    Plan {
+        build: command("python3", &["-c", load], &file, folder),
+        run: None,
+        file,
+    }
+}
+
+/// JSON: parse the file with Python's JSON tool.
+fn json(folder: &Path) -> Plan {
+    let file = folder.join("example.json");
+    Plan {
+        build: command("python3", &["-m", "json.tool"], &file, folder),
+        run: None,
+        file,
     }
 }
 
@@ -309,14 +335,12 @@ mod tests {
 
     fn checked(language: Language, code: &str) -> Result<Built, DataError> {
         let folder = scratch(language.name());
-        let built = check(
-            &Block {
-                language,
-                code: code.to_string(),
-                ignored: false,
-            },
-            &folder,
-        )?;
+        let block = Block {
+            language,
+            code: code.to_string(),
+            ignored: false,
+        };
+        let built = check(&block, &folder)?;
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))?;
         Ok(built)
     }

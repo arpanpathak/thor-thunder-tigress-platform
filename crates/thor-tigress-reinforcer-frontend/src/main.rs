@@ -164,10 +164,8 @@ mod tests {
     #[test]
     fn a_vanished_or_broken_client_is_only_logged() -> Outcome {
         let folder = TempDir::new()?;
-        let records = folder.file(
-            "train.jsonl",
-            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
-        )?;
+        let line = "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n";
+        let records = folder.file("train.jsonl", line)?;
         let spec = DatasetSpec::new(
             "train",
             &records,
@@ -203,10 +201,8 @@ mod tests {
     #[test]
     fn serve_opens_the_datasets_and_listens() -> Outcome {
         let folder = TempDir::new()?;
-        let records = folder.file(
-            "train.jsonl",
-            "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n",
-        )?;
+        let line = "{\"id\":\"a\",\"source\":\"chat\",\"origin\":\"c\"}\n";
+        let records = folder.file("train.jsonl", line)?;
         let missing = folder.path().join("none.jsonl");
         let specs = vec![
             DatasetSpec::new(

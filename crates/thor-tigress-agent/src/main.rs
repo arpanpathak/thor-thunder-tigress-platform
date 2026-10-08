@@ -61,16 +61,13 @@ fn main() -> ExitCode {
 /// Accepts connections forever, one thread each.
 fn serve(config: Config) -> Outcome<Infallible> {
     let listener = TcpListener::bind(&config.listen)?;
+    let access = if config.key.is_some() { "required" } else { "off" };
     eprintln!(
         "listening on {}, model {}, search {}, access key {}, keyring {}",
         config.listen,
         config.upstreams.model.address(),
         config.upstreams.search.address(),
-        if config.key.is_some() {
-            "required"
-        } else {
-            "off"
-        },
+        access,
         if config.people.is_some() { "on" } else { "off" }
     );
     let config = Arc::new(config);
@@ -156,18 +153,18 @@ mod tests {
 
     #[test]
     fn serve_binds_and_announces() -> Outcome {
-        let config = Config::from_args(
-            ["--listen", "127.0.0.1:0", "--key-file", "/nonexistent"].map(String::from),
-        )?;
+        let args = ["--listen", "127.0.0.1:0", "--key-file", "/nonexistent"].map(String::from);
+        let config = Config::from_args(args)?;
         thread::spawn(move || serve(config));
         thread::sleep(std::time::Duration::from_millis(200));
         let taken = TcpListener::bind("127.0.0.1:0")?;
-        let busy = Config::from_args([
+        let args = [
             "--listen".to_string(),
             taken.local_addr()?.to_string(),
             "--key-file".to_string(),
             "/nonexistent".to_string(),
-        ])?;
+        ];
+        let busy = Config::from_args(args)?;
         assert!(serve(busy).is_err());
         Ok(())
     }
@@ -176,17 +173,13 @@ mod tests {
     fn answers_connections_and_reports_bad_requests() -> Outcome {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?.to_string();
-        let config = Arc::new(Config::from_args([
-            "--key-file".to_string(),
-            "/nonexistent".to_string(),
-        ])?);
+        let arguments = ["--key-file".to_string(), "/nonexistent".to_string()];
+        let config = Arc::new(Config::from_args(arguments)?);
         let exchanged = thread::scope(|scope| {
             scope.spawn(|| accept(listener.incoming().take(2), &config));
             let health = exchange(&address, "GET /health HTTP/1.1\r\nHost: x\r\n\r\n")?;
-            let broken = exchange(
-                &address,
-                "POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 2\r\n\r\n{x",
-            )?;
+            let raw = "POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 2\r\n\r\n{x";
+            let broken = exchange(&address, raw)?;
             Ok::<_, crate::error::AgentError>((health, broken))
         });
         let (health, broken) = exchanged?;

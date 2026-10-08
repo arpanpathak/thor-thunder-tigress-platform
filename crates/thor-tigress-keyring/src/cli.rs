@@ -248,10 +248,8 @@ fn passphrase(
         return checked(&value);
     }
 
-    write_out(
-        prompt,
-        &format!("passphrase for {}: ", options.keyring.display()),
-    )?;
+    let question = format!("passphrase for {}: ", options.keyring.display());
+    write_out(prompt, &question)?;
     prompt.flush().map_err(KeyringError::io("standard error"))?;
     let mut line = String::new();
     input

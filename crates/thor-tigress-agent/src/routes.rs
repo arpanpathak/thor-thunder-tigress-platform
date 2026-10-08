@@ -234,14 +234,15 @@ mod tests {
         fs::create_dir_all(&folder)?;
         fs::write(folder.join("index.html"), "<p>cub</p>")?;
         let model = FakeServer::start(responses)?;
-        let mut config = Config::from_args([
+        let arguments = [
             "--web".to_string(),
             folder.to_string_lossy().into_owned(),
             "--model".to_string(),
             model.address(),
             "--key-file".to_string(),
             "/nonexistent".to_string(),
-        ])?;
+        ];
+        let mut config = Config::from_args(arguments)?;
         config.key = key.map(ToString::to_string);
         Ok(Setup {
             config,
@@ -357,18 +358,14 @@ mod tests {
 
     #[test]
     fn passes_model_routes_through_with_the_key() -> Outcome {
-        let setup = setup(
-            vec![
-                json_response(r#"{"data":[]}"#),
-                json_response(r#"{"input_tokens":3}"#),
-            ],
-            Some("k"),
-        )?;
+        let replies = vec![
+            json_response(r#"{"data":[]}"#),
+            json_response(r#"{"input_tokens":3}"#),
+        ];
+        let setup = setup(replies, Some("k"))?;
         let models = answered(&setup, &request("GET", "/v1/models", Some("Bearer k")))?;
-        let count = answered(
-            &setup,
-            &request("POST", "/v1/messages/count_tokens", Some("Bearer k")),
-        )?;
+        let counted = request("POST", "/v1/messages/count_tokens", Some("Bearer k"));
+        let count = answered(&setup, &counted)?;
         let unknown = answered(&setup, &request("GET", "/v1/embeddings", Some("Bearer k")))?;
         fs::remove_dir_all(&setup.folder)?;
         let seen = setup.model.requests()?;
@@ -395,7 +392,7 @@ mod tests {
         let passphrase = folder.join("passphrase");
         fs::write(&passphrase, "keyring passphrase\n")?;
         Keyring::create(&keyring, "keyring passphrase")?;
-        let config = Config::from_args([
+        let arguments = [
             "--web".to_string(),
             folder.display().to_string(),
             "--model".to_string(),
@@ -406,7 +403,8 @@ mod tests {
             keyring.display().to_string(),
             "--keyring-passphrase-file".to_string(),
             passphrase.display().to_string(),
-        ])?;
+        ];
+        let config = Config::from_args(arguments)?;
 
         let mut registered = request("POST", "/request", None);
         registered.body = br#"{"name":"Ada Lovelace","email":"ada@example.com"}"#.to_vec();

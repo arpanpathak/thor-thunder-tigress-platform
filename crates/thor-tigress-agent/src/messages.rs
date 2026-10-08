@@ -116,11 +116,7 @@ mod tests {
     fn forwards_and_relays() -> Outcome {
         let server = FakeServer::start(vec![json_response(r#"{"type":"message"}"#)])?;
         let mut client = Vec::new();
-        forward(
-            &mut client,
-            br#"{"messages":[]}"#,
-            &Endpoint::new(server.address(), None),
-        )?;
+        forward(&mut client, br#"{"messages":[]}"#, &Endpoint::new(server.address(), None))?;
         let sent = server.requests()?;
         assert!(sent[0].starts_with("POST /v1/messages HTTP/1.1"));
         assert!(sent[0].contains(r#""enable_thinking":false"#));

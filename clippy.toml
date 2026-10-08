@@ -1,2 +1,7 @@
 # Product names written as plain words in doc comments, not code.
 doc-valid-idents = ["SearXNG", "OpenAI", "..", "DuckDuckGo", "GitHub", "TensorRT", "JetPack", "macOS"]
+
+# The readability budget: a function that needs more than this is doing more
+# than one job, and a reader cannot hold it in their head.
+cognitive-complexity-threshold = 15
+too-many-lines-threshold = 55

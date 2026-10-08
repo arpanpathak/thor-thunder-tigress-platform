@@ -550,12 +550,8 @@ mod tests {
     #[test]
     fn a_phrase_found_outside_the_answers_marks_nothing() -> Outcome {
         let setup = setup()?;
-        let reply = call(
-            &setup.app,
-            "POST",
-            "/api/flag-matches",
-            r#"{"text":"trpl/src","category":"other"}"#,
-        )?;
+        let body = r#"{"text":"trpl/src","category":"other"}"#;
+        let reply = call(&setup.app, "POST", "/api/flag-matches", body)?;
         assert_eq!(
             (reply.body["matched"].as_u64(), reply.body["added"].as_u64()),
             (Some(0), Some(0))
@@ -681,18 +677,12 @@ mod tests {
         answer(&mut page, &Request::new("GET", "/", ""), &workspace)?;
         assert!(String::from_utf8_lossy(&page).starts_with("HTTP/1.1 200 OK"));
         let mut listed = Vec::new();
-        answer(
-            &mut listed,
-            &Request::new("GET", "/api/datasets", ""),
-            &workspace,
-        )?;
+        let datasets = Request::new("GET", "/api/datasets", "");
+        answer(&mut listed, &datasets, &workspace)?;
         assert!(String::from_utf8_lossy(&listed).contains(r#""name":"teacher","#));
         let mut records = Vec::new();
-        answer(
-            &mut records,
-            &Request::new("GET", "/api/page?dataset=teacher", ""),
-            &workspace,
-        )?;
+        let page_request = Request::new("GET", "/api/page?dataset=teacher", "");
+        answer(&mut records, &page_request, &workspace)?;
         let text = String::from_utf8_lossy(&records).into_owned();
         assert!(
             text.contains(r#""source_text":"Vectors hold values.""#)
@@ -789,12 +779,8 @@ mod tests {
             setup.app.flags()?.get("a1").map(|flag| flag.spans.len()),
             Some(1)
         );
-        call(
-            &setup.app,
-            "POST",
-            "/api/flag",
-            r#"{"id":"a1","flagged":false}"#,
-        )?;
+        let body = r#"{"id":"a1","flagged":false}"#;
+        call(&setup.app, "POST", "/api/flag", body)?;
         assert_eq!(setup.app.flags()?.get("a1"), None);
         Ok(())
     }
@@ -855,11 +841,9 @@ mod tests {
         let long = "x".repeat(MAX_INLINE_RESPONSE + 10);
         let line = serde_json::json!({ "id": "l", "source": "chat", "origin": "c", "response": format!("short\n{long}") });
         let training = folder.file("train.jsonl", &format!("{line}\n"))?;
-        let app = App::open(
-            &training,
-            &folder.path().join("f.jsonl"),
-            &folder.path().join("s.jsonl"),
-        )?;
+        let flags = folder.path().join("f.jsonl");
+        let slop = folder.path().join("s.jsonl");
+        let app = App::open(&training, &flags, &slop)?;
         let item = &call(&app, "GET", "/api/page", "")?.body["items"][0];
         assert_eq!(
             (item["response"].as_str(), item["shortened"].as_bool()),

@@ -171,10 +171,7 @@ impl People {
     }
 
     fn lock(&self) -> MutexGuard<'_, Loaded> {
-        match self.state.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
+        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 }
 
@@ -447,14 +444,15 @@ mod tests {
         keyring.approve("ada@example.com")?;
         let passphrase = folder.passphrase()?.display().to_string();
         let keyring_path = folder.keyring().display().to_string();
-        let config = Config::from_args(args(&[
+        let arguments = args(&[
             "--key-file",
             "/nonexistent",
             "--keyring",
             &keyring_path,
             "--keyring-passphrase-file",
             &passphrase,
-        ]))?;
+        ]);
+        let config = Config::from_args(arguments)?;
         Ok((config, keyring))
     }
 
@@ -471,7 +469,7 @@ mod tests {
 
     #[test]
     fn options_override_defaults() -> Outcome {
-        let config = Config::from_args(args(&[
+        let arguments = args(&[
             "--listen",
             "0.0.0.0:9000",
             "--model",
@@ -482,7 +480,8 @@ mod tests {
             "/srv",
             "--key-file",
             "/none",
-        ]))?;
+        ]);
+        let config = Config::from_args(arguments)?;
         assert_eq!(config.listen, "0.0.0.0:9000");
         assert_eq!(config.upstreams.model.address(), "m:1");
         assert_eq!(config.upstreams.search.address(), "s:2");

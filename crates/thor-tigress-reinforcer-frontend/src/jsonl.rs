@@ -66,17 +66,15 @@ mod tests {
     fn writes_and_reads_back_skipping_blank_lines() -> Outcome {
         let folder = TempDir::new()?;
         let path = folder.path().join("nested/lines.jsonl");
-        write_lines(
-            &path,
-            &[
-                Line {
-                    id: "a".to_string(),
-                },
-                Line {
-                    id: "b".to_string(),
-                },
-            ],
-        )?;
+        let lines = [
+            Line {
+                id: "a".to_string(),
+            },
+            Line {
+                id: "b".to_string(),
+            },
+        ];
+        write_lines(&path, &lines)?;
         fs::write(
             &path,
             format!(

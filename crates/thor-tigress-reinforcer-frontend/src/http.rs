@@ -330,11 +330,8 @@ mod tests {
     #[test]
     fn writes_status_type_and_json() -> Outcome {
         let mut out = Vec::new();
-        write_json(
-            &mut out,
-            Status::NotFound,
-            &serde_json::json!({ "error": "x" }),
-        )?;
+        let body = serde_json::json!({ "error": "x" });
+        write_json(&mut out, Status::NotFound, &body)?;
         let text = String::from_utf8_lossy(&out);
         assert!(text.starts_with(
             "HTTP/1.1 404 Not Found\r\nContent-Type: application/json; charset=utf-8\r\n"

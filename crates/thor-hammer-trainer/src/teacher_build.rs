@@ -572,10 +572,8 @@ mod tests {
             workspace.write("manifest.tsv", "source\tkind\tcommit\tlicence_file\tlicence\nbook\tbook\tabc\tLICENSE\tMIT License\nlib\tcode\tabc\tLICENSE\tMIT License\n")?;
             let train = r#"{"id":"s1","instruction":"","response":"A long passage about heaps.","source":"corpus","origin":"book/heaps.md"}"#;
             workspace.write("data/train.jsonl", train)?;
-            workspace.write(
-                "corpus/lib/src/heap.py",
-                &"def push(heap, item):\n    heap.append(item)\n".repeat(60),
-            )?;
+            let heap = "def push(heap, item):\n    heap.append(item)\n".repeat(60);
+            workspace.write("corpus/lib/src/heap.py", &heap)?;
             Ok(workspace)
         }
 
@@ -632,10 +630,8 @@ mod tests {
         let workspace = Workspace::new("check")?;
         workspace.write("teacher/a.md", &format!("{GOOD}---\n<!-- source: notes -->\n### User\nQ\n\n### Assistant\nGreat question!\n\n```python\nassert 1 + 1 == 2\n```\n---\n<!-- source: notes -->\n### User\nQ\n\n### Assistant\n```python\nassert sorted([2, 1]) == [1, 2]\n```\n"))?;
         let unknown = GOOD.replace("section: s1", "section: nowhere");
-        workspace.write(
-            "teacher/more/b.md",
-            &format!("{unknown}---\n### User\nno source comment\n"),
-        )?;
+        let more = format!("{unknown}---\n### User\nno source comment\n");
+        workspace.write("teacher/more/b.md", &more)?;
         let result = check(&workspace.paths)?;
         assert!(!result.all_passed);
         assert!(result.summary().contains("| Passed every check | 2 |"));
@@ -668,10 +664,8 @@ mod tests {
     #[test]
     fn a_set_without_grounded_entries_needs_no_sections() -> Result<(), DataError> {
         let workspace = Workspace::new("plain")?;
-        workspace.write(
-            "teacher/a.md",
-            "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA plain answer.\n",
-        )?;
+        let note = "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA plain answer.\n";
+        workspace.write("teacher/a.md", note)?;
         fs::remove_file(workspace.root.join("data/train.jsonl"))
             .map_err(DataError::io(&workspace.root))?;
         let result = check(&workspace.paths)?;
@@ -688,10 +682,8 @@ mod tests {
             r#"{{"id":"s1","instruction":"","response":"{}","source":"corpus","origin":"book/heaps.md"}}"#,
             "heaps ".repeat(200)
         ))?;
-        workspace.write(
-            "teacher/a.md",
-            "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA.\n",
-        )?;
+        let note = "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA.\n";
+        workspace.write("teacher/a.md", note)?;
         let summary = queue(&workspace.paths, 5, &[])?;
         assert!(summary.starts_with("2 sections queued"));
         let queued = workspace.read("data/teacher_queue.md")?;

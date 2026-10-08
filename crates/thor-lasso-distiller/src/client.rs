@@ -100,7 +100,10 @@ impl Client {
         let mut raw = Vec::new();
         reader.read_to_end(&mut raw).map_err(server)?;
         let text = String::from_utf8_lossy(&raw).into_owned();
-        let body = if chunked { dechunk(&text) } else { text };
+        let body = match chunked {
+            true => dechunk(&text),
+            false => text,
+        };
 
         match status.split_whitespace().nth(1) {
             Some("200") => Ok(body),
@@ -178,10 +181,9 @@ mod tests {
 
     #[test]
     fn reports_a_server_error() -> Result<(), DistillError> {
+        let reply = "HTTP/1.1 500 Internal Server Error\r\n\r\nengine not loaded".to_string();
         let client = Client {
-            address: serve_once(
-                "HTTP/1.1 500 Internal Server Error\r\n\r\nengine not loaded".to_string(),
-            )?,
+            address: serve_once(reply)?,
             model: "teacher".to_string(),
             key: None,
         };
@@ -216,15 +218,13 @@ mod tests {
             model: "teacher".to_string(),
             key: None,
         };
-        let not_json = client(serve_once(
-            "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nnope".to_string(),
-        )?);
+        let reply = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nnope".to_string();
+        let not_json = client(serve_once(reply)?);
         assert!(
             matches!(not_json.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply is not JSON"))
         );
-        let empty = client(serve_once(
-            "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}".to_string(),
-        )?);
+        let reply = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}".to_string();
+        let empty = client(serve_once(reply)?);
         assert!(
             matches!(empty.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply has no message"))
         );

@@ -356,12 +356,8 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
     let source = scratch.join("example.rs");
     fs::write(&source, code).map_err(DataError::io(&source))?;
     let crate_type = CrateType::of(code).flag();
-    let build = clippy(
-        &source,
-        scratch,
-        &["--crate-type", crate_type, "--emit=metadata", "--out-dir"],
-        scratch,
-    )?;
+    let flags = ["--crate-type", crate_type, "--emit=metadata", "--out-dir"];
+    let build = clippy(&source, scratch, &flags, scratch)?;
 
     if let Finished::Failed(output) = build {
         return Ok(Built::BuildFailed(output));
@@ -375,12 +371,8 @@ fn build_and_test(code: &str, scratch: &Path) -> Result<Built, DataError> {
     }
 
     let test_binary = scratch.join("example-tests");
-    let test_build = clippy(
-        &source,
-        scratch,
-        &["--test", "-A", "dead_code", "-o"],
-        &test_binary,
-    )?;
+    let test_flags = ["--test", "-A", "dead_code", "-o"];
+    let test_build = clippy(&source, scratch, &test_flags, &test_binary)?;
 
     if let Finished::Failed(output) = test_build {
         return Ok(Built::BuildFailed(output));
@@ -516,12 +508,8 @@ mod tests {
     #[test]
     fn an_unwrap_breaks_a_rule_and_clippy_pedantic() -> Result<(), DataError> {
         let folder = scratch("unwrap");
-        let checked = check(
-            &conversation(
-                &GOOD.replace("values.iter().sum()", "values.first().copied().unwrap()"),
-            )?,
-            &folder,
-        )?;
+        let source = GOOD.replace("values.iter().sum()", "values.first().copied().unwrap()");
+        let checked = check(&conversation(&source)?, &folder)?;
         assert_eq!(kinds(&checked), ["rule", "build"]);
         fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
     }

@@ -205,6 +205,7 @@ mod tests {
             Status::Unauthorized,
             Status::BadRequest,
             Status::NotFound,
+            Status::ServerError,
             Status::BadGateway,
         ]
         .map(Status::line);
@@ -223,6 +224,7 @@ mod tests {
                 "401 Unauthorized",
                 "400 Bad Request",
                 "404 Not Found",
+                "500 Internal Server Error",
                 "502 Bad Gateway"
             ]
         );
@@ -268,6 +270,9 @@ mod tests {
                 &AgentError::Refused("127.0.0.1: not public".to_string()),
             )
         })?;
+        let sealed = written(|out| {
+            failure(out, &AgentError::Keyring("wrong passphrase".to_string()))
+        })?;
         let gone = written(|out| failure(out, &AgentError::from(std::io::Error::other("reset"))))?;
         assert!(bad.starts_with("HTTP/1.1 400 Bad Request"));
         assert!(
@@ -275,6 +280,7 @@ mod tests {
         );
         assert!(gateway.starts_with("HTTP/1.1 502 Bad Gateway"));
         assert!(refused.starts_with("HTTP/1.1 502 Bad Gateway"));
+        assert!(sealed.starts_with("HTTP/1.1 500 Internal Server Error"));
         assert_eq!(gone, "");
         Ok(())
     }

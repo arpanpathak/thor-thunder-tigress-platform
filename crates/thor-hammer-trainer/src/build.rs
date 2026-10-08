@@ -234,16 +234,12 @@ fn read_all_examples(
     let single_chat = read_file(&datastore.join("chat_0.md"))?;
 
     let mut examples = readability::examples(&readability_set);
-    examples.extend(clever_vs_readable::examples(
-        &clever_vs_readable_set,
-        skip_reasons,
-    )?);
+    let clever = clever_vs_readable::examples(&clever_vs_readable_set, skip_reasons)?;
+    examples.extend(clever);
     examples.extend(chat::examples(&chat_export, skip_reasons)?);
     examples.extend(chat::example_from_question_file(&single_chat, "chat_0.md"));
-    examples.extend(book_repository_examples(
-        &inputs.book_repository,
-        skip_reasons,
-    )?);
+    let book = book_repository_examples(&inputs.book_repository, skip_reasons)?;
+    examples.extend(book);
     let fetched = corpus::examples(&inputs.corpus, &inputs.manifest)?;
     let corpus_lines = fetched.reports.iter().map(corpus_line).collect();
     examples.extend(fetched.examples);
@@ -422,45 +418,33 @@ mod tests {
             let fixture = Self { root };
             let long =
                 "A page is a fixed-size block of virtual memory that the kernel maps. ".repeat(4);
-            fixture.write(
-                "store/readability_training.md",
-                &format!("# Set\n---\n### Instruction\nWhat is a page?\n### Response\n{long}\n"),
-            )?;
+            let readability =
+                format!("# Set\n---\n### Instruction\nWhat is a page?\n### Response\n{long}\n");
+            fixture.write("store/readability_training.md", &readability)?;
             let sft = format!(
                 r#"{{"messages": [{{"role": "user", "content": "Rewrite this loop."}}, {{"role": "assistant", "content": "{long}"}}], "meta": {{"id": "rs-x"}}}}"#
             );
-            fixture.write(
-                "store/clever_vs_readable/clever_vs_readable_sft.jsonl",
-                &sft,
-            )?;
+            fixture.write("store/clever_vs_readable/clever_vs_readable_sft.jsonl", &sft)?;
             let dpo = r#"{"prompt":[{"role":"user","content":"Q"}],"chosen":[{"role":"assistant","content":"good"}],"rejected":[{"role":"assistant","content":"bad"}],"meta":{"id":"rs-x"}}"#;
             fixture.write("store/clever_vs_readable/clever_vs_readable_dpo.jsonl", dpo)?;
             let export = format!(
                 r#"[{{"uuid": "c1", "chat_messages": [{{"sender": "human", "content": [{{"type": "text", "text": "What is a futex?"}}]}}, {{"sender": "assistant", "content": [{{"type": "text", "text": "A fast userspace mutex. {long}"}}]}}]}}]"#
             );
             fixture.write("store/work/extracted/conversations.json", &export)?;
-            fixture.write(
-                "store/chat_0.md",
-                &format!(
-                    "#Question\nWhat is a TLB?\n#Answer\nA cache of page translations. {long}\n"
-                ),
-            )?;
-            fixture.write(
-                "books/book/ch01.md",
-                &format!("# Memory\n\n## Pages\n\n{long}\n"),
-            )?;
+            let chat =
+                format!("#Question\nWhat is a TLB?\n#Answer\nA cache of page translations. {long}\n");
+            fixture.write("store/chat_0.md", &chat)?;
+            let chapter = format!("# Memory\n\n## Pages\n\n{long}\n");
+            fixture.write("books/book/ch01.md", &chapter)?;
             fixture.write("books/book/WORKLOG.md", "notes")?;
-            fixture.write(
-                "books/lab/topk.rs",
-                &format!("//! Top K frequent elements, using a heap. {long}\nfn main() {{}}\n"),
-            )?;
+            let topk =
+                format!("//! Top K frequent elements, using a heap. {long}\nfn main() {{}}\n");
+            fixture.write("books/lab/topk.rs", &topk)?;
             fixture.write("books/lab/bare.rs", "fn main() {}\n")?;
             fixture.write("books/target/skip.md", "build output")?;
             fixture.write("books/.git/HEAD.md", "hidden")?;
-            fixture.write(
-                "corpus/eng-practices/review/index.md",
-                &format!("# Review\n\n## Design\n\n{long}\n"),
-            )?;
+            let review = format!("# Review\n\n## Design\n\n{long}\n");
+            fixture.write("corpus/eng-practices/review/index.md", &review)?;
             fixture.write("corpus/closed/review/a.md", "# Closed\n")?;
             fixture.write("corpus/empty/README.txt", "nothing")?;
             let manifest = "source\tkind\tcommit\tlicence_file\tlicence\neng-practices\tdocs\tabc\tLICENSE\tAttribution 4.0 International\nclosed\tdocs\tabc\tLICENSE\tAll rights reserved\nempty\tdocs\tabc\tLICENSE\tMIT License\nlib\tcode\tabc\tLICENSE\tMIT License\n";
