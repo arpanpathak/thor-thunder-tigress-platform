@@ -40,10 +40,10 @@ use crate::{
 /// does need room, so there are eight.
 const MAX_ROUNDS: usize = 8;
 
-/// Rounds without tools at the end. The model usually answers on the first; a
-/// second is there for the two ways it fails: a round that is only a tool call,
+/// Rounds without tools at the end. The model usually answers on the first; the
+/// others are there for the ways it fails: a round that is only a tool call,
 /// which is run, and a round with no text at all.
-const ANSWER_ROUNDS: usize = 2;
+const ANSWER_ROUNDS: usize = 3;
 
 /// Tool calls kept per round; more are ignored.
 const MAX_CALLS: usize = 8;
@@ -66,6 +66,14 @@ const SEARCH_HINT: &str = concat!(
     "promising results with fetch_page_content_recursive before you decide, and follow a ",
     "posting to the company's own page. Cite what you use with the [n] number each source is ",
     "given, and answer with headings when the answer has parts."
+);
+
+/// The line added as the last user turn before the answer rounds. A model that
+/// kept calling tools in the system line's words answers this one.
+const ANSWER_ASK: &str = concat!(
+    "Write the answer now, in plain text, from the sources above: the facts, the ",
+    "dates, the companies and the people. Cite each claim with its [n] number. ",
+    "Do not call a tool."
 );
 
 /// The line added before the answer rounds, when the model must stop calling
@@ -407,11 +415,15 @@ fn search_loop(
             &mut ledger,
         )?;
         append_round(&mut fields, &round, &results)?;
+        if ledger.searches_left(MAX_SEARCHES) == 0 {
+            break;
+        }
     }
 
     offer_tools(&mut fields, false);
     require_tool(&mut fields, false);
     append_system(&mut fields, ANSWER_NUDGE);
+    append_user(&mut fields, ANSWER_ASK);
     if !ledger.is_empty() {
         append_system(
             &mut fields,
@@ -522,6 +534,15 @@ fn append_system(fields: &mut Fields, line: &str) {
     if let Some(content) = merged {
         messages[0]["content"] = Value::String(content);
     }
+}
+
+/// Adds `line` as the last user turn, which is where a model looks for what to
+/// do next.
+fn append_user(fields: &mut Fields, line: &str) {
+    let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
+        return;
+    };
+    messages.push(json!({ "role": "user", "content": line }));
 }
 
 fn offer_tools(fields: &mut Fields, offered: bool) {
@@ -933,7 +954,11 @@ mod tests {
     }
 
     fn call_event(name: &str, arguments: &str) -> String {
-        json!({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":name,"arguments":arguments}}]}}]})
+        call_event_at(0, name, arguments)
+    }
+
+    fn call_event_at(index: usize, name: &str, arguments: &str) -> String {
+        json!({"choices":[{"delta":{"tool_calls":[{"index":index,"id":format!("c{index}"),"function":{"name":name,"arguments":arguments}}]}}]})
             .to_string()
     }
 
@@ -1085,9 +1110,10 @@ mod tests {
             plan(r#"{"query":"rust engineer","kind":"jobs"}"#),
             Some(SearchPlan {
                 queries: vec![
+                    "rust engineer".to_string(),
                     "rust engineer job posting".to_string(),
-                    "rust engineer hiring".to_string(),
                     "rust engineer careers".to_string(),
+                    "rust engineer linkedin jobs".to_string(),
                 ],
                 range: None
             })
@@ -1160,7 +1186,7 @@ mod tests {
         assert!(seen[1].contains("[1] A"), "{}", seen[1]);
         assert!(seen[1].contains("[2] B"), "{}", seen[1]);
         assert!(seen[1].contains("[3] C"), "{}", seen[1]);
-        assert!(seen[1].contains("Searches used 2 of 12"), "{}", seen[1]);
+        assert!(seen[1].contains("Searches used 2 of 16"), "{}", seen[1]);
 
         let sent = events(&client);
         assert_eq!(
@@ -1192,30 +1218,29 @@ mod tests {
 
         let asked = search.requests()?;
         assert_eq!(asked.len(), MAX_QUERIES_PER_CALL);
+        assert!(asked[0].contains("q=synthires+rust&"), "{}", asked[0]);
         assert!(
-            asked[0].contains("q=synthires+rust+recruiter"),
+            asked[1].contains("q=synthires+rust+recruiter"),
             "{}",
-            asked[0]
+            asked[1]
         );
-        assert!(asked[1].contains("hiring+manager"), "{}", asked[1]);
-        assert!(asked[2].contains("we+are+hiring"), "{}", asked[2]);
-        assert!(asked[3].contains("linkedin.com"), "{}", asked[3]);
+        assert!(asked[2].contains("hiring+manager"), "{}", asked[2]);
+        assert!(asked[3].contains("we+are+hiring"), "{}", asked[3]);
         Ok(())
     }
 
     #[test]
-    fn the_search_budget_stops_the_thirteenth_query() -> Outcome {
-        let wide = |round: usize| {
-            call_event(
+    fn the_search_budget_stops_the_seventeenth_query() -> Outcome {
+        let wide = |call: usize| {
+            call_event_at(
+                call,
                 "web_search",
-                &format!(r#"{{"queries":["q{round}a","q{round}b","q{round}c","q{round}d"]}}"#),
+                &format!(r#"{{"queries":["q{call}a","q{call}b","q{call}c","q{call}d"]}}"#),
             )
         };
+        let stream = event_stream(&[&wide(0), &wide(1), &wide(2), &wide(3), &wide(4)]);
         let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
-        let mut responses: Vec<String> =
-            (1..=4).map(|round| event_stream(&[&wide(round)])).collect();
-        responses.push(event_stream(&[reply]));
-        let model = FakeServer::start(responses)?;
+        let model = FakeServer::start(vec![stream, event_stream(&[reply])])?;
         let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#); MAX_SEARCHES])?;
         answer(
             &mut Vec::new(),
@@ -1225,9 +1250,9 @@ mod tests {
 
         assert_eq!(search.requests()?.len(), MAX_SEARCHES);
         let seen = model.requests()?;
-        assert_eq!(seen.len(), 5);
-        assert!(seen[4].contains("budget is spent"), "{}", seen[4]);
-        assert!(seen[4].contains("Searches used 12 of 12"), "{}", seen[4]);
+        assert_eq!(seen.len(), 2);
+        assert!(seen[1].contains("budget is spent"), "{}", seen[1]);
+        assert!(seen[1].contains("Searches used 16 of 16"), "{}", seen[1]);
         Ok(())
     }
 
@@ -1382,6 +1407,7 @@ mod tests {
         );
         assert!(!seen[MAX_ROUNDS].contains(r#""tools""#));
         assert!(seen[MAX_ROUNDS].contains(ANSWER_NUDGE));
+        assert!(seen[MAX_ROUNDS].contains(ANSWER_ASK));
         assert!(seen[1].contains("Unknown tool other."));
         assert!(seen[2].contains("already ran"), "{}", seen[2]);
         Ok(())
@@ -1461,7 +1487,7 @@ mod tests {
         assert!(seen[1].contains("bad"), "{}", seen[1]);
         assert!(seen[1].contains("failed"), "{}", seen[1]);
         assert!(seen[1].contains("[1] Good"), "{}", seen[1]);
-        assert!(seen[1].contains("Searches used 2 of 12"), "{}", seen[1]);
+        assert!(seen[1].contains("Searches used 2 of 16"), "{}", seen[1]);
         Ok(())
     }
 
@@ -1544,8 +1570,7 @@ mod tests {
         let call = call_event("other", "{}");
         let empty = r#"{"choices":[{"delta":{}}]}"#;
         let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
-        responses.push(event_stream(&[empty]));
-        responses.push(event_stream(&[empty]));
+        responses.extend((0..ANSWER_ROUNDS).map(|_| event_stream(&[empty])));
         let model = FakeServer::start(responses)?;
         let mut client = Vec::new();
         answer(

@@ -12,8 +12,9 @@ use crate::search::SearchResult;
 /// The most queries one `web_search` call may run.
 pub const MAX_QUERIES_PER_CALL: usize = 4;
 
-/// The most searches one answer may run.
-pub const MAX_SEARCHES: usize = 12;
+/// The most searches one answer may run. A hunt with sub-questions and the
+/// people behind them needs room; the point of the number is that it ends.
+pub const MAX_SEARCHES: usize = 16;
 
 /// The most pages one answer may read.
 pub const MAX_READS: usize = 12;
@@ -53,25 +54,50 @@ impl Kind {
         }
     }
 
-    /// The queries `base` becomes: itself for [`Kind::General`], and the few
-    /// angles worth trying for the other two.
+    /// The queries `base` becomes: itself for [`Kind::General`], and, for the
+    /// other two, itself followed by each angle that it does not already cover.
+    /// A base that already says "hiring" does not need "hiring" again, so the
+    /// widened list stays short and the search budget lasts.
     #[must_use]
     pub fn widen(self, base: &str) -> Vec<String> {
         match self {
             Kind::General => vec![base.to_string()],
-            Kind::Jobs => vec![
-                format!("{base} job posting"),
-                format!("{base} hiring"),
-                format!("{base} careers"),
-            ],
-            Kind::People => vec![
-                format!("{base} recruiter"),
-                format!("{base} \"hiring manager\""),
-                format!("{base} \"we are hiring\""),
-                format!("{base} site:linkedin.com"),
-            ],
+            Kind::Jobs => angles(
+                base,
+                &[
+                    ("job posting", "job"),
+                    ("careers", "career"),
+                    ("linkedin jobs", "linkedin"),
+                ],
+            ),
+            Kind::People => angles(
+                base,
+                &[
+                    ("recruiter", "recruiter"),
+                    ("\"hiring manager\"", "hiring manager"),
+                    ("\"we are hiring\"", "we are hiring"),
+                    ("site:linkedin.com", "linkedin"),
+                ],
+            ),
         }
     }
+}
+
+/// `base`, then each `(angle, key)` as `base angle` when `base` does not
+/// already mention `key`. The base comes first so the model's own wording is
+/// always searched.
+fn angles(base: &str, pairs: &[(&str, &str)]) -> Vec<String> {
+    let lower = base.to_ascii_lowercase();
+    let mut queries = vec![base.to_string()];
+    for (angle, key) in pairs {
+        if queries.len() == MAX_QUERIES_PER_CALL {
+            break;
+        }
+        if !lower.contains(&key.to_ascii_lowercase()) {
+            queries.push(format!("{base} {angle}"));
+        }
+    }
+    queries
 }
 
 /// One source, with the number the answer cites it by.
@@ -247,22 +273,39 @@ mod tests {
     }
 
     #[test]
-    fn a_job_hunt_is_widened_towards_postings() {
+    fn a_job_hunt_keeps_the_query_and_adds_the_posting_angles() {
         let queries = Kind::Jobs.widen("senior rust engineer");
-        assert_eq!(queries.len(), 3);
-        assert_eq!(queries[0], "senior rust engineer job posting");
-        assert!(queries[1].contains("hiring"));
-        assert!(queries[2].ends_with("careers"));
+        assert_eq!(queries.len(), MAX_QUERIES_PER_CALL);
+        assert_eq!(queries[0], "senior rust engineer");
+        assert_eq!(queries[1], "senior rust engineer job posting");
+        assert_eq!(queries[2], "senior rust engineer careers");
+        assert_eq!(queries[3], "senior rust engineer linkedin jobs");
     }
 
     #[test]
-    fn a_people_hunt_is_widened_towards_the_people_behind_the_posting() {
+    fn a_people_hunt_keeps_the_query_and_adds_the_people_angles() {
         let queries = Kind::People.widen("synthires rust");
         assert_eq!(queries.len(), MAX_QUERIES_PER_CALL);
-        assert!(queries[0].ends_with("recruiter"));
-        assert!(queries[1].contains("\"hiring manager\""));
-        assert!(queries[2].contains("\"we are hiring\""));
-        assert!(queries[3].contains("site:linkedin.com"));
+        assert_eq!(queries[0], "synthires rust");
+        assert_eq!(queries[1], "synthires rust recruiter");
+        assert!(queries[2].contains("\"hiring manager\""));
+        assert!(queries[3].contains("\"we are hiring\""));
+    }
+
+    #[test]
+    fn an_angle_the_query_already_covers_is_left_out() {
+        let queries = Kind::People.widen("synthires rust hiring manager");
+        assert_eq!(queries[0], "synthires rust hiring manager");
+        assert!(queries.contains(&"synthires rust hiring manager recruiter".to_string()));
+        assert!(
+            queries
+                .iter()
+                .all(|query| !query.contains("\"hiring manager\"")),
+            "{queries:?}"
+        );
+
+        let jobs = Kind::Jobs.widen("rust job careers linkedin");
+        assert_eq!(jobs, ["rust job careers linkedin"]);
     }
 
     #[test]

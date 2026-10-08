@@ -99,8 +99,8 @@ safety rule lives.
 | Backend | SearXNG on `127.0.0.1:8888`, which asks several search engines |
 | Results given to the model | the first 6 per query, each numbered once for the whole answer |
 | Per result | title, address, date when the engine sends one, and the engine's snippet, cut to 400 characters |
-| Budget per answer | 12 searches, 12 pages read, 4 queries per call |
-| Rounds | at most eight tool rounds, then up to two rounds without tools to write the answer |
+| Budget per answer | 16 searches, 12 pages read, 4 queries per call |
+| Rounds | at most eight tool rounds, then up to three rounds without tools to write the answer |
 | Network reach | only `127.0.0.1:8888`; the server itself never contacts the internet for a search |
 
 SearXNG's JSON answer carries a `publishedDate` on news and other dated
@@ -115,25 +115,31 @@ loop, and the loop gives the model the parts it needs:
 - **`queries`.** A call may carry up to three more sub-questions, and all of them
   are searched in that one round. "Senior Rust jobs" plus "remote" plus "AI
   inference" is one call, not three rounds.
-- **`kind`.** A search is widened by what it is looking for. `jobs` adds the
-  angles that find a posting (`… job posting`, `… hiring`, `… careers`); `people`
-  looks for the people behind one (`… recruiter`, `… "hiring manager"`, `…
-  "we are hiring"`, `… site:linkedin.com`), because a role is often mentioned in
-  a recruiter's or a hiring manager's own post before it reaches a job board.
+- **`kind`.** A search is widened by what it is looking for, and the model's own
+  words are always searched first. `jobs` adds the angles that find a posting
+  (`… job posting`, `… careers`, `… linkedin jobs`); `people` looks for the people
+  behind one (`… recruiter`, `… "hiring manager"`, `… "we are hiring"`, `…
+  site:linkedin.com`), because a role is often mentioned in a recruiter's or a
+  hiring manager's own post before it reaches a job board. An angle the query
+  already covers is left out, so a query that already says "hiring" is not
+  searched three more times for saying it again.
 - **The ledger.** Every source is added to a ledger (`research.rs`) that gives it
   a number, from 1, when it is first seen. The same address found by two queries
   keeps one number, and the number never changes, so the answer can cite `[7]`
   for a source found in the second round. Before the answer rounds the whole
   list is sent back to the model as "Sources found, with the numbers to cite".
-- **Budgets.** An answer may run 12 searches and read 12 pages. Every tool result
-  ends with the line `Searches used 3 of 12; pages read 1 of 12`, so the model
+- **Budgets.** An answer may run 16 searches and read 12 pages. Every tool result
+  ends with the line `Searches used 3 of 16; pages read 1 of 12`, so the model
   spends the budget instead of discovering it is gone. A call that asks for more
-  is answered with "The search budget is spent" and the model answers with what
-  it has.
+  is answered with "The search budget is spent", and once the search budget is
+  spent the tool rounds stop there: the model is asked for the answer instead of
+  being allowed to spend the last rounds on refusals.
 - **A plan first.** The system line under the **Web** switch asks for the plan
   before the searches: break the question into the sub-questions that must be
   true, search each, read the most promising pages, then answer with headings and
-  a citation for each claim.
+  a citation for each claim. Before the answer rounds the same ask is sent again
+  as the last user turn, `Write the answer now … Do not call a tool`, because that
+  is the turn a model that kept calling tools will read.
 
 The result is the shape of an answer you would want from a person: the posting,
 the company, the date, the recruiter who posted it, and the link to each, with
