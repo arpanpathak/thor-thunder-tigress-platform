@@ -18,6 +18,35 @@ there as untracked.
 
 ## 2026-10-07
 
+### The answer rounds run a call again: the text-only rule is reverted
+
+- Report: after the change below, a resume job search stopped giving job links,
+  and one reply tripped into repeating a form line. The rule that did it was
+  mine: an answer round that wrote text beside a call ended there. It does stop a
+  model that keeps calling tools, but it also stops a model that writes the first
+  sentence of the summary and then asks for one more page — the reader gets
+  "Here are the jobs." and nothing else. Reverted: a call written on an answer
+  round is run like any other, as it was before. The other two parts stand and
+  neither can cut an answer short: the search hint still comes back out of the
+  system line before the answer rounds, and the last-resort note still names the
+  sources. `ANSWER_AGAIN` is gone with it.
+- Measured, "here is my resume … find NVIDIA job openings in the US that match
+  it, summary with links", Nemotron, through the agent on the Thor:
+  - thinking off: 4 searches, 12 pages read, 350 s, 3,591-character answer, 5 links.
+  - thinking on with the page's 1,024-token budget: 4 searches, 0 pages read,
+    64 s, 2,852-character answer, 5 links.
+  Both ended with 0 fallback lines and 0 `<tool_call` occurrences. The refusal and
+  the repeated line did not reproduce, so the revert removes the only rule that
+  could produce them; it is not a confirmed repair of that exact reply.
+- Found while measuring, and left alone: the crawl spends the page budget on site
+  chrome. In the thinking-off run 6 of the 12 pages read were LinkedIn `/login`,
+  `/signup`, `/uas/request-password-reset` and `/company/nvidia`, reached by
+  following the job page's own navigation links. Those pages are forms, and form
+  text is what a small model repeats. `fetch.rs` and `html.rs` are untouched: if
+  the page budget should go to postings instead, that is a rule to design in
+  those modules, not something to bolt on here.
+- The entries below still describe the text-only rule; this one supersedes them.
+
 ### Think: a budget for the overthinking, and no more empty bubble
 
 - Report from a live chat: with Think on, a hard question made the model

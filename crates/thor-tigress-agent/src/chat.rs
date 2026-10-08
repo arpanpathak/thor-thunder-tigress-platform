@@ -84,16 +84,6 @@ const ANSWER_NUDGE: &str = concat!(
     "about hiring. Cite each claim with its [n] number. Do not write a tool call."
 );
 
-/// The line added when the model writes a tool call in the answer rounds, where
-/// no tool is offered and none runs. The call is dropped and the model is asked
-/// again, because a call is not an answer and running it is how a model that
-/// keeps calling tools never writes one.
-const ANSWER_AGAIN: &str = concat!(
-    "That was a tool call, and the tools are closed for this answer. Nothing ran. ",
-    "Write the answer in plain text now, from the sources above, citing each claim ",
-    "with its [n] number."
-);
-
 /// The most sources named in the last-resort note, which is all the page shows
 /// when no round wrote a word.
 const MAX_LISTED: usize = 10;
@@ -399,13 +389,12 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 /// a number to cite, and holds the search and page budgets; the numbers go to
 /// the model again before the answer rounds.
 ///
-/// After the tool rounds the answer rounds run with no tools at all, and there
-/// no call runs: a call written then is dropped and the model is asked again
-/// ([`ANSWER_AGAIN`]). A model that keeps calling tools is exactly the one that
-/// otherwise never writes a word, so the answer phase counts only text. When a
-/// round writes text beside a call, the text is the answer and the call is not
-/// run. Only when no round writes any text does the note name the sources the
-/// ledger found, so the page still shows what the search turned up.
+/// After the tool rounds the search hint is taken back out of the system line
+/// and the answer rounds run with no tools at all, with a line asking for the
+/// answer. A call the model writes there is still run, because the text is
+/// streamed as it arrives and cutting the round short would end the answer on a
+/// half sentence. Only when no round writes any text does the note name the
+/// sources the ledger found, so the page still shows what the search turned up.
 fn search_loop(
     client: &mut dyn Write,
     mut fields: Fields,
@@ -457,14 +446,22 @@ fn search_loop(
     for _ in 0..ANSWER_ROUNDS {
         let round = stream_round(client, &fields, model)?;
 
-        if !round.content.trim().is_empty() {
-            return Ok(());
-        }
         if round.calls.is_empty() {
+            if !round.content.trim().is_empty() {
+                return Ok(());
+            }
             continue;
         }
 
-        append_user(&mut fields, ANSWER_AGAIN);
+        let results = run_calls(
+            client,
+            &round.calls,
+            upstreams,
+            &mut allowed,
+            &mut ran,
+            &mut ledger,
+        )?;
+        append_round(&mut fields, &round, &results)?;
     }
 
     let note = if ledger.is_empty() {
@@ -1648,7 +1645,7 @@ mod tests {
     }
 
     #[test]
-    fn a_call_on_the_answer_round_is_dropped_and_asked_again() -> Outcome {
+    fn a_call_on_the_answer_round_is_run() -> Outcome {
         let call = call_event("other", "{}");
         let leaked = json!({ "choices": [{ "delta": { "content": "<tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
         let reply = r#"{"choices":[{"delta":{"content":"the answer"}}]}"#;
@@ -1656,7 +1653,7 @@ mod tests {
         responses.push(event_stream(&[&leaked]));
         responses.push(event_stream(&[reply]));
         let model = FakeServer::start(responses)?;
-        let search = idle()?;
+        let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
         let mut client = Vec::new();
         answer(
             &mut client,
@@ -1666,14 +1663,11 @@ mod tests {
         let seen = model.requests()?;
         assert_eq!(seen.len(), MAX_ROUNDS + 2);
         assert!(
-            seen[MAX_ROUNDS + 1].contains(ANSWER_AGAIN),
+            seen[MAX_ROUNDS + 1].contains("No results."),
             "{}",
             seen[MAX_ROUNDS + 1]
         );
-        assert!(
-            search.requests()?.is_empty(),
-            "a call written with the tools closed must not run"
-        );
+        assert!(search.requests()?[0].contains("q=x"));
         let sent = events(&client);
         assert!(
             !sent.iter().any(|event| event.contains("<tool_call")),
@@ -1687,27 +1681,33 @@ mod tests {
     }
 
     #[test]
-    fn text_beside_a_call_on_the_answer_round_is_the_answer() -> Outcome {
+    fn text_beside_a_call_on_the_answer_round_does_not_end_the_answer() -> Outcome {
         let call = call_event("other", "{}");
-        let mixed = json!({ "choices": [{ "delta": { "content": "Rust 1.99 is out. <tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
+        let mixed = json!({ "choices": [{ "delta": { "content": "Here are the jobs. <tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
+        let reply = r#"{"choices":[{"delta":{"content":"and the links: https://jobs.example/1"}}]}"#;
         let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
         responses.push(event_stream(&[&mixed]));
+        responses.push(event_stream(&[reply]));
         let model = FakeServer::start(responses)?;
+        let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
         let mut client = Vec::new();
         answer(
             &mut client,
             br#"{"messages":[],"thor_web_search":true}"#,
-            &upstreams(&model, &idle()?),
+            &upstreams(&model, &search),
         )?;
         let seen = model.requests()?;
-        assert_eq!(seen.len(), MAX_ROUNDS + 1);
+        assert_eq!(seen.len(), MAX_ROUNDS + 2);
+        assert!(search.requests()?[0].contains("q=x"));
         let sent = events(&client);
         assert!(
-            sent.iter().any(|event| event.contains("Rust 1.99 is out.")),
+            sent.iter().any(|event| event.contains("Here are the jobs.")),
             "{sent:?}"
         );
         assert!(
-            !sent.iter().any(|event| event.contains("<tool_call")),
+            sent
+                .iter()
+                .any(|event| event.contains("and the links: https://jobs.example/1")),
             "{sent:?}"
         );
         Ok(())

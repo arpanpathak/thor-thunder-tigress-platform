@@ -51,12 +51,11 @@ This chapter covers
 6. Steps 3 to 5 repeat at most eight times. The tools are offered on every one of
    those rounds. After them the search hint is taken back out of the system line
    and the model gets three rounds with no tools at all, with a line telling it
-   to answer. No call runs in those rounds: a call written there is dropped and
-   the model is asked again, because running it is how a model that keeps calling
-   tools never writes a word. Text written beside a call is the answer, and the
-   call is not run. Only when no round writes any text does the page show a short
-   note naming the sources the search found, so an answer still ends with
-   something to read.
+   to answer. A call written in those rounds is still run and the model is asked
+   again, because the text is streamed as it arrives: stopping at the first
+   sentence of a summary would end the answer on a half sentence with no links.
+   Only when no round writes any text does the page show a short note naming the
+   sources the search found, so an answer still ends with something to read.
 7. Every token is streamed to the page as it is written, and each tool use is
    sent as an event the page lists under "searched: …" or "read: …".
 
@@ -82,10 +81,9 @@ Left alone, that text is what the reader sees. `tooltext.rs` filters the stream
 instead. It holds back anything that could be a tool-call tag, parses a complete
 block in either the XML form above or the JSON form
 (`{"name": …, "arguments": …}`), and returns it to the loop as if the engine had
-sent it in `tool_calls`. The tags never reach the page, and a tag split across two
-chunks is held back until it is complete. A call written on a tool round runs
-like any other; one written on an answer round is dropped and the model is asked
-again, because that is the round the tools are closed for.
+sent it in `tool_calls`. The tags never reach the page, a tag split across two
+chunks is held back until it is complete, and a call written on the answer round
+is run like any other rather than shown.
 
 This also closes a hole rule 6 leaves open. A page could carry a hidden
 `<tool_call>` and the model could echo it; the call is run, but only under the
@@ -454,8 +452,8 @@ The modules, and what each holds:
 | a call written as text | run like a structured one; the tags never reach the page |
 | a call split across chunks | held back until complete, then parsed |
 | a repeated call | not run twice; the model is told and asked to answer |
-| a call on an answer round | dropped, not run; the model is asked again |
-| text beside a call on an answer round | the text is the answer; the call is not run |
+| a call on an answer round | run like any other; the answer follows |
+| text beside a call on an answer round | the round is not the end; the text is kept and the answer follows |
 | no round writes any text | the fallback names the sources the search found |
 
 Measured on the Thor, 2026-10-07 (Nemotron 3 Nano, thinking off):
