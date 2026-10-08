@@ -1,6 +1,11 @@
-# thor-thunder-tigress-platform
+# Thor Thunder Tigress Platform
 
-<p>
+<p align="center">
+  <img src="book/src/art/cover.png" alt="Cover: a tigress in a winged helm holding a war hammer" height="220">
+  <img src="book/src/art/cub.svg" alt="The Thor Tigress Cub: a grey-blue tiger cub in a winged helmet, raising a small hammer that throws sparks" height="220">
+</p>
+
+<p align="center">
   <a href="https://github.com/arpanpathak/thor-thunder-tigress-platform/actions/workflows/ci.yml"><img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/ci.svg" alt="CI" height="28"></a>
   <a href="https://github.com/arpanpathak/thor-thunder-tigress-platform/blob/badges/history.csv"><img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/coverage.svg" alt="Line coverage" height="28"></a>
   <a href="https://github.com/arpanpathak/thor-thunder-tigress-platform/blob/badges/summary.json"><img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/tests.svg" alt="Tests" height="28"></a>
@@ -9,19 +14,23 @@
   <a href="LICENSE"><img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/license.svg" alt="License" height="28"></a>
 </p>
 
+Thor Thunder Tigress fine-tunes a local language model on an NVIDIA Jetson so it
+stops writing AI slop: in prose (filler, fake importance, hedging) and in Rust
+(`unwrap`, comments inside function bodies, index loops, errors that are strings).
+
+The tigress is the project. `crates/` builds the training set and scores answers
+against the slop phrases and the five rules; `jetson-thor/` is the service that
+runs the models on the device; `book/` documents both.
+
+The cub is the part people talk to: the chat page and the API that put the models
+in front of anyone with an invite, from a browser or from a coding agent.
+
+**Book:** https://arpanpathak.github.io/thor-thunder-tigress-platform/ (or `mdbook serve book` locally).
+
 Measured by CI on every push to `main`: each crate's tests run under
 `cargo llvm-cov`, and `spark` checks the whole repository against the five
 rules. The numbers are kept over time in
 [`history.csv`](https://github.com/arpanpathak/thor-thunder-tigress-platform/blob/badges/history.csv) on the `badges` branch.
-
-Fine-tune a local language model, on an NVIDIA Jetson, so it stops writing AI
-slop: in prose (filler, fake importance, hedging) and in Rust (unwrap, comments
-inside function bodies, index loops, errors that are strings).
-
-This repository is the training and evaluation platform, and the umbrella for
-the other projects that run on the same device.
-
-**Book:** https://arpanpathak.github.io/thor-thunder-tigress-platform/ (or `mdbook serve book` locally).
 
 ## The projects
 
