@@ -149,6 +149,11 @@ there as untracked.
   the model can explain a thin answer instead of guessing. Found the hard way:
   the first live research run returned 0 results for all 16 searches because my
   own testing had got DuckDuckGo a CAPTCHA and Brave and Google suspended.
+- Second live run with the engines still down: 16 searches, 0 results, and a
+  structured answer that said so, listing what it had searched and that it had
+  no verifiable facts - no fallback line, no leaked tag. The engines will answer
+  again once the suspensions lift; until then a Web-on answer is honest and thin
+  rather than wrong.
 - Tests: 163 in the agent, 442 in the workspace. Chapter "Tool calling" gained
   "Deep research: sub-questions, kinds, and a budget"; the README and the
   tool-loop figure follow.
