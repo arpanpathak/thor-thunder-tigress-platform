@@ -135,21 +135,26 @@ chapter "Web chat: Thor Tigress Cub".
 |---|---|
 | Models | Nemotron 3 Nano 30B-A3B Q8_0 (llama.cpp, the default); Qwen3.6-35B-A3B NVFP4 (TensorRT Edge-LLM, 78 tok/s); Nemotron 3.5 Lightning on disk, not loaded |
 | People at once | Nano 4 (`USERS`); Qwen 1 |
-| Context per person | Nano 1,048,576 tokens (`CONTEXT`); Qwen 32,768 (`EDGE_CONTEXT`) |
+| Context per person | Nano 131,072 tokens (`CONTEXT`); Qwen 32,768 (`EDGE_CONTEXT`) |
+| KV cache | Nano 3.0 GB at 4 x 128K, held while loaded. It was 24 GB at 4 x 1M until 2026-10-08 |
 | Measured | Nano 53 tok/s, first token 0.2 s; Qwen 78 tok/s |
 | Model names | `nemotron` / `nemotron-think`, `Qwen3.6-35B-A3B-NVFP4`, or the full id; others refused |
 
 Change settings in `~/.config/thor-chat/env` (e.g. `USERS=8`), then
-`thor-tigress-serve install`. The page has Web and Think switches, a stop key (Esc),
+`thor-tigress-serve install`. For the context on its own,
+`thor-tigress-serve context TOKENS [USERS]` is quicker: it reloads the models
+through the router and never restarts a service. The page has Web and Think switches, a stop key (Esc),
 highlighted code with copy, twelve themes and an optional system prompt in
 Settings (none by default).
 
 ```bash
-thor-tigress-serve list               # the models on the Thor, each with a key
+thor-tigress-serve list               # the models on the Thor, each with a key and what it costs
 thor-tigress-serve list-latest        # the newest chat models on Hugging Face that fit
 thor-tigress-serve load KEY|NAME      # load a model from list
 thor-tigress-serve unload KEY|NAME    # unload it
 thor-tigress-serve download KEY|REPO  # download a model from list-latest
+thor-tigress-serve context            # what the context setting costs in memory
+thor-tigress-serve context TOKENS     # change it and reload; no service restart
 thor-tigress-serve logs               # follow both logs
 thor-tigress-serve key                # new access key; the page asks for it once
 thor-tigress-serve uninstall          # stop and remove both services
@@ -159,6 +164,108 @@ The first time, run it from the repository:
 `jetson-thor/model-serving/thor-tigress-serve install`. That also puts
 `thor-tigress-serve` in `~/.local/bin`. The memory checks, settings and
 models worth trying are in the book, chapter "Model serving".
+
+### Memory, context, and swapping models
+
+A loaded model costs two things: its weights, and a **KV cache that is reserved
+for the whole of `CONTEXT x USERS` the moment it loads** — not as chats arrive,
+and not released while it stays loaded. That second number is what surprises
+people, and at a big context it dwarfs the weights.
+
+Nemotron 3 Nano is unusually cheap in KV: it is a hybrid, and only 6 of its 52
+blocks are attention layers (each with 2 KV heads of 128), so it needs 6 KiB per
+token. The other 46 blocks are Mamba, whose state does not grow with the
+context. Even so, `CONTEXT=1048576` with `USERS=4` reserved 24 GB:
+
+| | Weights | KV cache | To load |
+|---|---|---|---|
+| 4 x 1,048,576 (the old default) | 33.6 GB | 24.0 GB | ~60 GB |
+| 4 x 131,072 (since 2026-10-08) | 33.6 GB | 3.0 GB | ~39 GB |
+
+On 2026-10-08 the Thor was holding 96 GB of its 122.8 GB with just two models
+loaded, and 24 GB of that was Nano's KV cache. Cutting the context to 128K freed
+33 GB the same day, without restarting a service:
+
+```bash
+thor-tigress-serve context                    # what the current setting costs
+thor-tigress-serve context 131072             # 128K per reply, keeping USERS=4
+thor-tigress-serve context 131072 2           # 128K per reply, 2 replies at once
+```
+
+`context` writes `~/.config/thor-chat/env`, regenerates `models.ini`, and
+unloads and reloads the models that are loaded through the router. `thor-chat`
+itself does not restart, `thor-tigress-agent` does not restart, and the
+TensorRT Edge-LLM service is not touched — so the other model keeps answering
+while one reloads.
+
+Nothing here is hard-coded per model. `list` reads the GGUF header of every model
+on disk (`block_count`, `attention.head_count_kv`, `attention.key_length`, …)
+and works out the KV per token, so a new model gets an honest `loads` figure the
+first time it appears. `load` also refuses a model that would not fit, counting
+its KV cache rather than only its file size — the check that was missing when
+Nano was given 4 x 1M on a 122.8 GB machine with another model already resident.
+
+To swap one model for another:
+
+```bash
+thor-tigress-serve list          # keys, states, and the cost of each
+thor-tigress-serve unload 2      # by key, or by name
+thor-tigress-serve load 2
+```
+
+### Choosing the engine in the chat page
+
+The picker at the top of the page is filled from the agent's `/v1/models`, which
+merges llama-server's list with every TensorRT Edge-LLM engine the agent was
+told about. Choosing a row sends that model's name in the request, and the agent
+routes by name: a model served by an engine goes to that engine, everything else
+to llama-server. Nothing else in the page changes.
+
+As of 2026-10-08 the picker offers three rows, and picking is how you test one
+engine against the other on the same prompt:
+
+| Row | Served by | Port |
+|---|---|---|
+| Nemotron 3 Nano 30B A3B · Q8_0 (llama.cpp) | llama-server | 8079 |
+| Qwen3.6 35B A3B NVFP4 (TensorRT) | TensorRT Edge-LLM | 8081 |
+| Nemotron 3 Nano 30B A3B NVFP4 (TensorRT) | TensorRT Edge-LLM | 8082 |
+
+The engine is named in brackets only when more than one engine answers, so a
+single-engine Thor still reads as before. A row for an engine that is down is
+simply left out, so one stopping never hides the others.
+
+Think works on every row. The think budget in Settings does not: it is a
+llama-server body field (`reasoning_budget_tokens` and `reasoning_budget_message`),
+and TensorRT Edge-LLM refuses a field it does not know with "Extra inputs are not
+permitted" and a 400. The page therefore sends those two fields to llama-server
+only, so Think on an engine reasoning works but its thinking has no token cap
+from that setting; the round is still bounded by the page's own `max_tokens`.
+Anything else driving these servers has to make the same split — the engines
+accept an OpenAI request plus `chat_template_kwargs`, and nothing else.
+
+An Edge-LLM model has no key to load. It is one line in
+`~/.config/thor-chat/env` naming the checkpoint folder and its port, and then
+`install`:
+
+```bash
+echo 'EDGE_MODELS=Nemotron-3-Nano-30B-A3B-NVFP4=8082' >> ~/.config/thor-chat/env
+thor-tigress-serve install
+```
+
+The folder must sit beside `EDGE_MODEL`'s, under `~/models/edge-llm`, because
+the folder's name is the model id the page shows and the request must name.
+`install` writes `thor-edge-llm-<name>.service` next to `thor-edge-llm.service`
+and reloads the agent, which is what makes the row appear. The first start
+builds the engine (minutes) and later starts reuse it from
+`~/models/edge-llm/cache`, where each model gets its own directory keyed by a
+hash, so the engines never collide. `EDGE_CONTEXT` caps their context; it is not
+part of the KV arithmetic above, because Edge-LLM pages its KV cache far more
+tightly than llama.cpp reserves one.
+
+`thor-tigress-serve load`/`unload` start and stop these services too, so
+"unload 3" then "load 3" is how to free and reclaim an engine's memory from the
+same list. Running `install` restarts every service, so use it when adding a
+model rather than for a routine change.
 
 ### Access key
 
@@ -245,3 +352,5 @@ ollama stop qwen3.6:27b              # unload to free memory
 | 2026-10-05 | openBatarangs `--thor` (Nemotron, thinking on), 5-module DSA crate with tests | 14 steps, 293 s, 14 tests pass |
 | 2026-10-05 | codebuddy, Nemotron 3 Nano 30B-A3B Q8_0 (llama.cpp), 1,046,528 context | 51.8 tok/s, first token 0.5 s |
 | 2026-10-05 | web chat (llama-server), Nemotron Q8_0, 4 × 1,048,576 context, thinking off | 53 tok/s, first token 0.2 s |
+| 2026-10-08 | Nemotron 3 Nano 30B-A3B, llama.cpp Q8_0 vs TensorRT Edge-LLM NVFP4, same 20 Rust tasks (`compare.py`), thinking off | 53.3 vs 58.9 tok/s; 15/20 vs 16/20 compile; 14/20 vs 16/20 tests; 35.4 GB vs 21.0 GB of GPU |
+| 2026-10-08 | Thor memory with two models loaded, before the context cut | 96 GB used, and 24 GB of it was Nano's 4 x 1M KV cache. `context 131072` freed 33 GB with no service restart |
