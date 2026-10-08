@@ -32,7 +32,7 @@ This chapter covers
 ## How a tool call works
 
 <figure>
-<img src="figures/tool-loop.svg" alt="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron or Qwen calls web_search, which asks SearXNG and the search engines for recent results with dates, or calls fetch_page_content_recursive, which checks that every hop is a public https address and reads a page and its own links. After at most eight tool rounds the model has to answer.">
+<img src="figures/tool-loop.svg" alt="The browser asks thor-tigress-agent with Web on. The agent sends messages and tools to llama-server; Nemotron or Qwen calls web_search, which asks SearXNG and the search engines for recent results with dates, or calls fetch_page_content_recursive, which checks that every hop is a public https address and reads a page and its own links. After at most six tool rounds the model has to answer.">
 <figcaption><b>Figure 18.1</b> The tool loop in <code>thor-tigress-agent</code>.</figcaption>
 </figure>
 
@@ -49,13 +49,10 @@ This chapter covers
    asked to use what it has. That is what stops a model looping on the same
    search.
 6. Steps 3 to 5 repeat at most eight times. The tools are offered on every one of
-   those rounds. After them the search hint is taken back out of the system line
-   and the model gets three rounds with no tools at all, with a line telling it
-   to answer. A call written in those rounds is still run and the model is asked
-   again, because the text is streamed as it arrives: stopping at the first
-   sentence of a summary would end the answer on a half sentence with no links.
-   Only when no round writes any text does the page show a short note naming the
-   sources the search found, so an answer still ends with something to read.
+   those rounds. After them the model gets up to two rounds without tools, with a
+   line telling it to answer; a call it writes anyway is run, and then it is
+   asked once more. That is what keeps a long hunt — several job titles, several
+   pages — from ending in a tool call or in nothing.
 7. Every token is streamed to the page as it is written, and each tool use is
    sent as an event the page lists under "searched: …" or "read: …".
 
@@ -146,10 +143,7 @@ loop, and the loop gives the model the parts it needs:
   true, search each, read the most promising pages, then answer with headings and
   a citation for each claim. Before the answer rounds the same ask is sent again
   as the last user turn, `Write the answer now … Do not call a tool`, because that
-  is the turn a model that kept calling tools will read. The plan itself is a
-  reason to call tools, so it is taken back out of the system line before those
-  rounds: a model told to search in its system line outranks the ask and writes a
-  call even when the request offers no tools.
+  is the turn a model that kept calling tools will read.
 
 The result is the shape of an answer you would want from a person: the posting,
 the company, the date, the recruiter who posted it, and the link to each, with
@@ -276,7 +270,7 @@ public address.
 
 | Limit | Value | Why |
 |---|---|---|
-| tool rounds | 8, then 3 without tools | bounds the time an answer can take |
+| tool rounds | 4 | bounds the time an answer can take |
 | pages read | 6 | each page adds up to ~3,000 tokens to read before answering |
 | hops | 2 | one click into the site, one more, and no further |
 | time per page | 10 s | a slow site can't hold a reply slot |
@@ -446,15 +440,13 @@ The modules, and what each holds:
 | a page budget of 12 | the thirteenth page is refused |
 | a query SearXNG rejects | that query is reported; the rest of the round still runs |
 | a search whose engines are suspended | the tool text names them, so the answer can say why it is thin |
-| the answer rounds | no tools, and the search hint is taken back out of the system line |
+| the answer rounds | the numbered source list is in the request |
 | the first Web round | `tool_choice: "required"` is sent; later rounds are not |
 | the fetch tool over a fake web | the read event, the text, and the numbered pages |
 | a call written as text | run like a structured one; the tags never reach the page |
 | a call split across chunks | held back until complete, then parsed |
 | a repeated call | not run twice; the model is told and asked to answer |
-| a call on an answer round | run like any other; the answer follows |
-| text beside a call on an answer round | the round is not the end; the text is kept and the answer follows |
-| no round writes any text | the fallback names the sources the search found |
+| the answer round | no tools; a call leaked there is stripped, and a fallback is sent when nothing else arrived |
 
 Measured on the Thor, 2026-10-07 (Nemotron 3 Nano, thinking off):
 
