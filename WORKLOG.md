@@ -101,6 +101,11 @@ there as untracked.
   asked again; the fallback is sent only when two rounds yield no text at all.
   Agent tests 138; the round count in the book, the README and the tool-loop
   figure was updated to six.
+- Deployed and checked live, 2026-10-08: "search recent remote senior Rust
+  engineer jobs, and senior distributed systems engineer jobs; list openings
+  from the last month with company and link". The agent searched twice (once per
+  title) and answered with a 2,108-character list; the stream held 0
+  occurrences of `<tool_call` and 0 fallback lines.
 - Deployed to the Thor again, 2026-10-07: rebuilt and reinstalled, service
   restarted, `/health` ok. A live Web-on request ("search the latest Rust
   release, read the announcement, name the page") then searched twice, read the
