@@ -19,7 +19,7 @@ let models = [];
 // Which engine serves each model, from /v1/models. Shown in the picker only when more
 // than one engine is answering, so the same model on llama.cpp and on TensorRT Edge-LLM
 // can be told apart before it is chosen.
-const ENGINE_NAMES = { llamacpp: "llama.cpp", "tensorrt-edgellm": "TensorRT" };
+const ENGINE_NAMES = { llamacpp: "llama.cpp", "tensorrt-edgellm": "TensorRT Edge-LLM" };
 let modelEngines = {};
 let controller = null;
 
