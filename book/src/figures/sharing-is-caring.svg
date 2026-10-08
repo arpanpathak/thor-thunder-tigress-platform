@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520" role="img" aria-label="Her laptop and your machines reach the Thor over the tailnet. The Thor holds two logins, friend and arpanpathak, and one GPU the two of them share.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520" role="img" aria-label="Your friend's laptop and your machines reach the Thor over the tailnet. The Thor holds two logins, friend and arpanpathak, and one GPU the two of them share.">
   <style>
     text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
     .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
@@ -22,7 +22,7 @@
   <text x="30" y="36" class="title">Two people, one Thor</text>
 
   <rect x="30" y="170" width="170" height="80" rx="10" class="outside"/>
-  <text x="115" y="200" class="name" text-anchor="middle">Her laptop</text>
+  <text x="115" y="200" class="name" text-anchor="middle">Friend's laptop</text>
   <text x="115" y="222" class="note" text-anchor="middle">Tailscale on</text>
 
   <rect x="30" y="310" width="170" height="80" rx="10" class="outside"/>
@@ -38,7 +38,7 @@
   <rect x="280" y="170" width="170" height="90" rx="10" class="box built"/>
   <text x="365" y="198" class="name" text-anchor="middle">friend</text>
   <text x="365" y="220" class="note" text-anchor="middle">sudo · video · render</text>
-  <text x="365" y="240" class="note" text-anchor="middle">her home, her key</text>
+  <text x="365" y="240" class="note" text-anchor="middle">their home, their key</text>
 
   <rect x="280" y="310" width="170" height="80" rx="10" class="box built"/>
   <text x="365" y="340" class="name" text-anchor="middle">arpanpathak</text>
@@ -59,5 +59,5 @@
   <text x="465" y="400" class="note" text-anchor="middle">two logins, one machine</text>
   <text x="465" y="420" class="note" text-anchor="middle">no port opens at home</text>
 
-  <text x="30" y="492" class="note">You share the Thor. Your other machines stay yours, and hers stay hers.</text>
+  <text x="30" y="492" class="note">You share the Thor. Your other machines stay yours, and theirs stay theirs.</text>
 </svg>

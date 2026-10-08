@@ -160,17 +160,17 @@ there as untracked.
 
 ### Design only: sharing the Thor with a friend
 
-- A friend wants GPU time and somewhere to host her apps, with her own domain.
+- A friend wants GPU time and somewhere to host their apps, with their own domain.
   Nothing is built; this is the design and the checklist for the afternoon it
   gets built. Chapter "Sharing is caring", three figures.
-- Decided: her own Unix user, with sudo (his call) and the `video` and `render`
+- Decided: their own Unix user, with sudo (the owner's call) and the `video` and `render`
   groups; reaching the Thor by sharing the node in Tailscale, so no port opens
-  at home; Tailscale Funnel and serve for her apps, not Cloudflare; her domain
+  at home; Tailscale Funnel and serve for their apps, not Cloudflare; their domain
   in front of a Funnel path by a forwarding page, because Funnel serves only the
   node's own `.ts.net` name and its certificate.
-- The chapter records what sudo buys her on this box (the chat's api-key file,
+- The chapter records what sudo buys a second person on this box (the chat's api-key file,
   the projects, the SSH key if it has no passphrase, the ability to stop the
-  chat services) and what stays his (the keyring, sealed with his passphrase).
+  chat services) and what stays the owner's (the keyring, sealed with the owner's passphrase).
   The SSH key is named as the one thing to settle before this starts.
 - Facts checked on the Thor: node `arpanpathak.taildb9a39.ts.net` at
   `100.84.254.65`, Tailscale 1.102.4, no operator set, Funnel 443 to
@@ -182,13 +182,13 @@ there as untracked.
   random pairs. Both belong to the whole node, so a rename moves the chat's own
   address, the `voltforge.tech` forwarding page, the Claude Code and
   openBatarangs aliases, `about.html` and the book with it.
-- Because of that the design now recommends a node of her own in front of her
-  apps instead: her Tailscale account, her Funnel, her certificates, a short
-  proxy to the Thor over the shared node. Her links carry nothing of his, and
-  nothing of his moves. A container or small VM on the Thor does the same job
+- Because of that the design now recommends a node of their own in front of their
+  apps instead: their Tailscale account, their Funnel, their certificates, a short
+  proxy to the Thor over the shared node. Their links carry no name of the owner's, and
+  none of the owner's addresses move. A container or small VM on the Thor does the same job
   without extra hardware, at the cost of a second `tailscaled` on the host.
   Figure 2 draws that route; figure 3 keeps the single-node one.
-- Still open: whether she runs that node herself or it is a container here, and
+- Still open: whether the friend runs that node or it is a container here, and
   the port range.
 
 ### Per-person keys: thor-tigress-keyring, and the registration form
