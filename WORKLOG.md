@@ -18,6 +18,48 @@ there as untracked.
 
 ## 2026-10-07
 
+### The agent's two long functions, split
+
+- Asked for readable code: composable functions, enums instead of flags,
+  exhaustive matching. Measured first. Whole workspace, clippy's own parser:
+  1125 functions, eight over 55 lines, the worst 97; one over cognitive
+  complexity 15; five pedantic nits and nothing under the repo's own gate. So
+  the agent's two offenders were the job, not a rewrite.
+- `search_loop` was 70 lines doing five things, with two six-argument calls
+  (`run_calls`) and boolean flags at the call sites (`offer_tools(fields, true)`,
+  `require_tool(fields, round == 1)`). It reads as the algorithm now: research →
+  `tool_rounds` → `ask` → `answer_rounds` → `note`.
+  - `Ending { Replied, Exhausted }` in place of bare early returns: each half
+    says what it ended with and the caller matches on it.
+  - `Phase { Opening, Searching, Answering }` in place of the two booleans.
+    `prepare` writes the tool fields with an exhaustive match, so a new phase
+    cannot be added without the compiler asking what it offers.
+  - `Research` owns the hosts a page may come from, the calls already run and the
+    ledger, with the four operations that mutate them: `run`, `run_one`,
+    `search`, `read`. That removes the six-argument call and the
+    `allowed`/`ran`/`ledger` threading through four signatures.
+  - `retract_system` is a split and a filter instead of two `replacen` calls and
+    a special case; `system_line` is the one lookup for the request's single
+    system message.
+- `fetch::read_recursive` was 70 lines at six levels. `Crawl` owns the queue, the
+  visited set, the pages and the failures, with `run`, `read` and `report`; the
+  two kinds a page can be are an exhaustive match with a helper each
+  (`html_page`, which also returns the links, and `text_page`, which has none).
+- Numbers, agent crate: production functions over 55 lines 2 → 0 (one 65-line
+  test left); coverage 94.40% regions / 97.92% → 97.98% functions / 98.20% →
+  98.31% lines; 169 tests (was 168); clippy `-D warnings` clean; `spark rs
+  crates` 83 files 0 problems. Commits `bf2b19d` and `f98241d`.
+- Deployed to the Thor (backup `thor-tigress-agent.bak-2026-10-08-refactor`) and
+  run live: the resume job search gave 4 searches, 0 pages read, 66 s, a
+  3,088-character answer with 4 links, 0 fallback lines and 0 `<tool_call` — the
+  same shape as before the refactor.
+- Still open, outside this crate: six functions over 55 lines — 97, 83 and 58 in
+  `thor-hammer-trainer` (`languages.rs`, `teacher_build.rs`, `corpus.rs`), and 89,
+  80 and one at cognitive complexity 18 in `thor-tigress-keyring/cli.rs`. The
+  five pedantic nits (two `single_match_else`, two `match_same_arms`, one
+  match-as-equality) are in `tooltext.rs`, `build.rs`, `corpus.rs` and `api.rs`;
+  none is in the repo's gate.
+
 ### The answer rounds run a call again: the text-only rule is reverted
 
 - Report: after the change below, a resume job search stopped giving job links,
