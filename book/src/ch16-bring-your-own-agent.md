@@ -80,7 +80,10 @@ engine from the model name, exactly as it does for the chat page, so a model on
 either engine can be chosen. Two shell functions switch Claude Code to the Thor
 only while they run; plain `claude` keeps using your Claude account.
 
-`thor-models` lists what the agent is serving, and `-m` picks one. On Linux
+`thor-models` lists what the agent is serving, and `-m` picks one. That list is
+only what can answer this minute: llama.cpp in router mode also lists the models
+in its preset that aren't loaded, and the agent leaves those out, because asking
+for one by name loads it — tens of gigabytes, for a minute or two. On Linux
 `~/.bashrc`, on macOS `~/.zshrc`:
 
 ```bash
@@ -89,7 +92,7 @@ cat >> ~/.bashrc <<'EOF'
 # Claude Code on the Thor through the agent on :8080. thor-models lists the
 # models; claude-thor -m MODEL picks one. claude-thor is the thinking-off one.
 THOR_URL=${THOR_URL:-http://127.0.0.1:8080}
-THOR_MODEL=${THOR_MODEL:-nemotron}
+THOR_MODEL=${THOR_MODEL:-Nemotron-3-Nano-30B-A3B-NVFP4}
 THOR_CONTEXT=${THOR_CONTEXT:-65536}
 
 thor-models() {
@@ -133,9 +136,9 @@ thor-models
 Then `claude-thor` for the default, or a model by name:
 
 ```bash
-claude-thor -m Nemotron-3-Nano-30B-A3B-NVFP4     # the Nano on TensorRT Edge-LLM
-claude-thor -m Qwen3.6-35B-A3B-NVFP4             # Qwen, also on Edge-LLM
-claude-thor -m nemotron-think                    # the Nano on llama.cpp, thinking on
+claude-thor                                       # the Nano on TensorRT Edge-LLM
+claude-thor -m Qwen3.6-35B-A3B-NVFP4              # Qwen, also on Edge-LLM
+claude-thor -m nemotron-think                     # llama.cpp; loads 35 GB first
 ```
 
 On a machine with the SSH tunnel (chapter "Local models"), `THOR_URL` stays
