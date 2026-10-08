@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 340" width="960" height="340" role="img" aria-label="A visitor reaches app.herdomain.com, which lands on her own Tailscale node running Funnel and a proxy. That node reaches the Thor over the tailnet, where her app listens on 127.0.0.1:9100. The Thor's own name does not change.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+  </defs>
+  <rect width="960" height="340" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Her name in front, the Thor behind it</text>
+
+  <rect x="30" y="120" width="170" height="80" rx="10" class="outside"/>
+  <text x="115" y="150" class="name" text-anchor="middle">visitor</text>
+  <text x="115" y="172" class="note" text-anchor="middle">app.herdomain.com</text>
+
+  <rect x="250" y="80" width="230" height="160" rx="14" class="zone"/>
+  <text x="264" y="100" class="zonelabel">her tailnet</text>
+
+  <rect x="270" y="120" width="190" height="80" rx="10" class="box built"/>
+  <text x="365" y="150" class="name" text-anchor="middle">her node</text>
+  <text x="365" y="172" class="note" text-anchor="middle">Funnel + proxy</text>
+
+  <rect x="560" y="80" width="370" height="160" rx="14" class="zone"/>
+  <text x="574" y="100" class="zonelabel">your tailnet, unchanged</text>
+
+  <rect x="580" y="120" width="330" height="80" rx="10" class="box built"/>
+  <text x="745" y="150" class="name" text-anchor="middle">Jetson AGX Thor</text>
+  <text x="745" y="172" class="note" text-anchor="middle">her app · 127.0.0.1:9100</text>
+
+  <path class="flow" d="M200,160 L248,160" marker-end="url(#arrow)"/>
+  <path class="flow" d="M460,160 L558,160" marker-end="url(#arrow)"/>
+  <text x="510" y="148" class="label" text-anchor="middle">shared node</text>
+
+  <text x="30" y="300" class="note">Her app uses the GPU here. The name on the link is hers, and your chat's address stays as it is.</text>
+</svg>

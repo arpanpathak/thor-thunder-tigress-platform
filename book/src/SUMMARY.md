@@ -21,6 +21,7 @@
 - [Bring your own domain](ch17-bring-your-own-domain.md)
 - [Security](ch10-security.md)
 - [Operations: recovery and hardening](ch18-operations.md)
+- [Sharing is caring](ch27-sharing-is-caring.md)
 - [Memory, context and slots](ch20-memory-and-context.md)
 
 # Plans

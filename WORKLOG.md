@@ -158,6 +158,39 @@ there as untracked.
   "Deep research: sub-questions, kinds, and a budget"; the README and the
   tool-loop figure follow.
 
+### Design only: sharing the Thor with a friend
+
+- A friend wants GPU time and somewhere to host her apps, with her own domain.
+  Nothing is built; this is the design and the checklist for the afternoon it
+  gets built. Chapter "Sharing is caring", three figures.
+- Decided: her own Unix user, with sudo (his call) and the `video` and `render`
+  groups; reaching the Thor by sharing the node in Tailscale, so no port opens
+  at home; Tailscale Funnel and serve for her apps, not Cloudflare; her domain
+  in front of a Funnel path by a forwarding page, because Funnel serves only the
+  node's own `.ts.net` name and its certificate.
+- The chapter records what sudo buys her on this box (the chat's api-key file,
+  the projects, the SSH key if it has no passphrase, the ability to stop the
+  chat services) and what stays his (the keyring, sealed with his passphrase).
+  The SSH key is named as the one thing to settle before this starts.
+- Facts checked on the Thor: node `arpanpathak.taildb9a39.ts.net` at
+  `100.84.254.65`, Tailscale 1.102.4, no operator set, Funnel 443 to
+  `127.0.0.1:8080`, four `--user` services, 742 GB free, one GPU.
+- The node name came up: `arpanpathak.taildb9a39.ts.net` would be in every
+  address a recruiter clicks. Chapter "Operations" already documents a rename,
+  and the machine name is free text (`tailscale set --hostname=`, or the admin
+  console), while the tailnet name can only be swapped for one of Tailscale's
+  random pairs. Both belong to the whole node, so a rename moves the chat's own
+  address, the `voltforge.tech` forwarding page, the Claude Code and
+  openBatarangs aliases, `about.html` and the book with it.
+- Because of that the design now recommends a node of her own in front of her
+  apps instead: her Tailscale account, her Funnel, her certificates, a short
+  proxy to the Thor over the shared node. Her links carry nothing of his, and
+  nothing of his moves. A container or small VM on the Thor does the same job
+  without extra hardware, at the cost of a second `tailscaled` on the host.
+  Figure 2 draws that route; figure 3 keeps the single-node one.
+- Still open: whether she runs that node herself or it is a container here, and
+  the port range.
+
 ### Per-person keys: thor-tigress-keyring, and the registration form
 
 - New crate `thor-tigress-keyring` (library and binary). One encrypted file,

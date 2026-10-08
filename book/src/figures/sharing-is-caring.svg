@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520" role="img" aria-label="Her laptop and your machines reach the Thor over the tailnet. The Thor holds two logins, friend and arpanpathak, and one GPU the two of them share.">
+  <style>
+    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
+    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
+    .note { fill: #5B6B7C; font-size: 12px; }
+    .label { fill: #1E88A8; font-size: 12px; }
+    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    .box { fill: #F4F7FA; stroke-width: 2; }
+    .built { stroke: #4E8A16; }
+    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
+    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
+    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
+    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    </marker>
+  </defs>
+  <rect width="960" height="520" fill="#FFFFFF"/>
+  <text x="30" y="36" class="title">Two people, one Thor</text>
+
+  <rect x="30" y="170" width="170" height="80" rx="10" class="outside"/>
+  <text x="115" y="200" class="name" text-anchor="middle">Her laptop</text>
+  <text x="115" y="222" class="note" text-anchor="middle">Tailscale on</text>
+
+  <rect x="30" y="310" width="170" height="80" rx="10" class="outside"/>
+  <text x="115" y="340" class="name" text-anchor="middle">Your machines</text>
+  <text x="115" y="362" class="note" text-anchor="middle">as today</text>
+
+  <rect x="230" y="70" width="470" height="400" rx="14" class="zone"/>
+  <text x="244" y="90" class="zonelabel">the tailnet</text>
+
+  <rect x="250" y="110" width="430" height="340" rx="10" class="box built"/>
+  <text x="465" y="140" class="name" text-anchor="middle">Jetson AGX Thor</text>
+
+  <rect x="280" y="170" width="170" height="90" rx="10" class="box built"/>
+  <text x="365" y="198" class="name" text-anchor="middle">friend</text>
+  <text x="365" y="220" class="note" text-anchor="middle">sudo · video · render</text>
+  <text x="365" y="240" class="note" text-anchor="middle">her home, her key</text>
+
+  <rect x="280" y="310" width="170" height="80" rx="10" class="box built"/>
+  <text x="365" y="340" class="name" text-anchor="middle">arpanpathak</text>
+  <text x="365" y="362" class="note" text-anchor="middle">your home, your keys</text>
+
+  <rect x="510" y="250" width="150" height="110" rx="10" class="box built"/>
+  <text x="585" y="282" class="name" text-anchor="middle">NVIDIA Thor</text>
+  <text x="585" y="302" class="note" text-anchor="middle">one GPU,</text>
+  <text x="585" y="320" class="note" text-anchor="middle">time-shared</text>
+
+  <path class="flow" d="M200,210 L276,210" marker-end="url(#arrow)"/>
+  <text x="238" y="200" class="label" text-anchor="middle">ssh</text>
+  <path class="flow" d="M200,350 L276,350" marker-end="url(#arrow)"/>
+  <text x="238" y="340" class="label" text-anchor="middle">ssh</text>
+  <path class="flow" d="M450,230 L506,285" marker-end="url(#arrow)"/>
+  <path class="flow" d="M450,350 L506,325" marker-end="url(#arrow)"/>
+
+  <text x="465" y="400" class="note" text-anchor="middle">two logins, one machine</text>
+  <text x="465" y="420" class="note" text-anchor="middle">no port opens at home</text>
+
+  <text x="30" y="492" class="note">You share the Thor. Your other machines stay yours, and hers stay hers.</text>
+</svg>
