@@ -371,8 +371,8 @@ conversation, so it is recorded here in full: the setup, the prompts, what came 
 |---|---|---|
 | Model | Nemotron 3 Nano 30B-A3B, Q8_0 GGUF, about 3B parameters active per token | `llama-server --model` on the Thor |
 | Sampling | temperature 1.0, top_p 1.0, top_k 40, min_p 0.05 | `GET /props`; the page sends none, so these are the model's defaults |
-| System prompt | none | the page adds one only when typed into Settings (`index.html`, line 768) |
-| History | every earlier message, including every earlier answer | `index.html`, line 767 |
+| System prompt | none | the page adds one only when typed into Settings (`chat.js`, line 632) |
+| History | every earlier message, including every earlier answer | `chat.js`, line 631 |
 | Check before display | none | the agent relays the model's text unchanged |
 
 ### The prompts

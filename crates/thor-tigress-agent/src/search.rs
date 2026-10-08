@@ -182,6 +182,28 @@ pub fn as_entry(result: &SearchResult, number: usize) -> String {
     )
 }
 
+/// The host of `url` for the page to show: the text after `://` up to the
+/// first `/`, `?`, `#` or `:`, without a user name, brackets or a leading
+/// `www.`, in lower case. Empty when `url` names no host.
+///
+/// Deliberately lenient: unlike [`crate::address::Url`], a search result may
+/// be `http`, or name a port, and the page only needs a label for it.
+#[must_use]
+pub fn domain_of(url: &str) -> String {
+    let Some((_, rest)) = url.trim().split_once("://") else {
+        return String::new();
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    let authority = authority.rsplit('@').next().unwrap_or(authority);
+    let host = match authority.strip_prefix('[') {
+        Some(bracketed) => bracketed.split(']').next().unwrap_or(bracketed),
+        None => authority.split(':').next().unwrap_or(authority),
+    };
+    host.strip_prefix("www.")
+        .unwrap_or(host)
+        .to_ascii_lowercase()
+}
+
 /// Percent-encodes `text` for a query string.
 fn encode(text: &str) -> String {
     text.bytes()
@@ -207,6 +229,21 @@ mod tests {
             encode("rust 1.99 & tokio/axum"),
             "rust+1.99+%26+tokio%2Faxum"
         );
+    }
+
+    #[test]
+    fn a_domain_is_shown_without_www_port_or_user() {
+        assert_eq!(domain_of("https://www.Example.com/jobs/1"), "example.com");
+        assert_eq!(domain_of("http://jobs.example:8080/x?y=1"), "jobs.example");
+        assert_eq!(
+            domain_of("https://user:secret@example.com/x"),
+            "example.com"
+        );
+        assert_eq!(domain_of("https://[::1]:443/x"), "::1");
+        assert_eq!(domain_of("https://r"), "r");
+        assert_eq!(domain_of(" https://example.com "), "example.com");
+        assert_eq!(domain_of("example.com/jobs"), "");
+        assert_eq!(domain_of(""), "");
     }
 
     #[test]

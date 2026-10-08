@@ -316,8 +316,12 @@ enum ThorEvent<'a> {
         query: &'a str,
         results: Vec<Source<'a>>,
     },
-    /// A page was read: its address and title.
-    Read { url: &'a str, title: &'a str },
+    /// A page was read: its address, its title, and the host to show.
+    Read {
+        url: &'a str,
+        title: &'a str,
+        domain: String,
+    },
     /// Something failed after the stream started.
     Error(String),
 }
@@ -326,6 +330,9 @@ enum ThorEvent<'a> {
 struct Source<'a> {
     title: &'a str,
     url: &'a str,
+    domain: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    published: Option<&'a str>,
 }
 
 /// Answers one chat request on `client`.
@@ -839,6 +846,7 @@ impl Research {
             let event = ThorEvent::Read {
                 url: &page.url,
                 title: &page.title,
+                domain: search::domain_of(&page.url),
             };
             send_thor(client, &event)?;
         }
@@ -884,6 +892,8 @@ fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
         .map(|result| Source {
             title: &result.title,
             url: &result.url,
+            domain: search::domain_of(&result.url),
+            published: result.published.as_deref(),
         })
         .collect()
 }

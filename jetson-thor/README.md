@@ -121,8 +121,9 @@ ssh thor 'bash -lc "cd ~/Projects/edgechat && cargo install --path ."'
 
 ## Thor Tigress Cub: chat in the browser
 
-`web/` holds the chat page (`index.html`, one file with the cub art inline, no
-outside scripts) and the art (`cub.svg`). `model-serving/thor-tigress-serve`
+`web/` holds the chat page (`index.html` with the cub art inline, `chat.css` for
+the theme, and `chat.js` for the markdown, links and tables; no outside scripts)
+and the art (`cub.svg`). `model-serving/thor-tigress-serve`
 serves the models and the page. `thor-tigress-serve install`
 creates two user services that start at boot: `thor-chat` (llama.cpp's
 `llama-server` with Nemotron on `127.0.0.1:8079`) and `thor-tigress-agent`

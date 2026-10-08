@@ -106,8 +106,8 @@ and macOS.
 | invited people's browsers | key and history are stored per address | they paste the key again on the new address |
 | git history of the platform repository | 7 commits | cannot be removed; harmless once the old name is dead |
 
-`jetson-thor/web/index.html` (the chat itself) uses relative paths and never
-contains the name, so the chat needs no change.
+`jetson-thor/web/index.html`, `chat.css` and `chat.js` (the chat itself) use
+relative paths and never contain the name, so the chat needs no change.
 
 ## Boot: what starts, in what order
 

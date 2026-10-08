@@ -537,7 +537,7 @@ fn searches_then_answers() -> Outcome {
     assert!(seen[1].contains(r#""role":"tool""#) && seen[1].contains("[1] Rust"));
     let sent = events(&client);
     assert_eq!(sent.first(), Some(&call));
-    assert!(sent.contains(&r#"{"thor":{"search":{"query":"rust","results":[{"title":"Rust","url":"https://r"}]}}}"#.to_string()));
+    assert!(sent.contains(&r#"{"thor":{"search":{"query":"rust","results":[{"domain":"r","title":"Rust","url":"https://r"}]}}}"#.to_string()), "{sent:?}");
     assert_eq!(sent.last().map(String::as_str), Some(DONE));
     Ok(())
 }
@@ -934,7 +934,7 @@ fn searches_then_answers_with_a_forced_first_round_and_recency() -> Outcome {
     assert!(search.requests()?[0].contains("time_range=day"));
     let sent = events(&client);
     assert_eq!(sent.first(), Some(&call));
-    assert!(sent.contains(&r#"{"thor":{"search":{"query":"rust","results":[{"title":"Rust","url":"https://r"}]}}}"#.to_string()));
+    assert!(sent.contains(&r#"{"thor":{"search":{"query":"rust","results":[{"domain":"r","published":"2026-10-06","title":"Rust","url":"https://r"}]}}}"#.to_string()), "{sent:?}");
     assert_eq!(sent.last().map(String::as_str), Some(DONE));
     Ok(())
 }
@@ -967,7 +967,7 @@ fn reads_a_cited_page_with_the_fetch_tool() -> Outcome {
     let sent = events(&client);
     assert!(
         sent.contains(
-            &json!({ "thor": { "read": { "url": "https://docs.example/guide", "title": "Guide" } } })
+            &json!({ "thor": { "read": { "url": "https://docs.example/guide", "title": "Guide", "domain": "docs.example" } } })
                 .to_string()
         ),
         "{sent:?}"

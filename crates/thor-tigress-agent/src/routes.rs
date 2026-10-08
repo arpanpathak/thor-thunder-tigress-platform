@@ -31,10 +31,18 @@ const PAGE: StaticFile = StaticFile {
 };
 
 /// The other files in the web folder that may be served; nothing else is.
-const FILES: [StaticFile; 3] = [
+const FILES: [StaticFile; 5] = [
     StaticFile {
         name: "about.html",
         content_type: ContentType::Html,
+    },
+    StaticFile {
+        name: "chat.css",
+        content_type: ContentType::Css,
+    },
+    StaticFile {
+        name: "chat.js",
+        content_type: ContentType::JavaScript,
     },
     StaticFile {
         name: "cub.svg",
@@ -198,6 +206,8 @@ mod tests {
             ("POST", "/v1/messages/count_tokens", Route::CountTokens),
             ("POST", "/request", Route::Request),
             ("GET", "/about.html", file("about.html")),
+            ("GET", "/chat.css", file("chat.css")),
+            ("GET", "/thor-tigress-cub/chat.js", file("chat.js")),
             ("GET", "/thor-tigress-cub/cub.svg", file("cub.svg")),
             ("GET", "/cub.png", file("cub.png")),
             ("POST", "/health", Route::NotFound),

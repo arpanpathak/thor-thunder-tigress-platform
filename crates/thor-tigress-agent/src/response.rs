@@ -49,6 +49,10 @@ pub enum ContentType {
     Text,
     /// The chat page and the About page.
     Html,
+    /// The chat page's stylesheet.
+    Css,
+    /// The chat page's script.
+    JavaScript,
     /// The cub as a drawing.
     Svg,
     /// The cub as a picture, for link previews.
@@ -74,6 +78,8 @@ impl ContentType {
             ContentType::Json => "application/json",
             ContentType::Text => "text/plain",
             ContentType::Html => "text/html; charset=utf-8",
+            ContentType::Css => "text/css; charset=utf-8",
+            ContentType::JavaScript => "text/javascript; charset=utf-8",
             ContentType::Svg => "image/svg+xml",
             ContentType::Png => "image/png",
         }
@@ -213,6 +219,8 @@ mod tests {
             ContentType::Json,
             ContentType::Text,
             ContentType::Html,
+            ContentType::Css,
+            ContentType::JavaScript,
             ContentType::Svg,
             ContentType::Png,
         ]
@@ -234,6 +242,8 @@ mod tests {
                 "application/json",
                 "text/plain",
                 "text/html; charset=utf-8",
+                "text/css; charset=utf-8",
+                "text/javascript; charset=utf-8",
                 "image/svg+xml",
                 "image/png"
             ]

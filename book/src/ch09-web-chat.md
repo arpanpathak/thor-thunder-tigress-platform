@@ -180,7 +180,9 @@ nowhere else. Another browser or device starts empty.
 
 | Part | Where | What it does |
 |---|---|---|
-| `jetson-thor/web/index.html` | this repository | the whole page: markup, styles, the cub, the script; no build step |
+| `jetson-thor/web/index.html` | this repository | the page's markup and the cub; no build step |
+| `jetson-thor/web/chat.css` | this repository | one style block per theme, plus the table and source cards |
+| `jetson-thor/web/chat.js` | this repository | the page's script: markdown, clickable links, tables, the model stream |
 | `thor-tigress-agent` | `crates/thor-tigress-agent` | serves the page, checks the key, runs the web-search loop, passes `/v1/*` to llama-server |
 | `llama-server` | `~/.local/src/llama.cpp` on the Thor | router mode: Nemotron 3 Nano 30B-A3B Q8_0, four replies at a time, 1M tokens each; more models can be added (chapter "Model serving") |
 | SearXNG | `~/.local/src/searxng`, user service `searxng` | meta search engine with JSON output |
@@ -195,7 +197,7 @@ connection:
 | Request | Answer |
 |---|---|
 | `GET /`, `/thor-tigress-cub/` | the page (no key needed) |
-| `GET /about.html`, `/cub.svg`, `/cub.png` | the About page and the art; a fixed list, nothing else in the folder is served |
+| `GET /about.html`, `/chat.css`, `/chat.js`, `/cub.svg`, `/cub.png` | the About page, the page's own styles and script, and the art; a fixed list, nothing else in the folder is served |
 | `GET /health` | `{"status":"ok"}` (no key needed) |
 | `GET /v1/models` | the served models: llama-server's, plus each engine's given with `--engine` |
 | `POST /v1/chat/completions` | streamed through; with `thor_web_search: true`, the search loop; without `stream: true`, plain JSON |
@@ -303,9 +305,9 @@ approved again.
 ## Change the page or the server
 
 The page is read from disk on every request, so editing
-`jetson-thor/web/index.html` in your clone is enough: `thor-sync` copies it to
-the Thor and the next page load has it. No restart. (Editing it on the Thor
-directly works too.)
+`jetson-thor/web/index.html`, `chat.css` or `chat.js` in your clone is enough:
+`thor-sync` copies them to the Thor and the next page load has them. No
+restart. (Editing them on the Thor directly works too.)
 
 A change to `thor-tigress-agent` needs a build and a restart. A restart cuts
 off any reply being written, so wait until none is:

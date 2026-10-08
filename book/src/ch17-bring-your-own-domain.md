@@ -181,6 +181,7 @@ Thor keep working whatever path they carry:
 |---|---|
 | `/`, `/thor-tigress-cub`, `/thor-tigress-cub/` | the chat |
 | `/about.html` (also under `/thor-tigress-cub/`) | the About page |
+| `/chat.css`, `/chat.js` | the page's own styles and script |
 | `/cub.svg`, `/cub.png` | the art; the PNG is the preview when the link is shared |
 | `/health` | `{"status":"ok"}` |
 | anything else outside `/v1/` | `404`; only these files are served, never the rest of the folder |
