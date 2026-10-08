@@ -126,9 +126,10 @@ function highlight(code, lang) {
 
 // ---- inline markdown: code, emphasis and links, all built from DOM nodes ----
 // The pattern matches, in order, a code span, bold, italic, a markdown link,
-// an <autolink> and a bare address. A bare address matters most in job
-// answers, where the model writes the posting's URL as plain text.
-const INLINE = /`(?<code>[^`\n]+)`|\*\*(?<bold>[^*\n]+)\*\*|\*(?<italic>[^*\n]+)\*|(?<!\w)_(?<under>[^_\n]+)_(?!\w)|\[(?<text>[^\]\n]+)\]\((?<href>https?:\/\/[^)\s]+)\)|<(?<auto>https?:\/\/[^>\s]+)>|(?<bare>(?:https?:\/\/|www\.)[^\s<>"'`]+)/g;
+// an <autolink>, a bare address, and a <br> the model writes to break a line
+// inside a table cell. A bare address matters most in job answers, where the
+// model writes the posting's URL as plain text.
+const INLINE = /`(?<code>[^`\n]+)`|\*\*(?<bold>[^*\n]+)\*\*|\*(?<italic>[^*\n]+)\*|(?<!\w)_(?<under>[^_\n]+)_(?!\w)|\[(?<text>[^\]\n]+)\]\((?<href>https?:\/\/[^)\s]+)\)|<(?<auto>https?:\/\/[^>\s]+)>|(?<bare>(?:https?:\/\/|www\.)[^\s<>"'`]+)|(?<br><\/?[bB][rR]\s*\/?>)/g;
 
 // Whether a run of text has more closing than opening parentheses, so a URL
 // that ends inside `(see …)` loses the sentence's bracket and not its own.
@@ -180,6 +181,7 @@ function inline(parent, text, insideLink = false) {
     else if (groups.bold !== undefined) parent.append(emphasis("strong", groups.bold, insideLink));
     else if (groups.italic !== undefined) parent.append(emphasis("em", groups.italic, insideLink));
     else if (groups.under !== undefined) parent.append(emphasis("em", groups.under, insideLink));
+    else if (groups.br !== undefined) parent.append(element("br"));
     else if (groups.text !== undefined) {
       const link = externalLink("", groups.href);
       inline(link, groups.text, true);

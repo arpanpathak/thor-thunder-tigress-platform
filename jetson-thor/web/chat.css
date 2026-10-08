@@ -203,9 +203,10 @@
                 background: var(--panel); -webkit-overflow-scrolling: touch; }
   .body table { border-collapse: collapse; width: 100%; font-size: 14px; }
   .body th, .body td { padding: 8px 13px; text-align: left; vertical-align: top;
-                       border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+                       border-bottom: 1px solid var(--border); overflow-wrap: break-word; }
   .body th + th, .body td + td { border-left: 1px solid var(--border); }
-  .body thead th { background: var(--bar); color: var(--text); font-weight: 600; }
+  .body td a { overflow-wrap: anywhere; }
+  .body thead th { background: var(--bar); color: var(--text); font-weight: 600; white-space: nowrap; }
   .body tbody tr:last-child td { border-bottom: 0; }
   .body tbody tr:nth-child(even) { background: color-mix(in srgb, var(--bar) 40%, transparent); }
   .body tbody tr:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
