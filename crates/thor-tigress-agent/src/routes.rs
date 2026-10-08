@@ -136,9 +136,12 @@ pub fn answer(client: &mut dyn Write, request: &Request, config: &Config) -> Out
         Route::Health => response::respond(client, Status::Ok, ContentType::Json, HEALTHY),
         Route::Models => models::list(client, upstreams),
         Route::ChatCompletions => chat::answer(client, &request.body, upstreams),
-        Route::Messages => {
-            messages::forward(client, &request.body, upstreams.serving_body(&request.body))
-        }
+        Route::Messages => messages::forward(
+            client,
+            &request.body,
+            upstreams.serving_body(&request.body),
+            upstreams.serves_engine_body(&request.body),
+        ),
         Route::CountTokens => upstreams
             .serving_body(&request.body)
             .post(paths::COUNT_TOKENS, &request.body)?

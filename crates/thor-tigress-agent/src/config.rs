@@ -102,13 +102,26 @@ impl Upstreams {
     /// The server for the model a JSON request `body` names.
     #[must_use]
     pub fn serving_body(&self, body: &[u8]) -> &Endpoint {
-        #[derive(Deserialize)]
-        struct Named {
-            model: Option<String>,
-        }
-        let named: Option<Named> = serde_json::from_slice(body).ok();
-        self.serving(named.and_then(|named| named.model).as_deref())
+        self.serving(named(body).as_deref())
     }
+
+    /// Whether one of the other engines serves the model a JSON request `body`
+    /// names, rather than llama-server. An engine is stricter about the body, so
+    /// the request is rewritten before it is sent there.
+    #[must_use]
+    pub fn serves_engine_body(&self, body: &[u8]) -> bool {
+        self.serves_engine(named(body).as_deref())
+    }
+}
+
+/// The model a JSON request `body` names, when it names one.
+fn named(body: &[u8]) -> Option<String> {
+    #[derive(Deserialize)]
+    struct Named {
+        model: Option<String>,
+    }
+    let named: Option<Named> = serde_json::from_slice(body).ok();
+    named.and_then(|named| named.model)
 }
 
 /// The people whose personal keys the chat accepts, read from the encrypted

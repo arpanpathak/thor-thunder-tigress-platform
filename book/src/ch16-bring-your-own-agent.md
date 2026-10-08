@@ -74,37 +74,95 @@ Nano, and the full id from `/v1/models` works too. Another model loaded with
 
 ## Claude Code
 
-Claude Code speaks the Anthropic API, which llama-server also serves. Two
-commands switch it to the Thor only while they run; plain `claude` keeps using
-your Claude account.
+Claude Code speaks the Anthropic API, and both servers answer it: llama-server
+and TensorRT Edge-LLM each serve `/v1/messages`. The agent on `:8080` picks the
+engine from the model name, exactly as it does for the chat page, so a model on
+either engine can be chosen. Two shell functions switch Claude Code to the Thor
+only while they run; plain `claude` keeps using your Claude account.
 
-Through the public address, on any machine (`~/.zshrc` on macOS,
-`~/.bashrc` on Linux):
+`thor-models` lists what the agent is serving, and `-m` picks one. On Linux
+`~/.bashrc`, on macOS `~/.zshrc`:
 
 ```bash
-THOR_CC='CLAUDE_CONFIG_DIR=$HOME/.claude-thor ANTHROPIC_BASE_URL=https://arpanpathak.taildb9a39.ts.net ANTHROPIC_AUTH_TOKEN=$(cat ~/.config/thor-chat/api-key) ANTHROPIC_MODEL=nemotron ANTHROPIC_DEFAULT_OPUS_MODEL=nemotron ANTHROPIC_DEFAULT_SONNET_MODEL=nemotron ANTHROPIC_DEFAULT_HAIKU_MODEL=nemotron CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000'
-echo "alias claude-thor='MAX_THINKING_TOKENS=0 $THOR_CC claude'" >> ~/.zshrc
-echo "alias claude-thor-think='$THOR_CC claude'" >> ~/.zshrc
-source ~/.zshrc
+cat >> ~/.bashrc <<'EOF'
+
+# Claude Code on the Thor through the agent on :8080. thor-models lists the
+# models; claude-thor -m MODEL picks one. claude-thor is the thinking-off one.
+THOR_URL=${THOR_URL:-http://127.0.0.1:8080}
+THOR_MODEL=${THOR_MODEL:-nemotron}
+THOR_CONTEXT=${THOR_CONTEXT:-65536}
+
+thor-models() {
+  local key out
+  key=$(cat ~/.config/thor-chat/api-key 2>/dev/null)
+  if ! out=$(curl -sf -m 15 -H "Authorization: Bearer $key" "$THOR_URL/v1/models" 2>/dev/null); then
+    echo "cannot reach $THOR_URL" >&2
+    echo "  start the tunnel:  ssh -L 8080:localhost:8080 thor" >&2
+    echo "  or a public url:   export THOR_URL=https://arpanpathak.taildb9a39.ts.net" >&2
+    return 1
+  fi
+  printf '%s' "$out" | python3 -c 'import json,sys
+for m in json.load(sys.stdin)["data"]:
+    print("  %-42s %s" % (m["id"], m.get("owned_by", "")))'
+}
+
+_claude_thor() {
+  local model="$THOR_MODEL"
+  case "${1:-}" in
+    -m|--model) model="$2"; shift 2 ;;
+    --model=*)  model="${1#--model=}"; shift ;;
+  esac
+  CLAUDE_CONFIG_DIR="$HOME/.claude-thor" \
+  ANTHROPIC_BASE_URL="$THOR_URL" \
+  ANTHROPIC_AUTH_TOKEN="$(cat ~/.config/thor-chat/api-key)" \
+  ANTHROPIC_MODEL="$model" \
+  ANTHROPIC_DEFAULT_OPUS_MODEL="$model" \
+  ANTHROPIC_DEFAULT_SONNET_MODEL="$model" \
+  ANTHROPIC_DEFAULT_HAIKU_MODEL="$model" \
+  CLAUDE_CODE_MAX_CONTEXT_TOKENS="$THOR_CONTEXT" \
+  claude "$@"
+}
+
+claude-thor()       { ( MAX_THINKING_TOKENS=0; _claude_thor "$@" ); }
+claude-thor-think() { _claude_thor "$@"; }
+EOF
+source ~/.bashrc
+thor-models
 ```
 
-On a machine with the SSH tunnel (chapter "Local models"), the same aliases
-can use `ANTHROPIC_BASE_URL=http://127.0.0.1:8080` and skip the public hop.
-It must be 8080, not 8079: only `thor-tigress-agent` translates the thinking
-setting.
+Then `claude-thor` for the default, or a model by name:
+
+```bash
+claude-thor -m Nemotron-3-Nano-30B-A3B-NVFP4     # the Nano on TensorRT Edge-LLM
+claude-thor -m Qwen3.6-35B-A3B-NVFP4             # Qwen, also on Edge-LLM
+claude-thor -m nemotron-think                    # the Nano on llama.cpp, thinking on
+```
+
+On a machine with the SSH tunnel (chapter "Local models"), `THOR_URL` stays
+`http://127.0.0.1:8080` and skips the public hop. It must be 8080, not 8079:
+only `thor-tigress-agent` turns Claude Code's `thinking` field into the chat
+template setting, and only the agent knows which engine serves which model.
 
 | Variable | Why |
 |---|---|
 | `CLAUDE_CONFIG_DIR=$HOME/.claude-thor` | its own settings, history and memory; without it both commands share `~/.claude`, so a setting changed in one applies to the other and `/resume` lists both |
 | `ANTHROPIC_AUTH_TOKEN` | the key, sent as `Authorization: Bearer` |
-| `ANTHROPIC_*_MODEL=nemotron` | every model slot goes to the Nano; other names are refused |
-| `CLAUDE_CODE_MAX_CONTEXT_TOKENS` | the real window; Claude Code assumes 200K for a model it doesn't know |
+| `ANTHROPIC_*_MODEL` | the model `-m` chose; every slot goes to it, and any name the agent serves is accepted |
+| `CLAUDE_CODE_MAX_CONTEXT_TOKENS` | the real window; Claude Code assumes 200K for a model it doesn't know, and only compacts when it thinks it is near the limit |
 | `MAX_THINKING_TOKENS=0` | Claude Code then sends no `thinking` field, so the Thor turns thinking off |
+| `THOR_URL` | the agent: `:8080` through the tunnel, else the public address |
+| `THOR_CONTEXT` | `65536` for a model on an engine, whose input length is half its `EDGE_CONTEXT`; `131072` for llama.cpp, whose `CONTEXT` is the per-reply window |
 
-The first run in `~/.claude-thor` shows the welcome screen and asks about
-folder trust again; it doesn't ask you to log in. Two warnings are expected:
-claude.ai connectors are off, and `nemotron` is not in Claude Code's model
-list.
+One limit is worth knowing before it bites. An engine refuses a request longer
+than its `--max-input-len` with `413 EDGELLM_INPUT_TOO_LONG`, and Claude Code's
+own system prompt and tool list are about 19,000 tokens before you type
+anything. So an engine has to be built with more room than that: `EDGE_CONTEXT`
+of at least `65536`, which is 32,768 tokens of input. llama.cpp has no such
+wall; its context is the model's own, cut by `CONTEXT` per reply.
+
+Two warnings are expected on the first run in `~/.claude-thor`: claude.ai
+connectors are off, and the model name is not in Claude Code's own list. Neither
+changes what works.
 
 Measured on 2026-10-05 (Claude Code 2.1.290, from a Jetson Orin NX on Linux
 through the public address, same prompt: "create a cargo project named dsa with a stack module
