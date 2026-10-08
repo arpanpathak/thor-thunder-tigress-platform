@@ -97,6 +97,17 @@ time: the reasoning is generated at the same ~53 tokens/s as the answer, so
 answer. For quick questions, leave it off. The switch is remembered in your
 browser.
 
+A hard question can send it further: the model spends the whole reply inside the
+think block and writes no answer at all. So Think sends a thinking budget with
+every request — 1,024 tokens by default, and the line *"Enough thinking. Write
+the final answer now."* is put in front of the end-of-thinking tag when the
+budget runs out. The model then answers with whatever room is left, and the
+reasoning it did write is still in the "thought" fold. The budget is a field in
+settings (⚙), in tokens; clear it for no limit. If a reply ever does end with
+thinking and no answer, the page opens the reasoning and says so instead of
+showing an empty bubble, and the line under the reply names the stop reason
+(`stopped at the token limit`).
+
 ### Web
 
 With **Web** on, the server gives the model two tools. The first round requires
@@ -161,6 +172,7 @@ header opens it.
 | Access key | sent as `Authorization: Bearer <key>` with every request |
 | System prompt | sent first in every conversation; empty sends none |
 | Temperature | empty uses the model's default |
+| Think budget | tokens of reasoning allowed before the model is told to answer; 1,024 by default, empty for no limit |
 
 Conversations, settings and the key live in your browser's local storage,
 nowhere else. Another browser or device starts empty.

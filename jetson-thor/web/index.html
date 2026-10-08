@@ -233,6 +233,7 @@
                            margin-top: 6px; max-height: 320px; overflow-y: auto; }
   .stats { margin-top: 8px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .error { color: var(--danger); font-size: 14px; }
+  .blank { color: var(--muted); font-size: 14px; }
   .cursor::after { content: "▍"; color: var(--muted); animation: blink 1s steps(2) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
 
@@ -421,6 +422,8 @@
     <textarea id="system"></textarea>
     <label for="temperature">Temperature (empty: the model's default)</label>
     <input id="temperature" type="number" step="0.1" min="0" max="2">
+    <label for="thinkbudget">Think budget, tokens (empty: no limit)</label>
+    <input id="thinkbudget" type="number" step="128" min="0">
     <div class="row"><button value="cancel">Cancel</button><button id="save" value="save">Save</button></div>
   </form>
 </dialog>
@@ -428,12 +431,18 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const API = "/";
+// Thinking runs away on a hard question: the model can spend the whole reply
+// inside the think block and never write an answer. The budget stops it there
+// and this line is injected before the end-of-thinking tag, so it answers.
+const THINK_STOP = "Enough thinking. Write the final answer now.";
+const DEFAULT_THINK_BUDGET = 1024;
 const store = {
   get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
 };
 
-let settings = store.get("settings", { key: "", system: "", temperature: "" });
+let settings = store.get("settings", { key: "", system: "", temperature: "", thinkbudget: String(DEFAULT_THINK_BUDGET) });
+if (settings.thinkbudget === undefined) settings.thinkbudget = String(DEFAULT_THINK_BUDGET);
 let messages = store.get("messages", []);
 let modelName = "";
 let models = [];
@@ -684,6 +693,8 @@ function renderMessage(message) {
     }
     if (message.reasoning) {
       const details = element("details", "thinking");
+      const blank = !message.streaming && !(message.content || "").trim();
+      if (blank) details.open = true;
       details.append(element("summary", "", message.thinkingDone ? "thought" : "thinking…"), element("div", "text", message.reasoning));
       body.append(part("thinking", details));
     }
@@ -698,6 +709,10 @@ function renderMessage(message) {
       body.append(part("content", content));
     }
     if (message.error) body.append(part("error", element("div", "error", message.error)));
+    else if (!message.streaming && !(message.content || "").trim() && (message.reasoning || "").trim()) {
+      const why = message.finish === "length" ? " It stopped at the token limit while it was still thinking." : "";
+      body.append(part("blank", element("div", "blank", `The model thought but wrote no answer.${why} Its thinking is open above. Turn Think off, or set a smaller think budget in settings (⚙).`)));
+    }
     if (message.stats) body.append(part("stats", element("div", "stats", message.stats)));
   }
   wrap.append(body);
@@ -892,9 +907,15 @@ async function send(text) {
 
   const history = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content)).map(({ role, content }) => ({ role, content }));
   if (settings.system.trim()) history.unshift({ role: "system", content: settings.system.trim() });
+  const thinking = $("think").checked;
   const body = { model: chosenModel(), messages: history, stream: true, stream_options: { include_usage: true },
-    chat_template_kwargs: { enable_thinking: $("think").checked }, thor_web_search: $("web").checked };
+    chat_template_kwargs: { enable_thinking: thinking }, thor_web_search: $("web").checked };
   if (settings.temperature !== "" && !Number.isNaN(Number(settings.temperature))) body.temperature = Number(settings.temperature);
+  const budget = Number(settings.thinkbudget);
+  if (thinking && settings.thinkbudget !== "" && Number.isInteger(budget) && budget >= 0) {
+    body.reasoning_budget_tokens = budget;
+    body.reasoning_budget_message = THINK_STOP;
+  }
 
   controller = new AbortController();
   const started = performance.now();
@@ -928,20 +949,22 @@ async function send(text) {
           if (chunk.thor.error) reply.error = chunk.thor.error;
           continue;
         }
-        const delta = chunk.choices && chunk.choices[0] && chunk.choices[0].delta || {};
+        const choice = chunk.choices && chunk.choices[0];
+        const delta = (choice && choice.delta) || {};
         if (delta.content || delta.reasoning_content) {
           lastToken = performance.now();
           if (!firstToken) firstToken = lastToken;
         }
         if (delta.reasoning_content) reply.reasoning += delta.reasoning_content;
         if (delta.content) { reply.content += delta.content; reply.thinkingDone = true; }
+        if (choice && choice.finish_reason) reply.finish = choice.finish_reason;
         if (chunk.timings) timings = chunk.timings;
         if (chunk.usage) usage = chunk.usage;
       }
       if (!frame) frame = requestAnimationFrame(() => { frame = 0; updateLast(); });
     }
     reply.thinkingDone = true;
-    reply.stats = statsLine({ timings, usage, started, firstToken, lastToken });
+    reply.stats = statsLine({ timings, usage, started, firstToken, lastToken, finish: reply.finish });
   } catch (error) {
     if (error.name === "AbortError") reply.stats = "stopped";
     else reply.error = error.message;
@@ -956,12 +979,13 @@ async function send(text) {
 
 // llama-server reports its own timings; other engines report only usage, so
 // their speed is measured here, from the first token to the last.
-function statsLine({ timings, usage, started, firstToken, lastToken }) {
+function statsLine({ timings, usage, started, firstToken, lastToken, finish }) {
   const seconds = (ms) => `${(ms / 1000).toFixed(1)}s`;
   const total = seconds(performance.now() - started);
+  const stop = finish && finish !== "stop" ? [finish === "length" ? "stopped at the token limit" : finish] : [];
   if (timings) {
     return [`${timings.predicted_n} tokens`, `${timings.predicted_per_second.toFixed(1)} tok/s`,
-      `first token ${seconds(timings.prompt_ms)}`, total].join(" · ");
+      `first token ${seconds(timings.prompt_ms)}`, total, ...stop].join(" · ");
   }
   const parts = [];
   if (usage) {
@@ -970,7 +994,7 @@ function statsLine({ timings, usage, started, firstToken, lastToken }) {
     if (streaming > 0 && usage.completion_tokens > 1) parts.push(`${((usage.completion_tokens - 1) / streaming).toFixed(1)} tok/s`);
   }
   if (firstToken) parts.push(`first token ${seconds(firstToken - started)}`);
-  return [...parts, total].join(" · ");
+  return [...parts, total, ...stop].join(" · ");
 }
 
 function setBusy(busy) {
@@ -1012,11 +1036,12 @@ $("think").addEventListener("change", () => store.set("think", $("think").checke
 
 $("open-settings").addEventListener("click", () => {
   $("key").value = settings.key; $("system").value = settings.system; $("temperature").value = settings.temperature;
+  $("thinkbudget").value = settings.thinkbudget;
   $("settings").showModal();
 });
 $("settings").addEventListener("close", () => {
   if ($("settings").returnValue !== "save") return;
-  settings = { key: $("key").value.trim(), system: $("system").value, temperature: $("temperature").value };
+  settings = { key: $("key").value.trim(), system: $("system").value, temperature: $("temperature").value, thinkbudget: $("thinkbudget").value.trim() };
   store.set("settings", settings);
   connect();
 });

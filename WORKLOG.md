@@ -18,6 +18,38 @@ there as untracked.
 
 ## 2026-10-07
 
+### Think: a budget for the overthinking, and no more empty bubble
+
+- Report from a live chat: with Think on, a hard question made the model
+  overthink and end with no answer at all. Cause, measured: nothing bounds
+  thinking. llama.cpp's `reasoning_budget_tokens` defaults to `-1`, its
+  `n_predict` defaults to `-1`, and the page sent no `max_tokens`, so a model
+  that will not leave the think block is bounded only by the 4M-token slot.
+  On the Thor, Nemotron, thinking on, "lock-free MPSC queue in safe Rust",
+  `max_tokens` 2048: `finish_reason: length` after exactly 2,048 completion
+  tokens, the answer cut off mid-sentence, 4,780 characters of reasoning before
+  the first word of it. The reply the report showed was also exactly 2,048
+  tokens; no cap exists in the page or the agent, so that number is the model
+  stopping on its own after 2,048 tokens of thinking. Either way, unbounded.
+- Fix, in the chat page. Think now sends `reasoning_budget_tokens` and
+  `reasoning_budget_message`, the line llama.cpp puts in front of
+  the end-of-thinking tag when the budget runs out. The budget is a settings
+  field, 1,024 tokens by default, empty for no limit. Measured through the agent
+  on the prompt above: budget 256 stops the reasoning at 1,172 characters, the
+  injected line arrives, and 15,661 characters of answer follow.
+- The page no longer shows an empty bubble when a reply is all thinking: the
+  reasoning opens by itself and a line says the model thought but wrote nothing,
+  naming the stop reason when it was the token limit. The stats line under a
+  reply now carries `stopped at the token limit` instead of hiding
+  `finish_reason`.
+- Not fixed, and not fixable from the page: the same session had the model invent
+  compiler errors — it said `.iter().filter(|x| x % 2 == 0)` does not compile and
+  printed a rustc error that rustc does not have. That is the model lying, which
+  is what Stages 2 and 3 are for. `spark` reads Rust source, and a false sentence
+  in prose is not Rust source. The immediate things that exist: the model picker
+  (Qwen3.6-35B-A3B-NVFP4 is served on `127.0.0.1:8081`) and the system prompt
+  field.
+
 ### SearXNG: the engines behind the search were off, not blocked
 
 - The loop fix below ended in a written answer that said it found nothing, and it
