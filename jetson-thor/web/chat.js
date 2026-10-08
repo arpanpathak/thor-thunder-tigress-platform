@@ -1,15 +1,18 @@
 const $ = (id) => document.getElementById(id);
 const API = "/";
-// A round may not generate without bound. Thinking can run away on a hard
-// question, and a model can fall into a repeat loop; a token limit stops the
-// engine, and the agent cuts the stream at its own cap as a second floor.
+// A round may not generate without bound, and thinking must not go on forever.
+// The think budget makes the engine force its own end-of-thinking tag, so the
+// model answers; max_tokens bounds the round, and the agent cuts the stream as
+// a last floor.
 const MAX_ANSWER_TOKENS = 8192;
+const DEFAULT_THINK_BUDGET = 1024;
 const store = {
   get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
 };
 
-let settings = store.get("settings", { key: "", system: "", temperature: "" });
+let settings = store.get("settings", { key: "", system: "", temperature: "", thinkbudget: String(DEFAULT_THINK_BUDGET) });
+if (settings.thinkbudget === undefined) settings.thinkbudget = String(DEFAULT_THINK_BUDGET);
 let messages = store.get("messages", []);
 let modelName = "";
 let models = [];
@@ -624,8 +627,11 @@ $("model").addEventListener("change", () => {
   render();
 });
 
-// The one place a request is built. `max_tokens` bounds every round, so the
-// engine stops a model that would otherwise generate until its context fills.
+// The one place a request is built. `max_tokens` bounds every round; when
+// thinking is on, the budget makes the engine force its own end-of-thinking
+// tag, so an overlong think ends with an answer. The message is empty on
+// purpose: a sentence there is injected into the model's own text, and the
+// model then answers the sentence instead of the question.
 function chatRequest(history, thinking) {
   const body = {
     model: chosenModel(), messages: history, stream: true,
@@ -636,6 +642,11 @@ function chatRequest(history, thinking) {
   };
   if (settings.temperature !== "" && !Number.isNaN(Number(settings.temperature))) {
     body.temperature = Number(settings.temperature);
+  }
+  const budget = Number(settings.thinkbudget);
+  if (thinking && settings.thinkbudget !== "" && Number.isInteger(budget) && budget >= 0) {
+    body.reasoning_budget_tokens = budget;
+    body.reasoning_budget_message = "";
   }
   return body;
 }
@@ -771,11 +782,12 @@ $("think").addEventListener("change", () => store.set("think", $("think").checke
 
 $("open-settings").addEventListener("click", () => {
   $("key").value = settings.key; $("system").value = settings.system; $("temperature").value = settings.temperature;
+  $("thinkbudget").value = settings.thinkbudget;
   $("settings").showModal();
 });
 $("settings").addEventListener("close", () => {
   if ($("settings").returnValue !== "save") return;
-  settings = { key: $("key").value.trim(), system: $("system").value, temperature: $("temperature").value };
+  settings = { key: $("key").value.trim(), system: $("system").value, temperature: $("temperature").value, thinkbudget: $("thinkbudget").value.trim() };
   store.set("settings", settings);
   connect();
 });
