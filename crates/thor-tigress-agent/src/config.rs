@@ -74,14 +74,29 @@ pub struct Engine {
 }
 
 impl Upstreams {
+    /// The engine serving `model`, when one of the other engines serves it.
+    #[must_use]
+    fn engine_for(&self, model: Option<&str>) -> Option<&Engine> {
+        self.engines
+            .iter()
+            .find(|engine| Some(engine.model.as_str()) == model)
+    }
+
     /// The server for requests naming `model`: the engine serving it, else
     /// llama-server.
     #[must_use]
     pub fn serving(&self, model: Option<&str>) -> &Endpoint {
-        self.engines
-            .iter()
-            .find(|engine| Some(engine.model.as_str()) == model)
+        self.engine_for(model)
             .map_or(&self.model, |engine| &engine.endpoint)
+    }
+
+    /// Whether one of the other engines serves `model`, rather than llama-server.
+    ///
+    /// Such an engine refuses a body field it does not know, so the request is
+    /// cleaned before it is sent there; see `chat::answer`.
+    #[must_use]
+    pub fn serves_engine(&self, model: Option<&str>) -> bool {
+        self.engine_for(model).is_some()
     }
 
     /// The server for the model a JSON request `body` names.

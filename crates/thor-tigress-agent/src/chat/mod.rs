@@ -60,6 +60,51 @@ const MAX_CITED: usize = 40;
 /// The page's switch for web search; removed before the model sees the request.
 const WEB_SEARCH_SWITCH: &str = "thor_web_search";
 
+/// Body fields only llama-server understands. TensorRT Edge-LLM answers a field
+/// it does not know with 400 `Extra inputs are not permitted`, so these are
+/// dropped when the request is going to an engine; llama-server still gets them.
+///
+/// Measured against TensorRT Edge-LLM 0.11.0, which rejects every field here and
+/// accepts `top_k`, `min_p`, `seed`, `top_p`, `stop`, `presence_penalty` and
+/// `chat_template_kwargs`, so none of those are below. Dropping a field an engine
+/// cannot honour is quieter than the 400 it used to get: `grammar` and
+/// `json_schema`, for instance, are ignored rather than refused.
+const LLAMA_SERVER_ONLY: [&str; 33] = [
+    "adaptive_decay",
+    "adaptive_target",
+    "cache_prompt",
+    "dry_allowed_length",
+    "dry_base",
+    "dry_multiplier",
+    "dynatemp_exponent",
+    "dynatemp_range",
+    "grammar",
+    "ignore_eos",
+    "json_schema",
+    "lora",
+    "min_keep",
+    "mirostat",
+    "mirostat_eta",
+    "mirostat_tau",
+    "n_keep",
+    "n_predict",
+    "n_probs",
+    "parse_tool_calls",
+    "reasoning_budget_message",
+    "reasoning_budget_tokens",
+    "repeat_last_n",
+    "repeat_penalty",
+    "return_progress",
+    "samplers",
+    "slot_id",
+    "t_max_predict_ms",
+    "timings_per_token",
+    "top_n_sigma",
+    "typical_p",
+    "xtc_probability",
+    "xtc_threshold",
+];
+
 /// The line added under the switch. It asks for a plan, names the two kinds
 /// that find postings and the people behind them, and asks for citations.
 const SEARCH_HINT: &str = concat!(
@@ -359,6 +404,12 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
         .remove(WEB_SEARCH_SWITCH)
         .and_then(|value| value.as_bool())
         .unwrap_or(false);
+    let engine_serves = upstreams.serves_engine(fields.get(MODEL).and_then(Value::as_str));
+    if engine_serves {
+        for field in LLAMA_SERVER_ONLY {
+            fields.remove(field);
+        }
+    }
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
     let model = upstreams.serving(fields.get(MODEL).and_then(Value::as_str));
 

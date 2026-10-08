@@ -1,4 +1,5 @@
 use super::*;
+use crate::config::Engine;
 use crate::testing::{FakeServer, FakeWeb, event_stream, json_response};
 
 fn upstreams(model: &FakeServer, search: &FakeServer) -> Upstreams {
@@ -1137,5 +1138,72 @@ fn a_round_under_the_cap_is_streamed_whole() -> Outcome {
         !sent.iter().any(|event| event.contains("finish_reason")),
         "{sent:?}"
     );
+    Ok(())
+}
+
+/// The upstreams, with `engine` serving the model `name` rather than llama-server.
+fn upstreams_serving(engine: &FakeServer, name: &str) -> Outcome<Upstreams> {
+    let mut upstreams = upstreams(engine, &idle()?);
+    upstreams.engines.push(Engine {
+        model: name.to_string(),
+        endpoint: Endpoint::new(engine.address(), None),
+    });
+    Ok(upstreams)
+}
+
+/// A field the engine does not know is a 400, so it is dropped; the fields the
+/// engine does accept have to survive, or the request quietly changes meaning.
+#[test]
+fn an_engine_is_not_sent_a_field_only_llama_server_understands() -> Outcome {
+    let engine = FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?;
+    let upstreams = upstreams_serving(&engine, "qwen")?;
+    let request = br#"{"model":"qwen","messages":[],"reasoning_budget_tokens":2048,
+        "reasoning_budget_message":"","n_predict":5,"grammar":"x","top_k":40,
+        "min_p":0.05,"seed":7,"chat_template_kwargs":{"enable_thinking":true}}"#;
+
+    answer(&mut Vec::new(), request, &upstreams)?;
+
+    let seen = engine.requests()?;
+    assert!(!seen[0].contains("reasoning_budget"), "{}", seen[0]);
+    assert!(!seen[0].contains("n_predict"), "{}", seen[0]);
+    assert!(!seen[0].contains("grammar"), "{}", seen[0]);
+    assert!(seen[0].contains(r#""top_k":40"#), "{}", seen[0]);
+    assert!(seen[0].contains(r#""min_p":0.05"#), "{}", seen[0]);
+    assert!(seen[0].contains(r#""seed":7"#), "{}", seen[0]);
+    assert!(seen[0].contains(r#""chat_template_kwargs""#), "{}", seen[0]);
+    Ok(())
+}
+
+#[test]
+fn every_field_only_llama_server_understands_is_dropped_for_an_engine() -> Outcome {
+    for field in LLAMA_SERVER_ONLY {
+        let engine = FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?;
+        let upstreams = upstreams_serving(&engine, "qwen")?;
+        let mut fields = Fields::new();
+        fields.insert(MODEL.to_string(), json!("qwen"));
+        fields.insert(MESSAGES.to_string(), json!([]));
+        fields.insert(field.to_string(), json!(1));
+
+        answer(&mut Vec::new(), &serde_json::to_vec(&fields)?, &upstreams)?;
+
+        let seen = engine.requests()?;
+        assert_eq!(seen.len(), 1);
+        assert!(!seen[0].contains(field), "{field} reached the engine");
+    }
+    Ok(())
+}
+
+#[test]
+fn llama_server_still_gets_the_fields_only_it_understands() -> Outcome {
+    let model = FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?;
+    let request = br#"{"messages":[],"reasoning_budget_tokens":2048,
+        "reasoning_budget_message":"","n_predict":5,"grammar":"x"}"#;
+
+    answer(&mut Vec::new(), request, &upstreams(&model, &idle()?))?;
+
+    let seen = model.requests()?;
+    for field in ["reasoning_budget_tokens", "reasoning_budget_message", "n_predict", "grammar"] {
+        assert!(seen[0].contains(field), "{field} was dropped");
+    }
     Ok(())
 }
