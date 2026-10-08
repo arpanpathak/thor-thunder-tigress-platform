@@ -18,6 +18,57 @@ there as untracked.
 
 ## 2026-10-07
 
+### The answer rounds are the model's turn to write, and nothing runs in them
+
+- Report from a live job search: the reply was the fallback "I ran out of tool
+  rounds without a written answer". Cause, in `search_loop`: the answer rounds
+  were sent with no `tools`, but a call the model wrote there was still run and
+  appended. A model that kept wanting to search (Nemotron does) spent all three
+  answer rounds calling tools and never wrote a word. The system line made it
+  worse: `SEARCH_HINT` tells the model to plan sub-questions and call
+  `web_search`, and it stayed in the system turn for the answer rounds, where it
+  outranks the last user ask.
+- Fix, in `chat.rs`. New `retract_system` takes `SEARCH_HINT` back out of the
+  conversation's one system message before the answer rounds, leaving
+  `ANSWER_NUDGE` and the numbered source list. The answer rounds are text-only
+  now: a call written there is dropped, nothing runs, and the model is asked
+  again with the new `ANSWER_AGAIN` line. Text written beside a call is the
+  answer and the call is not run, so a reply is never held behind a call.
+- The last-resort note no longer says "ask again". When no round wrote anything
+  it names the first ten sources the ledger found, so the answer still ends with
+  something to use.
+- Tests: 168 in the agent, up from 163. New rows: a call on an answer round is
+  dropped, not run, and the model is asked again; text beside that call is the
+  answer; the note names the sources when no round writes one; the hint is
+  retracted from the front, the middle and the whole line, and the retraction is
+  a no-op when the hint was never added; the answer-round request no longer
+  contains the hint. `cargo test --workspace` passes, `clippy --workspace
+  --all-targets -D warnings` is clean, `spark rs crates` finds 0 problems in 83
+  files.
+- Docs: the book chapter "Tool calling" (steps, the text-call section, the
+  limits table, the tests table), the figure alt text, the README search section
+  and the WORKLOG were updated. The answer phase is three rounds, not two, and
+  no call runs in it.
+- Deployed to the Thor, 2026-10-07 23:39 PDT: backed up the old binary
+  (`~/.cargo/bin/thor-tigress-agent.bak-2026-10-07-answerphase`), ran
+  `cargo install --locked --force --path crates/thor-tigress-agent` (3.3 s),
+  `systemctl --user restart thor-tigress-agent`, and `/health` answered
+  `{"status":"ok"}`. A live Web-on request (Nemotron 3 Nano, the same job-hunt
+  shape that failed before: NVIDIA openings for a senior systems and Rust
+  engineer, a link each) then ran 16 searches and wrote a 110-character answer.
+  The raw stream held 0 occurrences of `<tool_call` and 0 fallback lines, where
+  the old binary ended on the fallback.
+- Measured on the same run: all 16 searches returned 0 results. SearXNG answered
+  `/search?q=nvidia+jobs&format=json` with `0` results and
+  `brave: Suspended: too many requests`, `duckduckgo: CAPTCHA`,
+  `google cse: Suspended: too many requests`. So the loop fix is measured as
+  "a written answer arrives", not yet as "a good answer from sources"; the model
+  was right to say it found nothing. The suspended engines are the same incident
+  as the 2026-10-07 entry below and are still open.
+- Not measured yet: how often a fresh question reaches the answer rounds with a
+  useful answer, and whether Nemotron ever writes text beside a call on an answer
+  round outside the unit tests.
+
 ### Web search made useful for both models, and reading the pages
 
 - `web_search` gained an optional `time_range` (`day`, `week`, `month`, `year`,

@@ -84,6 +84,20 @@ const ANSWER_NUDGE: &str = concat!(
     "about hiring. Cite each claim with its [n] number. Do not write a tool call."
 );
 
+/// The line added when the model writes a tool call in the answer rounds, where
+/// no tool is offered and none runs. The call is dropped and the model is asked
+/// again, because a call is not an answer and running it is how a model that
+/// keeps calling tools never writes one.
+const ANSWER_AGAIN: &str = concat!(
+    "That was a tool call, and the tools are closed for this answer. Nothing ran. ",
+    "Write the answer in plain text now, from the sources above, citing each claim ",
+    "with its [n] number."
+);
+
+/// The most sources named in the last-resort note, which is all the page shows
+/// when no round wrote a word.
+const MAX_LISTED: usize = 10;
+
 /// The request field asking for a streamed answer.
 const STREAM: &str = "stream";
 
@@ -376,10 +390,7 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 }
 
 /// Asks the model, runs the tools it calls, and asks again, until it answers
-/// without a tool call or the tool rounds run out. After them the model gets a
-/// few rounds with no tools, and a call it writes even then is run: a research
-/// question can need several searches, and a reply that is only a tool call is
-/// not an answer.
+/// without a tool call or the tool rounds run out.
 ///
 /// The first round requires a call, so both models look something up before
 /// they answer; later rounds leave the choice to the model. A call that repeats
@@ -387,6 +398,14 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 /// that loops cannot loop forever. [`Ledger`] holds every source found, gives it
 /// a number to cite, and holds the search and page budgets; the numbers go to
 /// the model again before the answer rounds.
+///
+/// After the tool rounds the answer rounds run with no tools at all, and there
+/// no call runs: a call written then is dropped and the model is asked again
+/// ([`ANSWER_AGAIN`]). A model that keeps calling tools is exactly the one that
+/// otherwise never writes a word, so the answer phase counts only text. When a
+/// round writes text beside a call, the text is the answer and the call is not
+/// run. Only when no round writes any text does the note name the sources the
+/// ledger found, so the page still shows what the search turned up.
 fn search_loop(
     client: &mut dyn Write,
     mut fields: Fields,
@@ -422,8 +441,8 @@ fn search_loop(
 
     offer_tools(&mut fields, false);
     require_tool(&mut fields, false);
+    retract_system(&mut fields, SEARCH_HINT);
     append_system(&mut fields, ANSWER_NUDGE);
-    append_user(&mut fields, ANSWER_ASK);
     if !ledger.is_empty() {
         append_system(
             &mut fields,
@@ -433,30 +452,31 @@ fn search_loop(
             ),
         );
     }
+    append_user(&mut fields, ANSWER_ASK);
 
     for _ in 0..ANSWER_ROUNDS {
         let round = stream_round(client, &fields, model)?;
 
+        if !round.content.trim().is_empty() {
+            return Ok(());
+        }
         if round.calls.is_empty() {
-            if !round.content.trim().is_empty() {
-                return Ok(());
-            }
             continue;
         }
 
-        let results = run_calls(
-            client,
-            &round.calls,
-            upstreams,
-            &mut allowed,
-            &mut ran,
-            &mut ledger,
-        )?;
-        append_round(&mut fields, &round, &results)?;
+        append_user(&mut fields, ANSWER_AGAIN);
     }
 
-    let note = "I ran out of tool rounds without a written answer. \
-                The results above are what the tools returned; ask again, or narrow the question.";
+    let note = if ledger.is_empty() {
+        "The tool rounds are over and no round wrote an answer. Ask again, or narrow the question."
+            .to_string()
+    } else {
+        format!(
+            "The tool rounds are over and no round wrote an answer. These are the sources the \
+             search turned up:\n{}",
+            ledger.list(MAX_LISTED)
+        )
+    };
     response::send_event(
         client,
         &json!({ "choices": [{ "delta": { "content": note } }] }).to_string(),
@@ -543,6 +563,33 @@ fn append_user(fields: &mut Fields, line: &str) {
         return;
     };
     messages.push(json!({ "role": "user", "content": line }));
+}
+
+/// Takes `line` back out of the system message that [`append_system`] put it in.
+///
+/// The search hint tells the model to plan sub-questions and call `web_search`,
+/// and it stays in the system turn for the tool rounds. Left there for the
+/// answer rounds it outranks the ask: a model that is told to search in its
+/// system line writes a tool call even when the request offers no tools, which
+/// is the loop that ends with no answer at all.
+fn retract_system(fields: &mut Fields, line: &str) {
+    let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
+        return;
+    };
+    let Some(system) = messages
+        .first_mut()
+        .filter(|message| message.get("role").and_then(Value::as_str) == Some("system"))
+    else {
+        return;
+    };
+    let Some(content) = system.get("content").and_then(Value::as_str) else {
+        return;
+    };
+
+    let after = content.replacen(&format!("{line}\n\n"), "", 1);
+    let after = after.replacen(&format!("\n\n{line}"), "", 1);
+    let after = if after == line { String::new() } else { after };
+    system["content"] = Value::String(after);
 }
 
 fn offer_tools(fields: &mut Fields, offered: bool) {
@@ -1040,6 +1087,40 @@ mod tests {
     }
 
     #[test]
+    fn taking_the_hint_back_leaves_the_rest_of_the_system_line() {
+        let content = format!("Be brief.\n\n{SEARCH_HINT}\n\nBe honest.");
+        let system = |fields: &Fields| fields[MESSAGES][0]["content"].clone();
+        let mut fields = Fields::new();
+        fields.insert(
+            MESSAGES.to_string(),
+            json!([{ "role": "system", "content": content }, { "role": "user", "content": "hi" }]),
+        );
+        retract_system(&mut fields, SEARCH_HINT);
+        assert_eq!(system(&fields), json!("Be brief.\n\nBe honest."));
+        assert_eq!(fields[MESSAGES].as_array().map(Vec::len), Some(2));
+    }
+
+    #[test]
+    fn taking_back_a_hint_that_is_the_whole_system_line_leaves_it_empty() {
+        let mut fields = Fields::new();
+        fields.insert(
+            MESSAGES.to_string(),
+            json!([{ "role": "system", "content": SEARCH_HINT }]),
+        );
+        retract_system(&mut fields, SEARCH_HINT);
+        assert_eq!(fields[MESSAGES][0]["content"], json!(""));
+    }
+
+    #[test]
+    fn taking_back_a_hint_that_was_never_added_changes_nothing() {
+        let messages = json!([{ "role": "system", "content": "Be brief." }]);
+        let mut fields = Fields::new();
+        fields.insert(MESSAGES.to_string(), messages.clone());
+        retract_system(&mut fields, SEARCH_HINT);
+        assert_eq!(fields[MESSAGES], messages);
+    }
+
+    #[test]
     fn a_system_message_that_is_not_text_is_left_alone() {
         let messages = json!([{ "role": "system", "content": [{ "type": "text", "text": "hi" }] }]);
         let mut fields = Fields::new();
@@ -1304,6 +1385,10 @@ mod tests {
             "{}",
             seen[MAX_ROUNDS]
         );
+        assert!(
+            !seen[MAX_ROUNDS].contains(SEARCH_HINT),
+            "the search hint must be gone by the answer rounds"
+        );
         Ok(())
     }
 
@@ -1563,7 +1648,7 @@ mod tests {
     }
 
     #[test]
-    fn a_call_on_the_answer_round_is_run() -> Outcome {
+    fn a_call_on_the_answer_round_is_dropped_and_asked_again() -> Outcome {
         let call = call_event("other", "{}");
         let leaked = json!({ "choices": [{ "delta": { "content": "<tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
         let reply = r#"{"choices":[{"delta":{"content":"the answer"}}]}"#;
@@ -1571,7 +1656,7 @@ mod tests {
         responses.push(event_stream(&[&leaked]));
         responses.push(event_stream(&[reply]));
         let model = FakeServer::start(responses)?;
-        let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
+        let search = idle()?;
         let mut client = Vec::new();
         answer(
             &mut client,
@@ -1581,11 +1666,14 @@ mod tests {
         let seen = model.requests()?;
         assert_eq!(seen.len(), MAX_ROUNDS + 2);
         assert!(
-            seen[MAX_ROUNDS + 1].contains("No results."),
+            seen[MAX_ROUNDS + 1].contains(ANSWER_AGAIN),
             "{}",
             seen[MAX_ROUNDS + 1]
         );
-        assert!(search.requests()?[0].contains("q=x"));
+        assert!(
+            search.requests()?.is_empty(),
+            "a call written with the tools closed must not run"
+        );
         let sent = events(&client);
         assert!(
             !sent.iter().any(|event| event.contains("<tool_call")),
@@ -1593,6 +1681,33 @@ mod tests {
         );
         assert!(
             sent.iter().any(|event| event.contains("the answer")),
+            "{sent:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn text_beside_a_call_on_the_answer_round_is_the_answer() -> Outcome {
+        let call = call_event("other", "{}");
+        let mixed = json!({ "choices": [{ "delta": { "content": "Rust 1.99 is out. <tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
+        let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
+        responses.push(event_stream(&[&mixed]));
+        let model = FakeServer::start(responses)?;
+        let mut client = Vec::new();
+        answer(
+            &mut client,
+            br#"{"messages":[],"thor_web_search":true}"#,
+            &upstreams(&model, &idle()?),
+        )?;
+        let seen = model.requests()?;
+        assert_eq!(seen.len(), MAX_ROUNDS + 1);
+        let sent = events(&client);
+        assert!(
+            sent.iter().any(|event| event.contains("Rust 1.99 is out.")),
+            "{sent:?}"
+        );
+        assert!(
+            !sent.iter().any(|event| event.contains("<tool_call")),
             "{sent:?}"
         );
         Ok(())
@@ -1614,7 +1729,32 @@ mod tests {
         let sent = events(&client);
         assert!(
             sent.iter()
-                .any(|event| event.contains("ran out of tool rounds")),
+                .any(|event| event.contains("no round wrote an answer")),
+            "{sent:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_fallback_names_the_sources_when_no_round_writes_one() -> Outcome {
+        let call = call_event("web_search", r#"{"query":"nvidia jobs"}"#);
+        let empty = r#"{"choices":[{"delta":{}}]}"#;
+        let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
+        responses.extend((0..ANSWER_ROUNDS).map(|_| event_stream(&[empty])));
+        let model = FakeServer::start(responses)?;
+        let search = FakeServer::start(vec![json_response(
+            r#"{"results":[{"title":"A job","url":"https://jobs.example/1"}]}"#,
+        )])?;
+        let mut client = Vec::new();
+        answer(
+            &mut client,
+            br#"{"messages":[],"thor_web_search":true}"#,
+            &upstreams(&model, &search),
+        )?;
+        let sent = events(&client);
+        assert!(
+            sent.iter()
+                .any(|event| event.contains("[1] A job — https://jobs.example/1")),
             "{sent:?}"
         );
         Ok(())
