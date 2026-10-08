@@ -18,6 +18,42 @@ there as untracked.
 
 ## 2026-10-07
 
+### SearXNG: the engines behind the search were off, not blocked
+
+- The loop fix below ended in a written answer that said it found nothing, and it
+  was right: every search returned 0 results. SearXNG's own answer named
+  `brave: Suspended: too many requests`, `duckduckgo: CAPTCHA`,
+  `google cse: Suspended: too many requests`.
+- Cause: the shipped `searx/settings.yml` has nearly every general engine
+  `disabled` or `inactive`, and the Thor's `~/.config/searxng/settings.yml` used
+  `use_default_settings: true` without enabling any. Only `brave`, `duckduckgo`
+  and `google cse` were on, and all three are rate-limited from this address, so
+  a search could only ever come back empty. The engines were never the problem:
+  `mojeek`, `bing`, `qwant` and `wiby` answered `200` to a plain `curl` from the
+  Thor.
+- Fix, in `~/.config/searxng/settings.yml` (backup:
+  `settings.yml.bak-2026-10-07-engines`; `systemctl --user restart searxng`):
+  enable the no-key engines that answer from this address. Ten do: `bing`,
+  `yahoo`, `encyclosearch`, `fynd`, `mwmbl`, `privacywall`, `reloado`,
+  `resulthunter`, `seznam`, `wiby`. Measured with `format=json`: "nvidia jobs"
+  144 results from bing, encyclosearch, fynd, mwmbl, privacywall, reloado and
+  wiby; "senior rust engineer remote" 71; "nvidia site:jobs.nvidia.com" 29, the
+  first hit `https://jobs.nvidia.com/careers`.
+- `mojeek`, `startpage` and `dogpile` cannot be switched on: they are `inactive`
+  upstream (proof-of-work CAPTCHA). `marginalia` needs an API key. `qwant`,
+  `gabanza`, `tusksearch`, `fireball`, `fastbot`, `searchmysite`, `ayo` and
+  `crowdview` were tried and left off — CAPTCHA, a certificate error, a 401, or
+  empty. `brave`, `duckduckgo` and `google cse` are still suspended; they are the
+  defaults and stay on so they return if the block lifts.
+- The same live query through the agent, after: 4 searches, 12 pages read, and a
+  3,928-character answer — a table of 7 NVIDIA roles, each with a link and a `[n]`
+  citation — in 334 s, with 0 fallback lines and 0 `<tool_call` occurrences in the
+  stream. This is the run that used to end on the fallback.
+- Open: several of those roles come from aggregators (hitmarker.net,
+  claveprep.com, beyond-tabs.com) rather than the company's own posting, so the
+  answer is only as good as the snippets. Getting `brave`, `duckduckgo` or Google
+  back would need an API key or an outbound proxy.
+
 ### The answer rounds are the model's turn to write, and nothing runs in them
 
 - Report from a live job search: the reply was the fallback "I ran out of tool
