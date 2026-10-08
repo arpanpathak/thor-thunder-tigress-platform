@@ -48,6 +48,12 @@ const ANSWER_ROUNDS: usize = 3;
 /// Tool calls kept per round; more are ignored.
 const MAX_CALLS: usize = 8;
 
+/// The most answer text one round may stream, in bytes. A model that falls into
+/// a repeat loop would otherwise stream until its context fills, so a round is
+/// cut here and the upstream connection is closed: every answer ends, whatever
+/// the engine does.
+const MAX_ROUND_CHARS: usize = 48 * 1024;
+
 /// The most sources named in the note before the answer round.
 const MAX_CITED: usize = 40;
 
@@ -273,6 +279,8 @@ struct ToolCall {
 struct Round {
     content: String,
     calls: Vec<ToolCall>,
+    /// Whether the round was cut off at [`MAX_ROUND_CHARS`].
+    cut: bool,
 }
 
 /// A message this server adds to the conversation, in OpenAI's shape.
@@ -445,7 +453,7 @@ fn tool_rounds(
         prepare(fields, Phase::of_tool_round(round));
         let reply = stream_round(client, fields, model)?;
 
-        if reply.calls.is_empty() {
+        if reply.cut || reply.calls.is_empty() {
             return Ok(Ending::Replied);
         }
 
@@ -489,7 +497,7 @@ fn answer_rounds(
     for _ in 0..ANSWER_ROUNDS {
         let reply = stream_round(client, fields, model)?;
 
-        if reply.calls.is_empty() && !reply.content.trim().is_empty() {
+        if reply.cut || (reply.calls.is_empty() && !reply.content.trim().is_empty()) {
             return Ok(Ending::Replied);
         }
         if reply.calls.is_empty() {
@@ -915,6 +923,7 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
 
     let mut round = Round::default();
     let mut sieve = Sieve::new();
+    let mut streamed = 0_usize;
 
     for line in response.body.lines() {
         let line = line?;
@@ -927,10 +936,19 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
         }
 
         let mut value: Value = serde_json::from_str(data)?;
+        streamed += text_length(&value);
         if let Some(event) = forward(&mut value, data, &mut sieve) {
             response::send_event(client, &event)?;
         }
         round.absorb(serde_json::from_value(value)?);
+
+        if streamed > MAX_ROUND_CHARS {
+            round.cut = true;
+            let event =
+                json!({ "choices": [{ "delta": {}, "finish_reason": "length" }] }).to_string();
+            response::send_event(client, &event)?;
+            break;
+        }
     }
 
     let tail = sieve.finish();
@@ -984,6 +1002,18 @@ fn carries_more(value: &Value) -> bool {
         .pointer("/choices/0/finish_reason")
         .is_some_and(|reason| !reason.is_null());
     delta || finish
+}
+
+/// The text one chunk adds: the answer and the thinking in it. The round's
+/// output budget is spent on both, because either can loop.
+fn text_length(value: &Value) -> usize {
+    let of = |pointer: &str| {
+        value
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .map_or(0, str::len)
+    };
+    of("/choices/0/delta/content") + of("/choices/0/delta/reasoning_content")
 }
 
 impl Round {

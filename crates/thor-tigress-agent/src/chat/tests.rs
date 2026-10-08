@@ -461,6 +461,7 @@ fn added_messages_have_openais_shape() -> Outcome {
             name: "web_search".to_string(),
             arguments: "{}".to_string(),
         }],
+        cut: false,
     };
     assert_eq!(
         serde_json::to_value(round.as_message())?,
@@ -1086,6 +1087,55 @@ fn a_search_without_messages_is_reported() -> Outcome {
         events(&client)
             .iter()
             .any(|event| event.contains("messages must be a list"))
+    );
+    Ok(())
+}
+
+#[test]
+fn a_chunks_text_is_its_content_and_its_thinking() {
+    let both = json!({ "choices": [{ "delta": { "content": "abc", "reasoning_content": "de" } }] });
+    assert_eq!(text_length(&both), 5);
+    assert_eq!(text_length(&json!({ "choices": [{ "delta": {} }] })), 0);
+}
+
+#[test]
+fn a_round_that_runs_away_is_cut_and_the_stream_ends() -> Outcome {
+    let huge = "x".repeat(MAX_ROUND_CHARS + 1);
+    let chunk = json!({ "choices": [{ "delta": { "content": huge } }] }).to_string();
+    let model = FakeServer::start(vec![event_stream(&[&chunk])])?;
+    let mut client = Vec::new();
+    answer(
+        &mut client,
+        br#"{"messages":[{"role":"user","content":"hi"}],"stream":true}"#,
+        &upstreams(&model, &idle()?),
+    )?;
+
+    let sent = events(&client);
+    assert!(
+        sent.iter()
+            .any(|event| event.contains(r#""finish_reason":"length""#)),
+        "{sent:?}"
+    );
+    assert_eq!(sent.last().map(String::as_str), Some(DONE));
+    Ok(())
+}
+
+#[test]
+fn a_round_under_the_cap_is_streamed_whole() -> Outcome {
+    let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
+    let model = FakeServer::start(vec![event_stream(&[reply])])?;
+    let mut client = Vec::new();
+    answer(
+        &mut client,
+        br#"{"messages":[],"stream":true}"#,
+        &upstreams(&model, &idle()?),
+    )?;
+
+    let sent = events(&client);
+    assert!(sent.iter().any(|event| event.contains("done")), "{sent:?}");
+    assert!(
+        !sent.iter().any(|event| event.contains("finish_reason")),
+        "{sent:?}"
     );
     Ok(())
 }

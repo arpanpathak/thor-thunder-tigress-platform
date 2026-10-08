@@ -1,17 +1,15 @@
 const $ = (id) => document.getElementById(id);
 const API = "/";
-// Thinking runs away on a hard question: the model can spend the whole reply
-// inside the think block and never write an answer. The budget stops it there
-// and this line is injected before the end-of-thinking tag, so it answers.
-const THINK_STOP = "Enough thinking. Write the final answer now.";
-const DEFAULT_THINK_BUDGET = 1024;
+// A round may not generate without bound. Thinking can run away on a hard
+// question, and a model can fall into a repeat loop; a token limit stops the
+// engine, and the agent cuts the stream at its own cap as a second floor.
+const MAX_ANSWER_TOKENS = 8192;
 const store = {
   get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
 };
 
-let settings = store.get("settings", { key: "", system: "", temperature: "", thinkbudget: String(DEFAULT_THINK_BUDGET) });
-if (settings.thinkbudget === undefined) settings.thinkbudget = String(DEFAULT_THINK_BUDGET);
+let settings = store.get("settings", { key: "", system: "", temperature: "" });
 let messages = store.get("messages", []);
 let modelName = "";
 let models = [];
@@ -626,6 +624,22 @@ $("model").addEventListener("change", () => {
   render();
 });
 
+// The one place a request is built. `max_tokens` bounds every round, so the
+// engine stops a model that would otherwise generate until its context fills.
+function chatRequest(history, thinking) {
+  const body = {
+    model: chosenModel(), messages: history, stream: true,
+    stream_options: { include_usage: true },
+    chat_template_kwargs: { enable_thinking: thinking },
+    thor_web_search: $("web").checked,
+    max_tokens: MAX_ANSWER_TOKENS,
+  };
+  if (settings.temperature !== "" && !Number.isNaN(Number(settings.temperature))) {
+    body.temperature = Number(settings.temperature);
+  }
+  return body;
+}
+
 async function send(text) {
   messages.push({ role: "user", content: text });
   const reply = { role: "assistant", content: "", reasoning: "", streaming: true };
@@ -636,15 +650,7 @@ async function send(text) {
 
   const history = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content)).map(({ role, content }) => ({ role, content }));
   if (settings.system.trim()) history.unshift({ role: "system", content: settings.system.trim() });
-  const thinking = $("think").checked;
-  const body = { model: chosenModel(), messages: history, stream: true, stream_options: { include_usage: true },
-    chat_template_kwargs: { enable_thinking: thinking }, thor_web_search: $("web").checked };
-  if (settings.temperature !== "" && !Number.isNaN(Number(settings.temperature))) body.temperature = Number(settings.temperature);
-  const budget = Number(settings.thinkbudget);
-  if (thinking && settings.thinkbudget !== "" && Number.isInteger(budget) && budget >= 0) {
-    body.reasoning_budget_tokens = budget;
-    body.reasoning_budget_message = THINK_STOP;
-  }
+  const body = chatRequest(history, $("think").checked);
 
   controller = new AbortController();
   const started = performance.now();
@@ -765,12 +771,11 @@ $("think").addEventListener("change", () => store.set("think", $("think").checke
 
 $("open-settings").addEventListener("click", () => {
   $("key").value = settings.key; $("system").value = settings.system; $("temperature").value = settings.temperature;
-  $("thinkbudget").value = settings.thinkbudget;
   $("settings").showModal();
 });
 $("settings").addEventListener("close", () => {
   if ($("settings").returnValue !== "save") return;
-  settings = { key: $("key").value.trim(), system: $("system").value, temperature: $("temperature").value, thinkbudget: $("thinkbudget").value.trim() };
+  settings = { key: $("key").value.trim(), system: $("system").value, temperature: $("temperature").value };
   store.set("settings", settings);
   connect();
 });
