@@ -152,73 +152,137 @@ pub fn read_recursive(
         )));
     }
 
-    let limit = limit.max(1);
-    let mut queue: VecDeque<(Url, usize)> = VecDeque::new();
-    queue.push_back((start.clone(), 0));
-    let mut visited: Vec<String> = Vec::new();
-    let mut pages: Vec<Page> = Vec::new();
-    let mut notes: Vec<String> = Vec::new();
+    let mut crawl = Crawl::new(start);
+    crawl.run(web, limit.max(1))?;
 
-    while let Some((url, depth)) = queue.pop_front() {
-        if pages.len() >= limit {
-            break;
-        }
-        if visited.contains(&url.as_string()) {
-            continue;
-        }
-        visited.push(url.as_string());
+    Ok(crawl.report(start))
+}
 
-        match fetch_one(web, &url) {
-            Ok((page_url, body, Kind::Html)) => {
-                let title = html::title(&body).unwrap_or_else(|| page_url.host().to_string());
-                let text = html::to_text(&body)?;
-                pages.push(Page {
-                    url: page_url.as_string(),
-                    title,
-                    text: html::cut(&text, MAX_PAGE),
-                });
-                if depth < MAX_DEPTH {
-                    for link in html::links(&body, &page_url) {
-                        queue.push_back((link, depth + 1));
-                    }
-                }
+/// A breadth-first crawl: the addresses still to read with their depth, the ones
+/// already asked for, the pages that were read, and the ones that failed.
+struct Crawl {
+    queue: VecDeque<(Url, usize)>,
+    visited: Vec<String>,
+    pages: Vec<Page>,
+    notes: Vec<String>,
+}
+
+impl Crawl {
+    /// A crawl about to read `start` at depth 0.
+    fn new(start: &Url) -> Crawl {
+        Crawl {
+            queue: VecDeque::from([(start.clone(), 0)]),
+            visited: Vec::new(),
+            pages: Vec::new(),
+            notes: Vec::new(),
+        }
+    }
+
+    /// Reads until the queue is empty or `limit` pages have been read, breadth
+    /// first, so a page's own links are read before their links are.
+    fn run(&mut self, web: &dyn Web, limit: usize) -> Outcome<()> {
+        while let Some((url, depth)) = self.queue.pop_front() {
+            if self.pages.len() >= limit {
+                break;
             }
-            Ok((page_url, body, Kind::Text)) => {
-                let title = page_url.host().to_string();
-                pages.push(Page {
-                    url: page_url.as_string(),
-                    title,
-                    text: html::cut(body.trim(), MAX_PAGE),
-                });
+            if self.visited.contains(&url.as_string()) {
+                continue;
             }
-            Err(error) if pages.is_empty() => return Err(error),
-            Err(error) => notes.push(format!("could not read {}: {error}", url.as_string())),
+            self.visited.push(url.as_string());
+
+            self.read(web, &url, depth)?;
         }
+
+        Ok(())
     }
 
-    let mut text = String::new();
-    text.push_str(&UNTRUSTED.replace("{host}", start.host()));
-    text.push('\n');
-    for (page, number) in pages.iter().zip(1..) {
-        text.push_str(&format!(
-            "\n[{number}] {} ({})\n{}\n",
-            page.title, page.url, page.text
-        ));
+    /// Reads one page and queues its same-site links. The address the model named
+    /// has to work, so its failure ends the crawl; a page found inside it may
+    /// fail, and that becomes a note in the text instead.
+    fn read(&mut self, web: &dyn Web, url: &Url, depth: usize) -> Outcome<()> {
+        let (page_url, body, kind) = match fetch_one(web, url) {
+            Ok(fetched) => fetched,
+            Err(error) if self.pages.is_empty() => return Err(error),
+            Err(error) => {
+                self.notes
+                    .push(format!("could not read {}: {error}", url.as_string()));
+
+                return Ok(());
+            }
+        };
+
+        let (page, links) = match kind {
+            Kind::Html => html_page(&page_url, &body, depth)?,
+            Kind::Text => (text_page(&page_url, body.trim()), Vec::new()),
+        };
+
+        self.pages.push(page);
+        for link in links {
+            self.queue.push_back((link, depth + 1));
+        }
+
+        Ok(())
     }
-    for note in &notes {
-        text.push_str(&format!("\n{note}\n"));
+
+    /// The text the model reads: the untrusted label, every page under the number
+    /// it was read in, then the pages that failed.
+    fn report(self, start: &Url) -> Report {
+        let mut text = String::new();
+        text.push_str(&UNTRUSTED.replace("{host}", start.host()));
+        text.push('\n');
+        for (page, number) in self.pages.iter().zip(1..) {
+            text.push_str(&format!(
+                "\n[{number}] {} ({})\n{}\n",
+                page.title, page.url, page.text
+            ));
+        }
+        for note in &self.notes {
+            text.push_str(&format!("\n{note}\n"));
+        }
+
+        let pages = self
+            .pages
+            .into_iter()
+            .map(|page| Read {
+                url: page.url,
+                title: page.title,
+            })
+            .collect();
+
+        Report {
+            text: html::cut(&text, MAX_TOTAL),
+            pages,
+        }
     }
-    let pages = pages
-        .into_iter()
-        .map(|page| Read {
-            url: page.url,
-            title: page.title,
-        })
-        .collect();
-    Ok(Report {
-        text: html::cut(&text, MAX_TOTAL),
-        pages,
-    })
+}
+
+/// An HTML page and the same-site links to follow, while there is depth left.
+fn html_page(url: &Url, body: &str, depth: usize) -> Outcome<(Page, Vec<Url>)> {
+    let title = html::title(body).unwrap_or_else(|| url.host().to_string());
+    let text = html::to_text(body)?;
+    let links = if depth < MAX_DEPTH {
+        html::links(body, url)
+    } else {
+        Vec::new()
+    };
+
+    Ok((
+        Page {
+            url: url.as_string(),
+            title,
+            text: html::cut(&text, MAX_PAGE),
+        },
+        links,
+    ))
+}
+
+/// A page served as plain text. It has no links to follow.
+fn text_page(url: &Url, body: &str) -> Page {
+    Page {
+        url: url.as_string(),
+        title: url.host().to_string(),
+        text: html::cut(body, MAX_PAGE),
+    }
 }
 
 /// One page in the report, before the public fields are separated.
