@@ -94,26 +94,12 @@ impl Client {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Write, net::TcpListener, thread};
-
     use super::*;
-    use crate::testing::read_request;
+    use crate::testing::FakeServer;
 
+    /// The address of a server that answers one connection with `reply`.
     fn serve_once(reply: String) -> Result<String, DistillError> {
-        let listener = TcpListener::bind("127.0.0.1:0").map_err(DistillError::io("listener"))?;
-        let address = listener
-            .local_addr()
-            .map_err(DistillError::io("listener"))?
-            .to_string();
-
-        thread::spawn(move || {
-            if let Ok((mut stream, _)) = listener.accept() {
-                let _ = read_request(&stream);
-                let _ = stream.write_all(reply.as_bytes());
-            }
-        });
-
-        Ok(address)
+        Ok(FakeServer::start(vec![reply])?.address)
     }
 
     #[test]

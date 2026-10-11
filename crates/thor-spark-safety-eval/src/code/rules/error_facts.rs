@@ -191,6 +191,19 @@ pub(super) fn error_name(ty: &Type) -> Option<String> {
     }
 }
 
+/// The types among the arguments of a generic type, without its lifetimes
+/// and constants.
+fn type_arguments(arguments: &syn::AngleBracketedGenericArguments) -> Vec<&Type> {
+    arguments
+        .args
+        .iter()
+        .filter_map(|argument| match argument {
+            syn::GenericArgument::Type(ty) => Some(ty),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The error type of `Result<T, E>`. A one-argument `Result<T>` is looked up
 /// as a local alias; `io::Result<T>` stands for `io::Error`. `fmt::Result`
 /// belongs to `Display` impls and is not error handling.
@@ -209,14 +222,7 @@ pub(super) fn result_error(ty: &Type) -> Option<ErrorType> {
         return None;
     };
 
-    let types: Vec<&Type> = arguments
-        .args
-        .iter()
-        .filter_map(|argument| match argument {
-            syn::GenericArgument::Type(ty) => Some(ty),
-            _ => None,
-        })
-        .collect();
+    let types = type_arguments(arguments);
     let module = path
         .path
         .segments

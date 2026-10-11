@@ -49,13 +49,39 @@ fn post(path: &str, body: &str) -> String {
     )
 }
 
+/// One request per route, and the status each gets from a server whose
+/// engine and web folder are not there.
+fn routes() -> [(String, &'static str); 8] {
+    let question = r#"{"messages":[{"role":"user","content":"hi"}]}"#;
+    let form = r#"{"name":"Ada","email":"ada@example.com"}"#;
+    let get = |path: &str| format!("GET {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
+
+    [
+        (get("/health"), "HTTP/1.1 200 OK"),
+        (get("/v1/models"), "HTTP/1.1 200 OK"),
+        (get("/"), "HTTP/1.1 500 Internal Server Error"),
+        (get("/nowhere"), "HTTP/1.1 404 Not Found"),
+        (
+            post("/v1/chat/completions", question),
+            "HTTP/1.1 502 Bad Gateway",
+        ),
+        (post("/v1/messages", question), "HTTP/1.1 502 Bad Gateway"),
+        (
+            post("/v1/messages/count_tokens", question),
+            "HTTP/1.1 502 Bad Gateway",
+        ),
+        (post("/request", form), "HTTP/1.1 400 Bad Request"),
+    ]
+}
+
+/// An address nothing listens on yet.
+fn free_address() -> anyhow::Result<String> {
+    Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.to_string())
+}
+
 #[test]
 fn answers_every_route_as_a_running_server() -> anyhow::Result<()> {
-    let free = TcpListener::bind("127.0.0.1:0")?;
-    let address = free.local_addr()?.to_string();
-
-    drop(free);
-
+    let address = free_address()?;
     let mut server = Command::new(env!("CARGO_BIN_EXE_thor-tigress-agent"))
         .args(["--listen", &address, "--key-file", "/nonexistent"])
         .args(["--engine", "nemotron=127.0.0.1:1", "--web", "/nonexistent"])
@@ -64,24 +90,11 @@ fn answers_every_route_as_a_running_server() -> anyhow::Result<()> {
     let log = server.stderr.take().context("no standard error")?;
     let mut logged = BufReader::new(log).lines().map_while(Result::ok);
     let listening = logged.any(|line| line.starts_with("listening on "));
-    let question = r#"{"messages":[{"role":"user","content":"hi"}]}"#;
-    let form = r#"{"name":"Ada","email":"ada@example.com"}"#;
-    let get = |path: &str| format!("GET {path} HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n");
-    let requests = [
-        get("/health"),
-        get("/v1/models"),
-        get("/"),
-        get("/nowhere"),
-        post("/v1/chat/completions", question),
-        post("/v1/messages", question),
-        post("/v1/messages/count_tokens", question),
-        post("/request", form),
-    ];
+    let (requests, expected): (Vec<String>, Vec<&str>) = routes().into_iter().unzip();
     let statuses = requests
         .iter()
         .map(|request| status_of(&address, request))
         .collect::<anyhow::Result<Vec<String>>>();
-
     let told = Command::new("kill")
         .args(["-TERM", &server.id().to_string()])
         .status()?;
@@ -91,19 +104,7 @@ fn answers_every_route_as_a_running_server() -> anyhow::Result<()> {
     assert!(listening);
     assert!(told.success() && stopped.success());
     assert_eq!(failures.count(), 5);
-    assert_eq!(
-        statuses?,
-        [
-            "HTTP/1.1 200 OK",
-            "HTTP/1.1 200 OK",
-            "HTTP/1.1 500 Internal Server Error",
-            "HTTP/1.1 404 Not Found",
-            "HTTP/1.1 502 Bad Gateway",
-            "HTTP/1.1 502 Bad Gateway",
-            "HTTP/1.1 502 Bad Gateway",
-            "HTTP/1.1 400 Bad Request",
-        ]
-    );
+    assert_eq!(statuses?, expected);
 
     Ok(())
 }

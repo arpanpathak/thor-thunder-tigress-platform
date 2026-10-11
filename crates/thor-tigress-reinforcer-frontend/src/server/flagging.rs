@@ -127,6 +127,33 @@ pub(super) struct Occurrence {
     text: String,
 }
 
+/// Every example whose answer contains `needle`, with the text as the answer
+/// spells it.
+fn occurrences(app: &App, needle: &str) -> Outcome<Vec<Occurrence>> {
+    let filter = Filter {
+        query: Some(needle.to_string()),
+        ..Filter::default()
+    };
+    let mut found = Vec::new();
+
+    for position in app.index.matching(&filter, &Ids::new())? {
+        let record: RecordText = app.index.parsed(position)?;
+
+        let Some(text) = occurrence(&record.response, needle) else {
+            continue;
+        };
+
+        let id = app
+            .index
+            .entry(position)
+            .map(|entry| entry.id.clone())
+            .unwrap_or_default();
+        found.push(Occurrence { id, text });
+    }
+
+    Ok(found)
+}
+
 /// Marks a phrase in the answer of every example that contains it, ignoring
 /// case. Examples that already carry the phrase are left as they are.
 pub(super) fn flag_matches(app: &App, body: &str) -> Outcome<Matched> {
@@ -139,27 +166,7 @@ pub(super) fn flag_matches(app: &App, body: &str) -> Outcome<Matched> {
         )));
     }
 
-    let filter = Filter {
-        query: Some(needle.clone()),
-        ..Filter::default()
-    };
-    let mut found = Vec::new();
-
-    for position in app.index.matching(&filter, &Ids::new())? {
-        let record: RecordText = app.index.parsed(position)?;
-
-        let Some(text) = occurrence(&record.response, &needle) else {
-            continue;
-        };
-
-        let id = app
-            .index
-            .entry(position)
-            .map(|entry| entry.id.clone())
-            .unwrap_or_default();
-        found.push(Occurrence { id, text });
-    }
-
+    let found = occurrences(app, &needle)?;
     let mut store = app.flags()?;
     let note = format!("{PHRASE_NOTE} {}", wanted.text.trim());
     let added = found

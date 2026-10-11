@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 description = "Scores answers for AI slop in prose and for the five Rust rules in code."
 
+[lints]
+workspace = true
+
 [dependencies]
 thiserror = "2"
 proc-macro2 = { version = "1", features = ["span-locations"] }
@@ -15,3 +18,6 @@ syn = { version = "2", features = ["full", "visit", "extra-traits"] }
 [[bin]]
 name = "spark"
 path = "src/main.rs"
+
+[dev-dependencies]
+tempfile = "3"

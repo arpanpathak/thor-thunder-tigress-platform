@@ -277,22 +277,27 @@ pub fn prose_only(text: &str) -> String {
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
+/// Every pattern match in `prose`, as its category and byte range.
+fn matches(prose: &str) -> impl Iterator<Item = (Category, usize, usize)> + '_ {
+    let phrases = PHRASE_PATTERNS.iter().flat_map(move |(category, regex)| {
+        regex
+            .find_iter(prose)
+            .map(move |found| (*category, found.start(), found.end()))
+    });
+    let rhythm = RHYTHM_PATTERNS.iter().flat_map(move |regex| {
+        regex
+            .find_iter(prose)
+            .map(|found| (Category::RhythmTrick, found.start(), found.end()))
+    });
+
+    phrases.chain(rhythm)
+}
+
 /// Finds the slop in `text`.
 #[must_use]
 pub fn check(text: &str) -> SlopReport {
     let prose = prose_only(text);
-    let mut hits: Vec<Hit> = PHRASE_PATTERNS
-        .iter()
-        .flat_map(|(category, regex)| {
-            regex
-                .find_iter(&prose)
-                .map(move |found| (*category, found.start(), found.end()))
-        })
-        .chain(RHYTHM_PATTERNS.iter().flat_map(|regex| {
-            regex
-                .find_iter(&prose)
-                .map(|found| (Category::RhythmTrick, found.start(), found.end()))
-        }))
+    let mut hits: Vec<Hit> = matches(&prose)
         .filter_map(|(category, start, end)| {
             let found = prose.get(start..end)?;
             let start = start + found.len() - found.trim_start().len();

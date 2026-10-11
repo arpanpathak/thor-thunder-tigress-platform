@@ -174,6 +174,21 @@ pub struct Built {
     pub report: String,
 }
 
+/// What is printed for a reviewed flag that matched no example.
+fn warning(unmatched: &slop_flags::UnmatchedFlag) -> String {
+    format!(
+        "warning: flag {} matched no example and was NOT applied: {}",
+        unmatched.id, unmatched.note
+    )
+}
+
+/// The preference pairs of the clever-versus-readable file in the datastore.
+fn preference_pairs(inputs: &Inputs) -> Result<Vec<clever_vs_readable::PreferencePair>, DataError> {
+    let file = inputs.datastore.join(CLEVER_VS_READABLE_DPO);
+
+    clever_vs_readable::preference_pairs(&read_file(&file)?)
+}
+
 /// Reads every input, filters the examples, and writes `train.jsonl`,
 /// `slop.jsonl`, `preferences.jsonl` and `stats.md` to `output_dir`.
 ///
@@ -188,17 +203,8 @@ pub fn build_training_set(inputs: &Inputs, output_dir: &Path) -> Result<Built, D
     let slop_flags_by_id = slop_flags::read(&inputs.slop_flags)?;
     let (training_set, flagged_examples, unmatched_flags) =
         slop_flags::separate_flagged(unique_examples, &slop_flags_by_id, &mut skip_reasons);
-    let warnings = unmatched_flags
-        .iter()
-        .map(|unmatched| {
-            format!(
-                "warning: flag {} matched no example and was NOT applied: {}",
-                unmatched.id, unmatched.note
-            )
-        })
-        .collect();
-    let preference_file = inputs.datastore.join(CLEVER_VS_READABLE_DPO);
-    let preference_pairs = clever_vs_readable::preference_pairs(&read_file(&preference_file)?)?;
+    let warnings = unmatched_flags.iter().map(warning).collect();
+    let preference_pairs = preference_pairs(inputs)?;
     let slop_span_counts = slop_flags::span_counts(&flagged_examples);
     let report = report::render(&ReportInput {
         training_set: &training_set,

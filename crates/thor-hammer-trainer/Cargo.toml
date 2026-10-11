@@ -5,6 +5,9 @@ edition = "2024"
 description = "Builds the instruction/response training set."
 default-run = "thor-hammer-trainer"
 
+[lints]
+workspace = true
+
 [dependencies]
 thiserror = "2"
 serde = { version = "1.0.229", features = ["derive"] }
@@ -19,3 +22,6 @@ path = "src/main.rs"
 [[bin]]
 name = "teacher"
 path = "src/bin/teacher.rs"
+
+[dev-dependencies]
+tempfile = "3"

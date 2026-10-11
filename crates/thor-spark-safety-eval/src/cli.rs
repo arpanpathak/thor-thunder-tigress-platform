@@ -131,45 +131,66 @@ fn paths(arguments: &[String]) -> Outcome<Vec<PathBuf>> {
 
 impl ScoreOptions {
     fn parse(arguments: &[String]) -> Outcome<ScoreOptions> {
-        let mut input = None;
-        let mut field = DEFAULT_FIELD.to_string();
-        let mut code_field = None;
-        let mut label = None;
-        let mut output = None;
+        let mut given = Given::default();
         let mut rest = arguments.iter();
 
         while let Some(argument) = rest.next() {
-            let mut value = || {
-                rest.next()
-                    .cloned()
-                    .ok_or_else(|| EvalError::Usage(format!("{argument} needs a value")))
-            };
-
-            match argument.as_str() {
-                "--field" => field = value()?,
-                "--code-field" => code_field = Some(value()?),
-                "--label" => label = Some(value()?),
-                "--out" => output = Some(PathBuf::from(value()?)),
-                flag if flag.starts_with("--") => {
-                    return Err(EvalError::Usage(format!(
-                        "unknown option {flag}\n{}",
-                        usage()
-                    )));
-                }
-                path => input = Some(PathBuf::from(path)),
-            }
+            given.take(argument, &mut rest)?;
         }
 
-        let Some(input) = input else {
+        given.into_options()
+    }
+}
+
+/// The `score` arguments as given, before the defaults are filled in.
+#[derive(Default)]
+struct Given {
+    input: Option<PathBuf>,
+    field: Option<String>,
+    code_field: Option<String>,
+    label: Option<String>,
+    output: Option<PathBuf>,
+}
+
+impl Given {
+    /// Records `argument`, reading its value from `rest` when it is an option.
+    fn take<'a>(&mut self, argument: &str, rest: &mut impl Iterator<Item = &'a String>) -> Outcome {
+        let mut value = || {
+            rest.next()
+                .cloned()
+                .ok_or_else(|| EvalError::Usage(format!("{argument} needs a value")))
+        };
+
+        match argument {
+            "--field" => self.field = Some(value()?),
+            "--code-field" => self.code_field = Some(value()?),
+            "--label" => self.label = Some(value()?),
+            "--out" => self.output = Some(PathBuf::from(value()?)),
+            flag if flag.starts_with("--") => {
+                let message = format!("unknown option {flag}\n{}", usage());
+
+                return Err(EvalError::Usage(message));
+            }
+            path => self.input = Some(PathBuf::from(path)),
+        }
+
+        Ok(())
+    }
+
+    /// The options, with the output and the label named after the input.
+    fn into_options(self) -> Outcome<ScoreOptions> {
+        let Some(input) = self.input else {
             return Err(EvalError::Usage(usage()));
         };
 
         Ok(ScoreOptions {
-            output: output.unwrap_or_else(|| input.with_extension("scored.jsonl")),
-            label: label.unwrap_or_else(|| stem(&input)),
+            output: self
+                .output
+                .unwrap_or_else(|| input.with_extension("scored.jsonl")),
+            label: self.label.unwrap_or_else(|| stem(&input)),
             input,
-            field,
-            code_field,
+            field: self.field.unwrap_or_else(|| DEFAULT_FIELD.to_string()),
+            code_field: self.code_field,
         })
     }
 }
@@ -304,20 +325,10 @@ struct Scored {
     score: AnswerScore,
 }
 
-fn score_run(options: &ScoreOptions) -> Outcome<Report> {
-    let text = fs::read_to_string(&options.input).map_err(EvalError::io(&options.input))?;
-    let file = fs::File::create(&options.output).map_err(EvalError::io(&options.output))?;
-    let mut writer = BufWriter::new(file);
-    let mut summary = Summary::default();
-
-    for (line, number) in text
-        .lines()
-        .zip(1..)
-        .filter(|(line, _)| !line.trim().is_empty())
-    {
-        let Scored { mut record, score } = score_line(line, number, options)?;
-        summary.add(&score);
-
+impl Scored {
+    /// The answer's record with its score and the run's label added.
+    fn labelled(self, options: &ScoreOptions, number: usize) -> Outcome<Value> {
+        let Scored { mut record, score } = self;
         let spark =
             serde_json::to_value(&score).map_err(EvalError::json(&options.output, number))?;
 
@@ -329,25 +340,49 @@ fn score_run(options: &ScoreOptions) -> Outcome<Report> {
             );
         }
 
-        writeln!(writer, "{record}").map_err(EvalError::io(&options.output))?;
+        Ok(record)
     }
+}
 
-    writer.flush().map_err(EvalError::io(&options.output))?;
-
+/// What a scored run prints: the table, the slop found and where it was written.
+fn summary_lines(summary: &Summary, options: &ScoreOptions) -> Vec<String> {
     let categories: Vec<String> = summary
         .categories
         .iter()
         .map(|(category, count)| format!("{} {count}", category.label()))
         .collect();
-    let lines = vec![
+
+    vec![
         Summary::header(),
         summary.row(&options.label),
         format!("\nslop by category: {}", categories.join(", ")),
         format!("wrote {}", options.output.display()),
-    ];
+    ]
+}
+
+fn score_run(options: &ScoreOptions) -> Outcome<Report> {
+    let text = fs::read_to_string(&options.input).map_err(EvalError::io(&options.input))?;
+    let file = fs::File::create(&options.output).map_err(EvalError::io(&options.output))?;
+    let mut writer = BufWriter::new(file);
+    let mut summary = Summary::default();
+
+    for (line, number) in text
+        .lines()
+        .zip(1..)
+        .filter(|(line, _)| !line.trim().is_empty())
+    {
+        let scored = score_line(line, number, options)?;
+        summary.add(&scored.score);
+
+        let record = scored.labelled(options, number)?;
+
+        writeln!(writer, "{record}").map_err(EvalError::io(&options.output))?;
+    }
+
+    writer.flush().map_err(EvalError::io(&options.output))?;
 
     Ok(Report {
-        lines,
+        lines: summary_lines(&summary, options),
         exit: Exit::Clean,
     })
 }

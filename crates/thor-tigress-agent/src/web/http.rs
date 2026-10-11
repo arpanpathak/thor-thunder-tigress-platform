@@ -197,7 +197,7 @@ mod tests {
     use std::{
         io::{BufRead, BufReader, Read, Write},
         net::TcpListener,
-        sync::{Arc, mpsc},
+        sync::Arc,
         thread,
     };
 
@@ -226,7 +226,11 @@ mod tests {
         HttpWeb::with_addresses(Box::new(Local { address }), tls)
     }
 
-    fn https_server(response: &str) -> Result<(SocketAddr, mpsc::Receiver<Result<String>>)> {
+    /// The thread of a server that answers one connection; it ends with the
+    /// request it read.
+    type Serving = thread::JoinHandle<Result<String>>;
+
+    fn https_server(response: &str) -> Result<(SocketAddr, Serving)> {
         let certified = rcgen::generate_simple_self_signed(["localhost".to_string()])?;
         let certificate = CertificateDer::from(certified.cert.der().to_vec());
         let key =
@@ -237,14 +241,10 @@ mod tests {
         let config = Arc::new(config);
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?;
-        let (sender, received) = mpsc::channel();
         let owned = response.to_string();
+        let serving = thread::spawn(move || serve_once(&listener, &config, &owned));
 
-        thread::spawn(move || {
-            let _ = sender.send(serve_once(&listener, &config, &owned));
-        });
-
-        Ok((address, received))
+        Ok((address, serving))
     }
 
     fn serve_once(
@@ -296,7 +296,7 @@ mod tests {
     fn downloads_a_page_over_tls_and_sends_none_of_the_user() -> Result<()> {
         let (address, request) = https_server(&page("<p>hi</p>"))?;
         let fetched = web(address).get(&url()?)?;
-        let seen = request.recv().ok().and_then(Result::ok).unwrap_or_default();
+        let seen = request.join().ok().and_then(Result::ok).unwrap_or_default();
 
         assert_eq!(fetched.status, 200);
         assert_eq!(fetched.content_type, "text/html");
@@ -325,8 +325,9 @@ mod tests {
         let (address, request) = https_server(response)?;
         let fetched = web(address).get(&url()?);
 
-        request.recv().ok();
+        let served = request.join();
 
+        assert!(served.is_ok(), "the server thread panicked");
         assert!(matches!(fetched, Err(AgentError::Fetch(_))), "{fetched:?}");
 
         Ok(())
@@ -338,8 +339,9 @@ mod tests {
         let (address, request) = https_server(response)?;
         let fetched = web(address).get(&url()?)?;
 
-        request.recv().ok();
+        let served = request.join();
 
+        assert!(served.is_ok(), "the server thread panicked");
         assert_eq!((fetched.status, fetched.body.as_str()), (500, "nope"));
 
         Ok(())
@@ -351,8 +353,9 @@ mod tests {
         let (address, request) = https_server(response)?;
         let fetched = web(address).get(&url()?)?;
 
-        request.recv().ok();
+        let served = request.join();
 
+        assert!(served.is_ok(), "the server thread panicked");
         assert_eq!(fetched.status, 302);
         assert_eq!(
             fetched.location.as_deref(),

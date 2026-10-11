@@ -1,29 +1,26 @@
 use super::*;
 
 /// A fresh folder for one test, removed when dropped.
-struct Folder(PathBuf);
+struct Folder(tempfile::TempDir);
 
 impl Folder {
-    fn new(name: &str) -> Outcome<Folder> {
-        let path = std::env::temp_dir().join(format!("spark-cli-{}-{name}", std::process::id()));
-        fs::create_dir_all(&path).map_err(EvalError::io(&path))?;
+    fn new() -> Outcome<Folder> {
+        let folder = tempfile::tempdir().map_err(EvalError::io("temporary folder"))?;
 
-        Ok(Folder(path))
+        Ok(Folder(folder))
+    }
+
+    fn path(&self) -> &Path {
+        self.0.path()
     }
 
     fn file(&self, name: &str, text: &str) -> Outcome<PathBuf> {
-        let path = self.0.join(name);
-        let parent = path.parent().unwrap_or(&self.0);
+        let path = self.path().join(name);
+        let parent = path.parent().unwrap_or(self.path());
         fs::create_dir_all(parent).map_err(EvalError::io(parent))?;
         fs::write(&path, text).map_err(EvalError::io(&path))?;
 
         Ok(path)
-    }
-}
-
-impl Drop for Folder {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
     }
 }
 
@@ -77,7 +74,7 @@ fn refuses_what_it_does_not_understand() {
 
 #[test]
 fn checks_rust_files_and_skips_build_output() -> Outcome {
-    let folder = Folder::new("rs")?;
+    let folder = Folder::new()?;
     let good = "/// Adds.\npub fn add(a: i32, b: i32) -> i32 { a + b }\n";
     folder.file("src/good.rs", good)?;
     folder.file("src/bad.rs", "fn a() { b().unwrap(); }\n")?;
@@ -85,7 +82,7 @@ fn checks_rust_files_and_skips_build_output() -> Outcome {
     folder.file("target/skip.rs", "fn a() { b().unwrap(); }\n")?;
     folder.file(".hidden/skip.rs", "fn a() { b().unwrap(); }\n")?;
 
-    let report = Command::Rust(vec![folder.0.clone()]).run()?;
+    let report = Command::Rust(vec![folder.path().to_path_buf()]).run()?;
 
     assert_eq!(report.exit, Exit::Problems);
     assert!(
@@ -110,7 +107,7 @@ fn checks_rust_files_and_skips_build_output() -> Outcome {
 
 #[test]
 fn clean_rust_is_clean() -> Outcome {
-    let folder = Folder::new("clean")?;
+    let folder = Folder::new()?;
     let file = folder.file("a.rs", "fn add(a: i32) -> i32 { a + 1 }\n")?;
 
     assert_eq!(Command::Rust(vec![file]).run()?.exit, Exit::Clean);
@@ -120,7 +117,7 @@ fn clean_rust_is_clean() -> Outcome {
 
 #[test]
 fn finds_slop_in_text_with_its_line() -> Outcome {
-    let folder = Folder::new("text")?;
+    let folder = Folder::new()?;
     let file = folder.file("answer.md", "Fine.\nGreat question! Here it is.\n")?;
     let report = Command::Text(vec![file]).run()?;
 
@@ -133,7 +130,7 @@ fn finds_slop_in_text_with_its_line() -> Outcome {
 
 #[test]
 fn scores_a_run_and_writes_each_line_back() -> Outcome {
-    let folder = Folder::new("score")?;
+    let folder = Folder::new()?;
     let lines = "{\"text\":\"Great question!\",\"code\":\"fn a() { b().unwrap(); }\"}\n\n{\"text\":\"Plain.\",\"code\":\"\"}\n";
     let run = folder.file("run.jsonl", lines)?;
     let report = Command::from_args(&args(&[
@@ -148,10 +145,10 @@ fn scores_a_run_and_writes_each_line_back() -> Outcome {
 
     assert!(report.lines[1].starts_with("| base | 2 | 1 |"));
 
-    let written =
-        fs::read_to_string(folder.0.join("run.scored.jsonl")).map_err(EvalError::io(&folder.0))?;
+    let written = fs::read_to_string(folder.path().join("run.scored.jsonl"))
+        .map_err(EvalError::io(folder.path()))?;
     let first: Value = serde_json::from_str(written.lines().next().unwrap_or_default())
-        .map_err(EvalError::json(&folder.0, 1))?;
+        .map_err(EvalError::json(folder.path(), 1))?;
 
     assert_eq!(first["spark_run"], "base");
     assert_eq!(first["spark"]["rules"]["no_unwrap"], "fail");
@@ -161,7 +158,7 @@ fn scores_a_run_and_writes_each_line_back() -> Outcome {
 
 #[test]
 fn a_line_without_the_field_is_named() -> Outcome {
-    let folder = Folder::new("missing")?;
+    let folder = Folder::new()?;
     let run = folder.file("run.jsonl", "{\"text\":\"ok\"}\n{\"other\":1}\n")?;
     let outcome = Command::from_args(&args(&["score", &run.to_string_lossy()]))?.run();
 

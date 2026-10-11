@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 description = "Encrypted registry of the people allowed to use the Thor Tigress Cub, and the keys they were given."
 
+[lints]
+workspace = true
+
 [dependencies]
 thiserror = "2"
 argon2 = "0.6.0"
@@ -14,6 +17,7 @@ serde_json = "1.0.151"
 zeroize = "1.9.1"
 
 [dev-dependencies]
+tempfile = "3"
 anyhow = "1"
 
 [lib]

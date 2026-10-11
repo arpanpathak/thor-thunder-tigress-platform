@@ -1,8 +1,9 @@
 use super::*;
 use crate::teacher;
 
-fn scratch(name: &str) -> PathBuf {
-    std::env::temp_dir().join(format!("thor-hammer-verify-{name}-{}", std::process::id()))
+/// A fresh folder for one test, removed when dropped.
+fn scratch() -> Result<tempfile::TempDir, DataError> {
+    tempfile::tempdir().map_err(DataError::io(Path::new("temporary folder")))
 }
 
 fn conversation(answer: &str) -> Result<Conversation, DataError> {
@@ -15,15 +16,15 @@ const GOOD: &str = "Sums the values.\n\n```rust\n/// The sum of `values`.\n#[mus
 
 #[test]
 fn a_clean_block_builds_and_its_tests_count() -> Result<(), DataError> {
-    let folder = scratch("good");
-    let checked = check(&conversation(GOOD)?, &folder)?;
+    let folder = scratch()?;
+    let checked = check(&conversation(GOOD)?, folder.path())?;
 
     assert_eq!(
         (checked.block_count(), checked.tests, checked.problems.len()),
         (1, 1, 0)
     );
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 fn kinds(checked: &Checked) -> Vec<&'static str> {
@@ -32,33 +33,33 @@ fn kinds(checked: &Checked) -> Vec<&'static str> {
 
 #[test]
 fn a_failing_test_is_a_problem() -> Result<(), DataError> {
-    let folder = scratch("tests");
-    let checked = check(&conversation(&GOOD.replace("3);", "4);"))?, &folder)?;
+    let folder = scratch()?;
+    let checked = check(&conversation(&GOOD.replace("3);", "4);"))?, folder.path())?;
 
     assert_eq!(kinds(&checked), ["tests"]);
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 #[test]
 fn an_unwrap_breaks_a_rule_and_clippy_pedantic() -> Result<(), DataError> {
-    let folder = scratch("unwrap");
+    let folder = scratch()?;
     let source = GOOD.replace("values.iter().sum()", "values.first().copied().unwrap()");
-    let checked = check(&conversation(&source)?, &folder)?;
+    let checked = check(&conversation(&source)?, folder.path())?;
 
     assert_eq!(kinds(&checked), ["rule", "build"]);
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 #[test]
 fn a_clippy_warning_fails_the_build() -> Result<(), DataError> {
-    let folder = scratch("lint");
+    let folder = scratch()?;
     let linted = GOOD.replace(
         "values.iter().sum()",
         "values.iter().fold(0, |sum, value| sum + value)",
     );
-    let checked = check(&conversation(&linted)?, &folder)?;
+    let checked = check(&conversation(&linted)?, folder.path())?;
 
     assert!(matches!(
         checked.problems.as_slice(),
@@ -69,14 +70,14 @@ fn a_clippy_warning_fails_the_build() -> Result<(), DataError> {
         }]
     ));
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 #[test]
 fn slop_and_false_claims_are_problems() -> Result<(), DataError> {
-    let folder = scratch("prose");
+    let folder = scratch()?;
     let sloppy = "Great question! This code never uses unwrap.\n\n```rust\n/// One.\n#[must_use]\npub fn one(values: &[u8]) -> u8 {\n    values.first().copied().unwrap()\n}\n```";
-    let checked = check(&conversation(sloppy)?, &folder)?;
+    let checked = check(&conversation(sloppy)?, folder.path())?;
 
     assert!(
         checked
@@ -92,7 +93,7 @@ fn slop_and_false_claims_are_problems() -> Result<(), DataError> {
     );
     assert!(!spark_objections(sloppy).is_empty());
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 #[test]
@@ -106,10 +107,10 @@ fn only_a_main_function_makes_a_program() {
 
 #[test]
 fn checks_other_languages_and_counts_them() -> Result<(), DataError> {
-    let folder = scratch("python");
+    let folder = scratch()?;
     let answer =
         "Two blocks.\n\n```python\nassert max([3, 9]) == 9\n```\n\n```python\ndef f(:\n```";
-    let checked = check(&conversation(answer)?, &folder)?;
+    let checked = check(&conversation(answer)?, folder.path())?;
 
     assert_eq!(checked.blocks.get("python"), Some(&2));
     assert_eq!(checked.runs, 1);
@@ -121,35 +122,35 @@ fn checks_other_languages_and_counts_them() -> Result<(), DataError> {
         }]
     ));
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 #[test]
 fn a_grounded_entry_keeps_broken_rules_as_notes() -> Result<(), DataError> {
-    let folder = scratch("grounded");
+    let folder = scratch()?;
     let answer = "```rust\n/// One.\n#[must_use]\npub fn one(text: &str) -> u8 {\n    text.parse().unwrap_or(1)\n}\n\nfn main() {\n    let n: u8 = \"1\".parse().unwrap();\n    println!(\"{}\", one(\"x\") + n);\n}\n```";
     let entry = format!(
         "<!-- source: trpl; section: abc -->\n### User\nShow unwrap.\n### Assistant\n{answer}\n"
     );
     let grounded = teacher::parse(&entry, "x").map_err(DataError::format("x"))?;
-    let checked = check(&grounded, &folder)?;
+    let checked = check(&grounded, folder.path())?;
 
     assert!(checked.problems.is_empty(), "{:?}", checked.problems);
     assert_eq!(checked.notes.len(), 1);
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 #[test]
 fn a_command_over_its_limit_is_killed() -> Result<(), DataError> {
-    let folder = scratch("limit");
-    fs::create_dir_all(&folder).map_err(DataError::io(&folder))?;
+    let folder = scratch()?;
+    fs::create_dir_all(folder.path()).map_err(DataError::io(folder.path()))?;
 
     let mut sleeper = Command::new("sleep");
     sleeper.arg("5");
 
     assert_eq!(
-        run_limited(sleeper, &folder, Duration::from_millis(50))?,
+        run_limited(sleeper, folder.path(), Duration::from_millis(50))?,
         Finished::OverTime
     );
     assert_eq!(Built::after_run(Finished::OverTime), Built::TimedOut);
@@ -158,7 +159,7 @@ fn a_command_over_its_limit_is_killed() -> Result<(), DataError> {
         Built::TestsFailed("x".to_string())
     );
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 #[test]
@@ -186,16 +187,16 @@ fn records_every_outcome_of_a_block() {
 
 #[test]
 fn a_warning_only_in_test_code_fails_the_test_build() -> Result<(), DataError> {
-    let folder = scratch("testlint");
+    let folder = scratch()?;
     let linted = GOOD.replace(
         "assert_eq!(total(&[1, 2]), 3);",
         "let unused = 1;\n        assert_eq!(total(&[1, 2]), 3);",
     );
-    let checked = check(&conversation(&linted)?, &folder)?;
+    let checked = check(&conversation(&linted)?, folder.path())?;
 
     assert_eq!(kinds(&checked), ["build"]);
 
-    fs::remove_dir_all(&folder).map_err(DataError::io(&folder))
+    Ok(())
 }
 
 #[test]
@@ -235,13 +236,11 @@ fn names_every_kind_of_problem() {
 
 #[test]
 fn a_block_that_does_not_parse_and_em_dashes_are_problems() -> Result<(), DataError> {
-    let folder = scratch("unparsed");
+    let folder = scratch()?;
     let answer = "One \u{2014} two \u{2014} three.\n\n```rust,ignore\nfn (\n```";
-    let kinds_found = kinds(&check(&conversation(answer)?, &folder)?);
+    let kinds_found = kinds(&check(&conversation(answer)?, folder.path())?);
 
     assert_eq!(kinds_found, ["rule", "slop"]);
-
-    let _ = fs::remove_dir_all(&folder);
 
     Ok(())
 }

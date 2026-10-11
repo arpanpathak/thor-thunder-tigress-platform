@@ -1,32 +1,24 @@
 use super::*;
 
-struct Folder {
-    path: PathBuf,
-}
+/// A fresh folder for one test, removed when dropped.
+struct Folder(tempfile::TempDir);
 
 impl Folder {
-    fn new(name: &str) -> Result<Self, KeyringError> {
-        let path = std::env::temp_dir().join(format!("thor-keyring-{name}-{}", std::process::id()));
-        fs::create_dir_all(&path).map_err(KeyringError::io(&path))?;
+    fn new() -> Result<Self, KeyringError> {
+        let folder = tempfile::tempdir().map_err(KeyringError::io("temporary folder"))?;
 
-        Ok(Self { path })
+        Ok(Self(folder))
     }
 
     fn keyring(&self) -> PathBuf {
-        self.path.join("keyring")
-    }
-}
-
-impl Drop for Folder {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
+        self.0.path().join("keyring")
     }
 }
 
 const PASS: &str = "correct horse battery staple";
 
-fn made(name: &str) -> Result<(Folder, Keyring), KeyringError> {
-    let folder = Folder::new(name)?;
+fn made() -> Result<(Folder, Keyring), KeyringError> {
+    let folder = Folder::new()?;
     let keyring = Keyring::create(folder.keyring(), PASS)?;
 
     Ok((folder, keyring))
@@ -34,7 +26,7 @@ fn made(name: &str) -> Result<(Folder, Keyring), KeyringError> {
 
 #[test]
 fn a_new_keyring_is_empty_and_reopens_with_the_same_passphrase() -> Outcome<()> {
-    let (folder, keyring) = made("round")?;
+    let (folder, keyring) = made()?;
 
     assert!(keyring.records().is_empty());
 
@@ -47,7 +39,7 @@ fn a_new_keyring_is_empty_and_reopens_with_the_same_passphrase() -> Outcome<()> 
 
 #[test]
 fn creating_twice_is_refused() -> Outcome<()> {
-    let folder = Folder::new("twice")?;
+    let folder = Folder::new()?;
     Keyring::create(folder.keyring(), PASS)?;
 
     assert!(matches!(
@@ -68,14 +60,14 @@ fn creating_twice_is_refused() -> Outcome<()> {
 
 #[test]
 fn a_wrong_passphrase_does_not_open_the_keyring() -> Outcome<()> {
-    let (folder, _) = made("wrong")?;
+    let (folder, _) = made()?;
 
     assert!(matches!(
         Keyring::open(folder.keyring(), "not the passphrase"),
         Err(KeyringError::Sealed)
     ));
     assert!(matches!(
-        Keyring::open(folder.path.join("missing"), PASS),
+        Keyring::open(folder.0.path().join("missing"), PASS),
         Err(KeyringError::Io { .. })
     ));
 
@@ -84,7 +76,7 @@ fn a_wrong_passphrase_does_not_open_the_keyring() -> Outcome<()> {
 
 #[test]
 fn what_is_not_a_keyring_is_refused() -> Outcome<()> {
-    let folder = Folder::new("format")?;
+    let folder = Folder::new()?;
     let path = folder.keyring();
     fs::write(&path, b"too short").map_err(KeyringError::io(&path))?;
 
@@ -125,7 +117,7 @@ fn what_is_not_a_keyring_is_refused() -> Outcome<()> {
 
 #[test]
 fn a_sealed_file_that_is_not_json_is_refused() -> Outcome<()> {
-    let folder = Folder::new("json")?;
+    let folder = Folder::new()?;
     let path = folder.keyring();
     let salt = [1u8; SALT_LEN];
     let nonce = [2u8; NONCE_LEN];
@@ -147,7 +139,7 @@ fn a_sealed_file_that_is_not_json_is_refused() -> Outcome<()> {
 
 #[test]
 fn a_request_is_recorded_once_and_must_look_like_a_person() -> Outcome<()> {
-    let (folder, mut keyring) = made("request")?;
+    let (folder, mut keyring) = made()?;
     let added = keyring.request("  Ada Lovelace ", "ada@example.com")?;
 
     assert_eq!(added.name, "Ada Lovelace");
@@ -186,7 +178,7 @@ fn a_request_is_recorded_once_and_must_look_like_a_person() -> Outcome<()> {
 
 #[test]
 fn approving_mints_a_working_key_and_then_refuses_a_second() -> Outcome<()> {
-    let (folder, mut keyring) = made("approve")?;
+    let (folder, mut keyring) = made()?;
 
     assert!(matches!(
         keyring.approve("nobody@example.com"),
@@ -222,7 +214,7 @@ fn approving_mints_a_working_key_and_then_refuses_a_second() -> Outcome<()> {
 
 #[test]
 fn revoking_takes_the_key_away_by_email_or_by_key() -> Outcome<()> {
-    let (_folder, mut keyring) = made("revoke")?;
+    let (_folder, mut keyring) = made()?;
     keyring.request("Ada", "ada@example.com")?;
 
     let ada = keyring.approve("ada@example.com")?;
@@ -253,7 +245,7 @@ fn revoking_takes_the_key_away_by_email_or_by_key() -> Outcome<()> {
 
 #[test]
 fn revoking_everything_stops_the_whole_chat_at_once() -> Outcome<()> {
-    let (_folder, mut keyring) = made("revoke-all")?;
+    let (_folder, mut keyring) = made()?;
     keyring.request("Ada", "ada@example.com")?;
     keyring.approve("ada@example.com")?;
     keyring.request("Bob", "bob@example.com")?;

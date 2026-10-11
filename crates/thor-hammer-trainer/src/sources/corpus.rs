@@ -285,76 +285,77 @@ pub fn examples(root: &Path, manifest_path: &Path) -> Result<Corpus, DataError> 
     let mut reports = Vec::new();
 
     for row in read_manifest(manifest_path)? {
-        let source_dir = root.join(&row.name);
-
-        if row.licence.permits_reuse() && row.kind == CODE_KIND {
-            reports.push(SourceReport {
-                name: row.name,
-                outcome: SourceOutcome::CodeOnly,
-            });
-
-            continue;
-        }
-
-        if !row.licence.permits_reuse() {
-            reports.push(SourceReport {
-                name: row.name,
-                outcome: SourceOutcome::LicenceRefused(row.licence),
-            });
-
-            continue;
-        }
-
-        if !source_dir.is_dir() {
-            reports.push(SourceReport {
-                name: row.name,
-                outcome: SourceOutcome::NoMarkdown,
-            });
-
-            continue;
-        }
-
-        let mut produced = Vec::new();
-
-        for file in markdown_roots(&row.name, &source_dir)? {
-            let origin = file
-                .strip_prefix(root)
-                .unwrap_or(&file)
-                .display()
-                .to_string();
-
-            if SKIPPED_TREES.iter().any(|tree| origin.starts_with(tree)) {
-                continue;
-            }
-
-            let text = clean(&fs::read_to_string(&file).map_err(DataError::io(&file))?);
-
-            produced.extend(
-                book::examples(&text, &origin)
-                    .into_iter()
-                    .map(as_corpus_example),
-            );
-        }
-
-        let before_cap = produced.len();
-        let kept = cap_tokens(produced, MAX_SOURCE_TOKENS);
+        let (outcome, kept) = read_source(root, &row)?;
 
         reports.push(SourceReport {
             name: row.name,
-            outcome: match kept.len() {
-                0 => SourceOutcome::NoMarkdown,
-                count => SourceOutcome::Used {
-                    examples: count,
-                    before_cap,
-                    licence: row.licence,
-                },
-            },
+            outcome,
         });
-
         examples.extend(kept);
     }
 
     Ok(Corpus { examples, reports })
+}
+
+/// What the source in `row` contributes, and its examples.
+fn read_source(root: &Path, row: &ManifestRow) -> Result<(SourceOutcome, Vec<Example>), DataError> {
+    let source_dir = root.join(&row.name);
+
+    if !row.licence.permits_reuse() {
+        let refused = SourceOutcome::LicenceRefused(row.licence);
+
+        return Ok((refused, Vec::new()));
+    }
+
+    if row.kind == CODE_KIND {
+        return Ok((SourceOutcome::CodeOnly, Vec::new()));
+    }
+
+    if !source_dir.is_dir() {
+        return Ok((SourceOutcome::NoMarkdown, Vec::new()));
+    }
+
+    let produced = prose_examples(root, &row.name, &source_dir)?;
+    let before_cap = produced.len();
+    let kept = cap_tokens(produced, MAX_SOURCE_TOKENS);
+
+    let outcome = match kept.len() {
+        0 => SourceOutcome::NoMarkdown,
+        count => SourceOutcome::Used {
+            examples: count,
+            before_cap,
+            licence: row.licence,
+        },
+    };
+
+    Ok((outcome, kept))
+}
+
+/// One example per section of every markdown file of the source `name`.
+fn prose_examples(root: &Path, name: &str, source_dir: &Path) -> Result<Vec<Example>, DataError> {
+    let mut produced = Vec::new();
+
+    for file in markdown_roots(name, source_dir)? {
+        let origin = file
+            .strip_prefix(root)
+            .unwrap_or(&file)
+            .display()
+            .to_string();
+
+        if SKIPPED_TREES.iter().any(|tree| origin.starts_with(tree)) {
+            continue;
+        }
+
+        let text = clean(&fs::read_to_string(&file).map_err(DataError::io(&file))?);
+
+        produced.extend(
+            book::examples(&text, &origin)
+                .into_iter()
+                .map(as_corpus_example),
+        );
+    }
+
+    Ok(produced)
 }
 
 /// The most tokens one source may put in the training set, estimated as

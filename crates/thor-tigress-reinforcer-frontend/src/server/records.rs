@@ -66,6 +66,18 @@ pub(super) enum Length {
     ShortenedTo(usize),
 }
 
+impl Length {
+    /// As much of `response` as this length sends.
+    fn of(self, response: &str) -> String {
+        match self {
+            Length::ShortenedTo(limit) if response.chars().count() > limit => {
+                shorten_at_line(response, limit)
+            }
+            Length::ShortenedTo(_) | Length::Whole => response.to_string(),
+        }
+    }
+}
+
 /// One record as the page draws it.
 #[derive(Serialize)]
 pub(super) struct Item {
@@ -123,12 +135,8 @@ pub(super) fn item(app: &App, position: usize, length: Length) -> Outcome<Item> 
     let record: RecordText = app.index.parsed(position)?;
     let source = app.index.source_of(entry);
     let response_chars = record.response.chars().count();
-    let shortened = matches!(length, Length::ShortenedTo(limit) if response_chars > limit);
-
-    let response = match length {
-        Length::ShortenedTo(limit) if shortened => shorten_at_line(&record.response, limit),
-        Length::ShortenedTo(_) | Length::Whole => record.response.clone(),
-    };
+    let response = length.of(&record.response);
+    let shortened = response.len() < record.response.len();
 
     Ok(Item {
         position,

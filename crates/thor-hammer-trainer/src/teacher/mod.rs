@@ -196,6 +196,20 @@ pub fn entries(markdown: &str, file: &str) -> Vec<(String, Result<Conversation, 
         .collect()
 }
 
+/// The turns of the sections before a rejected answer.
+fn turns(sections: &[(Heading, String)]) -> Result<Vec<Turn>, FormatError> {
+    sections
+        .iter()
+        .map(|(heading, content)| match heading {
+            Heading::Speaker(role) => Ok(Turn {
+                role: *role,
+                content: content.clone(),
+            }),
+            Heading::Rejected => Err(FormatError::RejectedNotLast),
+        })
+        .collect()
+}
+
 /// Reads one entry.
 ///
 /// # Errors
@@ -215,16 +229,7 @@ pub fn parse(entry: &str, origin: &str) -> Result<Conversation, FormatError> {
         _ => (None, sections.as_slice()),
     };
 
-    let turns = turn_sections
-        .iter()
-        .map(|(heading, content)| match heading {
-            Heading::Speaker(role) => Ok(Turn {
-                role: *role,
-                content: content.clone(),
-            }),
-            Heading::Rejected => Err(FormatError::RejectedNotLast),
-        })
-        .collect::<Result<Vec<Turn>, FormatError>>()?;
+    let turns = turns(turn_sections)?;
     check_order(&turns)?;
 
     if turns.iter().any(|turn| turn.content.is_empty())

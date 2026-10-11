@@ -18,40 +18,47 @@ pub fn source_title(source: &str) -> String {
     }
 }
 
+/// The books and document sets whose titles are not their folder's name.
+const KNOWN_COLLECTIONS: [(&str, &str); 22] = [
+    ("trpl", "The Rust Programming Language"),
+    ("rbe", "Rust by Example"),
+    ("nomicon", "The Rustonomicon"),
+    ("async-book", "Asynchronous Programming in Rust"),
+    ("api-guidelines", "Rust API Guidelines"),
+    ("rustc-dev-guide", "Rust Compiler Development Guide"),
+    ("patterns", "Rust Design Patterns"),
+    (
+        "too-many-lists",
+        "Learn Rust With Entirely Too Many Linked Lists",
+    ),
+    ("comprehensive-rust", "Comprehensive Rust (Google)"),
+    ("reference", "The Rust Reference"),
+    ("cargo-book", "The Cargo Book"),
+    ("clippy", "Clippy Lint Documentation"),
+    ("google-styleguide", "Google Style Guides"),
+    ("ms-style-guide", "Microsoft Writing Style Guide"),
+    ("kubernetes-website", "Kubernetes Documentation"),
+    ("go-website", "Go Documentation"),
+    (
+        "cracking-the-systems-programming-interview",
+        "Cracking the Systems Programming Interview",
+    ),
+    (
+        "cracking-the-systems-engineering-book",
+        "Cracking the Systems Engineering Book",
+    ),
+    ("gpu-accelerated-kubernetes", "GPU-Accelerated Kubernetes"),
+    ("rust-interview-lab", "Rust Interview Lab"),
+    ("systems_design", "Systems Design"),
+    ("docs", "Interview Prep Docs"),
+];
+
 /// The title of a book or document set, from the folder it was read from.
 pub fn collection_title(folder: &str) -> String {
-    let known = match folder {
-        "trpl" => "The Rust Programming Language",
-        "rbe" => "Rust by Example",
-        "nomicon" => "The Rustonomicon",
-        "async-book" => "Asynchronous Programming in Rust",
-        "api-guidelines" => "Rust API Guidelines",
-        "rustc-dev-guide" => "Rust Compiler Development Guide",
-        "patterns" => "Rust Design Patterns",
-        "too-many-lists" => "Learn Rust With Entirely Too Many Linked Lists",
-        "comprehensive-rust" => "Comprehensive Rust (Google)",
-        "reference" => "The Rust Reference",
-        "cargo-book" => "The Cargo Book",
-        "clippy" => "Clippy Lint Documentation",
-        "google-styleguide" => "Google Style Guides",
-        "ms-style-guide" => "Microsoft Writing Style Guide",
-        "kubernetes-website" => "Kubernetes Documentation",
-        "go-website" => "Go Documentation",
-        "cracking-the-systems-programming-interview" => {
-            "Cracking the Systems Programming Interview"
-        }
-        "cracking-the-systems-engineering-book" => "Cracking the Systems Engineering Book",
-        "gpu-accelerated-kubernetes" => "GPU-Accelerated Kubernetes",
-        "rust-interview-lab" => "Rust Interview Lab",
-        "systems_design" => "Systems Design",
-        "docs" => "Interview Prep Docs",
-        _ => "",
-    };
-
-    match known {
-        "" => humanize(folder),
-        title => title.to_string(),
-    }
+    KNOWN_COLLECTIONS
+        .iter()
+        .find(|(name, _)| *name == folder)
+        .map_or_else(|| humanize(folder), |(_, title)| (*title).to_string())
 }
 
 /// What a broken rule means, in words.

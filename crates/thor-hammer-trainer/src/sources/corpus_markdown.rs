@@ -112,6 +112,12 @@ pub(super) fn tidy_with(
         joinable = !trimmed.is_empty() && !trimmed.starts_with('#') && !trimmed.starts_with('|');
     }
 
+    without_reference_links(lines, reference)
+}
+
+/// Joins `lines`, each marked as code or not, with reference-style links in
+/// the prose replaced by their text.
+fn without_reference_links(lines: Vec<(bool, String)>, reference: &Regex) -> String {
     lines
         .into_iter()
         .map(|(is_code, line)| match is_code {

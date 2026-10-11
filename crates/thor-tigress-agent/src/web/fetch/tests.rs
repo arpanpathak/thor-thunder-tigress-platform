@@ -2,6 +2,31 @@ use std::{collections::HashMap, sync::Mutex};
 
 use super::*;
 
+/// A page that answers 200 with `body`.
+fn html(body: &str) -> Fetched {
+    page(200, "text/html", body)
+}
+
+/// A redirect with `status` to `location`.
+fn redirect(status: u16, location: &str) -> Fetched {
+    let mut moved = page(status, "text/html", "");
+    moved.location = Some(location.to_string());
+
+    moved
+}
+
+/// What reading `https://example.com/` finds when the site holds `pages`.
+fn read_from(pages: &[(&str, Fetched)]) -> Outcome<Report> {
+    let start = url("https://example.com/")?;
+
+    read_recursive(
+        &Fake::with(pages),
+        &start,
+        &allowed(&["example.com"]),
+        MAX_PAGES,
+    )
+}
+
 #[derive(Debug, Default)]
 struct Fake {
     pages: HashMap<String, Fetched>,
@@ -87,39 +112,30 @@ fn an_allowed_set_is_the_hosts_it_was_given() -> Outcome {
 
 #[test]
 fn reads_a_page_and_its_same_site_links() -> Outcome {
-    let start = url("https://example.com/")?;
-    let fake = Fake::with(&[
+    let links = "<title>Start</title><a href=\"/a\">A</a><a href=\"/b\">B</a>";
+    let report = read_from(&[
         (
             "https://example.com/",
-            page(
-                200,
-                "text/html; charset=utf-8",
-                "<title>Start</title><a href=\"/a\">A</a><a href=\"/b\">B</a>",
-            ),
+            page(200, "text/html; charset=utf-8", links),
         ),
         (
             "https://example.com/a",
-            page(200, "text/html", "<title>A</title><p>alpha</p>"),
+            html("<title>A</title><p>alpha</p>"),
         ),
         ("https://example.com/b", page(200, "text/plain", "beta")),
-    ]);
-    let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
+    ])?;
+    let read: Vec<(&str, &str)> = report
+        .pages
+        .iter()
+        .map(|page| (page.url.as_str(), page.title.as_str()))
+        .collect();
 
     assert_eq!(
-        report.pages,
+        read,
         [
-            Read {
-                url: "https://example.com/".to_string(),
-                title: "Start".to_string()
-            },
-            Read {
-                url: "https://example.com/a".to_string(),
-                title: "A".to_string()
-            },
-            Read {
-                url: "https://example.com/b".to_string(),
-                title: "example.com".to_string()
-            },
+            ("https://example.com/", "Start"),
+            ("https://example.com/a", "A"),
+            ("https://example.com/b", "example.com"),
         ]
     );
     assert!(report.text.starts_with("Untrusted text from example.com."));
@@ -172,38 +188,20 @@ fn a_page_at_the_depth_limit_has_no_links_to_follow() -> Outcome {
 #[test]
 fn a_page_budget_stops_the_crawl_early() -> Outcome {
     let start = url("https://example.com/")?;
+    let links = "<title>Start</title><a href=\"/a\">A</a><a href=\"/b\">B</a>";
     let pages = [
-        (
-            "https://example.com/",
-            page(
-                200,
-                "text/html",
-                "<title>Start</title><a href=\"/a\">A</a><a href=\"/b\">B</a>",
-            ),
-        ),
-        (
-            "https://example.com/a",
-            page(200, "text/html", "<title>A</title>"),
-        ),
-        (
-            "https://example.com/b",
-            page(200, "text/html", "<title>B</title>"),
-        ),
+        ("https://example.com/", html(links)),
+        ("https://example.com/a", html("<title>A</title>")),
+        ("https://example.com/b", html("<title>B</title>")),
     ];
     let fake = Fake::with(&pages);
     let report = read_recursive(&fake, &start, &allowed(&["example.com"]), 2)?;
+    let without_a_budget =
+        read_recursive(&Fake::with(&pages), &start, &allowed(&["example.com"]), 0)?;
 
     assert_eq!(report.pages.len(), 2);
     assert_eq!(fake.asked().len(), 2);
-
-    let none = Fake::with(&pages);
-
-    assert_eq!(
-        read_recursive(&none, &start, &allowed(&["example.com"]), 0)?
-            .pages
-            .len(),
-        1
-    );
+    assert_eq!(without_a_budget.pages.len(), 1);
 
     Ok(())
 }
@@ -269,50 +267,31 @@ fn stops_at_six_pages_with_links_still_queued() -> Outcome {
 }
 
 #[test]
-fn follows_redirects_and_reports_too_many() -> Outcome {
-    let start = url("https://example.com/")?;
-    let mut moved = page(302, "text/html", "");
-    moved.location = Some("/loop".to_string());
-
-    let mut forever = page(307, "text/html", "");
-    forever.location = Some("/loop".to_string());
-
-    let fake = Fake::with(&[
-        ("https://example.com/", moved),
-        ("https://example.com/loop", forever),
-    ]);
-
-    assert!(
-        read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)
-            .is_err_and(|error| error.to_string().contains("too many redirects"))
-    );
-
-    let mut once = page(302, "text/html", "");
-    once.location = Some("/final".to_string());
-
-    let fake = Fake::with(&[
-        ("https://example.com/", once),
+fn follows_a_redirect_to_the_page() -> Outcome {
+    let report = read_from(&[
+        ("https://example.com/", redirect(302, "/final")),
         (
             "https://example.com/final",
             page(200, "text/plain", "arrived"),
         ),
-    ]);
-    let report = read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)?;
+    ])?;
 
     assert_eq!(report.pages[0].url, "https://example.com/final");
     assert!(report.text.contains("arrived"));
 
-    let mut bad = page(302, "text/html", "");
-    bad.location = Some("//:bad".to_string());
-
-    let fake = Fake::with(&[("https://example.com/", bad)]);
-
-    assert!(
-        read_recursive(&fake, &start, &allowed(&["example.com"]), MAX_PAGES)
-            .is_err_and(|error| error.to_string().contains("bad redirect"))
-    );
-
     Ok(())
+}
+
+#[test]
+fn reports_a_redirect_loop_and_a_bad_redirect() {
+    let looping = read_from(&[
+        ("https://example.com/", redirect(302, "/loop")),
+        ("https://example.com/loop", redirect(307, "/loop")),
+    ]);
+    let bad = read_from(&[("https://example.com/", redirect(302, "//:bad"))]);
+
+    assert!(looping.is_err_and(|error| error.to_string().contains("too many redirects")));
+    assert!(bad.is_err_and(|error| error.to_string().contains("bad redirect")));
 }
 
 #[test]

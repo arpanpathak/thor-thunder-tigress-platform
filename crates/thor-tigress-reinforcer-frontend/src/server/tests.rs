@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::oneshot,
+    sync::Notify,
 };
 use tower::ServiceExt;
 
@@ -412,9 +412,10 @@ async fn answers_over_a_real_connection() -> Result<()> {
     let setup = Setup::new()?;
     let listener = TcpListener::bind("127.0.0.1:0").await?;
     let address = listener.local_addr()?;
-    let (stop, stopped) = oneshot::channel::<()>();
-    let serving = tokio::spawn(serve(listener, Arc::clone(&setup.workspace), async {
-        let _ = stopped.await;
+    let stop = Arc::new(Notify::new());
+    let stopped = Arc::clone(&stop);
+    let serving = tokio::spawn(serve(listener, Arc::clone(&setup.workspace), async move {
+        stopped.notified().await
     }));
     let mut stream = TcpStream::connect(address).await?;
     let mut reply = String::new();
@@ -423,7 +424,7 @@ async fn answers_over_a_real_connection() -> Result<()> {
         .write_all(b"GET /api/datasets HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")
         .await?;
     stream.read_to_string(&mut reply).await?;
-    drop(stop);
+    stop.notify_one();
     serving.await??;
 
     assert!(reply.starts_with("HTTP/1.1 200 OK"), "{reply}");

@@ -62,63 +62,58 @@ fn caps_a_source_by_tokens_and_keeps_the_original_order() {
     assert_eq!(cap_tokens(all.clone(), 1_000).len(), 4);
 }
 
+/// The start of each licence text that was fetched, and what it is.
+const FETCHED_LICENCES: [(&str, Licence); 11] = [
+    ("Apache License Version 2.0, January 2004", Licence::Apache),
+    (
+        "Copyright (c) 2015 Aria Desires Permission is hereby granted",
+        Licence::Mit,
+    ),
+    (
+        "Copyright 2009 The Go Authors. Redistribution and use in source and binary forms",
+        Licence::Bsd,
+    ),
+    ("Attribution 4.0 International", Licence::CreativeCommons),
+    ("Mozilla Public License Version 2.0", Licence::MozillaPublic),
+    (
+        "A. HISTORY OF THE SOFTWARE PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2",
+        Licence::PythonSoftwareFoundation,
+    ),
+    (
+        "Attribution-NonCommercial-NoDerivatives 4.0 International",
+        Licence::CreativeCommonsRestricted,
+    ),
+    (
+        "Creative Commons Legal Code Attribution-ShareAlike 3.0 Unported",
+        Licence::CreativeCommonsRestricted,
+    ),
+    (
+        "Creative Commons Legal Code CC0 1.0 Universal",
+        Licence::CreativeCommons,
+    ),
+    (
+        "CC0 1.0 Universal Statement of Purpose The laws of most jurisdictions",
+        Licence::CreativeCommons,
+    ),
+    (
+        "MIT License Permission is hereby granted || Attribution-NonCommercial 4.0 International",
+        Licence::CreativeCommonsRestricted,
+    ),
+];
+
 #[test]
 fn classifies_the_licences_actually_fetched() {
-    assert_eq!(
-        Licence::classify("Apache License Version 2.0, January 2004"),
-        Licence::Apache
-    );
-    assert_eq!(
-        Licence::classify("Copyright (c) 2015 Aria Desires Permission is hereby granted"),
-        Licence::Mit
-    );
-    assert_eq!(
-        Licence::classify(
-            "Copyright 2009 The Go Authors. Redistribution and use in source and binary forms"
-        ),
-        Licence::Bsd
-    );
-    assert_eq!(
-        Licence::classify("Attribution 4.0 International"),
-        Licence::CreativeCommons
-    );
-    assert_eq!(
-        Licence::classify("Mozilla Public License Version 2.0"),
-        Licence::MozillaPublic
-    );
-    assert_eq!(
-        Licence::classify(
-            "A. HISTORY OF THE SOFTWARE PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2"
-        ),
-        Licence::PythonSoftwareFoundation
-    );
-    assert!(Licence::PythonSoftwareFoundation.permits_reuse());
+    for (text, licence) in FETCHED_LICENCES {
+        assert_eq!(Licence::classify(text), licence, "{text}");
+    }
+}
 
+#[test]
+fn a_licence_for_personal_use_only_is_refused() {
     let personal_use_only = "Standard C++ Foundation grants you a worldwide, nonexclusive, royalty-free, perpetual license to copy, use, modify, and create derivative works from this project for your personal or internal business use only.";
 
+    assert!(Licence::PythonSoftwareFoundation.permits_reuse());
     assert!(!Licence::classify(personal_use_only).permits_reuse());
-    assert_eq!(
-        Licence::classify("Attribution-NonCommercial-NoDerivatives 4.0 International"),
-        Licence::CreativeCommonsRestricted
-    );
-    assert_eq!(
-        Licence::classify("Creative Commons Legal Code Attribution-ShareAlike 3.0 Unported"),
-        Licence::CreativeCommonsRestricted
-    );
-    assert_eq!(
-        Licence::classify("Creative Commons Legal Code CC0 1.0 Universal"),
-        Licence::CreativeCommons
-    );
-    assert_eq!(
-        Licence::classify("CC0 1.0 Universal Statement of Purpose The laws of most jurisdictions"),
-        Licence::CreativeCommons
-    );
-    assert_eq!(
-        Licence::classify(
-            "MIT License Permission is hereby granted || Attribution-NonCommercial 4.0 International"
-        ),
-        Licence::CreativeCommonsRestricted
-    );
 }
 
 #[test]
@@ -130,38 +125,36 @@ fn mozilla_public_is_refused() {
     assert!(!Licence::Unrecognised.permits_reuse());
 }
 
-struct Tree {
-    root: PathBuf,
-}
+/// A fresh folder for one test, removed when dropped.
+struct Tree(tempfile::TempDir);
 
 impl Tree {
-    fn new(name: &str) -> Self {
-        Self {
-            root: std::env::temp_dir()
-                .join(format!("thor-hammer-corpus-{name}-{}", std::process::id())),
-        }
+    fn new() -> Result<Self, DataError> {
+        Ok(Self(
+            tempfile::tempdir().map_err(DataError::io(Path::new("temporary folder")))?,
+        ))
+    }
+
+    fn root(&self) -> &Path {
+        self.0.path()
     }
 
     fn write(&self, path: &str, text: &str) -> Result<(), DataError> {
-        let file = self.root.join(path);
-        let parent = file.parent().unwrap_or(&self.root);
+        let file = self.root().join(path);
+        let parent = file.parent().unwrap_or(self.root());
         fs::create_dir_all(parent).map_err(DataError::io(parent))?;
 
         fs::write(&file, text).map_err(DataError::io(&file))
     }
 }
 
-impl Drop for Tree {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
-    }
-}
-
-#[test]
-fn walks_books_plain_sources_and_skips_what_it_should() -> Result<(), DataError> {
-    let tree = Tree::new("walk");
+/// The corpus read from a tree with a book, a plain source, a source in
+/// the wrong place, one that was never fetched, and files to skip.
+fn walked() -> Result<Corpus, DataError> {
+    let tree = Tree::new()?;
     let section =
         "# Title\n\n## Part\n\nEnough words to make a section that is kept as an example.\n";
+    let manifest = "source\tkind\tcommit\tlicence_file\tlicence\nmybook\tbook\tabc\tLICENSE\tMIT License\naosa-500lines\tbook\tabc\tLICENSE\tMIT License\neng-practices\tdocs\tabc\tLICENSE\tMIT License\nnot-fetched\tbook\tabc\tLICENSE\tMIT License\nbroken line\n";
 
     tree.write("corpus/mybook/guide/book.toml", "[book]\nsrc = \"text\"\n")?;
     tree.write("corpus/mybook/guide/text/ch01.md", section)?;
@@ -172,11 +165,17 @@ fn walks_books_plain_sources_and_skips_what_it_should() -> Result<(), DataError>
     tree.write("corpus/aosa-500lines/incomplete/draft.md", section)?;
     tree.write("corpus/aosa-500lines/.git/x.md", section)?;
     tree.write("corpus/eng-practices/other/x.md", section)?;
-
-    let manifest = "source\tkind\tcommit\tlicence_file\tlicence\nmybook\tbook\tabc\tLICENSE\tMIT License\naosa-500lines\tbook\tabc\tLICENSE\tMIT License\neng-practices\tdocs\tabc\tLICENSE\tMIT License\nnot-fetched\tbook\tabc\tLICENSE\tMIT License\nbroken line\n";
     tree.write("manifest.tsv", manifest)?;
 
-    let corpus = examples(&tree.root.join("corpus"), &tree.root.join("manifest.tsv"))?;
+    examples(
+        &tree.root().join("corpus"),
+        &tree.root().join("manifest.tsv"),
+    )
+}
+
+#[test]
+fn walks_books_and_plain_sources_and_skips_what_it_should() -> Result<(), DataError> {
+    let corpus = walked()?;
     let origins: Vec<&str> = corpus
         .examples
         .iter()
@@ -191,14 +190,19 @@ fn walks_books_plain_sources_and_skips_what_it_should() -> Result<(), DataError>
         ]
     );
 
+    Ok(())
+}
+
+#[test]
+fn a_source_with_nothing_to_read_is_reported_as_having_no_markdown() -> Result<(), DataError> {
+    let corpus = walked()?;
     let outcomes: Vec<(&str, bool)> = corpus
         .reports
         .iter()
         .map(|report| {
-            (
-                report.name.as_str(),
-                matches!(report.outcome, SourceOutcome::NoMarkdown),
-            )
+            let empty = matches!(report.outcome, SourceOutcome::NoMarkdown);
+
+            (report.name.as_str(), empty)
         })
         .collect();
 

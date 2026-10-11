@@ -230,32 +230,8 @@ fn parse_xml(block: &str) -> Option<TextCall> {
     let mut arguments = Map::new();
     let mut rest = &block[end..];
 
-    while let Some(at) = find_ci(rest, "<parameter=") {
-        let start = at + "<parameter=".len();
-
-        let Some(gt) = rest[start..].find('>') else {
-            break;
-        };
-
-        let key = rest[start..start + gt].trim().to_string();
-        let value_at = start + gt + 1;
-
-        let value = match find_ci(&rest[value_at..], "</parameter>") {
-            Some(end) => {
-                let value = rest[value_at..value_at + end].trim().to_string();
-
-                rest = &rest[value_at + end + "</parameter>".len()..];
-
-                value
-            }
-            None => {
-                let value = rest[value_at..].trim().to_string();
-
-                rest = "";
-
-                value
-            }
-        };
+    while let Some((key, value, after)) = next_parameter(rest) {
+        rest = after;
 
         if !key.is_empty() {
             arguments.insert(key, Value::String(value));
@@ -266,6 +242,23 @@ fn parse_xml(block: &str) -> Option<TextCall> {
         name,
         arguments: Value::Object(arguments).to_string(),
     })
+}
+
+/// The next `<parameter=KEY>VALUE</parameter>` in `text`: its key, its value
+/// and the text after it. A parameter that is never closed takes the rest of
+/// the text.
+fn next_parameter(text: &str) -> Option<(String, String, &str)> {
+    let start = find_ci(text, "<parameter=")? + "<parameter=".len();
+    let key_end = text[start..].find('>')? + start;
+    let key = text[start..key_end].trim().to_string();
+    let after_key = &text[key_end + 1..];
+
+    let (value, rest) = match find_ci(after_key, "</parameter>") {
+        Some(end) => (&after_key[..end], &after_key[end + "</parameter>".len()..]),
+        None => (after_key, ""),
+    };
+
+    Some((key, value.trim().to_string(), rest))
 }
 
 #[cfg(test)]

@@ -140,6 +140,37 @@ impl UpstreamResponse {
     }
 }
 
+/// What the headers of a response say about its body.
+struct Headers {
+    chunked: bool,
+    content_type: String,
+}
+
+/// Reads the headers from `reader`, up to and including the empty line.
+fn read_headers(reader: &mut dyn BufRead) -> Outcome<Headers> {
+    let mut headers = Headers {
+        chunked: false,
+        content_type: DEFAULT_CONTENT_TYPE.to_string(),
+    };
+
+    loop {
+        let mut header = String::new();
+        reader.read_line(&mut header)?;
+
+        let header = header.trim().to_ascii_lowercase();
+
+        if header.is_empty() {
+            return Ok(headers);
+        }
+
+        headers.chunked |= header.starts_with("transfer-encoding:") && header.contains("chunked");
+
+        if let Some(value) = header.strip_prefix("content-type:") {
+            headers.content_type = value.trim().to_string();
+        }
+    }
+}
+
 /// Reads a status line and headers from `reader`, leaving it at the body.
 fn read_response(mut reader: Box<dyn BufRead + Send>, address: &str) -> Outcome<UpstreamResponse> {
     let mut status_line = String::new();
@@ -153,25 +184,10 @@ fn read_response(mut reader: Box<dyn BufRead + Send>, address: &str) -> Outcome<
         return Err(AgentError::Upstream(format!("{address}: no status line")));
     };
 
-    let mut chunked = false;
-    let mut content_type = DEFAULT_CONTENT_TYPE.to_string();
-
-    loop {
-        let mut header = String::new();
-        reader.read_line(&mut header)?;
-
-        let header = header.trim().to_ascii_lowercase();
-
-        if header.is_empty() {
-            break;
-        }
-
-        chunked |= header.starts_with("transfer-encoding:") && header.contains("chunked");
-
-        if let Some(value) = header.strip_prefix("content-type:") {
-            content_type = value.trim().to_string();
-        }
-    }
+    let Headers {
+        chunked,
+        content_type,
+    } = read_headers(&mut reader)?;
 
     let body: Box<dyn BufRead + Send> = if chunked {
         Box::new(BufReader::new(Dechunk::new(reader)))

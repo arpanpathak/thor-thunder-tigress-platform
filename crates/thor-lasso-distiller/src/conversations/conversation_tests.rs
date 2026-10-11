@@ -8,24 +8,36 @@ fn section(text: &str) -> Passage {
     }
 }
 
-#[test]
-fn keeps_checked_questions_and_records_every_rejection() -> Result<(), DistillError> {
-    let replies = [
-        "Not a question",
-        "How do I grow a vector?",
-        "yes",
-        "How do I grow a vector?",
-        "What about strings?",
-        "no",
-        "How do I append to a String?",
-        "yes",
-    ];
-    let model = FakeModel::start(&replies)?;
+/// What the fake teacher says: a rejected reply, a kept question and its
+/// check for the first section; a repeat, an unanswered one and a kept one
+/// for the second.
+const REPLIES: [&str; 8] = [
+    "Not a question",
+    "How do I grow a vector?",
+    "yes",
+    "How do I grow a vector?",
+    "What about strings?",
+    "no",
+    "How do I append to a String?",
+    "yes",
+];
+
+/// The conversation the fake teacher has about two sections, and how many
+/// requests it took.
+fn conversed() -> Result<(Conversation, usize), DistillError> {
+    let model = FakeModel::start(&REPLIES)?;
     let sections = [
         section("Use push to grow a vector."),
         section("Use push_str to append to a String."),
     ];
     let conversation = converse(&model.client, &sections)?;
+
+    Ok((conversation, model.request_count()))
+}
+
+#[test]
+fn keeps_checked_questions_with_the_section_as_the_answer() -> Result<(), DistillError> {
+    let (conversation, requests) = conversed()?;
     let questions: Vec<&str> = conversation
         .turns
         .iter()
@@ -37,12 +49,20 @@ fn keeps_checked_questions_and_records_every_rejection() -> Result<(), DistillEr
         ["How do I grow a vector?", "How do I append to a String?"]
     );
     assert_eq!(conversation.turns[0].1, "Use push to grow a vector.");
+    assert_eq!(requests, REPLIES.len());
 
+    Ok(())
+}
+
+#[test]
+fn records_every_rejection_with_its_reason() -> Result<(), DistillError> {
+    let (conversation, _) = conversed()?;
     let reasons: Vec<&str> = conversation
         .rejected
         .iter()
         .map(|(_, reason)| reason.as_str())
         .collect();
+    let line = conversation.to_json("teacher");
 
     assert_eq!(
         reasons,
@@ -52,10 +72,6 @@ fn keeps_checked_questions_and_records_every_rejection() -> Result<(), DistillEr
             "the section does not answer it"
         ]
     );
-    assert_eq!(model.request_count(), replies.len());
-
-    let line = conversation.to_json("teacher");
-
     assert_eq!(line["messages"].as_array().map(Vec::len), Some(4));
     assert_eq!(line["rejected"].as_array().map(Vec::len), Some(3));
     assert_eq!(line["model"], "teacher");

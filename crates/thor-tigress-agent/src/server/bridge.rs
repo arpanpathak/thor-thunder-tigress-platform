@@ -224,7 +224,9 @@ mod tests {
 
             let outcome = std::iter::repeat_n(b"x", PENDING_CHUNKS * 4)
                 .try_for_each(|piece| client.write_all(piece).and_then(|()| client.flush()));
-            let _ = stopped.send(outcome.is_err());
+            stopped
+                .send(outcome.is_err())
+                .map_err(|_| AgentError::Upstream("nobody is watching".to_string()))?;
 
             Ok(outcome?)
         })

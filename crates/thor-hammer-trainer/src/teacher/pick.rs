@@ -8,7 +8,6 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fmt::Write as _,
     fs,
     path::Path,
 };
@@ -157,37 +156,40 @@ pub fn code_sections(root: &Path, manifest: &Path) -> Result<Vec<Section>, DataE
         source_files(&folder, &mut files)?;
         files.sort();
 
-        for file in files {
-            let Some(language) = language_of(&file) else {
-                continue;
-            };
-
-            let Ok(text) = fs::read_to_string(&file) else {
-                continue;
-            };
-
-            if !(MIN_CODE_CHARS..=MAX_CODE_CHARS).contains(&text.chars().count()) {
-                continue;
-            }
-
-            let relative = file
-                .strip_prefix(root)
-                .unwrap_or(&file)
-                .display()
-                .to_string();
-
-            sections.push(Section {
-                id: stable_id(&format!("{relative}\n{text}")),
-                source: row.name.clone(),
-                origin: relative,
-                licence: row.licence.name().to_string(),
-                text,
-                language: Some(language),
-            });
-        }
+        sections.extend(
+            files
+                .iter()
+                .filter_map(|file| code_section(root, &row, file)),
+        );
     }
 
     Ok(sections)
+}
+
+/// `file` as a section, when it is text in a known language and its size
+/// suits one lesson.
+fn code_section(root: &Path, row: &corpus::ManifestRow, file: &Path) -> Option<Section> {
+    let language = language_of(file)?;
+    let text = fs::read_to_string(file).ok()?;
+
+    if !(MIN_CODE_CHARS..=MAX_CODE_CHARS).contains(&text.chars().count()) {
+        return None;
+    }
+
+    let relative = file
+        .strip_prefix(root)
+        .unwrap_or(file)
+        .display()
+        .to_string();
+
+    Some(Section {
+        id: stable_id(&format!("{relative}\n{text}")),
+        source: row.name.clone(),
+        origin: relative,
+        licence: row.licence.name().to_string(),
+        text,
+        language: Some(language),
+    })
 }
 
 fn language_of(file: &Path) -> Option<&'static str> {
@@ -278,22 +280,22 @@ pub fn pick<'a>(
 /// The picked sections as one markdown file the teacher reads.
 #[must_use]
 pub fn render_queue(picked: &[&Section]) -> String {
-    let mut queue = String::from("# Sections to teach from\n\n");
+    let entries: String = picked
+        .iter()
+        .map(|section| {
+            let body = match section.language {
+                Some(language) => format!("````{language}\n{}\n````", section.text),
+                None => section.text.chars().take(MAX_QUEUE_CHARS).collect(),
+            };
 
-    for section in picked {
-        let body = match section.language {
-            Some(language) => format!("````{language}\n{}\n````", section.text),
-            None => section.text.chars().take(MAX_QUEUE_CHARS).collect(),
-        };
+            format!(
+                "## {}\n\n<!-- source: {}; section: {}; licence: {} -->\n\n{}\n\n",
+                section.origin, section.origin, section.id, section.licence, body
+            )
+        })
+        .collect();
 
-        let _ = write!(
-            queue,
-            "## {}\n\n<!-- source: {}; section: {}; licence: {} -->\n\n{}\n\n",
-            section.origin, section.origin, section.id, section.licence, body
-        );
-    }
-
-    queue
+    format!("# Sections to teach from\n\n{entries}")
 }
 
 #[cfg(test)]
@@ -302,7 +304,8 @@ mod tests {
 
     #[test]
     fn skips_files_that_are_not_text() -> Result<(), DataError> {
-        let root = std::env::temp_dir().join(format!("thor-hammer-binary-{}", std::process::id()));
+        let scratch = tempfile::tempdir().map_err(DataError::io(Path::new("temporary folder")))?;
+        let root = scratch.path();
         let folder = root.join("lib");
         fs::create_dir_all(&folder).map_err(DataError::io(&folder))?;
 
@@ -317,9 +320,9 @@ mod tests {
         )
         .map_err(DataError::io(&manifest))?;
 
-        assert_eq!(code_sections(&root, &manifest)?, []);
+        assert_eq!(code_sections(root, &manifest)?, []);
 
-        fs::remove_dir_all(&root).map_err(DataError::io(&root))
+        Ok(())
     }
 
     fn section(id: &str, source: &str, file: &str, chars: usize) -> Section {

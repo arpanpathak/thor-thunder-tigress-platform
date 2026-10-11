@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 description = "Front server for the Thor chat: serves the page, checks the access key, and lets the model search the web through SearXNG."
 
+[lints]
+workspace = true
+
 [dependencies]
 axum = "0.8"
 tokio = { version = "1", features = ["fs", "macros", "net", "rt-multi-thread", "signal", "sync"] }
@@ -17,6 +20,7 @@ ureq = { version = "3.4.2", default-features = false, features = ["rustls", "gzi
 zeroize = "1.9.1"
 
 [dev-dependencies]
+tempfile = "3"
 anyhow = "1"
 tokio = { version = "1", features = ["io-util", "time"] }
 tower = { version = "0.5", features = ["util"] }

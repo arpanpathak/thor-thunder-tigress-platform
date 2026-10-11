@@ -36,11 +36,11 @@ use crate::{
         fetch::{self, Allowed},
         http::Web,
         research::{Kind, Ledger, MAX_READS, MAX_SEARCHES},
-        search::{self, SearchResult},
+        search::{self, SearchResult, TimeRange},
     },
     engines::{
         body::{self, Fields},
-        upstream::Endpoint,
+        upstream::{Endpoint, UpstreamResponse},
     },
     config::{Engine, Upstreams},
     error::{AgentError, Outcome},
@@ -178,45 +178,61 @@ impl Tool {
         Tool::ALL.into_iter().find(|tool| tool.name() == name)
     }
 
+    /// What the tool is for, as the model reads it.
+    fn description(self) -> &'static str {
+        match self {
+            Tool::WebSearch => concat!(
+                "Research the web. Returns titles, addresses, dates and short snippets, each ",
+                "with a number to cite. `query` is the sub-question to search; `queries` ",
+                "adds up to three more, so one call can fan out over the parts of a ",
+                "question. `kind` widens the search: \"jobs\" looks for postings, ",
+                "\"people\" for the recruiter and hiring manager behind one, whose posts ",
+                "often mention a role first. `time_range` keeps results recent: day, ",
+                "week, month or year."
+            ),
+            Tool::FetchPage => concat!(
+                "Read a web page as plain text, following the page's own links up to two hops, ",
+                "so the answer can use the page itself and not only a snippet. Only an https ",
+                "address from this answer's search results, or one the user wrote, can be opened."
+            ),
+        }
+    }
+
+    /// The tool's arguments, as a JSON schema.
+    fn parameters(self) -> Value {
+        match self {
+            Tool::WebSearch => json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "The sub-question to search for" },
+                    "queries": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Up to three more sub-questions to search in the same call"
+                    },
+                    "kind": { "type": "string", "enum": Kind::ALL.map(Kind::as_str), "description": "How to widen the search" },
+                    "time_range": { "type": "string", "enum": ["day", "week", "month", "year"], "description": "Keep results no older than this" }
+                },
+                "required": ["query"],
+            }),
+            Tool::FetchPage => json!({
+                "type": "object",
+                "properties": { "url": { "type": "string", "description": "An https address from this answer's search results" } },
+                "required": ["url"],
+            }),
+        }
+    }
+
     /// The tool as the model sees it: name, purpose, and arguments.
     fn definition(self) -> Value {
-        let (description, parameters) = match self {
-            Tool::WebSearch => (
-                concat!(
-                    "Research the web. Returns titles, addresses, dates and short snippets, each ",
-                    "with a number to cite. `query` is the sub-question to search; `queries` ",
-                    "adds up to three more, so one call can fan out over the parts of a ",
-                    "question. `kind` widens the search: \"jobs\" looks for postings, ",
-                    "\"people\" for the recruiter and hiring manager behind one, whose posts ",
-                    "often mention a role first. `time_range` keeps results recent: day, ",
-                    "week, month or year."
-                ),
-                json!({
-                    "type": "object",
-                    "properties": {
-                        "query": { "type": "string", "description": "The sub-question to search for" },
-                        "queries": {
-                            "type": "array",
-                            "items": { "type": "string" },
-                            "description": "Up to three more sub-questions to search in the same call"
-                        },
-                        "kind": { "type": "string", "enum": Kind::ALL.map(Kind::as_str), "description": "How to widen the search" },
-                        "time_range": { "type": "string", "enum": ["day", "week", "month", "year"], "description": "Keep results no older than this" }
-                    },
-                    "required": ["query"],
-                }),
-            ),
-            Tool::FetchPage => (
-                "Read a web page as plain text, following the page's own links up to two hops, so the answer can use the page itself and not only a snippet. Only an https address from this answer's search results, or one the user wrote, can be opened.",
-                json!({
-                    "type": "object",
-                    "properties": { "url": { "type": "string", "description": "An https address from this answer's search results" } },
-                    "required": ["url"],
-                }),
-            ),
-        };
-
-        json!({ "type": "function", "function": { "name": self.name(), "description": description, "parameters": parameters } })
+        json!({
+            "type": "function",
+            "function": {
+                "name": self.name(),
+                "description": self.description(),
+                "parameters": self.parameters(),
+            },
+        })
     }
 }
 
@@ -245,7 +261,9 @@ pub fn answer(client: &mut dyn Client, body: &[u8], upstreams: &Upstreams) -> Ou
             .post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?
             .relay(client),
         Mode::Stream => as_events(client, &mut |client| {
-            stream_round(client, &fields, model).map(drop)
+            stream_round(client, &fields, model)?;
+
+            Ok(())
         }),
         Mode::Search => {
             fields.insert(STREAM.to_string(), Value::Bool(true));
@@ -697,27 +715,7 @@ impl Research {
                 break;
             }
 
-            self.ledger.count_search();
-
-            let hits = match search::search(searxng, query, plan.range) {
-                Ok(hits) => hits,
-                Err(error) => {
-                    blocks.push(format!("The search \"{query}\" failed: {error}"));
-                    continue;
-                }
-            };
-
-            for result in &hits.results {
-                self.allowed.add_url(&result.url);
-            }
-
-            let event = ThorEvent::Search {
-                query,
-                results: sources(&hits.results),
-            };
-            send_thor(client, &event)?;
-
-            blocks.push(search_block(query, &hits, &mut self.ledger));
+            blocks.push(self.search_one(client, query, plan.range, searxng)?);
         }
 
         blocks.push(format!(
@@ -728,6 +726,35 @@ impl Research {
         ));
 
         Ok(blocks.join("\n\n"))
+    }
+
+    /// Runs one search, tells the page what it found, and returns the results
+    /// as the model reads them, or that the search failed.
+    fn search_one(
+        &mut self,
+        client: &mut dyn Write,
+        query: &str,
+        range: Option<TimeRange>,
+        searxng: &Endpoint,
+    ) -> Outcome<String> {
+        self.ledger.count_search();
+
+        let hits = match search::search(searxng, query, range) {
+            Ok(hits) => hits,
+            Err(error) => return Ok(format!("The search \"{query}\" failed: {error}")),
+        };
+
+        for result in &hits.results {
+            self.allowed.add_url(&result.url);
+        }
+
+        let event = ThorEvent::Search {
+            query,
+            results: sources(&hits.results),
+        };
+        send_thor(client, &event)?;
+
+        Ok(search_block(query, &hits, &mut self.ledger))
     }
 
     /// Reads one page and its same-site links, up to what is left of the page
@@ -826,17 +853,8 @@ fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
 /// model writes into the text is taken out by [`Sieve`] and runs like a
 /// structured one, and the reader never sees the tags.
 fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
-    let response = model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(fields)?)?;
-
-    if !response.is_ok() {
-        let status = response.status;
-
-        return Err(AgentError::Upstream(format!(
-            "model server returned {status}: {}",
-            response.text()?
-        )));
-    }
-
+    let request = serde_json::to_vec(fields)?;
+    let response = accepted(model.post(paths::CHAT_COMPLETIONS, &request)?)?;
     let mut round = Round::default();
     let mut sieve = Sieve::new();
     let mut streamed = 0_usize;
@@ -852,14 +870,7 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
             break;
         }
 
-        let mut value: Value = serde_json::from_str(data)?;
-        streamed += text_length(&value);
-
-        if let Some(event) = forward(&mut value, data, &mut sieve) {
-            response::send_event(client, &event)?;
-        }
-
-        round.absorb(serde_json::from_value(value)?);
+        streamed += relay_chunk(client, data, &mut sieve, &mut round)?;
 
         if streamed > MAX_ROUND_CHARS {
             round.cut = true;
@@ -871,6 +882,49 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
         }
     }
 
+    finish_round(client, sieve, &mut round)?;
+
+    Ok(round)
+}
+
+/// The model server's response when it took the request, or what it said
+/// when it did not.
+fn accepted(response: UpstreamResponse) -> Outcome<UpstreamResponse> {
+    if response.is_ok() {
+        return Ok(response);
+    }
+
+    let status = response.status;
+
+    Err(AgentError::Upstream(format!(
+        "model server returned {status}: {}",
+        response.text()?
+    )))
+}
+
+/// Sends one chunk of the model's reply on to the client and adds it to
+/// `round`. Returns how many characters of text the chunk carried.
+fn relay_chunk(
+    client: &mut dyn Write,
+    data: &str,
+    sieve: &mut Sieve,
+    round: &mut Round,
+) -> Outcome<usize> {
+    let mut value: Value = serde_json::from_str(data)?;
+    let length = text_length(&value);
+
+    if let Some(event) = forward(&mut value, data, sieve) {
+        response::send_event(client, &event)?;
+    }
+
+    round.absorb(serde_json::from_value(value)?);
+
+    Ok(length)
+}
+
+/// Ends a round: sends the text the sieve was still holding, and adds the
+/// tool calls it took out of the text.
+fn finish_round(client: &mut dyn Write, mut sieve: Sieve, round: &mut Round) -> Outcome {
     let tail = sieve.finish();
 
     if !tail.is_empty() {
@@ -888,7 +942,7 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
         });
     }
 
-    Ok(round)
+    Ok(())
 }
 
 /// Rewrites one chunk so only the visible part of its text is forwarded, and

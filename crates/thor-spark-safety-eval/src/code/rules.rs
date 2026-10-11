@@ -185,6 +185,16 @@ pub fn check(source: &str) -> CodeReport {
     }
 }
 
+/// What a rule gets: it fails when broken, passes when it applies and holds,
+/// and otherwise has nothing to judge.
+fn verdict(applies: bool, broken: bool) -> Verdict {
+    match (applies, broken) {
+        (_, true) => Verdict::Fail,
+        (true, false) => Verdict::Pass,
+        (false, false) => Verdict::NotApplicable,
+    }
+}
+
 fn judge(file: &File, source: &str, wrapping: Wrapping) -> CodeReport {
     let mut scan = Scan {
         offset: wrapping.offset(),
@@ -202,24 +212,12 @@ fn judge(file: &File, source: &str, wrapping: Wrapping) -> CodeReport {
     violations.extend(scan.errors.violations());
     violations.sort_by_key(|violation| (violation.line, violation.rule));
 
-    let applies = |rule: Rule| match rule {
-        Rule::NoUnwrap | Rule::NoIndexLoops => true,
-        Rule::ErrorEnum => scan.errors.handles_errors(),
-        Rule::PubDocs => scan.pub_items > 0,
-        Rule::NoBodyComments => whole_file && !scan.bodies.is_empty(),
-    };
     let verdicts = Rule::ALL
         .iter()
         .map(|rule| {
             let broken = violations.iter().any(|violation| violation.rule == *rule);
 
-            let verdict = match (applies(*rule), broken) {
-                (_, true) => Verdict::Fail,
-                (true, false) => Verdict::Pass,
-                (false, false) => Verdict::NotApplicable,
-            };
-
-            (*rule, verdict)
+            (*rule, verdict(scan.applies(*rule, whole_file), broken))
         })
         .collect();
 
@@ -334,25 +332,33 @@ impl Scan {
         }
     }
 
+    /// Whether `rule` has anything to judge in what was scanned.
+    fn applies(&self, rule: Rule, whole_file: bool) -> bool {
+        match rule {
+            Rule::NoUnwrap | Rule::NoIndexLoops => true,
+            Rule::ErrorEnum => self.errors.handles_errors(),
+            Rule::PubDocs => self.pub_items > 0,
+            Rule::NoBodyComments => whole_file && !self.bodies.is_empty(),
+        }
+    }
+
     /// Records `#[derive(Error)]` on the type `name` as its `Display` and
     /// `Error` impls, which is what `thiserror` writes.
     fn derives_error(&mut self, attributes: &[Attribute], name: &str) {
         let derives = attributes
             .iter()
             .filter(|attribute| attribute.path().is_ident("derive"))
-            .any(|attribute| {
-                let mut found = false;
-                let _ = attribute.parse_nested_meta(|meta| {
-                    found |= meta
-                        .path
-                        .segments
-                        .last()
-                        .is_some_and(|last| last.ident == "Error");
-
-                    Ok(())
-                });
-
-                found
+            .filter_map(|attribute| {
+                attribute
+                    .parse_args_with(Punctuated::<syn::Path, Token![,]>::parse_terminated)
+                    .ok()
+            })
+            .flatten()
+            .any(|derived| {
+                derived
+                    .segments
+                    .last()
+                    .is_some_and(|last| last.ident == "Error")
             });
 
         if derives {

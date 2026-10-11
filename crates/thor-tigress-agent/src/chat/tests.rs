@@ -18,6 +18,57 @@ fn upstreams_with(model: &FakeServer, search: &FakeServer, web: FakeWeb) -> Upst
     }
 }
 
+/// A model reply that says `text` and stops.
+fn says(text: &str) -> String {
+    let chunk = json!({ "choices": [{ "delta": { "content": text } }] }).to_string();
+
+    event_stream(&[&chunk])
+}
+
+/// A model reply that calls `tool` with `arguments`.
+fn calls(tool: &str, arguments: &str) -> String {
+    event_stream(&[&call_event(tool, arguments)])
+}
+
+/// A chat with web search on, once it has been answered: the events the
+/// client was sent, and the two servers that were asked.
+struct Searched {
+    sent: Vec<String>,
+    model: FakeServer,
+    search: FakeServer,
+}
+
+/// Answers `messages` with web search on, against a model server and a
+/// SearXNG that give the canned `replies` and `results`.
+fn searched(
+    messages: Value,
+    replies: Vec<String>,
+    results: Vec<String>,
+    web: FakeWeb,
+) -> Outcome<Searched> {
+    let model = FakeServer::start(replies)?;
+    let search = FakeServer::start(results)?;
+    let request = json!({ "messages": messages, "thor_web_search": true });
+    let mut client = Vec::new();
+
+    answer(
+        &mut client,
+        &serde_json::to_vec(&request)?,
+        &upstreams_with(&model, &search, web),
+    )?;
+
+    Ok(Searched {
+        sent: events(&client),
+        model,
+        search,
+    })
+}
+
+/// One user message asking `question`.
+fn asking(question: &str) -> Value {
+    json!([{ "role": "user", "content": question }])
+}
+
 fn idle() -> Outcome<FakeServer> {
     FakeServer::start(Vec::new())
 }
@@ -251,74 +302,71 @@ fn ignores_tool_calls_past_the_limit() -> Outcome {
     Ok(())
 }
 
-#[test]
-fn a_search_plan_holds_the_queries_and_the_recency() {
-    let plan = |arguments: &str| {
-        ToolCall {
-            arguments: arguments.to_string(),
-            ..ToolCall::default()
-        }
-        .search_plan()
-    };
+/// The plan of a `web_search` call with `arguments`.
+fn plan(arguments: &str) -> Option<SearchPlan> {
+    ToolCall {
+        arguments: arguments.to_string(),
+        ..ToolCall::default()
+    }
+    .search_plan()
+}
 
+/// The queries of a `web_search` call with `arguments`.
+fn planned(arguments: &str) -> Option<Vec<String>> {
+    plan(arguments).map(|plan| plan.queries)
+}
+
+fn owned(queries: &[&str]) -> Option<Vec<String>> {
+    Some(queries.iter().map(ToString::to_string).collect())
+}
+
+#[test]
+fn a_search_plan_holds_each_query_once_and_trimmed() {
+    let several = r#"{"query":"rust","queries":["rust","tokio","  ","axum"]}"#;
+
+    assert_eq!(planned(r#"{"query":"  rust  "}"#), owned(&["rust"]));
+    assert_eq!(planned(several), owned(&["rust", "tokio", "axum"]));
     assert_eq!(
-        plan(r#"{"query":"  rust  "}"#),
-        Some(SearchPlan {
-            queries: vec!["rust".to_string()],
-            range: None
-        })
-    );
-    assert_eq!(
-        plan(r#"{"query":"jobs","time_range":"week"}"#),
-        Some(SearchPlan {
-            queries: vec!["jobs".to_string()],
-            range: Some(TimeRange::Week)
-        })
-    );
-    assert_eq!(
-        plan(r#"{"query":"jobs","time_range":"forever"}"#),
-        Some(SearchPlan {
-            queries: vec!["jobs".to_string()],
-            range: None
-        })
-    );
-    assert_eq!(
-        plan(r#"{"query":"rust","queries":["rust","tokio","  ","axum"]}"#),
-        Some(SearchPlan {
-            queries: vec!["rust".to_string(), "tokio".to_string(), "axum".to_string()],
-            range: None
-        })
-    );
-    assert_eq!(
-        plan(r#"{"query":"rust engineer","kind":"jobs"}"#),
-        Some(SearchPlan {
-            queries: vec![
-                "rust engineer".to_string(),
-                "rust engineer job posting".to_string(),
-                "rust engineer careers".to_string(),
-                "rust engineer linkedin jobs".to_string(),
-            ],
-            range: None
-        })
-    );
-    assert_eq!(
-        plan(r#"{"query":"synthires","kind":"people"}"#).map(|plan| plan.queries.len()),
-        Some(MAX_QUERIES_PER_CALL)
-    );
-    assert_eq!(
-        plan(r#"{"queries":["only this"]}"#),
-        Some(SearchPlan {
-            queries: vec!["only this".to_string()],
-            range: None
-        })
-    );
-    assert_eq!(
-        plan(r#"{"queries":["a","b"],"kind":"people"}"#).map(|plan| plan.queries.len()),
-        Some(MAX_QUERIES_PER_CALL)
+        planned(r#"{"queries":["only this"]}"#),
+        owned(&["only this"])
     );
     assert_eq!(plan(r#"{"query":"  "}"#), None);
     assert_eq!(plan(r#"{"q":"rust"}"#), None);
     assert_eq!(plan("not json"), None);
+}
+
+#[test]
+fn a_search_plan_reads_a_known_recency_only() {
+    let range = |arguments: &str| plan(arguments).and_then(|plan| plan.range);
+
+    assert_eq!(
+        range(r#"{"query":"jobs","time_range":"week"}"#),
+        Some(TimeRange::Week)
+    );
+    assert_eq!(range(r#"{"query":"jobs","time_range":"forever"}"#), None);
+    assert_eq!(range(r#"{"query":"jobs"}"#), None);
+}
+
+#[test]
+fn a_search_plan_is_widened_by_its_kind_and_capped() {
+    let jobs = owned(&[
+        "rust engineer",
+        "rust engineer job posting",
+        "rust engineer careers",
+        "rust engineer linkedin jobs",
+    ]);
+    let people = planned(r#"{"query":"synthires","kind":"people"}"#);
+    let two_people = planned(r#"{"queries":["a","b"],"kind":"people"}"#);
+
+    assert_eq!(planned(r#"{"query":"rust engineer","kind":"jobs"}"#), jobs);
+    assert_eq!(
+        people.map(|queries| queries.len()),
+        Some(MAX_QUERIES_PER_CALL)
+    );
+    assert_eq!(
+        two_people.map(|queries| queries.len()),
+        Some(MAX_QUERIES_PER_CALL)
+    );
 }
 
 #[test]
@@ -340,49 +388,32 @@ fn a_tool_call_must_carry_its_argument() {
 
 #[test]
 fn a_search_call_with_several_queries_fans_out() -> Outcome {
-    let call = call_event(
-        "web_search",
-        r#"{"query":"rust jobs","queries":["tokio jobs"]}"#,
-    );
-    let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
-    let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
-    let search = FakeServer::start(vec![
+    let call = r#"{"query":"rust jobs","queries":["tokio jobs"]}"#;
+    let results = vec![
         json_response(
             r#"{"results":[{"title":"A","url":"https://a"},{"title":"B","url":"https://b"}]}"#,
         ),
         json_response(
             r#"{"results":[{"title":"B again","url":"https://b"},{"title":"C","url":"https://c"}]}"#,
         ),
-    ])?;
-    let mut client = Vec::new();
-
-    answer(
-        &mut client,
-        br#"{"messages":[{"role":"user","content":"jobs"}],"thor_web_search":true}"#,
-        &upstreams(&model, &search),
-    )?;
-
-    let asked = search.requests()?;
+    ];
+    let replies = vec![calls("web_search", call), says("done")];
+    let chat = searched(asking("jobs"), replies, results, FakeWeb::default())?;
+    let asked = chat.search.requests()?;
+    let seen = chat.model.requests()?;
+    let searches = chat
+        .sent
+        .iter()
+        .filter(|event| event.contains(r#""search""#));
 
     assert_eq!(asked.len(), 2);
     assert!(asked[0].contains("q=rust+jobs"));
     assert!(asked[1].contains("q=tokio+jobs"));
-
-    let seen = model.requests()?;
-
     assert!(seen[1].contains("[1] A"), "{}", seen[1]);
     assert!(seen[1].contains("[2] B"), "{}", seen[1]);
     assert!(seen[1].contains("[3] C"), "{}", seen[1]);
     assert!(seen[1].contains("Searches used 2 of 16"), "{}", seen[1]);
-
-    let sent = events(&client);
-
-    assert_eq!(
-        sent.iter()
-            .filter(|event| event.contains(r#""search""#))
-            .count(),
-        2
-    );
+    assert_eq!(searches.count(), 2);
 
     Ok(())
 }
@@ -454,47 +485,26 @@ fn the_search_budget_stops_the_seventeenth_query() -> Outcome {
 
 #[test]
 fn the_answer_round_is_given_the_source_numbers() -> Outcome {
-    let calls: Vec<String> = (1..=MAX_ROUNDS)
-        .map(|round| call_event("web_search", &format!(r#"{{"query":"q{round}"}}"#)))
-        .collect();
-    let mut responses: Vec<String> = calls
-        .iter()
-        .map(|call| event_stream(&[call.as_str()]))
+    let mut replies: Vec<String> = (1..=MAX_ROUNDS)
+        .map(|round| calls("web_search", &format!(r#"{{"query":"q{round}"}}"#)))
         .collect();
 
-    responses.push(event_stream(&[
-        r#"{"choices":[{"delta":{"content":"done"}}]}"#,
-    ]));
+    replies.push(says("done"));
 
-    let model = FakeServer::start(responses)?;
-    let search = FakeServer::start(vec![
-        json_response(
-            r#"{"results":[{"title":"Rust","url":"https://r"}]}"#
-        );
-        MAX_ROUNDS
-    ])?;
-
-    answer(
-        &mut Vec::new(),
-        br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
-        &upstreams(&model, &search),
-    )?;
-
-    let seen = model.requests()?;
+    let found = json_response(r#"{"results":[{"title":"Rust","url":"https://r"}]}"#);
+    let results = vec![found; MAX_ROUNDS];
+    let chat = searched(asking("news"), replies, results, FakeWeb::default())?;
+    let seen = chat.model.requests()?;
+    let last = &seen[MAX_ROUNDS];
 
     assert_eq!(seen.len(), MAX_ROUNDS + 1);
     assert!(
-        seen[MAX_ROUNDS].contains("Sources found, with the numbers to cite"),
-        "{}",
-        seen[MAX_ROUNDS]
+        last.contains("Sources found, with the numbers to cite"),
+        "{last}"
     );
+    assert!(last.contains("[1] Rust — https://r"), "{last}");
     assert!(
-        seen[MAX_ROUNDS].contains("[1] Rust — https://r"),
-        "{}",
-        seen[MAX_ROUNDS]
-    );
-    assert!(
-        !seen[MAX_ROUNDS].contains(SEARCH_HINT),
+        !last.contains(SEARCH_HINT),
         "the search hint must be gone by the answer rounds"
     );
 
@@ -668,40 +678,19 @@ fn every_tool_round_has_tools_and_one_last_round_does_not() -> Outcome {
 #[test]
 fn a_call_written_as_text_runs_and_is_not_shown() -> Outcome {
     let text = "Let me look.\n<tool_call>\n<function=web_search>\n<parameter=query>\nrust jobs\n</parameter>\n</function>\n</tool_call>\nDone.";
-    let call = json!({ "choices": [{ "delta": { "content": text } }] }).to_string();
-    let reply = r#"{"choices":[{"delta":{"content":"Here is the answer"}}]}"#;
-    let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
-    let search = FakeServer::start(vec![json_response(
+    let replies = vec![says(text), says("Here is the answer")];
+    let results = vec![json_response(
         r#"{"results":[{"title":"A job","url":"https://jobs.example/1","content":"hiring"}]}"#,
-    )])?;
-    let mut client = Vec::new();
-
-    answer(
-        &mut client,
-        br#"{"messages":[{"role":"user","content":"jobs?"}],"thor_web_search":true}"#,
-        &upstreams(&model, &search),
-    )?;
-
-    let seen = model.requests()?;
+    )];
+    let chat = searched(asking("jobs?"), replies, results, FakeWeb::default())?;
+    let seen = chat.model.requests()?;
+    let shown = |text: &str| chat.sent.iter().any(|event| event.contains(text));
 
     assert!(seen[1].contains("[1] A job"), "{}", seen[1]);
-    assert!(search.requests()?[0].contains("q=rust+jobs"));
-
-    let sent = events(&client);
-
-    assert!(
-        !sent.iter().any(|event| event.contains("<tool_call")),
-        "{sent:?}"
-    );
-    assert!(
-        sent.iter().any(|event| event.contains("Let me look.")),
-        "{sent:?}"
-    );
-    assert!(
-        sent.iter()
-            .any(|event| event.contains("Here is the answer")),
-        "{sent:?}"
-    );
+    assert!(chat.search.requests()?[0].contains("q=rust+jobs"));
+    assert!(!shown("<tool_call"), "{:?}", chat.sent);
+    assert!(shown("Let me look."), "{:?}", chat.sent);
+    assert!(shown("Here is the answer"), "{:?}", chat.sent);
 
     Ok(())
 }
@@ -782,42 +771,38 @@ fn engines_that_did_not_answer_reach_the_model() -> Outcome {
     Ok(())
 }
 
+/// Six pages on one site, each linking to all six.
+fn linked_pages() -> FakeWeb {
+    let names = ["a", "b", "c", "d", "e", "f"];
+    let links: String = names
+        .iter()
+        .map(|name| format!("<a href=\"/{name}\">{name}</a>"))
+        .collect();
+    let urls = names.map(|name| format!("https://docs.example/{name}"));
+    let pages = names
+        .iter()
+        .zip(&urls)
+        .map(|(name, url)| {
+            let page = format!("<title>{}</title>{links}", name.to_uppercase());
+
+            (url.as_str(), fetched("text/html", &page))
+        })
+        .collect();
+
+    FakeWeb::new(pages)
+}
+
 #[test]
 fn the_page_budget_stops_after_twelve_pages() -> Outcome {
-    let links = "<a href=\"/a\">a</a><a href=\"/b\">b</a><a href=\"/c\">c</a><a href=\"/d\">d</a><a href=\"/e\">e</a><a href=\"/f\">f</a>";
-    let page = |name: &str| fetched("text/html", &format!("<title>{name}</title>{links}"));
-    let web = FakeWeb::new(vec![
-        ("https://docs.example/a", page("A")),
-        ("https://docs.example/b", page("B")),
-        ("https://docs.example/c", page("C")),
-        ("https://docs.example/d", page("D")),
-        ("https://docs.example/e", page("E")),
-        ("https://docs.example/f", page("F")),
-    ]);
+    let fetch = |page: &str| {
+        let arguments = format!(r#"{{"url":"https://docs.example/{page}"}}"#);
 
-    let fetch_call = |url: &str| {
-        call_event(
-            "fetch_page_content_recursive",
-            &format!(r#"{{"url":"{url}"}}"#),
-        )
+        calls("fetch_page_content_recursive", &arguments)
     };
-    let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
-    let mut responses = vec![
-        event_stream(&[&fetch_call("https://docs.example/a")]),
-        event_stream(&[&fetch_call("https://docs.example/b")]),
-        event_stream(&[&fetch_call("https://docs.example/c")]),
-    ];
-    responses.push(event_stream(&[reply]));
-
-    let model = FakeServer::start(responses)?;
-
-    answer(
-        &mut Vec::new(),
-        br#"{"messages":[{"role":"user","content":"read https://docs.example/a https://docs.example/b https://docs.example/c"}],"thor_web_search":true}"#,
-        &upstreams_with(&model, &idle()?, web),
-    )?;
-
-    let seen = model.requests()?;
+    let replies = vec![fetch("a"), fetch("b"), fetch("c"), says("done")];
+    let question = "read https://docs.example/a https://docs.example/b https://docs.example/c";
+    let chat = searched(asking(question), replies, Vec::new(), linked_pages())?;
+    let seen = chat.model.requests()?;
 
     assert!(seen[3].contains("page budget is spent"), "{}", seen[3]);
     assert!(seen[3].contains("(12 pages)"), "{}", seen[3]);
@@ -827,43 +812,24 @@ fn the_page_budget_stops_after_twelve_pages() -> Outcome {
 
 #[test]
 fn a_call_on_the_answer_round_is_run() -> Outcome {
-    let call = call_event("other", "{}");
-    let leaked = json!({ "choices": [{ "delta": { "content": "<tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
-    let reply = r#"{"choices":[{"delta":{"content":"the answer"}}]}"#;
-    let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
-    responses.push(event_stream(&[&leaked]));
-    responses.push(event_stream(&[reply]));
+    let leaked =
+        "<tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>";
+    let mut replies = vec![calls("other", "{}"); MAX_ROUNDS];
 
-    let model = FakeServer::start(responses)?;
-    let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
-    let mut client = Vec::new();
+    replies.push(says(leaked));
+    replies.push(says("the answer"));
 
-    answer(
-        &mut client,
-        br#"{"messages":[],"thor_web_search":true}"#,
-        &upstreams(&model, &search),
-    )?;
-
-    let seen = model.requests()?;
+    let results = vec![json_response(r#"{"results":[]}"#)];
+    let chat = searched(json!([]), replies, results, FakeWeb::default())?;
+    let seen = chat.model.requests()?;
+    let last = &seen[MAX_ROUNDS + 1];
+    let shown = |text: &str| chat.sent.iter().any(|event| event.contains(text));
 
     assert_eq!(seen.len(), MAX_ROUNDS + 2);
-    assert!(
-        seen[MAX_ROUNDS + 1].contains("No results."),
-        "{}",
-        seen[MAX_ROUNDS + 1]
-    );
-    assert!(search.requests()?[0].contains("q=x"));
-
-    let sent = events(&client);
-
-    assert!(
-        !sent.iter().any(|event| event.contains("<tool_call")),
-        "{sent:?}"
-    );
-    assert!(
-        sent.iter().any(|event| event.contains("the answer")),
-        "{sent:?}"
-    );
+    assert!(last.contains("No results."), "{last}");
+    assert!(chat.search.requests()?[0].contains("q=x"));
+    assert!(!shown("<tool_call"), "{:?}", chat.sent);
+    assert!(shown("the answer"), "{:?}", chat.sent);
 
     Ok(())
 }
@@ -1096,41 +1062,27 @@ fn searches_then_answers_with_a_forced_first_round_and_recency() -> Outcome {
 
 #[test]
 fn reads_a_cited_page_with_the_fetch_tool() -> Outcome {
-    let search_call = call_event("web_search", r#"{"query":"rust"}"#);
-    let fetch_call = call_event(
-        "fetch_page_content_recursive",
-        r#"{"url":"https://docs.example/guide"}"#,
-    );
-    let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
-    let model = FakeServer::start(vec![
-        event_stream(&[&search_call]),
-        event_stream(&[&fetch_call]),
-        event_stream(&[reply]),
-    ])?;
-    let search = FakeServer::start(vec![json_response(
+    let replies = vec![
+        calls("web_search", r#"{"query":"rust"}"#),
+        calls(
+            "fetch_page_content_recursive",
+            r#"{"url":"https://docs.example/guide"}"#,
+        ),
+        says("done"),
+    ];
+    let results = vec![json_response(
         r#"{"results":[{"title":"Guide","url":"https://docs.example/guide","content":"see"}]}"#,
-    )])?;
+    )];
     let web = FakeWeb::new(vec![(
         "https://docs.example/guide",
         fetched("text/html", "<title>Guide</title><p>the answer</p>"),
     )]);
-    let mut client = Vec::new();
-    let request = br#"{"messages":[{"role":"user","content":"how?"}],"thor_web_search":true}"#;
-    answer(&mut client, request, &upstreams_with(&model, &search, web))?;
-
-    let seen = model.requests()?;
+    let read = json!({ "thor": { "read": { "url": "https://docs.example/guide", "title": "Guide", "domain": "docs.example" } } });
+    let chat = searched(asking("how?"), replies, results, web)?;
+    let seen = chat.model.requests()?;
 
     assert!(seen[2].contains("the answer"), "{}", seen[2]);
-
-    let sent = events(&client);
-
-    assert!(
-        sent.contains(
-            &json!({ "thor": { "read": { "url": "https://docs.example/guide", "title": "Guide", "domain": "docs.example" } } })
-                .to_string()
-        ),
-        "{sent:?}"
-    );
+    assert!(chat.sent.contains(&read.to_string()), "{:?}", chat.sent);
 
     Ok(())
 }
@@ -1324,14 +1276,10 @@ fn a_round_under_the_cap_is_streamed_whole() -> Outcome {
     Ok(())
 }
 
-/// A coding tool's request: a hosted model's name, fields the engine does not
-/// know, two system messages, and its own tools. It is fitted to the engine
-/// and the answer copied back, streamed as it was asked.
-#[test]
-fn a_coding_tools_request_is_fitted_and_relayed() -> Outcome {
-    let stream = event_stream(&[r#"{"choices":[{"delta":{"content":"<tool_call>"}}]}"#]);
-    let engine = FakeServer::start(vec![stream.clone()])?;
-    let request = json!({
+/// What a coding tool sends: a hosted model's name, fields the engine does
+/// not know, two system messages, and its own tools.
+fn coding_tool_request() -> Value {
+    json!({
         "model": "gpt-5",
         "stream": true,
         "user": "someone",
@@ -1343,30 +1291,39 @@ fn a_coding_tools_request_is_fitted_and_relayed() -> Outcome {
             { "role": "user", "content": "ask" },
             { "role": "system", "content": "more" }
         ]
-    });
-    let mut client = Vec::new();
-    let body = serde_json::to_vec(&request)?;
+    })
+}
 
-    answer(&mut client, &body, &upstreams(&engine, &idle()?))?;
+/// A coding tool's request: a hosted model's name, fields the engine does not
+/// know, two system messages, and its own tools. It is fitted to the engine
+/// and the answer copied back, streamed as it was asked.
+#[test]
+fn a_coding_tools_request_is_fitted_and_relayed() -> Outcome {
+    let stream = event_stream(&[r#"{"choices":[{"delta":{"content":"<tool_call>"}}]}"#]);
+    let engine = FakeServer::start(vec![stream.clone()])?;
+    let request = coding_tool_request();
+    let mut client = Vec::new();
+
+    answer(
+        &mut client,
+        &serde_json::to_vec(&request)?,
+        &upstreams(&engine, &idle()?),
+    )?;
 
     let seen = engine.requests()?;
     let sent: Value = serde_json::from_str(seen[0].split("\r\n\r\n").nth(1).unwrap_or_default())?;
+    let merged = json!([
+        { "role": "system", "content": "rules\n\nmore" },
+        { "role": "user", "content": "ask" }
+    ]);
+    let body = stream.split("\r\n\r\n").nth(1).unwrap_or_default();
 
     assert_eq!(sent["model"], "nemotron");
     assert_eq!(sent["top_k"], 40);
     assert_eq!(sent["tools"], request["tools"]);
     assert_eq!(sent.get("user"), None);
     assert_eq!(sent.get("n_predict"), None);
-    assert_eq!(
-        sent[MESSAGES],
-        json!([
-            { "role": "system", "content": "rules\n\nmore" },
-            { "role": "user", "content": "ask" }
-        ])
-    );
-
-    let body = stream.split("\r\n\r\n").nth(1).unwrap_or_default();
-
+    assert_eq!(sent[MESSAGES], merged);
     assert!(String::from_utf8_lossy(&client).ends_with(body));
 
     Ok(())

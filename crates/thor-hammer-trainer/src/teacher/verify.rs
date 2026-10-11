@@ -20,7 +20,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use thor_spark_safety_eval::answer;
+use thor_spark_safety_eval::{answer, code::rules::CodeReport, prose::slop::SlopReport};
 
 use crate::{
     error::DataError,
@@ -249,45 +249,51 @@ pub fn check(conversation: &Conversation, scratch: &Path) -> Result<Checked, Dat
     Ok(checked)
 }
 
-fn spark_problems(turn: usize, text: &str) -> Vec<Problem> {
-    let score = answer::score(text);
-    let rules = score.blocks.iter().flat_map(|block| {
-        let parse_error = block
-            .report
-            .parse_error
-            .iter()
-            .map(move |error| Problem::Rule {
-                turn,
-                detail: format!("does not parse: {error}"),
-            });
-        let violations = block
-            .report
-            .violations
-            .iter()
-            .map(move |violation| Problem::Rule {
-                turn,
-                detail: format!(
-                    "{} at block line {}: {}",
-                    violation.rule.label(),
-                    violation.line,
-                    violation.detail
-                ),
-            });
-
-        parse_error.chain(violations)
-    });
-    let slop = (!score.slop.clean()).then(|| Problem::Slop {
+/// What the rule checker found in one code block: that it does not parse,
+/// and every rule it breaks.
+fn rule_problems(turn: usize, report: &CodeReport) -> impl Iterator<Item = Problem> + '_ {
+    let parse_error = report.parse_error.iter().map(move |error| Problem::Rule {
         turn,
-        phrases: score
-            .slop
+        detail: format!("does not parse: {error}"),
+    });
+    let violations = report
+        .violations
+        .iter()
+        .map(move |violation| Problem::Rule {
+            turn,
+            detail: format!(
+                "{} at block line {}: {}",
+                violation.rule.label(),
+                violation.line,
+                violation.detail
+            ),
+        });
+
+    parse_error.chain(violations)
+}
+
+/// The slop phrases of one turn, with its em dashes when there are several.
+fn slop_problem(turn: usize, slop: &SlopReport) -> Option<Problem> {
+    let dashes = (slop.em_dashes > 1).then(|| format!("{} em dashes", slop.em_dashes));
+
+    (!slop.clean()).then(|| Problem::Slop {
+        turn,
+        phrases: slop
             .hits
             .iter()
             .map(|hit| hit.text.clone())
-            .chain(
-                (score.slop.em_dashes > 1).then(|| format!("{} em dashes", score.slop.em_dashes)),
-            )
+            .chain(dashes)
             .collect(),
-    });
+    })
+}
+
+fn spark_problems(turn: usize, text: &str) -> Vec<Problem> {
+    let score = answer::score(text);
+    let rules = score
+        .blocks
+        .iter()
+        .flat_map(|block| rule_problems(turn, &block.report));
+    let slop = slop_problem(turn, &score.slop);
     let claims = score.false_claims.iter().map(|claim| Problem::FalseClaim {
         turn,
         text: claim.text.clone(),

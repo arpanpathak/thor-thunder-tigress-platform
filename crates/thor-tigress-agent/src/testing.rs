@@ -4,7 +4,6 @@
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
-    sync::mpsc,
     thread,
 };
 
@@ -22,7 +21,7 @@ use crate::{
 /// A server on `127.0.0.1` at a free port, serving canned responses in order.
 pub struct FakeServer {
     address: String,
-    received: mpsc::Receiver<Outcome<String>>,
+    serving: thread::JoinHandle<Vec<Outcome<String>>>,
 }
 
 impl FakeServer {
@@ -30,15 +29,14 @@ impl FakeServer {
     pub fn start(responses: Vec<String>) -> Outcome<Self> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?.to_string();
-        let (sender, received) = mpsc::channel();
-
-        thread::spawn(move || {
-            for response in responses {
-                let _ = sender.send(serve_one(&listener, &response));
-            }
+        let serving = thread::spawn(move || {
+            responses
+                .iter()
+                .map(|response| serve_one(&listener, response))
+                .collect()
         });
 
-        Ok(FakeServer { address, received })
+        Ok(FakeServer { address, serving })
     }
 
     /// The `host:port` to call.
@@ -48,7 +46,11 @@ impl FakeServer {
 
     /// Waits until every response is sent, and returns the requests received.
     pub fn requests(self) -> Outcome<Vec<String>> {
-        self.received.into_iter().collect()
+        self.serving
+            .join()
+            .map_err(|_| AgentError::Upstream("the fake server panicked".to_string()))?
+            .into_iter()
+            .collect()
     }
 }
 

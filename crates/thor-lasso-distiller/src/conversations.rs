@@ -15,7 +15,7 @@
 //! one line, ending in `?`, not mentioning "the passage" or "the book", and
 //! with none of the slop phrases Stage 0 knows.
 
-use std::{collections::BTreeMap, fmt, fs, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use serde_json::{Value, json};
 use thor_spark_safety_eval::prose::slop;
@@ -218,42 +218,33 @@ pub fn question_prompt(previous_questions: &[String], passage: &Passage) -> Vec<
 }
 
 /// Why a question the teacher wrote was not kept.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Rejection {
     /// Nothing usable came back.
+    #[error("empty reply")]
     Empty,
     /// More than one line.
+    #[error("more than one line")]
     NotOneLine,
     /// It does not end with a question mark.
+    #[error("does not end with a question mark")]
     NotAQuestion,
     /// Longer than [`MAX_QUESTION`].
+    #[error("longer than {MAX_QUESTION} characters")]
     TooLong,
     /// It talks about the text instead of the problem.
+    #[error("mentions \"{0}\"")]
     MentionsSource(&'static str),
     /// It contains a slop phrase.
+    #[error("slop phrase \"{0}\"")]
     Slop(String),
     /// It repeats a question asked earlier in the conversation.
+    #[error("repeats an earlier question")]
     Repeats,
     /// The section does not answer it.
+    #[error("the section does not answer it")]
     NotAnswered,
 }
-
-impl fmt::Display for Rejection {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Rejection::Empty => formatter.write_str("empty reply"),
-            Rejection::NotOneLine => formatter.write_str("more than one line"),
-            Rejection::NotAQuestion => formatter.write_str("does not end with a question mark"),
-            Rejection::TooLong => write!(formatter, "longer than {MAX_QUESTION} characters"),
-            Rejection::MentionsSource(word) => write!(formatter, "mentions \"{word}\""),
-            Rejection::Slop(phrase) => write!(formatter, "slop phrase \"{phrase}\""),
-            Rejection::Repeats => formatter.write_str("repeats an earlier question"),
-            Rejection::NotAnswered => formatter.write_str("the section does not answer it"),
-        }
-    }
-}
-
-impl std::error::Error for Rejection {}
 
 /// The question in `reply`, tidied, or why it cannot be used. Surrounding
 /// quotes and a leading `Question:` are removed first, since models add them.
@@ -351,43 +342,64 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
             .iter()
             .map(|(question, _)| question.clone())
             .collect();
-        let prompt = question_prompt(&asked, passage);
-        let mut question = None;
 
-        for _ in 0..ATTEMPTS {
-            let reply = client.complete(&prompt, 80, 0.7)?;
-
-            let verdict = match check_question(&reply) {
-                Ok(checked)
-                    if asked
-                        .iter()
-                        .any(|earlier| overlap(earlier, &checked) >= REPEAT_OVERLAP) =>
-                {
-                    Err(Rejection::Repeats)
-                }
-                Ok(checked) if !answers(client, &checked, passage)? => Err(Rejection::NotAnswered),
-                other => other,
-            };
-
-            match verdict {
-                Ok(checked) => {
-                    question = Some(checked);
-
-                    break;
-                }
-                Err(reason) => conversation
-                    .rejected
-                    .push((reply.trim().to_string(), reason.to_string())),
-            }
-        }
-
-        match question {
+        match ask(client, &asked, passage, &mut conversation.rejected)? {
             Some(question) => conversation.turns.push((question, passage.answer())),
             None => break,
         }
     }
 
     Ok(conversation)
+}
+
+/// Asks for a question about `passage` until one is kept, at most
+/// [`ATTEMPTS`] times. Every reply that is not kept goes to `rejected` with
+/// the reason.
+fn ask(
+    client: &Client,
+    asked: &[String],
+    passage: &Passage,
+    rejected: &mut Vec<(String, String)>,
+) -> Result<Option<String>, DistillError> {
+    let prompt = question_prompt(asked, passage);
+
+    for _ in 0..ATTEMPTS {
+        let reply = client.complete(&prompt, 80, 0.7)?;
+
+        match judged(client, &reply, asked, passage)? {
+            Ok(question) => return Ok(Some(question)),
+            Err(reason) => rejected.push((reply.trim().to_string(), reason.to_string())),
+        }
+    }
+
+    Ok(None)
+}
+
+/// The question in `reply` when it is well formed, new to the conversation
+/// and answered by `passage`; otherwise why it is not kept.
+fn judged(
+    client: &Client,
+    reply: &str,
+    asked: &[String],
+    passage: &Passage,
+) -> Result<Result<String, Rejection>, DistillError> {
+    let question = match check_question(reply) {
+        Ok(question) => question,
+        Err(reason) => return Ok(Err(reason)),
+    };
+    let repeats = asked
+        .iter()
+        .any(|earlier| overlap(earlier, &question) >= REPEAT_OVERLAP);
+
+    if repeats {
+        return Ok(Err(Rejection::Repeats));
+    }
+
+    if !answers(client, &question, passage)? {
+        return Ok(Err(Rejection::NotAnswered));
+    }
+
+    Ok(Ok(question))
 }
 
 /// Asks the model whether `passage` answers `question`; only a reply that

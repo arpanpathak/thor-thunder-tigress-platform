@@ -1,192 +1,167 @@
 use super::*;
-use std::io::Cursor;
+use std::{io::Cursor, path::Path};
 
-struct Folder {
-    path: PathBuf,
-}
+/// A fresh folder for one test, removed when dropped.
+struct Folder(tempfile::TempDir);
 
 impl Folder {
-    fn new(name: &str) -> Result<Self, KeyringError> {
-        let path =
-            std::env::temp_dir().join(format!("thor-keyring-cli-{name}-{}", std::process::id()));
-        fs::create_dir_all(&path).map_err(KeyringError::io(&path))?;
+    fn new() -> Result<Self, KeyringError> {
+        let folder = tempfile::tempdir().map_err(KeyringError::io("temporary folder"))?;
 
-        Ok(Self { path })
+        Ok(Self(folder))
+    }
+
+    fn path(&self) -> &Path {
+        self.0.path()
     }
 
     fn keyring(&self) -> String {
-        self.path.join("keyring").display().to_string()
-    }
-}
-
-impl Drop for Folder {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
+        self.path().join("keyring").display().to_string()
     }
 }
 
 const PASS: &str = "test passphrase";
 
-fn run(arguments: &[&str], input: &str) -> (Outcome<()>, String) {
-    let words: Vec<String> = arguments.iter().map(ToString::to_string).collect();
-    let mut out = Vec::new();
-    let mut prompt = Vec::new();
-    let mut source = Cursor::new(input.as_bytes().to_vec());
-    let outcome = main_with(
-        &words,
-        Some(PASS.to_string()),
-        &mut source,
-        &mut prompt,
-        &mut out,
-    );
-
-    (outcome, String::from_utf8_lossy(&out).into_owned())
+/// What one run of the program ended with, printed and asked.
+struct Ran {
+    outcome: Outcome<()>,
+    said: String,
+    asked: String,
 }
 
-fn run_in(folder: &Folder, rest: &[&str]) -> (Outcome<()>, String) {
-    let mut words = vec!["--keyring".to_string(), folder.keyring()];
-    words.extend(rest.iter().map(ToString::to_string));
-
+/// Runs `words` with `passphrase` in the environment and `typed` on the input.
+fn run_with(words: &[String], passphrase: Option<&str>, typed: &str) -> Ran {
     let mut out = Vec::new();
     let mut prompt = Vec::new();
-    let mut source = Cursor::new(Vec::new());
-    let outcome = main_with(
-        &words,
-        Some(PASS.to_string()),
-        &mut source,
-        &mut prompt,
-        &mut out,
-    );
+    let mut source = Cursor::new(typed.as_bytes().to_vec());
+    let passphrase = passphrase.map(ToString::to_string);
+    let outcome = main_with(words, passphrase, &mut source, &mut prompt, &mut out);
 
-    (outcome, String::from_utf8_lossy(&out).into_owned())
+    Ran {
+        outcome,
+        said: String::from_utf8_lossy(&out).into_owned(),
+        asked: String::from_utf8_lossy(&prompt).into_owned(),
+    }
+}
+
+fn run(arguments: &[&str]) -> (Outcome<()>, String) {
+    let words: Vec<String> = arguments.iter().map(ToString::to_string).collect();
+    let ran = run_with(&words, Some(PASS), "");
+
+    (ran.outcome, ran.said)
+}
+
+/// The words of a command on the keyring in `folder`.
+fn on_keyring(folder: &Folder, rest: &[&str]) -> Vec<String> {
+    ["--keyring", &folder.keyring()]
+        .iter()
+        .chain(rest)
+        .map(ToString::to_string)
+        .collect()
+}
+
+/// What a command on the keyring in `folder` prints.
+fn said(folder: &Folder, rest: &[&str]) -> Outcome<String> {
+    let ran = run_with(&on_keyring(folder, rest), Some(PASS), "");
+
+    ran.outcome.map(|()| ran.said)
+}
+
+/// A keyring in which Ada has asked for a key.
+fn with_a_request() -> Outcome<Folder> {
+    let folder = Folder::new()?;
+
+    said(&folder, &["init"])?;
+    said(&folder, &["request", "Ada Lovelace", "ada@example.com"])?;
+
+    Ok(folder)
+}
+
+/// The key printed when Ada is approved.
+fn approved(folder: &Folder) -> Outcome<String> {
+    let printed = said(folder, &["approve", "ada@example.com"])?;
+
+    assert!(printed.contains("key for Ada Lovelace <ada@example.com>:"));
+
+    Ok(printed.lines().nth(1).unwrap_or_default().to_string())
 }
 
 #[test]
-fn the_whole_life_of_a_request_is_printed() -> Outcome<()> {
-    let folder = Folder::new("life")?;
-    let (init, said) = run_in(&folder, &["init"]);
-    init?;
+fn a_new_keyring_is_empty_until_someone_asks() -> Outcome<()> {
+    let folder = Folder::new()?;
 
-    assert!(said.starts_with("created "));
+    assert!(said(&folder, &["init"])?.starts_with("created "));
+    assert_eq!(said(&folder, &["requests"])?, "nobody is waiting\n");
 
-    let (nothing, said) = run_in(&folder, &["requests"]);
-    nothing?;
+    let recorded = said(&folder, &["request", "Ada Lovelace", "ada@example.com"])?;
+    let waiting = said(&folder, &["requests"])?;
 
-    assert_eq!(said, "nobody is waiting\n");
+    assert!(recorded.contains("recorded Ada Lovelace <ada@example.com>"));
+    assert!(waiting.starts_with("1 waiting\n"));
+    assert!(waiting.contains("Ada Lovelace  <ada@example.com>"));
 
-    let (asked, said) = run_in(&folder, &["request", "Ada Lovelace", "ada@example.com"]);
-    asked?;
+    Ok(())
+}
 
-    assert!(said.contains("recorded Ada Lovelace <ada@example.com>"));
-
-    let (waiting, said) = run_in(&folder, &["requests"]);
-    waiting?;
-
-    assert!(said.starts_with("1 waiting\n"));
-    assert!(said.contains("Ada Lovelace  <ada@example.com>"));
-
-    let (key, said) = run_in(&folder, &["approve", "ada@example.com"]);
-    key?;
-
-    assert!(said.contains("key for Ada Lovelace <ada@example.com>:"));
-
-    let minted = said.lines().nth(1).unwrap_or_default().to_string();
+#[test]
+fn an_approved_person_has_a_key_that_is_listed_shown_and_exported() -> Outcome<()> {
+    let folder = with_a_request()?;
+    let minted = approved(&folder)?;
+    let listed = said(&folder, &["keys"])?;
 
     assert_eq!(minted.len(), store::KEY_BYTES * 2);
-
-    let (all, said) = run_in(&folder, &["keys"]);
-    all?;
-
-    assert!(said.contains("NAME"));
-    assert!(said.contains("Ada Lovelace"));
-    assert!(said.contains(&format!("{}…", minted.get(..8).unwrap_or_default())));
-
-    let (shown, said) = run_in(&folder, &["show", "ada@example.com"]);
-    shown?;
-
-    assert_eq!(said.trim_end(), minted);
-
-    let (exported, said) = run_in(&folder, &["export"]);
-    exported?;
-
-    assert_eq!(said, format!("{minted}\n"));
-
-    let (revoked, said) = run_in(&folder, &["revoke", "ada@example.com"]);
-    revoked?;
-
-    assert_eq!(said, "revoked Ada Lovelace <ada@example.com>\n");
-
-    let (gone, said) = run_in(&folder, &["export"]);
-    gone?;
-
-    assert!(said.is_empty());
-
-    let (taken, _) = run_in(&folder, &["show", "ada@example.com"]);
-
-    assert!(
-        taken
-            .err()
-            .is_some_and(|error| error.to_string().contains("has no key"))
+    assert!(listed.contains("NAME"));
+    assert!(listed.contains("Ada Lovelace"));
+    assert!(listed.contains(&format!("{}…", minted.get(..8).unwrap_or_default())));
+    assert_eq!(
+        said(&folder, &["show", "ada@example.com"])?.trim_end(),
+        minted
     );
+    assert_eq!(said(&folder, &["export"])?, format!("{minted}\n"));
 
-    let (still_there, said) = run_in(&folder, &["keys"]);
-    still_there?;
+    Ok(())
+}
 
-    assert!(said.contains("revoked"));
-    assert!(said.contains("Ada Lovelace"));
+#[test]
+fn a_revoked_key_is_gone_and_its_record_stays() -> Outcome<()> {
+    let folder = with_a_request()?;
+
+    approved(&folder)?;
+
+    let revoked = said(&folder, &["revoke", "ada@example.com"])?;
+    let shown = said(&folder, &["show", "ada@example.com"]);
+    let listed = said(&folder, &["keys"])?;
+
+    assert_eq!(revoked, "revoked Ada Lovelace <ada@example.com>\n");
+    assert!(said(&folder, &["export"])?.is_empty());
+    assert!(shown.is_err_and(|error| error.to_string().contains("has no key")));
+    assert!(listed.contains("revoked"));
+    assert!(listed.contains("Ada Lovelace"));
 
     Ok(())
 }
 
 #[test]
 fn a_bad_command_line_says_so() {
-    let (unknown, said) = run(&["--colour", "1"], "");
+    let cases: [(&[&str], &str); 7] = [
+        (&["--colour", "1"], "unknown option --colour"),
+        (&["request"], "request needs a name"),
+        (&["request", "a", "b", "c"], "request needs a name"),
+        (&["keys", "extra"], "keys takes no arguments"),
+        (&["--keyring"], "--keyring needs a value"),
+        (&["nonsense"], "unknown command nonsense"),
+        (&["approve"], "approve needs one email address or key"),
+    ];
 
-    assert!(matches!(unknown, Err(KeyringError::Usage(_))));
-    assert!(said.is_empty());
+    for (arguments, expected) in cases {
+        let (outcome, said) = run(arguments);
 
-    let (missing, _) = run(&["request"], "");
-
-    assert!(
-        missing
-            .err()
-            .is_some_and(|error| error.to_string().contains("request needs a name"))
-    );
-
-    let (extra, _) = run(&["request", "a", "b", "c"], "");
-
-    assert!(matches!(extra, Err(KeyringError::Usage(_))));
-
-    let (empty, _) = run(&["keys", "extra"], "");
-
-    assert!(
-        empty
-            .err()
-            .is_some_and(|error| error.to_string().contains("keys takes no arguments"))
-    );
-
-    let (flag, _) = run(&["--keyring"], "");
-
-    assert!(
-        flag.err()
-            .is_some_and(|error| error.to_string().starts_with("--keyring needs a value"))
-    );
-
-    let (command, _) = run(&["nonsense"], "");
-
-    assert!(
-        command
-            .err()
-            .is_some_and(|error| error.to_string().starts_with("unknown command nonsense"))
-    );
-
-    let (one, _) = run(&["approve"], "");
-
-    assert!(one.err().is_some_and(|error| {
-        error
-            .to_string()
-            .contains("approve needs one email address or key")
-    }));
+        assert!(said.is_empty());
+        assert!(
+            matches!(&outcome, Err(error @ KeyringError::Usage(_)) if error.to_string().contains(expected)),
+            "{arguments:?}: {outcome:?}"
+        );
+    }
 }
 
 #[test]
@@ -198,7 +173,7 @@ fn help_is_printed_without_touching_a_keyring() -> Outcome<()> {
         vec!["--help"],
         vec!["keys", "--help"],
     ] {
-        let (outcome, said) = run(&arguments, "");
+        let (outcome, said) = run(&arguments);
         outcome?;
 
         assert!(said.starts_with("usage: thor-tigress-keyring"));
@@ -209,105 +184,57 @@ fn help_is_printed_without_touching_a_keyring() -> Outcome<()> {
 
 #[test]
 fn a_missing_keyring_is_an_error() {
-    let (opened, _) = run(&["--keyring", "/nonexistent/keyring", "keys"], "");
+    let (opened, _) = run(&["--keyring", "/nonexistent/keyring", "keys"]);
 
     assert!(matches!(opened, Err(KeyringError::Io { .. })));
 }
 
-#[test]
-fn the_passphrase_comes_from_the_file_the_environment_or_the_input() -> Outcome<()> {
-    let folder = Folder::new("passphrase")?;
-    let secret = folder.path.join("pass");
+/// A keyring made with a passphrase file, and the file.
+fn sealed_with_a_file() -> Outcome<(Folder, PathBuf)> {
+    let folder = Folder::new()?;
+    let secret = folder.path().join("pass");
     fs::write(&secret, "from the file\n").map_err(KeyringError::io(&secret))?;
 
-    let init = vec![
-        "--keyring".to_string(),
-        folder.keyring(),
-        "--passphrase-file".to_string(),
-        secret.display().to_string(),
-        "init".to_string(),
-    ];
-    let mut out = Vec::new();
-    let mut prompt = Vec::new();
-    let mut source = Cursor::new(Vec::new());
-    main_with(&init, None, &mut source, &mut prompt, &mut out)?;
+    let file = secret.display().to_string();
+    let init = on_keyring(&folder, &["--passphrase-file", &file, "init"]);
 
-    let keys = vec![
-        "--keyring".to_string(),
-        folder.keyring(),
-        "keys".to_string(),
-    ];
-    let mut out = Vec::new();
-    let mut prompt = Vec::new();
-    let mut source = Cursor::new(Vec::new());
-    let pass = "from the file".to_string();
-    let opened = main_with(&keys, Some(pass), &mut source, &mut prompt, &mut out);
+    run_with(&init, None, "").outcome?;
 
-    assert!(opened.is_ok());
-    assert!(String::from_utf8_lossy(&out).contains("the keyring is empty"));
+    Ok((folder, secret))
+}
 
-    let mut out = Vec::new();
-    let mut prompt = Vec::new();
-    let mut source = Cursor::new(Vec::new());
+#[test]
+fn the_passphrase_comes_from_the_environment_or_the_input() -> Outcome<()> {
+    let (folder, _) = sealed_with_a_file()?;
+    let keys = on_keyring(&folder, &["keys"]);
+    let from_environment = run_with(&keys, Some("from the file"), "");
+    let typed = run_with(&keys, None, "from the file\n");
 
-    assert!(matches!(
-        main_with(
-            &keys,
-            Some("wrong".to_string()),
-            &mut source,
-            &mut prompt,
-            &mut out
-        ),
-        Err(KeyringError::Sealed)
-    ));
+    from_environment.outcome?;
+    typed.outcome?;
 
-    let mut out = Vec::new();
-    let mut prompt = Vec::new();
-    let mut source = Cursor::new(b"from the file\n".to_vec());
-    main_with(&keys, None, &mut source, &mut prompt, &mut out)?;
+    assert!(from_environment.said.contains("the keyring is empty"));
+    assert!(typed.said.contains("the keyring is empty"));
+    assert!(typed.asked.starts_with("passphrase for "));
 
-    assert!(String::from_utf8_lossy(&out).contains("the keyring is empty"));
-    assert!(String::from_utf8_lossy(&prompt).starts_with("passphrase for "));
+    Ok(())
+}
 
-    let mut out = Vec::new();
-    let mut prompt = Vec::new();
-    let mut source = Cursor::new(Vec::new());
+#[test]
+fn a_wrong_empty_or_unreadable_passphrase_is_refused() -> Outcome<()> {
+    let (folder, _) = sealed_with_a_file()?;
+    let keys = on_keyring(&folder, &["keys"]);
+    let gone = folder.path().join("gone").display().to_string();
+    let from_missing_file = on_keyring(&folder, &["--passphrase-file", &gone, "keys"]);
+    let wrong = run_with(&keys, Some("wrong"), "").outcome;
+    let nothing_typed = run_with(&keys, None, "").outcome;
+    let empty = run_with(&keys, Some(""), "").outcome;
+    let unreadable = run_with(&from_missing_file, None, "").outcome;
 
-    assert!(matches!(
-        main_with(&keys, None, &mut source, &mut prompt, &mut out),
-        Err(KeyringError::EmptyPassphrase)
-    ));
-
-    let mut out = Vec::new();
-    let mut prompt = Vec::new();
-    let mut source = Cursor::new(Vec::new());
-
-    assert!(matches!(
-        main_with(
-            &keys,
-            Some(String::new()),
-            &mut source,
-            &mut prompt,
-            &mut out
-        ),
-        Err(KeyringError::EmptyPassphrase)
-    ));
-
-    let missing = vec![
-        "--keyring".to_string(),
-        folder.keyring(),
-        "--passphrase-file".to_string(),
-        folder.path.join("gone").display().to_string(),
-        "keys".to_string(),
-    ];
-    let mut out = Vec::new();
-    let mut prompt = Vec::new();
-    let mut source = Cursor::new(Vec::new());
-
-    assert!(matches!(
-        main_with(&missing, None, &mut source, &mut prompt, &mut out),
-        Err(KeyringError::Io { .. })
-    ));
+    assert!(matches!(wrong, Err(KeyringError::Sealed)));
+    assert!(matches!(nothing_typed, Err(KeyringError::EmptyPassphrase)));
+    assert!(matches!(empty, Err(KeyringError::EmptyPassphrase)));
+    assert!(matches!(unreadable, Err(KeyringError::Io { .. })));
 
     Ok(())
 }
@@ -341,32 +268,22 @@ fn the_report_tables_look_right() {
 
 #[test]
 fn revoke_all_stops_everyone_at_once() -> Outcome<()> {
-    let folder = Folder::new("revoke-all")?;
-    let (init, _) = run_in(&folder, &["init"]);
-    init?;
+    let folder = Folder::new()?;
+
+    said(&folder, &["init"])?;
 
     for (name, email) in [("Ada", "ada@example.com"), ("Bob", "bob@example.com")] {
-        let (asked, _) = run_in(&folder, &["request", name, email]);
-        asked?;
-
-        let (approved, _) = run_in(&folder, &["approve", email]);
-        approved?;
+        said(&folder, &["request", name, email])?;
+        said(&folder, &["approve", email])?;
     }
 
-    let (stopped, said) = run_in(&folder, &["revoke-all"]);
-    stopped?;
+    let stopped = said(&folder, &["revoke-all"])?;
+    let exported = said(&folder, &["export"])?;
+    let again = said(&folder, &["revoke-all"])?;
 
-    assert_eq!(said, "revoked 2 active key(s); the records stay\n");
-
-    let (exported, said) = run_in(&folder, &["export"]);
-    exported?;
-
-    assert!(said.is_empty());
-
-    let (again, said) = run_in(&folder, &["revoke-all"]);
-    again?;
-
-    assert_eq!(said, "revoked 0 active key(s); the records stay\n");
+    assert_eq!(stopped, "revoked 2 active key(s); the records stay\n");
+    assert!(exported.is_empty());
+    assert_eq!(again, "revoked 0 active key(s); the records stay\n");
 
     Ok(())
 }

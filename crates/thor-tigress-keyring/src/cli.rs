@@ -127,16 +127,71 @@ pub fn main_with(
     write_out(out, &text)
 }
 
-/// The text one command prints. The keyring is opened only by the arms that
-/// need it, so a usage error costs nothing.
+/// What a command line asks for, once its arguments are counted.
+enum Action<'a> {
+    /// `init`: create the keyring.
+    Init,
+    /// Anything done to a keyring that exists.
+    On(Task<'a>),
+}
+
+/// One command on an opened keyring.
+enum Task<'a> {
+    Request(&'a str, &'a str),
+    Requests,
+    Approve(&'a str),
+    Keys,
+    Show(&'a str),
+    Revoke(&'a str),
+    RevokeAll,
+    Export,
+}
+
+impl<'a> Action<'a> {
+    /// Reads the command and its arguments.
+    fn of(options: &'a Options) -> Outcome<Self> {
+        let task = match (options.command.as_str(), options.arguments.as_slice()) {
+            ("init", []) => return Ok(Action::Init),
+            ("request", [name, email]) => Task::Request(name, email),
+            ("requests", []) => Task::Requests,
+            ("approve", [email]) => Task::Approve(email),
+            ("keys", []) => Task::Keys,
+            ("show", [email]) => Task::Show(email),
+            ("revoke", [who]) => Task::Revoke(who),
+            ("revoke-all", []) => Task::RevokeAll,
+            ("export", []) => Task::Export,
+            (command, _) => return Err(misused(command)),
+        };
+
+        Ok(Action::On(task))
+    }
+}
+
+/// The usage error for `command` given the wrong number of arguments, or
+/// for a command that doesn't exist.
+fn misused(command: &str) -> KeyringError {
+    let problem = match command {
+        "init" | "requests" | "keys" | "export" | "revoke-all" => {
+            format!("{command} takes no arguments")
+        }
+        "request" => "request needs a name and an email".to_string(),
+        "approve" | "show" | "revoke" => format!("{command} needs one email address or key"),
+        _ => format!("unknown command {command}"),
+    };
+
+    KeyringError::Usage(format!("{problem}\n{}", usage()))
+}
+
+/// The text one command prints. The keyring is opened only by the commands
+/// that need it, so a usage error costs nothing.
 fn command(
     options: &Options,
     env_passphrase: Option<String>,
     input: &mut impl BufRead,
     prompt: &mut impl Write,
 ) -> Outcome<String> {
-    match (options.command.as_str(), options.arguments.as_slice()) {
-        ("init", []) => {
+    match Action::of(options)? {
+        Action::Init => {
             let passphrase = passphrase(options, env_passphrase, input, prompt)?;
             let keyring = Keyring::create(&options.keyring, &passphrase)?;
 
@@ -145,92 +200,78 @@ fn command(
                 keyring.path().display()
             ))
         }
-        ("request", [name, email]) => {
+        Action::On(task) => {
             let mut keyring = opened(options, env_passphrase, input, prompt)?;
-            let person = keyring.request(name, email)?;
 
-            Ok(format!(
-                "recorded {} <{}> at {}; approve with: thor-tigress-keyring approve {}\n",
-                person.name,
-                person.email,
-                store::timestamp(person.created),
-                person.email
-            ))
+            task.run(&mut keyring)
         }
-        ("requests", []) => {
-            let keyring = opened(options, env_passphrase, input, prompt)?;
+    }
+}
 
-            Ok(report_requests(keyring.records()))
-        }
-        ("approve", [email]) => {
-            let mut keyring = opened(options, env_passphrase, input, prompt)?;
-            let key = keyring.approve(email)?;
-            let name = keyring
-                .find(email)
-                .map_or_else(|| email.clone(), |person| person.name.clone());
+impl Task<'_> {
+    /// Does the task on `keyring` and says what happened.
+    fn run(&self, keyring: &mut Keyring) -> Outcome<String> {
+        match *self {
+            Task::Request(name, email) => request(keyring, name, email),
+            Task::Requests => Ok(report_requests(keyring.records())),
+            Task::Approve(email) => approve(keyring, email),
+            Task::Keys => Ok(report_keys(keyring.records())),
+            Task::Show(email) => show(keyring, email),
+            Task::Revoke(who) => {
+                let person = keyring.revoke(who)?;
 
-            Ok(format!(
-                "key for {name} <{email}>:\n{key}\nsend it to them; their old key, if any, no longer works\n"
-            ))
-        }
-        ("keys", []) => {
-            let keyring = opened(options, env_passphrase, input, prompt)?;
-
-            Ok(report_keys(keyring.records()))
-        }
-        ("show", [email]) => {
-            let keyring = opened(options, env_passphrase, input, prompt)?;
-            let person = keyring
-                .records()
-                .iter()
-                .find(|person| person.email == *email)
-                .ok_or_else(|| KeyringError::NotFound(email.clone()))?;
-
-            match &person.key {
-                Some(key) if person.status == Status::Active => Ok(format!("{key}\n")),
-                _ => Err(KeyringError::Invalid(format!(
-                    "{} <{}> has no key",
-                    person.name, person.email
-                ))),
+                Ok(format!("revoked {} <{}>\n", person.name, person.email))
             }
-        }
-        ("revoke", [who]) => {
-            let mut keyring = opened(options, env_passphrase, input, prompt)?;
-            let person = keyring.revoke(who)?;
+            Task::RevokeAll => {
+                let count = keyring.revoke_all()?;
 
-            Ok(format!("revoked {} <{}>\n", person.name, person.email))
-        }
-        ("revoke-all", []) => {
-            let mut keyring = opened(options, env_passphrase, input, prompt)?;
-            let count = keyring.revoke_all()?;
-
-            Ok(format!("revoked {count} active key(s); the records stay\n"))
-        }
-        ("export", []) => {
-            let keyring = opened(options, env_passphrase, input, prompt)?;
-
-            Ok(keyring
+                Ok(format!("revoked {count} active key(s); the records stay\n"))
+            }
+            Task::Export => Ok(keyring
                 .active_keys()
                 .iter()
                 .map(|key| format!("{key}\n"))
-                .collect())
+                .collect()),
         }
-        ("init" | "requests" | "keys" | "export" | "revoke-all", _) => Err(KeyringError::Usage(
-            format!("{} takes no arguments\n{}", options.command, usage()),
-        )),
-        ("request", _) => Err(KeyringError::Usage(format!(
-            "request needs a name and an email\n{}",
-            usage()
-        ))),
-        ("approve" | "show" | "revoke", _) => Err(KeyringError::Usage(format!(
-            "{} needs one email address or key\n{}",
-            options.command,
-            usage()
-        ))),
-        _ => Err(KeyringError::Usage(format!(
-            "unknown command {}\n{}",
-            options.command,
-            usage()
+    }
+}
+
+fn request(keyring: &mut Keyring, name: &str, email: &str) -> Outcome<String> {
+    let person = keyring.request(name, email)?;
+
+    Ok(format!(
+        "recorded {} <{}> at {}; approve with: thor-tigress-keyring approve {}\n",
+        person.name,
+        person.email,
+        store::timestamp(person.created),
+        person.email
+    ))
+}
+
+fn approve(keyring: &mut Keyring, email: &str) -> Outcome<String> {
+    let key = keyring.approve(email)?;
+    let name = keyring
+        .find(email)
+        .map_or_else(|| email.to_string(), |person| person.name.clone());
+
+    Ok(format!(
+        "key for {name} <{email}>:\n{key}\nsend it to them; their old key, if any, no longer works\n"
+    ))
+}
+
+/// The active key of the person with `email`.
+fn show(keyring: &Keyring, email: &str) -> Outcome<String> {
+    let person = keyring
+        .records()
+        .iter()
+        .find(|person| person.email == email)
+        .ok_or_else(|| KeyringError::NotFound(email.to_string()))?;
+
+    match &person.key {
+        Some(key) if person.status == Status::Active => Ok(format!("{key}\n")),
+        _ => Err(KeyringError::Invalid(format!(
+            "{} <{}> has no key",
+            person.name, person.email
         ))),
     }
 }

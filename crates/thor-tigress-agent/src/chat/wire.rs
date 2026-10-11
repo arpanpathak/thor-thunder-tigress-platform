@@ -24,6 +24,22 @@ pub(super) struct SearchArguments {
     pub(super) time_range: Option<String>,
 }
 
+impl SearchArguments {
+    /// The sub-questions asked for, trimmed, in order and without repeats.
+    fn asked(&self) -> Vec<String> {
+        let more = self.queries.as_deref().unwrap_or_default();
+        let mut asked: Vec<String> = Vec::new();
+
+        for query in self.query.iter().chain(more).map(|query| query.trim()) {
+            if !query.is_empty() && !asked.iter().any(|seen| seen == query) {
+                asked.push(query.to_string());
+            }
+        }
+
+        asked
+    }
+}
+
 /// One `web_search` call, worked out: the queries to run and the recency asked
 /// for. The queries are already widened by `kind` and capped.
 #[derive(Debug, PartialEq, Eq)]
@@ -222,22 +238,7 @@ impl ToolCall {
     pub(super) fn search_plan(&self) -> Option<SearchPlan> {
         let arguments: SearchArguments = self.arguments()?;
 
-        let mut base: Vec<String> = Vec::new();
-
-        for query in arguments.query.as_deref().into_iter().chain(
-            arguments
-                .queries
-                .as_deref()
-                .unwrap_or_default()
-                .iter()
-                .map(String::as_str),
-        ) {
-            let query = query.trim();
-
-            if !query.is_empty() && !base.iter().any(|seen| seen == query) {
-                base.push(query.to_string());
-            }
-        }
+        let base = arguments.asked();
 
         if base.is_empty() {
             return None;

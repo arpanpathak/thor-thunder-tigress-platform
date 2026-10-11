@@ -94,66 +94,54 @@ fn absolute_addresses_resolve_against_a_page() -> Outcome {
     Ok(())
 }
 
+/// One address from every range the fetch tool must never reach.
+const BLOCKED: [&str; 21] = [
+    "0.0.0.0",
+    "127.0.0.1",
+    "10.1.2.3",
+    "172.16.5.4",
+    "172.31.255.1",
+    "192.168.0.1",
+    "100.84.254.65",
+    "169.254.169.254",
+    "192.0.0.1",
+    "198.18.0.1",
+    "224.0.0.1",
+    "240.0.0.1",
+    "255.255.255.255",
+    "::",
+    "::1",
+    "fe80::1",
+    "fc00::1",
+    "fd7a:115c:a1e0::1",
+    "ff02::1",
+    "::ffff:127.0.0.1",
+    "64:ff9b::7f00:1",
+];
+
+/// Whether `raw` is an address, and a public one.
+fn public(raw: &str) -> bool {
+    raw.parse::<IpAddr>().is_ok_and(is_public)
+}
+
 #[test]
 fn blocks_the_documented_ranges() {
-    let blocked = [
-        "0.0.0.0",
-        "127.0.0.1",
-        "10.1.2.3",
-        "172.16.5.4",
-        "172.31.255.1",
-        "192.168.0.1",
-        "100.84.254.65",
-        "169.254.169.254",
-        "192.0.0.1",
-        "198.18.0.1",
-        "224.0.0.1",
-        "240.0.0.1",
-        "255.255.255.255",
-        "::",
-        "::1",
-        "fe80::1",
-        "fc00::1",
-        "fd7a:115c:a1e0::1",
-        "ff02::1",
-        "::ffff:127.0.0.1",
-        "64:ff9b::7f00:1",
-    ];
-
-    for raw in blocked {
-        let ip = raw.parse::<IpAddr>();
-
-        assert!(ip.is_ok(), "{raw}");
-        assert!(
-            !is_public(ip.unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED))),
-            "{raw}"
-        );
+    for raw in BLOCKED {
+        assert!(raw.parse::<IpAddr>().is_ok(), "{raw}");
+        assert!(!public(raw), "{raw}");
     }
+}
 
-    assert!(is_public(IpAddr::V4(Ipv4Addr::new(172, 15, 0, 1))));
-    assert!(!is_public(IpAddr::V4(Ipv4Addr::new(172, 16, 0, 1))));
-    assert!(!is_public(IpAddr::V4(Ipv4Addr::new(172, 31, 255, 1))));
-    assert!(is_public(IpAddr::V4(Ipv4Addr::new(172, 32, 0, 1))));
-    assert!(is_public(
-        "8.8.8.8"
-            .parse()
-            .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
-    ));
-    assert!(is_public(
-        "1.1.1.1"
-            .parse()
-            .unwrap_or(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
-    ));
-    assert!(is_public(
-        "2606:4700::1111"
-            .parse()
-            .unwrap_or(IpAddr::V6(Ipv6Addr::LOCALHOST))
-    ));
-    assert!(is_public(
-        "64:ff9b::808:808"
-            .parse()
-            .unwrap_or(IpAddr::V6(Ipv6Addr::LOCALHOST))
-    ));
+#[test]
+fn allows_public_addresses_up_to_the_edge_of_a_private_range() {
+    assert!(public("172.15.0.1"));
+    assert!(!public("172.16.0.1"));
+    assert!(!public("172.31.255.1"));
+    assert!(public("172.32.0.1"));
+    assert!(public("8.8.8.8"));
+    assert!(public("1.1.1.1"));
+    assert!(public("2606:4700::1111"));
+    assert!(public("64:ff9b::808:808"));
 }
 
 #[test]

@@ -1,21 +1,21 @@
 use super::*;
 
 struct Workspace {
-    root: PathBuf,
+    folder: tempfile::TempDir,
     paths: Paths,
 }
 
 impl Workspace {
-    fn new(name: &str) -> Result<Self, DataError> {
-        let root =
-            std::env::temp_dir().join(format!("thor-hammer-teacher-{name}-{}", std::process::id()));
+    fn new() -> Result<Self, DataError> {
+        let folder = tempfile::tempdir().map_err(DataError::io(Path::new("temporary folder")))?;
+        let root = folder.path();
         let paths = Paths {
             source: root.join("teacher"),
             output: root.join("data"),
             corpus: root.join("corpus"),
             manifest: root.join("manifest.tsv"),
         };
-        let workspace = Self { root, paths };
+        let workspace = Self { folder, paths };
         workspace.write("manifest.tsv", "source\tkind\tcommit\tlicence_file\tlicence\nbook\tbook\tabc\tLICENSE\tMIT License\nlib\tcode\tabc\tLICENSE\tMIT License\n")?;
 
         let train = r#"{"id":"s1","instruction":"","response":"A long passage about heaps.","source":"corpus","origin":"book/heaps.md"}"#;
@@ -27,24 +27,22 @@ impl Workspace {
         Ok(workspace)
     }
 
+    fn root(&self) -> &Path {
+        self.folder.path()
+    }
+
     fn write(&self, path: &str, text: &str) -> Result<(), DataError> {
-        let file = self.root.join(path);
-        let parent = file.parent().unwrap_or(&self.root);
+        let file = self.root().join(path);
+        let parent = file.parent().unwrap_or(self.root());
         fs::create_dir_all(parent).map_err(DataError::io(parent))?;
 
         fs::write(&file, text).map_err(DataError::io(&file))
     }
 
     fn read(&self, path: &str) -> Result<String, DataError> {
-        let file = self.root.join(path);
+        let file = self.root().join(path);
 
         fs::read_to_string(&file).map_err(DataError::io(&file))
-    }
-}
-
-impl Drop for Workspace {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
     }
 }
 
@@ -80,7 +78,7 @@ fn reads_the_command_line() {
 
 #[test]
 fn writes_passing_entries_and_reports_failing_ones() -> Result<(), DataError> {
-    let workspace = Workspace::new("check")?;
+    let workspace = Workspace::new()?;
     workspace.write("teacher/a.md", &format!("{GOOD}---\n<!-- source: notes -->\n### User\nQ\n\n### Assistant\nGreat question!\n\n```python\nassert 1 + 1 == 2\n```\n---\n<!-- source: notes -->\n### User\nQ\n\n### Assistant\n```python\nassert sorted([2, 1]) == [1, 2]\n```\n"))?;
 
     let unknown = GOOD.replace("section: s1", "section: nowhere");
@@ -121,11 +119,11 @@ fn writes_passing_entries_and_reports_failing_ones() -> Result<(), DataError> {
 
 #[test]
 fn a_set_without_grounded_entries_needs_no_sections() -> Result<(), DataError> {
-    let workspace = Workspace::new("plain")?;
+    let workspace = Workspace::new()?;
     let note = "<!-- source: notes -->\n### User\nQ\n\n### Assistant\nA plain answer.\n";
     workspace.write("teacher/a.md", note)?;
-    fs::remove_file(workspace.root.join("data/train.jsonl"))
-        .map_err(DataError::io(&workspace.root))?;
+    fs::remove_file(workspace.root().join("data/train.jsonl"))
+        .map_err(DataError::io(workspace.root()))?;
 
     let result = check(&workspace.paths)?;
 
@@ -138,7 +136,7 @@ fn a_set_without_grounded_entries_needs_no_sections() -> Result<(), DataError> {
 
 #[test]
 fn queues_unused_prose_and_code_sections() -> Result<(), DataError> {
-    let workspace = Workspace::new("queue")?;
+    let workspace = Workspace::new()?;
 
     workspace.write("data/train.jsonl", &format!(
             r#"{{"id":"s1","instruction":"","response":"{}","source":"corpus","origin":"book/heaps.md"}}"#,

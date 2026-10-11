@@ -20,7 +20,6 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fmt::Write as _,
     fs,
     io::{BufWriter, Write},
     path::{Path, PathBuf},
@@ -246,18 +245,17 @@ pub fn queue(paths: &Paths, count: usize, sources: &[String]) -> Result<String, 
         .iter()
         .filter(|section| pick::is_teachable(section))
         .count();
-    let mut summary = format!(
-        "{} sections queued in {} ({teachable} teachable, {} already used)\n",
+    let per_source: String = per_source
+        .iter()
+        .map(|(source, count)| format!("  {source:<44} {count}\n"))
+        .collect();
+
+    Ok(format!(
+        "{} sections queued in {} ({teachable} teachable, {} already used)\n{per_source}",
         picked.len(),
         path.display(),
         used.len()
-    );
-
-    for (source, count) in per_source {
-        let _ = writeln!(summary, "  {source:<44} {count}");
-    }
-
-    Ok(summary)
+    ))
 }
 
 /// What a check found: the report, and whether every entry passed.
@@ -289,20 +287,7 @@ impl CheckResult {
 pub fn check(paths: &Paths) -> Result<CheckResult, DataError> {
     let (source, output) = (paths.source.as_path(), paths.output.as_path());
     let entries = read_entries(source)?;
-    let needs_sections = entries
-        .iter()
-        .any(|(_, parsed)| parsed.as_ref().is_ok_and(|entry| entry.section.is_some()));
-
-    let sections: HashMap<String, Section> = if needs_sections {
-        paths
-            .sections()?
-            .into_iter()
-            .map(|section| (section.id.clone(), section))
-            .collect()
-    } else {
-        HashMap::new()
-    };
-
+    let sections = known_sections(paths, &entries)?;
     let entries = entries.into_iter().map(|(origin, parsed)| {
         let known = parsed.and_then(|entry| match &entry.section {
             Some(id) if !sections.contains_key(id) => Err(format!(
@@ -322,26 +307,54 @@ pub fn check(paths: &Paths) -> Result<CheckResult, DataError> {
 
     fs::create_dir_all(output).map_err(DataError::io(output))?;
 
-    let passed: Vec<(&Conversation, &Checked)> =
-        outcomes.iter().filter_map(Outcome::passed).collect();
-    let chat_lines = passed
-        .iter()
-        .map(|(conversation, checked)| chat_line(conversation, checked, &sections));
-    write_jsonl(&output.join("teacher.jsonl"), chat_lines)?;
-
-    let preference_lines = passed
-        .iter()
-        .filter_map(|(conversation, _)| preference_line(conversation));
-    write_jsonl(&output.join("teacher_preferences.jsonl"), preference_lines)?;
-
-    let report = render_report(&outcomes, &sections);
-    let report_path = output.join("teacher.md");
-    fs::write(&report_path, &report).map_err(DataError::io(&report_path))?;
+    let report = write_outputs(output, &outcomes, &sections)?;
 
     Ok(CheckResult {
         report,
-        all_passed: passed.len() == outcomes.len(),
+        all_passed: outcomes.iter().all(|outcome| outcome.passed().is_some()),
     })
+}
+
+/// The sections the entries may name, by id. They are read only when an
+/// entry names one, since reading them takes the whole training file.
+fn known_sections(paths: &Paths, entries: &[Entry]) -> Result<HashMap<String, Section>, DataError> {
+    let needed = entries
+        .iter()
+        .any(|(_, parsed)| parsed.as_ref().is_ok_and(|entry| entry.section.is_some()));
+
+    if !needed {
+        return Ok(HashMap::new());
+    }
+
+    Ok(paths
+        .sections()?
+        .into_iter()
+        .map(|section| (section.id.clone(), section))
+        .collect())
+}
+
+/// Writes the training lines, the preference pairs and the report to
+/// `output`, and returns the report.
+fn write_outputs(
+    output: &Path,
+    outcomes: &[Outcome],
+    sections: &HashMap<String, Section>,
+) -> Result<String, DataError> {
+    let passed: Vec<Passed<'_>> = outcomes.iter().filter_map(Outcome::passed).collect();
+    let chat_lines = passed
+        .iter()
+        .map(|(conversation, checked)| chat_line(conversation, checked, sections));
+    let preference_lines = passed
+        .iter()
+        .filter_map(|(conversation, _)| preference_line(conversation));
+    let report = render_report(outcomes, sections);
+    let report_path = output.join("teacher.md");
+
+    write_jsonl(&output.join("teacher.jsonl"), chat_lines)?;
+    write_jsonl(&output.join("teacher_preferences.jsonl"), preference_lines)?;
+    fs::write(&report_path, &report).map_err(DataError::io(&report_path))?;
+
+    Ok(report)
 }
 
 fn markdown_files(folder: &Path, files: &mut Vec<PathBuf>) -> Result<(), DataError> {
@@ -487,46 +500,101 @@ fn write_jsonl<T: Serialize>(path: &Path, lines: impl Iterator<Item = T>) -> Res
     writer.flush().map_err(DataError::io(path))
 }
 
-fn render_report(outcomes: &[Outcome], sections: &HashMap<String, Section>) -> String {
-    let passed: Vec<(&Conversation, &Checked)> =
-        outcomes.iter().filter_map(Outcome::passed).collect();
-    let turns: usize = passed
-        .iter()
-        .map(|(conversation, _)| conversation.turns.len())
-        .sum();
-    let multi_turn = passed
-        .iter()
-        .filter(|(conversation, _)| conversation.turns.len() > 2)
-        .count();
-    let grounded = passed
-        .iter()
-        .filter(|(conversation, _)| conversation.section.is_some())
-        .count();
-    let tests: usize = passed.iter().map(|(_, checked)| checked.tests).sum();
-    let runs: usize = passed.iter().map(|(_, checked)| checked.runs).sum();
-    let notes: usize = passed.iter().map(|(_, checked)| checked.notes.len()).sum();
-    let ignored: usize = passed.iter().map(|(_, checked)| checked.ignored).sum();
-    let tokens: usize = passed
-        .iter()
-        .map(|(conversation, _)| conversation.char_count())
-        .sum::<usize>()
-        / CHARS_PER_TOKEN;
-    let rejected: Vec<&String> = passed
-        .iter()
-        .filter_map(|(conversation, _)| conversation.rejected.as_ref())
-        .collect();
-    let caught = rejected
-        .iter()
-        .filter(|text| !verify::spark_objections(text).is_empty())
-        .count();
-    let mut languages: BTreeMap<&str, usize> = BTreeMap::new();
-    let mut sources: BTreeMap<&str, usize> = BTreeMap::new();
+/// An entry that passed, with what its checks found.
+type Passed<'a> = (&'a Conversation, &'a Checked);
 
-    for (conversation, checked) in &passed {
-        for (language, count) in &checked.blocks {
-            *languages.entry(language).or_insert(0) += count;
+/// What the entries that passed add up to.
+struct Totals {
+    turns: usize,
+    multi_turn: usize,
+    grounded: usize,
+    tests: usize,
+    runs: usize,
+    notes: usize,
+    ignored: usize,
+    tokens: usize,
+    pairs: usize,
+    caught: usize,
+}
+
+impl Totals {
+    fn of(passed: &[Passed<'_>]) -> Self {
+        let total = |of: fn(&Checked) -> usize| -> usize {
+            passed.iter().map(|(_, checked)| of(checked)).sum()
+        };
+        let count = |is: fn(&Conversation) -> bool| -> usize {
+            passed.iter().filter(|(spoken, _)| is(spoken)).count()
+        };
+        let chars: usize = passed.iter().map(|(spoken, _)| spoken.char_count()).sum();
+        let rejected: Vec<&String> = passed
+            .iter()
+            .filter_map(|(spoken, _)| spoken.rejected.as_ref())
+            .collect();
+
+        Totals {
+            turns: passed.iter().map(|(spoken, _)| spoken.turns.len()).sum(),
+            multi_turn: count(|spoken| spoken.turns.len() > 2),
+            grounded: count(|spoken| spoken.section.is_some()),
+            tests: total(|checked| checked.tests),
+            runs: total(|checked| checked.runs),
+            notes: total(|checked| checked.notes.len()),
+            ignored: total(|checked| checked.ignored),
+            tokens: chars / CHARS_PER_TOKEN,
+            pairs: rejected.len(),
+            caught: rejected
+                .iter()
+                .filter(|text| !verify::spark_objections(text).is_empty())
+                .count(),
         }
+    }
 
+    /// The report's first table, for `entries` entries of which `passed` passed.
+    fn table(&self, entries: usize, passed: usize) -> String {
+        let Totals {
+            turns,
+            multi_turn,
+            grounded,
+            tests,
+            runs,
+            notes,
+            ignored,
+            tokens,
+            pairs,
+            caught,
+        } = self;
+
+        format!(
+            "# Teacher set\n\n\
+             | | |\n|---|---|\n\
+             | Entries | {entries} |\n| Passed every check | {passed} |\n| Written from a real section | {grounded} |\n\
+             | Multi-turn conversations | {multi_turn} |\n| Turns | {turns} |\n\
+             | Rust tests run and passed | {tests} |\n| Programs in other languages run cleanly | {runs} |\n\
+             | Fragments marked `ignore`, not built | {ignored} |\n\
+             | Broken Rust rules kept as notes (grounded entries) | {notes} |\n\
+             | Preference pairs | {pairs} |\n| Rejected answers spark also catches | {caught} of {pairs} |\n| Tokens (estimate) | {tokens} |\n"
+        )
+    }
+}
+
+/// How many code blocks were built in each language.
+fn blocks_by_language<'a>(passed: &[Passed<'a>]) -> BTreeMap<&'a str, usize> {
+    let mut languages = BTreeMap::new();
+
+    for (language, count) in passed.iter().flat_map(|(_, checked)| &checked.blocks) {
+        *languages.entry(language.as_ref()).or_insert(0) += count;
+    }
+
+    languages
+}
+
+/// How many conversations were written from each source.
+fn conversations_by_source<'a>(
+    passed: &[Passed<'a>],
+    sections: &'a HashMap<String, Section>,
+) -> BTreeMap<&'a str, usize> {
+    let mut sources = BTreeMap::new();
+
+    for (conversation, _) in passed {
         let source = conversation
             .section
             .as_ref()
@@ -535,53 +603,59 @@ fn render_report(outcomes: &[Outcome], sections: &HashMap<String, Section>) -> S
         *sources.entry(source).or_insert(0) += 1;
     }
 
-    let mut report = format!(
-        "# Teacher set\n\n\
-         | | |\n|---|---|\n\
-         | Entries | {} |\n| Passed every check | {} |\n| Written from a real section | {grounded} |\n\
-         | Multi-turn conversations | {multi_turn} |\n| Turns | {turns} |\n\
-         | Rust tests run and passed | {tests} |\n| Programs in other languages run cleanly | {runs} |\n\
-         | Fragments marked `ignore`, not built | {ignored} |\n\
-         | Broken Rust rules kept as notes (grounded entries) | {notes} |\n\
-         | Preference pairs | {} |\n| Rejected answers spark also catches | {caught} of {} |\n| Tokens (estimate) | {tokens} |\n",
-        outcomes.len(),
-        passed.len(),
-        rejected.len(),
-        rejected.len(),
-    );
-    report.push_str("\n## Code blocks built, by language\n\n| Language | Blocks |\n|---|---|\n");
+    sources
+}
 
-    for (language, count) in languages {
-        let _ = writeln!(report, "| {language} | {count} |");
-    }
-
-    report.push_str("\n## Conversations by source\n\n| Source | Conversations |\n|---|---|\n");
-
-    for (source, count) in sources {
-        let _ = writeln!(report, "| {source} | {count} |");
-    }
-
-    report.push_str("\n## Problems\n\n");
-
-    let failed: Vec<&Outcome> = outcomes
+/// A two-column table under `heading`, one row per count.
+fn counts_table(heading: &str, columns: &str, counts: &BTreeMap<&str, usize>) -> String {
+    let rows: String = counts
         .iter()
-        .filter(|outcome| outcome.passed().is_none())
+        .map(|(name, count)| format!("| {name} | {count} |\n"))
         .collect();
 
-    if failed.is_empty() {
-        report.push_str("- none\n");
-    }
+    format!("\n## {heading}\n\n| {columns} |\n|---|---|\n{rows}")
+}
 
-    for outcome in failed {
-        let _ = write!(
-            report,
-            "### {}\n\n```text\n{}\n```\n\n",
-            outcome.origin,
-            outcome.problems().join("\n")
-        );
-    }
+/// The entries that failed, each with what was wrong with it.
+fn problems(outcomes: &[Outcome]) -> String {
+    let failed: String = outcomes
+        .iter()
+        .filter(|outcome| outcome.passed().is_none())
+        .map(|outcome| {
+            let found = outcome.problems().join("\n");
 
-    report
+            format!("### {}\n\n```text\n{found}\n```\n\n", outcome.origin)
+        })
+        .collect();
+    let listed = if failed.is_empty() {
+        "- none\n"
+    } else {
+        &failed
+    };
+
+    format!("\n## Problems\n\n{listed}")
+}
+
+fn render_report(outcomes: &[Outcome], sections: &HashMap<String, Section>) -> String {
+    let passed: Vec<Passed<'_>> = outcomes.iter().filter_map(Outcome::passed).collect();
+    let languages = blocks_by_language(&passed);
+    let sources = conversations_by_source(&passed, sections);
+
+    [
+        Totals::of(&passed).table(outcomes.len(), passed.len()),
+        counts_table(
+            "Code blocks built, by language",
+            "Language | Blocks",
+            &languages,
+        ),
+        counts_table(
+            "Conversations by source",
+            "Source | Conversations",
+            &sources,
+        ),
+        problems(outcomes),
+    ]
+    .concat()
 }
 
 #[cfg(test)]

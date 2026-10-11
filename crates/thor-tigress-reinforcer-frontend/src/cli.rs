@@ -131,33 +131,39 @@ fn serve(options: &[String]) -> Command {
 
         match option.as_str() {
             "--port" => port.clone_from(value),
-            "--dataset" => match dataset(value) {
-                Some(spec) => datasets.push(spec),
-                None => {
-                    return Command::Usage(format!(
-                        "--dataset {value}: expected NAME=RECORDS[,FLAGS[,REMOVED]]"
-                    ));
-                }
-            },
+            "--dataset" => {
+                let Some(spec) = dataset(value) else {
+                    let expected = "expected NAME=RECORDS[,FLAGS[,REMOVED]]";
+
+                    return Command::Usage(format!("--dataset {value}: {expected}"));
+                };
+
+                datasets.push(spec);
+            }
             other => return Command::Usage(format!("unknown option {other}")),
         }
     }
 
     if datasets.is_empty() {
-        datasets = DEFAULT_DATASETS
-            .iter()
-            .map(|&(name, records, flags, removed)| {
-                DatasetSpec::new(
-                    name,
-                    Path::new(records),
-                    Path::new(flags),
-                    Path::new(removed),
-                )
-            })
-            .collect();
+        datasets = default_datasets();
     }
 
     Command::Serve { port, datasets }
+}
+
+/// The datasets shown when the command line names none.
+fn default_datasets() -> Vec<DatasetSpec> {
+    DEFAULT_DATASETS
+        .iter()
+        .map(|&(name, records, flags, removed)| {
+            DatasetSpec::new(
+                name,
+                Path::new(records),
+                Path::new(flags),
+                Path::new(removed),
+            )
+        })
+        .collect()
 }
 
 /// Reads `NAME=RECORDS[,FLAGS[,REMOVED]]`. Missing files default to

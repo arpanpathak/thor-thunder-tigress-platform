@@ -3,34 +3,27 @@ use crate::testing::{FakeServer, json_response};
 
 const PASS: &str = "keyring passphrase";
 
-struct Folder {
-    path: PathBuf,
-}
+/// A fresh folder for one test, removed when dropped.
+struct Folder(tempfile::TempDir);
 
 impl Folder {
-    fn new(name: &str) -> Result<Self, AgentError> {
-        let path =
-            std::env::temp_dir().join(format!("thor-agent-config-{name}-{}", std::process::id()));
-        fs::create_dir_all(&path)?;
+    fn new() -> Result<Self, AgentError> {
+        Ok(Self(tempfile::tempdir()?))
+    }
 
-        Ok(Self { path })
+    fn path(&self) -> &Path {
+        self.0.path()
     }
 
     fn keyring(&self) -> PathBuf {
-        self.path.join("keyring")
+        self.path().join("keyring")
     }
 
     fn passphrase(&self) -> Result<PathBuf, AgentError> {
-        let path = self.path.join("passphrase");
+        let path = self.path().join("passphrase");
         fs::write(&path, format!("{PASS}\n"))?;
 
         Ok(path)
-    }
-}
-
-impl Drop for Folder {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.path);
     }
 }
 
@@ -259,7 +252,7 @@ fn secrets_compare_by_whole_value() {
 
 #[test]
 fn a_keyring_lets_each_person_in() -> Outcome {
-    let folder = Folder::new("people")?;
+    let folder = Folder::new()?;
     let (config, keyring) = with_people(&folder)?;
     let ada = keyring
         .find("ada@example.com")
@@ -287,7 +280,7 @@ fn a_keyring_lets_each_person_in() -> Outcome {
 
 #[test]
 fn a_keyring_that_goes_away_is_reported_and_keeps_the_old_keys() -> Outcome {
-    let folder = Folder::new("gone")?;
+    let folder = Folder::new()?;
     let (config, _keyring) = with_people(&folder)?;
 
     fs::remove_file(folder.keyring())?;
@@ -298,64 +291,49 @@ fn a_keyring_that_goes_away_is_reported_and_keeps_the_old_keys() -> Outcome {
 }
 
 #[test]
-fn keyring_settings_have_to_be_complete() -> Outcome {
-    let folder = Folder::new("settings")?;
-    let missing = folder.path.join("nowhere").display().to_string();
+fn a_keyring_needs_its_file_and_a_passphrase() -> Outcome {
+    let folder = Folder::new()?;
+    let missing = folder.path().join("nowhere").display().to_string();
     let name = folder.keyring().display().to_string();
     let passphrase = folder.passphrase()?.display().to_string();
+    let without_the_file = Config::from_args(args(&[
+        "--key-file",
+        "/none",
+        "--keyring",
+        &missing,
+        "--keyring-passphrase-file",
+        &passphrase,
+    ]));
+    let without_a_passphrase =
+        Config::from_args(args(&["--key-file", "/none", "--keyring", &name]));
 
-    assert!(matches!(
-        Config::from_args(args(&[
-            "--key-file",
-            "/none",
-            "--keyring",
-            &missing,
-            "--keyring-passphrase-file",
-            &passphrase,
-        ])),
-        Err(AgentError::Keyring(_))
-    ));
-    assert!(matches!(
-        Config::from_args(args(&["--key-file", "/none", "--keyring", &name])),
-        Err(AgentError::Config(_))
-    ));
+    assert!(matches!(without_the_file, Err(AgentError::Keyring(_))));
+    assert!(matches!(without_a_passphrase, Err(AgentError::Config(_))));
 
-    let empty = folder.path.join("empty");
+    Ok(())
+}
+
+#[test]
+fn a_keyring_passphrase_comes_from_a_readable_file_or_the_environment() -> Outcome {
+    let folder = Folder::new()?;
+    let empty = folder.path().join("empty");
     fs::write(&empty, "\n")?;
 
-    let empty = empty.display().to_string();
-    let options = Options {
-        keyring: Some(PathBuf::from(&name)),
-        keyring_passphrase_file: Some(PathBuf::from(&empty)),
+    let with_file = |file: Option<PathBuf>| Options {
+        keyring: Some(folder.keyring()),
+        keyring_passphrase_file: file,
         ..Options::default()
     };
+    let from_env = |value: &str| keyring_passphrase(&with_file(None), Some(value.to_string()));
+    let from_empty_file =
+        keyring_passphrase(&with_file(Some(empty)), Some("from-the-env".to_string()));
+    let from_missing_file =
+        keyring_passphrase(&with_file(Some(folder.path().join("nowhere"))), None);
 
-    assert!(matches!(
-        keyring_passphrase(&options, Some("from-the-env".to_string())),
-        Err(AgentError::Config(_))
-    ));
-
-    let from_env = Options {
-        keyring: Some(PathBuf::from(&name)),
-        ..Options::default()
-    };
-
-    assert!(keyring_passphrase(&from_env, Some("from-the-env".to_string())).is_ok());
-    assert!(matches!(
-        keyring_passphrase(&from_env, Some(String::new())),
-        Err(AgentError::Config(_))
-    ));
-    assert!(matches!(
-        keyring_passphrase(
-            &Options {
-                keyring: Some(PathBuf::from(&name)),
-                keyring_passphrase_file: Some(PathBuf::from(&missing)),
-                ..Options::default()
-            },
-            None,
-        ),
-        Err(AgentError::Config(_))
-    ));
+    assert!(from_env("from-the-env").is_ok());
+    assert!(matches!(from_env(""), Err(AgentError::Config(_))));
+    assert!(matches!(from_empty_file, Err(AgentError::Config(_))));
+    assert!(matches!(from_missing_file, Err(AgentError::Config(_))));
 
     Ok(())
 }

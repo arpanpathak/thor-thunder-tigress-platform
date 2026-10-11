@@ -483,6 +483,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce5d3ddc6d3fa000eb1536d85e147bfe31aacaba692ed6a876f95cb7c855be78"
 
 [[package]]
+name = "linux-raw-sys"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+
+[[package]]
 name = "lock_api"
 version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -788,6 +794,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustix"
+version = "1.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "891efababe418670775f199f0d233d84843c227a0949a883ce15b37c78d6629d"
+dependencies = [
+ "bitflags",
+ "errno",
+ "libc",
+ "linux-raw-sys",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "rustls"
 version = "0.23.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1009,6 +1028,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0bf256ce5efdfa370213c1dabab5935a12e49f2c58d15e9eac2870d3b4f27263"
 
 [[package]]
+name = "tempfile"
+version = "3.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
+dependencies = [
+ "fastrand",
+ "getrandom 0.4.3",
+ "once_cell",
+ "rustix",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "tendril"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1044,6 +1076,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "thor-spark-safety-eval",
 ]
@@ -1054,6 +1087,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "thor-spark-safety-eval",
  "ureq",
@@ -1068,6 +1102,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.119",
+ "tempfile",
  "thiserror",
 ]
 
@@ -1082,6 +1117,7 @@ dependencies = [
  "rustls",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "thor-tigress-keyring",
  "tokio",
@@ -1101,6 +1137,7 @@ dependencies = [
  "getrandom 0.4.3",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "zeroize",
 ]
@@ -1113,6 +1150,7 @@ dependencies = [
  "axum",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror",
  "thor-spark-safety-eval",
  "tokio",

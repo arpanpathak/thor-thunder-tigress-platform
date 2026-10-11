@@ -190,6 +190,14 @@ pub fn separate_flagged(
         }
     }
 
+    (kept, flagged, unmatched(flags_by_id, &matched_ids))
+}
+
+/// The reviewed flags whose id is not among `matched_ids`, in id order.
+fn unmatched(
+    flags_by_id: &HashMap<String, SlopFlag>,
+    matched_ids: &std::collections::HashSet<String>,
+) -> Vec<UnmatchedFlag> {
     let mut unmatched: Vec<UnmatchedFlag> = flags_by_id
         .iter()
         .filter(|(id, flag)| !matched_ids.contains(*id) && flag.is_reviewed())
@@ -200,7 +208,7 @@ pub fn separate_flagged(
         .collect();
     unmatched.sort_by(|left, right| left.id.cmp(&right.id));
 
-    (kept, flagged, unmatched)
+    unmatched
 }
 
 /// How many flagged spans fall in each category, in [`SlopCategory::ALL`] order.
