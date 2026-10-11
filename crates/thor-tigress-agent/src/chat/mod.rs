@@ -2,7 +2,7 @@
 //! on, run as a loop in which the model may call a tool before it answers.
 //!
 //! ```text
-//!   client ── request ──► server ── stream ──► llama-server
+//!   client ── request ──► server ── stream ──► the engine
 //!      ▲                    │  tool call: web_search("…", time_range)
 //!      │                    │             fetch_page_content_recursive(url)
 //!      │                    ▼
@@ -15,14 +15,21 @@
 //! something up before they answer; later rounds go back to `auto`. A model that
 //! writes a call into the text instead of into `tool_calls` is understood too:
 //! [`crate::tooltext`] takes it out of the answer and hands it to the loop.
+//!
+//! A request that brings its own tools comes from a coding tool running its
+//! own loop, so the engine's answer is copied back untouched, streamed or not.
+//! Every request is first given the shape the engine takes; see [`shape`].
+
+mod shape;
 
 use std::io::{BufRead, Write};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 use crate::{
     address::Url,
+    body::{self, Fields},
     config::Upstreams,
     error::{AgentError, Outcome},
     fetch::{self, Allowed},
@@ -59,51 +66,6 @@ const MAX_CITED: usize = 40;
 
 /// The page's switch for web search; removed before the model sees the request.
 const WEB_SEARCH_SWITCH: &str = "thor_web_search";
-
-/// Body fields only llama-server understands. TensorRT Edge-LLM answers a field
-/// it does not know with 400 `Extra inputs are not permitted`, so these are
-/// dropped when the request is going to an engine; llama-server still gets them.
-///
-/// Measured against TensorRT Edge-LLM 0.11.0, which rejects every field here and
-/// accepts `top_k`, `min_p`, `seed`, `top_p`, `stop`, `presence_penalty` and
-/// `chat_template_kwargs`, so none of those are below. Dropping a field an engine
-/// cannot honour is quieter than the 400 it used to get: `grammar` and
-/// `json_schema`, for instance, are ignored rather than refused.
-const LLAMA_SERVER_ONLY: [&str; 33] = [
-    "adaptive_decay",
-    "adaptive_target",
-    "cache_prompt",
-    "dry_allowed_length",
-    "dry_base",
-    "dry_multiplier",
-    "dynatemp_exponent",
-    "dynatemp_range",
-    "grammar",
-    "ignore_eos",
-    "json_schema",
-    "lora",
-    "min_keep",
-    "mirostat",
-    "mirostat_eta",
-    "mirostat_tau",
-    "n_keep",
-    "n_predict",
-    "n_probs",
-    "parse_tool_calls",
-    "reasoning_budget_message",
-    "reasoning_budget_tokens",
-    "repeat_last_n",
-    "repeat_penalty",
-    "return_progress",
-    "samplers",
-    "slot_id",
-    "t_max_predict_ms",
-    "timings_per_token",
-    "top_n_sigma",
-    "typical_p",
-    "xtc_probability",
-    "xtc_threshold",
-];
 
 /// The line added under the switch. It asks for a plan, names the two kinds
 /// that find postings and the people behind them, and asks for citations.
@@ -142,9 +104,6 @@ const MAX_LISTED: usize = 10;
 /// The request field asking for a streamed answer.
 const STREAM: &str = "stream";
 
-/// The request field naming the model, which picks the engine.
-const MODEL: &str = "model";
-
 /// The request field listing the tools the model may call.
 const TOOLS: &str = "tools";
 
@@ -157,13 +116,10 @@ const REQUIRED: &str = "required";
 /// The request field holding the conversation.
 const MESSAGES: &str = "messages";
 
-/// A chat request's top-level fields.
-type Fields = Map<String, Value>;
-
 /// How a chat request is answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
-    /// Passed to the model server and its answer copied back as it is.
+    /// Passed to the engine and its answer copied back as it is.
     Relay,
     /// Streamed to the client as events.
     Stream,
@@ -172,13 +128,23 @@ enum Mode {
 }
 
 impl Mode {
-    fn of(web_search: bool, streamed: bool) -> Mode {
-        match (web_search, streamed) {
-            (true, _) => Mode::Search,
-            (false, true) => Mode::Stream,
-            (false, false) => Mode::Relay,
+    /// The mode for a request: whether the page turned web search on, whether
+    /// it asks for a stream, and whether it brings tools of its own.
+    fn of(web_search: bool, streamed: bool, own_tools: bool) -> Mode {
+        match (web_search, streamed, own_tools) {
+            (true, _, _) => Mode::Search,
+            (false, true, false) => Mode::Stream,
+            (false, true, true) | (false, false, _) => Mode::Relay,
         }
     }
+}
+
+/// Whether the request lists tools for the model to call.
+fn brings_tools(fields: &Fields) -> bool {
+    fields
+        .get(TOOLS)
+        .and_then(Value::as_array)
+        .is_some_and(|tools| !tools.is_empty())
 }
 
 /// The tools the model may call.
@@ -276,7 +242,7 @@ struct FetchArguments {
     url: String,
 }
 
-/// One streamed chunk from llama-server, as far as this server reads it.
+/// One streamed chunk from the engine, as far as this server reads it.
 #[derive(Deserialize)]
 struct Chunk {
     #[serde(default)]
@@ -396,24 +362,20 @@ struct Source<'a> {
 /// or I/O errors before the answer starts. Errors after an event stream has
 /// started are sent to the client as a `{"thor":{"error":…}}` event instead.
 pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Outcome {
-    let Value::Object(mut fields) = serde_json::from_slice(body)? else {
-        return Err(AgentError::bad_request("the body must be a JSON object"));
-    };
-
+    let mut fields = body::fields(body)?;
     let web_search = fields
         .remove(WEB_SEARCH_SWITCH)
         .and_then(|value| value.as_bool())
         .unwrap_or(false);
-    let engine_serves = upstreams.serves_engine(fields.get(MODEL).and_then(Value::as_str));
-    if engine_serves {
-        for field in LLAMA_SERVER_ONLY {
-            fields.remove(field);
-        }
-    }
-    let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
-    let model = upstreams.serving(fields.get(MODEL).and_then(Value::as_str));
 
-    match Mode::of(web_search, streamed) {
+    let engine = upstreams.serving(body::model(&fields));
+    body::name(&mut fields, &engine.model);
+    shape::fit(&mut fields);
+
+    let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
+    let model = &engine.endpoint;
+
+    match Mode::of(web_search, streamed, brings_tools(&fields)) {
         Mode::Relay => model
             .post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?
             .relay(client),

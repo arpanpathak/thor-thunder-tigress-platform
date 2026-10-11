@@ -1,10 +1,10 @@
 //! `thor-tigress-agent`: the front server of the Thor Tigress Cub.
 //!
-//! It serves the chat page, checks the access key, passes model calls to
-//! llama-server, and, when the page turns web search on, lets the model call
-//! `web_search` backed by SearXNG. `/v1/messages` (Anthropic's API, used by
-//! Claude Code) goes to llama-server with thinking off unless the request asks
-//! for it. One thread per connection.
+//! It serves the chat page, checks the access key, passes model calls to the
+//! TensorRT Edge-LLM engine serving the model they name, and, when the page
+//! turns web search on, lets the model call `web_search` backed by SearXNG.
+//! `/v1/chat/completions` is what OpenAI-compatible coding tools call and
+//! `/v1/messages` what Claude Code calls. One thread per connection.
 //!
 //! | Module | Does |
 //! |---|---|
@@ -15,11 +15,14 @@
 //! | [`research`] | how a question becomes searches, and the source ledger |
 //! | [`address`], [`fetch`], [`html`], [`http`] | reading a cited page and its links |
 //! | [`tooltext`] | tool calls the model writes as text |
-//! | [`upstream`] | calling llama-server and SearXNG |
+//! | [`body`] | a JSON request body and the model it names |
+//! | [`models`] | the models the engines offer |
+//! | [`upstream`] | calling an engine and SearXNG |
 
 #![forbid(unsafe_code)]
 
 mod address;
+mod body;
 mod chat;
 mod config;
 mod error;
@@ -62,10 +65,16 @@ fn main() -> ExitCode {
 fn serve(config: Config) -> Outcome<Infallible> {
     let listener = TcpListener::bind(&config.listen)?;
     let access = if config.key.is_some() { "required" } else { "off" };
+    let engines: Vec<&str> = config
+        .upstreams
+        .engines()
+        .map(|engine| engine.model.as_str())
+        .collect();
+
     eprintln!(
-        "listening on {}, model {}, search {}, access key {}, keyring {}",
+        "listening on {}, engines {}, search {}, access key {}, keyring {}",
         config.listen,
-        config.upstreams.model.address(),
+        engines.join(", "),
         config.upstreams.search.address(),
         access,
         if config.people.is_some() { "on" } else { "off" }
@@ -110,6 +119,19 @@ fn handle(stream: &mut dyn Connection, config: &Config) {
 mod tests {
     use super::*;
 
+    /// `more`, behind an engine and a key file that isn't there.
+    fn arguments(more: &[&str]) -> Vec<String> {
+        let engine = ["--engine", "nemotron=127.0.0.1:1"];
+        let key = ["--key-file", "/nonexistent"];
+
+        engine
+            .iter()
+            .chain(&key)
+            .chain(more)
+            .map(ToString::to_string)
+            .collect()
+    }
+
     /// A client that sends `request` and is gone before the answer.
     struct Vanishing {
         request: io::Cursor<Vec<u8>>,
@@ -133,7 +155,7 @@ mod tests {
 
     #[test]
     fn a_client_gone_before_the_answer_is_only_logged() -> Outcome {
-        let config = Config::from_args(["--key-file".to_string(), "/nonexistent".to_string()])?;
+        let config = Config::from_args(arguments(&[]))?;
         let request = b"POST /v1/chat/completions HTTP/1.1\r\nContent-Length: 2\r\n\r\n{x".to_vec();
         let mut client = Vanishing {
             request: io::Cursor::new(request),
@@ -153,18 +175,12 @@ mod tests {
 
     #[test]
     fn serve_binds_and_announces() -> Outcome {
-        let args = ["--listen", "127.0.0.1:0", "--key-file", "/nonexistent"].map(String::from);
-        let config = Config::from_args(args)?;
+        let config = Config::from_args(arguments(&["--listen", "127.0.0.1:0"]))?;
         thread::spawn(move || serve(config));
         thread::sleep(std::time::Duration::from_millis(200));
         let taken = TcpListener::bind("127.0.0.1:0")?;
-        let args = [
-            "--listen".to_string(),
-            taken.local_addr()?.to_string(),
-            "--key-file".to_string(),
-            "/nonexistent".to_string(),
-        ];
-        let busy = Config::from_args(args)?;
+        let address = taken.local_addr()?.to_string();
+        let busy = Config::from_args(arguments(&["--listen", &address]))?;
         assert!(serve(busy).is_err());
         Ok(())
     }
@@ -173,8 +189,7 @@ mod tests {
     fn answers_connections_and_reports_bad_requests() -> Outcome {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?.to_string();
-        let arguments = ["--key-file".to_string(), "/nonexistent".to_string()];
-        let config = Arc::new(Config::from_args(arguments)?);
+        let config = Arc::new(Config::from_args(arguments(&[]))?);
         let exchanged = thread::scope(|scope| {
             scope.spawn(|| accept(listener.incoming().take(2), &config));
             let health = exchange(&address, "GET /health HTTP/1.1\r\nHost: x\r\n\r\n")?;

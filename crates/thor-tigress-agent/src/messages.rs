@@ -1,14 +1,19 @@
-//! Anthropic's `/v1/messages` (used by Claude Code), passed to the model server
-//! with the little rewriting the two servers need: thinking off unless the
-//! request asks for it, and, for an engine, system messages moved to the top.
+//! Anthropic's `/v1/messages` and `/v1/messages/count_tokens` (used by Claude
+//! Code), passed to an engine with the three rewrites it needs: the model
+//! named as the engine knows it, system messages moved to the top, and
+//! thinking off unless the request asks for it.
 
 use std::io::Write;
 
 use serde_json::{Value, json};
 
-use crate::{error::Outcome, paths, upstream::Endpoint};
+use crate::{
+    body::{self, Fields},
+    config::Upstreams,
+    error::Outcome,
+};
 
-/// The field llama-server reads to switch the model's chat template.
+/// The field an engine reads to switch the model's chat template.
 const TEMPLATE_SETTINGS: &str = "chat_template_kwargs";
 
 /// The request's conversation.
@@ -34,85 +39,88 @@ enum Thinking {
 }
 
 impl Thinking {
-    fn asked_by(request: &Value) -> Thinking {
-        match request.pointer("/thinking/type").and_then(Value::as_str) {
+    fn asked_by(fields: &Fields) -> Thinking {
+        let kind = fields
+            .get("thinking")
+            .and_then(|thinking| thinking.get("type"))
+            .and_then(Value::as_str);
+
+        match kind {
             Some("enabled" | "adaptive") => Thinking::On,
             _ => Thinking::Off,
         }
     }
 }
 
-/// Sends a `/v1/messages` request to the model server and relays the answer.
-/// `engine` says whether an engine rather than llama-server will answer it,
-/// which decides how much of the body has to be rewritten.
+/// Sends an Anthropic request to `path` on the engine serving its model and
+/// relays the answer.
 ///
 /// # Errors
 ///
-/// `AgentError::Json` when `body` isn't JSON; upstream and I/O errors as in
-/// [`Endpoint::post`].
-pub fn forward(client: &mut dyn Write, body: &[u8], model: &Endpoint, engine: bool) -> Outcome {
-    model
-        .post(paths::MESSAGES, &prepare(body, engine)?)?
+/// `AgentError::Json` or `AgentError::BadRequest` when `body` isn't a JSON
+/// object; upstream and I/O errors as in [`crate::upstream::Endpoint::post`].
+pub fn forward(client: &mut dyn Write, path: &str, body: &[u8], upstreams: &Upstreams) -> Outcome {
+    let mut fields = body::fields(body)?;
+    let engine = upstreams.serving(body::model(&fields));
+
+    body::name(&mut fields, &engine.model);
+    lift_system_messages(&mut fields);
+    choose_thinking(&mut fields);
+
+    engine
+        .endpoint
+        .post(path, &serde_json::to_vec(&fields)?)?
         .relay(client)
 }
 
-/// Two rewrites, because the two servers read the same body differently.
-///
-/// llama-server ignores Anthropic's `thinking` field, so the choice is made
-/// through the chat template instead. A request that sets the template settings
-/// itself is left as it is.
-///
-/// An engine takes Anthropic's request as it is except for one field: it answers
-/// `messages[i].role must be user or assistant`, and Claude Code puts parts of
-/// its system prompt into the messages as well as at the top level. For an
-/// engine those move up into `system`, which is where Anthropic defines them and
-/// where the engine reads them.
-fn prepare(body: &[u8], engine: bool) -> Outcome<Vec<u8>> {
-    let mut request: Value = serde_json::from_slice(body)?;
-    let thinking = Thinking::asked_by(&request);
-
-    if engine {
-        lift_system_messages(&mut request);
+/// An engine ignores Anthropic's `thinking` field, so the choice is made
+/// through the chat template instead. A request that sets the template
+/// settings itself is left as it is.
+fn choose_thinking(fields: &mut Fields) {
+    match (
+        Thinking::asked_by(fields),
+        fields.contains_key(TEMPLATE_SETTINGS),
+    ) {
+        (Thinking::Off, false) => {
+            fields.insert(
+                TEMPLATE_SETTINGS.to_string(),
+                json!({ "enable_thinking": false }),
+            );
+        }
+        (Thinking::On, _) | (Thinking::Off, true) => {}
     }
-    if let Some(fields) = request.as_object_mut()
-        && thinking == Thinking::Off
-        && !fields.contains_key(TEMPLATE_SETTINGS)
-    {
-        fields.insert(
-            TEMPLATE_SETTINGS.to_string(),
-            json!({ "enable_thinking": false }),
-        );
-    }
-    Ok(serde_json::to_vec(&request)?)
 }
 
 /// Moves `{"role":"system"}` messages into the top-level `system`, behind
 /// whatever the request already had there, keeping their blocks in order.
-fn lift_system_messages(request: &mut Value) {
-    let Some(fields) = request.as_object_mut() else {
+///
+/// An engine answers `messages[i].role must be user or assistant`, and Claude
+/// Code puts parts of its system prompt into the messages as well as at the
+/// top level, which is where Anthropic defines them.
+fn lift_system_messages(fields: &mut Fields) {
+    let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return;
     };
-    let lifted = {
-        let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
-            return;
-        };
-        let mut lifted = Vec::new();
-        messages.retain(|message| {
-            if message.get(ROLE).and_then(Value::as_str) != Some(SYSTEM) {
-                return true;
-            }
-            lifted.extend(blocks(message.get(CONTENT)));
-            false
-        });
-        lifted
-    };
+
+    let (system, kept): (Vec<Value>, Vec<Value>) = std::mem::take(messages)
+        .into_iter()
+        .partition(|message| message.get(ROLE).and_then(Value::as_str) == Some(SYSTEM));
+    *messages = kept;
+
+    let lifted: Vec<Value> = system
+        .iter()
+        .flat_map(|message| blocks(message.get(CONTENT)))
+        .collect();
+
     if lifted.is_empty() {
         return;
     }
-    let system = fields.entry(SYSTEM.to_string()).or_insert_with(|| json!([]));
-    let mut merged = blocks(Some(&*system));
-    merged.extend(lifted);
-    *system = Value::Array(merged);
+
+    let merged = blocks(fields.get(SYSTEM))
+        .into_iter()
+        .chain(lifted)
+        .collect();
+    fields.insert(SYSTEM.to_string(), Value::Array(merged));
 }
 
 /// A message's content as blocks: a plain string becomes one text block.
@@ -127,37 +135,40 @@ fn blocks(content: Option<&Value>) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{FakeServer, json_response};
+    use crate::{
+        config::Engine,
+        error::AgentError,
+        paths,
+        testing::{FakeServer, FakeWeb, json_response},
+        upstream::Endpoint,
+    };
 
-    fn prepared(body: &Value, engine: bool) -> Outcome<Value> {
-        Ok(serde_json::from_slice(&prepare(
-            &serde_json::to_vec(body)?,
-            engine,
-        )?)?)
+    fn upstreams(engine: &FakeServer) -> Upstreams {
+        Upstreams {
+            default: Engine::new("qwen".to_string(), engine.address()),
+            others: Vec::new(),
+            search: Endpoint::new(engine.address(), None),
+            web: Box::new(FakeWeb::default()),
+        }
     }
 
-    fn thinking_sent(body: &Value) -> Outcome<Value> {
-        Ok(prepared(body, false)?
+    /// What the engine was sent for `request`.
+    fn sent(request: &Value) -> Outcome<Value> {
+        let engine = FakeServer::start(vec![json_response(r#"{"type":"message"}"#)])?;
+        let body = serde_json::to_vec(request)?;
+
+        forward(&mut Vec::new(), paths::MESSAGES, &body, &upstreams(&engine))?;
+
+        let seen = engine.requests()?;
+        let json = seen[0].split("\r\n\r\n").nth(1).unwrap_or_default();
+        Ok(serde_json::from_str(json)?)
+    }
+
+    fn thinking_sent(request: &Value) -> Outcome<Value> {
+        Ok(sent(request)?
             .pointer("/chat_template_kwargs/enable_thinking")
             .cloned()
             .unwrap_or(Value::Null))
-    }
-
-    #[test]
-    fn reads_what_the_request_asks_for() {
-        assert_eq!(
-            Thinking::asked_by(&json!({"thinking": {"type": "enabled"}})),
-            Thinking::On
-        );
-        assert_eq!(
-            Thinking::asked_by(&json!({"thinking": {"type": "adaptive"}})),
-            Thinking::On
-        );
-        assert_eq!(
-            Thinking::asked_by(&json!({"thinking": {"type": "disabled"}})),
-            Thinking::Off
-        );
-        assert_eq!(Thinking::asked_by(&json!({})), Thinking::Off);
     }
 
     #[test]
@@ -166,6 +177,10 @@ mod tests {
         assert_eq!(
             thinking_sent(&json!({"thinking": {"type": "disabled"}}))?,
             json!(false)
+        );
+        assert_eq!(
+            thinking_sent(&json!({"thinking": {"type": "enabled"}}))?,
+            Value::Null
         );
         assert_eq!(
             thinking_sent(&json!({"thinking": {"type": "adaptive"}}))?,
@@ -179,106 +194,81 @@ mod tests {
     }
 
     #[test]
-    fn a_body_that_is_not_an_object_passes_unchanged() -> Outcome {
-        assert_eq!(prepare(b"[1,2]", false)?, b"[1,2]");
-        assert_eq!(prepare(b"[1,2]", true)?, b"[1,2]");
-        assert!(prepare(b"{", false).is_err());
+    fn a_body_that_is_not_an_object_is_refused() -> Outcome {
+        let engine = FakeServer::start(Vec::new())?;
+        let upstreams = upstreams(&engine);
+        let answered = |body: &[u8]| forward(&mut Vec::new(), paths::MESSAGES, body, &upstreams);
+
+        assert!(matches!(answered(b"[1,2]"), Err(AgentError::BadRequest(_))));
+        assert!(matches!(answered(b"{"), Err(AgentError::Json(_))));
         Ok(())
     }
 
-    /// What Claude Code sends: the system prompt split between the top-level
-    /// field and a message in the middle of the conversation.
+    /// What Claude Code sends: a hosted model's name, and the system prompt
+    /// split between the top-level field and a message in the conversation.
     #[test]
-    fn an_engine_is_not_given_a_system_message() -> Outcome {
-        let request = json!({
+    fn claude_code_is_answered_by_the_engine() -> Outcome {
+        let lifted = sent(&json!({
+            "model": "claude-sonnet-5-5",
             "system": [{"type": "text", "text": "header"}],
             "messages": [
                 {"role": "user", "content": "ask"},
                 {"role": "system", "content": [{"type": "text", "text": "rules"}]},
                 {"role": "assistant", "content": "answer"}
             ]
-        });
+        }))?;
 
-        let lifted = prepared(&request, true)?;
-        let roles = lifted[MESSAGES]
-            .as_array()
-            .map(|messages| messages.iter().filter_map(|one| one[ROLE].as_str()).collect::<Vec<_>>());
-        assert_eq!(roles, Some(vec!["user", "assistant"]));
-        let system = lifted[SYSTEM].as_array().cloned().unwrap_or_default();
-        assert_eq!(system.len(), 2);
-        assert_eq!(system[0]["text"], "header");
-        assert_eq!(system[1]["text"], "rules");
-
-        let kept = prepared(&request, false)?;
+        assert_eq!(lifted["model"], "qwen");
         assert_eq!(
-            kept[MESSAGES].as_array().map(Vec::len),
-            Some(3),
-            "llama-server reads its system messages where they are"
+            lifted[MESSAGES],
+            json!([
+                {"role": "user", "content": "ask"},
+                {"role": "assistant", "content": "answer"}
+            ])
         );
-        assert_eq!(kept[SYSTEM].as_array().map(Vec::len), Some(1));
+        assert_eq!(
+            lifted[SYSTEM],
+            json!([{"type": "text", "text": "header"}, {"type": "text", "text": "rules"}])
+        );
         Ok(())
     }
 
     #[test]
     fn a_system_message_joins_a_plain_system_prompt() -> Outcome {
-        let lifted = prepared(
-            &json!({
-                "system": "header",
-                "messages": [{"role": "system", "content": "rules"}, {"role": "user", "content": "hi"}]
-            }),
-            true,
-        )?;
-        let system = lifted[SYSTEM].as_array().cloned().unwrap_or_default();
-        assert_eq!(system.len(), 2);
-        assert_eq!(system[0]["text"], "header");
-        assert_eq!(system[1]["text"], "rules");
+        let lifted = sent(&json!({
+            "system": "header",
+            "messages": [{"role": "system", "content": "rules"}, {"role": "user", "content": "hi"}]
+        }))?;
+
         assert_eq!(
-            lifted[MESSAGES].as_array().map(Vec::len),
-            Some(1),
-            "the message itself is gone"
+            lifted[SYSTEM],
+            json!([{"type": "text", "text": "header"}, {"type": "text", "text": "rules"}])
         );
+        assert_eq!(lifted[MESSAGES].as_array().map(Vec::len), Some(1));
         Ok(())
     }
 
     #[test]
-    fn an_engine_request_without_a_system_message_is_left_alone() -> Outcome {
-        let request = json!({"messages": [{"role": "user", "content": "hi"}]});
-        let lifted = prepared(&request, true)?;
-        assert_eq!(lifted.get(SYSTEM), None, "no empty system prompt is added");
-        assert_eq!(lifted[MESSAGES], request[MESSAGES]);
+    fn a_request_without_a_system_message_gains_no_system_prompt() -> Outcome {
+        let request = json!({"messages": [{"role": "user", "content": "hi"}, {"role": "system"}]});
+        let lifted = sent(&request)?;
+
+        assert_eq!(lifted.get(SYSTEM), None);
+        assert_eq!(lifted[MESSAGES], json!([{"role": "user", "content": "hi"}]));
+        assert_eq!(sent(&json!({"messages": "text"}))?[MESSAGES], "text");
         Ok(())
     }
 
     #[test]
-    fn forwards_and_relays() -> Outcome {
-        let server = FakeServer::start(vec![json_response(r#"{"type":"message"}"#)])?;
+    fn relays_the_answer_from_the_path_asked_for() -> Outcome {
+        let engine = FakeServer::start(vec![json_response(r#"{"input_tokens":3}"#)])?;
         let mut client = Vec::new();
-        forward(
-            &mut client,
-            br#"{"messages":[]}"#,
-            &Endpoint::new(server.address(), None),
-            false,
-        )?;
-        let sent = server.requests()?;
-        assert!(sent[0].starts_with("POST /v1/messages HTTP/1.1"));
-        assert!(sent[0].contains(r#""enable_thinking":false"#));
-        assert!(String::from_utf8_lossy(&client).ends_with(r#"{"type":"message"}"#));
-        Ok(())
-    }
 
-    #[test]
-    fn forwards_an_engine_request_with_the_system_lifted() -> Outcome {
-        let server = FakeServer::start(vec![json_response(r#"{"type":"message"}"#)])?;
-        let mut client = Vec::new();
-        forward(
-            &mut client,
-            br#"{"messages":[{"role":"user","content":"a"},{"role":"system","content":"b"}]}"#,
-            &Endpoint::new(server.address(), None),
-            true,
-        )?;
-        let sent = server.requests()?;
-        assert!(!sent[0].contains(r#""role":"system""#), "{}", sent[0]);
-        assert!(sent[0].contains(r#""text":"b""#), "{}", sent[0]);
+        forward(&mut client, paths::COUNT_TOKENS, b"{}", &upstreams(&engine))?;
+
+        let seen = engine.requests()?;
+        assert!(seen[0].starts_with("POST /v1/messages/count_tokens HTTP/1.1"));
+        assert!(String::from_utf8_lossy(&client).ends_with(r#"{"input_tokens":3}"#));
         Ok(())
     }
 }

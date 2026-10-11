@@ -1,18 +1,18 @@
 //! The server's settings, from the command line, the key file and the keyring.
 //!
 //! ```text
-//! thor-tigress-agent [--listen 127.0.0.1:8080] [--model 127.0.0.1:8079]
-//!                    [--engine MODEL=HOST:PORT]... [--search 127.0.0.1:8888]
+//! thor-tigress-agent --engine MODEL=HOST:PORT [--engine MODEL=HOST:PORT]...
+//!                    [--listen 127.0.0.1:8080] [--search 127.0.0.1:8888]
 //!                    [--web DIR] [--key-file FILE]
 //!                    [--keyring FILE] [--keyring-passphrase-file FILE]
 //! ```
 //!
-//! `--engine` names a model another engine serves, such as TensorRT
-//! Edge-LLM; requests for it go there, everything else to `--model`.
+//! Each `--engine` names a model and the TensorRT Edge-LLM server holding it.
+//! A request naming one of them goes there; a request naming anything else,
+//! or nothing, goes to the first.
 //!
-//! `--key-file` is the one key this server sends to llama-server. When
-//! `--keyring` names an encrypted registry, the personal keys in it are what
-//! visitors may use, and `--key-file` still lets the operator in. The
+//! `--key-file` holds the operator's key. When `--keyring` names an encrypted
+//! registry, the personal keys in it are what visitors may use. The
 //! keyring's passphrase comes from `--keyring-passphrase-file` or the
 //! `THOR_KEYRING_PASSPHRASE` environment variable.
 
@@ -23,7 +23,6 @@ use std::{
     time::SystemTime,
 };
 
-use serde::Deserialize;
 use thor_tigress_keyring::{error::KeyringError, store::Keyring};
 use zeroize::Zeroizing;
 
@@ -35,9 +34,6 @@ use crate::{
 
 /// Where the server listens unless `--listen` says otherwise.
 const DEFAULT_LISTEN: &str = "127.0.0.1:8080";
-
-/// Where llama-server listens.
-const DEFAULT_MODEL: &str = "127.0.0.1:8079";
 
 /// Where SearXNG listens.
 const DEFAULT_SEARCH: &str = "127.0.0.1:8888";
@@ -51,20 +47,19 @@ const KEYRING_ENV: &str = "THOR_KEYRING_PASSPHRASE";
 /// How a key is sent in an `Authorization` header.
 pub const BEARER: &str = "Bearer ";
 
-/// The model servers and the search engine.
+/// The engines and the search engine.
 pub struct Upstreams {
-    /// llama-server, called with the access key when there is one; it serves
-    /// every model no engine below serves.
-    pub model: Endpoint,
-    /// Models served by other engines.
-    pub engines: Vec<Engine>,
+    /// The engine that answers a request naming no engine's model.
+    pub default: Engine,
+    /// The other engines, each answering requests that name its model.
+    pub others: Vec<Engine>,
     /// SearXNG, called without a key.
     pub search: Endpoint,
     /// The web, for the fetch tool: one HTTPS client with the address checks.
     pub web: Box<dyn Web>,
 }
 
-/// A model served by another engine, such as TensorRT Edge-LLM.
+/// One model, and the TensorRT Edge-LLM server holding it.
 #[derive(Debug, Clone)]
 pub struct Engine {
     /// The model id requests name.
@@ -73,55 +68,32 @@ pub struct Engine {
     pub endpoint: Endpoint,
 }
 
-impl Upstreams {
-    /// The engine serving `model`, when one of the other engines serves it.
+impl Engine {
+    /// The engine serving `model` at `address` (`host:port`).
     #[must_use]
-    fn engine_for(&self, model: Option<&str>) -> Option<&Engine> {
-        self.engines
-            .iter()
-            .find(|engine| Some(engine.model.as_str()) == model)
-    }
-
-    /// The server for requests naming `model`: the engine serving it, else
-    /// llama-server.
-    #[must_use]
-    pub fn serving(&self, model: Option<&str>) -> &Endpoint {
-        self.engine_for(model)
-            .map_or(&self.model, |engine| &engine.endpoint)
-    }
-
-    /// Whether one of the other engines serves `model`, rather than llama-server.
-    ///
-    /// Such an engine refuses a body field it does not know, so the request is
-    /// cleaned before it is sent there; see `chat::answer`.
-    #[must_use]
-    pub fn serves_engine(&self, model: Option<&str>) -> bool {
-        self.engine_for(model).is_some()
-    }
-
-    /// The server for the model a JSON request `body` names.
-    #[must_use]
-    pub fn serving_body(&self, body: &[u8]) -> &Endpoint {
-        self.serving(named(body).as_deref())
-    }
-
-    /// Whether one of the other engines serves the model a JSON request `body`
-    /// names, rather than llama-server. An engine is stricter about the body, so
-    /// the request is rewritten before it is sent there.
-    #[must_use]
-    pub fn serves_engine_body(&self, body: &[u8]) -> bool {
-        self.serves_engine(named(body).as_deref())
+    pub fn new(model: String, address: String) -> Self {
+        Engine {
+            model,
+            endpoint: Endpoint::new(address, None),
+        }
     }
 }
 
-/// The model a JSON request `body` names, when it names one.
-fn named(body: &[u8]) -> Option<String> {
-    #[derive(Deserialize)]
-    struct Named {
-        model: Option<String>,
+impl Upstreams {
+    /// Every engine, the default first.
+    pub fn engines(&self) -> impl Iterator<Item = &Engine> {
+        std::iter::once(&self.default).chain(&self.others)
     }
-    let named: Option<Named> = serde_json::from_slice(body).ok();
-    named.and_then(|named| named.model)
+
+    /// The engine for a request naming `model`: the one serving it, else the
+    /// default. A coding tool sends the name it was built around, such as a
+    /// hosted model's, and still has to be answered.
+    #[must_use]
+    pub fn serving(&self, model: Option<&str>) -> &Engine {
+        self.engines()
+            .find(|engine| Some(engine.model.as_str()) == model)
+            .unwrap_or(&self.default)
+    }
 }
 
 /// The people whose personal keys the chat accepts, read from the encrypted
@@ -224,12 +196,20 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// `AgentError::Config` for an unknown option or one without a value, and
-    /// `AgentError::Keyring` when the keyring cannot be opened.
+    /// `AgentError::Config` for an unknown option, one without a value, or no
+    /// `--engine` at all, and `AgentError::Keyring` when the keyring cannot be
+    /// opened.
     pub fn from_args(arguments: impl IntoIterator<Item = String>) -> Outcome<Self> {
         let options = Options::parse(arguments)?;
         let key = read_key(&options.key_file);
-        let authorization = key.as_ref().map(|key| format!("{BEARER}{key}"));
+        let mut engines = options.engines.iter().cloned();
+
+        let Some(default) = engines.next() else {
+            return Err(AgentError::Config(
+                "at least one --engine MODEL=HOST:PORT is needed".to_string(),
+            ));
+        };
+
         let people = match &options.keyring {
             Some(path) => {
                 let passphrase = keyring_passphrase(&options, std::env::var(KEYRING_ENV).ok())?;
@@ -243,15 +223,8 @@ impl Config {
             key,
             people,
             upstreams: Upstreams {
-                model: Endpoint::new(options.model, authorization),
-                engines: options
-                    .engines
-                    .into_iter()
-                    .map(|(model, address)| Engine {
-                        model,
-                        endpoint: Endpoint::new(address, None),
-                    })
-                    .collect(),
+                default,
+                others: engines.collect(),
                 search: Endpoint::new(options.search, None),
                 web: Box::new(HttpWeb::new()),
             },
@@ -299,8 +272,7 @@ impl Config {
 /// The options as given, before the key file is read.
 struct Options {
     listen: String,
-    model: String,
-    engines: Vec<(String, String)>,
+    engines: Vec<Engine>,
     search: String,
     web: PathBuf,
     key_file: PathBuf,
@@ -315,7 +287,6 @@ impl Default for Options {
             .unwrap_or_default();
         Options {
             listen: DEFAULT_LISTEN.to_string(),
-            model: DEFAULT_MODEL.to_string(),
             engines: Vec::new(),
             search: DEFAULT_SEARCH.to_string(),
             web: PathBuf::from("."),
@@ -344,7 +315,6 @@ impl Options {
     fn set(&mut self, flag: &str, value: String) -> Outcome {
         match flag {
             "--listen" => self.listen = value,
-            "--model" => self.model = value,
             "--engine" => self.engines.push(engine(&value)?),
             "--search" => self.search = value,
             "--web" => self.web = PathBuf::from(value),
@@ -361,10 +331,10 @@ impl Options {
 }
 
 /// Reads `MODEL=HOST:PORT`.
-fn engine(value: &str) -> Outcome<(String, String)> {
+fn engine(value: &str) -> Outcome<Engine> {
     match value.split_once('=') {
         Some((model, address)) if !model.is_empty() && !address.is_empty() => {
-            Ok((model.to_string(), address.to_string()))
+            Ok(Engine::new(model.to_string(), address.to_string()))
         }
         _ => Err(AgentError::Config(format!(
             "--engine {value}: expected MODEL=HOST:PORT"
@@ -433,8 +403,7 @@ mod tests {
         fn new(name: &str) -> Result<Self, AgentError> {
             let path = std::env::temp_dir()
                 .join(format!("thor-agent-config-{name}-{}", std::process::id()));
-            fs::create_dir_all(&path)
-                .map_err(|error| AgentError::Config(format!("{}: {error}", path.display())))?;
+            fs::create_dir_all(&path)?;
             Ok(Self { path })
         }
 
@@ -444,8 +413,7 @@ mod tests {
 
         fn passphrase(&self) -> Result<PathBuf, AgentError> {
             let path = self.path.join("passphrase");
-            fs::write(&path, format!("{PASS}\n"))
-                .map_err(|error| AgentError::Config(format!("{}: {error}", path.display())))?;
+            fs::write(&path, format!("{PASS}\n"))?;
             Ok(path)
         }
     }
@@ -456,8 +424,13 @@ mod tests {
         }
     }
 
+    /// `list`, behind the one engine every server needs.
     fn args(list: &[&str]) -> Vec<String> {
-        list.iter().map(ToString::to_string).collect()
+        ["--engine", "nemotron=127.0.0.1:1"]
+            .iter()
+            .chain(list)
+            .map(ToString::to_string)
+            .collect()
     }
 
     fn with_key(key: Option<&str>) -> Outcome<Config> {
@@ -488,7 +461,7 @@ mod tests {
     fn defaults_point_at_localhost() -> Outcome {
         let config = Config::from_args(args(&["--key-file", "/nonexistent"]))?;
         assert_eq!(config.listen, "127.0.0.1:8080");
-        assert_eq!(config.upstreams.model.address(), "127.0.0.1:8079");
+        assert_eq!(config.upstreams.default.endpoint.address(), "127.0.0.1:1");
         assert_eq!(config.upstreams.search.address(), "127.0.0.1:8888");
         assert_eq!(config.key, None);
         assert!(config.people.is_none());
@@ -500,8 +473,6 @@ mod tests {
         let arguments = args(&[
             "--listen",
             "0.0.0.0:9000",
-            "--model",
-            "m:1",
             "--search",
             "s:2",
             "--web",
@@ -511,36 +482,36 @@ mod tests {
         ]);
         let config = Config::from_args(arguments)?;
         assert_eq!(config.listen, "0.0.0.0:9000");
-        assert_eq!(config.upstreams.model.address(), "m:1");
         assert_eq!(config.upstreams.search.address(), "s:2");
         assert_eq!(config.web, PathBuf::from("/srv"));
         Ok(())
     }
 
     #[test]
-    fn routes_named_models_to_their_engine() -> Outcome {
+    fn a_named_model_goes_to_its_engine_and_any_other_name_to_the_first() -> Outcome {
         let config = Config::from_args(args(&["--engine", "qwen=e:1", "--key-file", "/none"]))?;
         let upstreams = &config.upstreams;
-        assert_eq!(upstreams.serving(Some("qwen")).address(), "e:1");
-        assert_eq!(
-            upstreams.serving(Some("nemotron")).address(),
-            "127.0.0.1:8079"
+        let served = |model| upstreams.serving(model).endpoint.address();
+
+        assert_eq!(served(Some("qwen")), "e:1");
+        assert_eq!(served(Some("nemotron")), "127.0.0.1:1");
+        assert_eq!(served(Some("claude-sonnet-5-5")), "127.0.0.1:1");
+        assert_eq!(served(None), "127.0.0.1:1");
+        assert!(
+            upstreams
+                .engines()
+                .all(|engine| engine.endpoint.authorization().is_none())
         );
-        assert_eq!(upstreams.serving(None).address(), "127.0.0.1:8079");
-        assert_eq!(
-            upstreams.serving_body(br#"{"model":"qwen"}"#).address(),
-            "e:1"
-        );
-        assert_eq!(
-            upstreams.serving_body(br#"{"messages":[]}"#).address(),
-            "127.0.0.1:8079"
-        );
-        assert_eq!(
-            upstreams.serving_body(b"not json").address(),
-            "127.0.0.1:8079"
-        );
-        assert_eq!(upstreams.engines[0].endpoint.authorization(), None);
         Ok(())
+    }
+
+    #[test]
+    fn a_server_without_an_engine_is_refused() {
+        let refused = Config::from_args(["--key-file".to_string(), "/none".to_string()]);
+
+        assert!(refused.is_err_and(|error| {
+            error.to_string() == "config: at least one --engine MODEL=HOST:PORT is needed"
+        }));
     }
 
     #[test]
@@ -572,10 +543,6 @@ mod tests {
         fs::remove_file(&path)?;
         let config = config?;
         assert_eq!(config.key.as_deref(), Some("secret"));
-        assert_eq!(
-            config.upstreams.model.authorization(),
-            Some("Bearer secret")
-        );
         assert_eq!(config.upstreams.search.authorization(), None);
         Ok(())
     }
@@ -617,8 +584,9 @@ mod tests {
         let (config, keyring) = with_people(&folder)?;
         let ada = keyring
             .find("ada@example.com")
-            .and_then(|person| person.key.clone());
-        let ada = ada.ok_or_else(|| AgentError::Config("ada has no key".to_string()))?;
+            .and_then(|person| person.key.clone())
+            .unwrap_or_default();
+        assert!(!ada.is_empty());
         assert!(config.admits(Some(&format!("Bearer {ada}"))));
         assert!(!config.admits(Some("Bearer not-a-key")));
         assert!(!config.admits(None));
@@ -665,8 +633,7 @@ mod tests {
         ));
 
         let empty = folder.path.join("empty");
-        fs::write(&empty, "\n")
-            .map_err(|error| AgentError::Config(format!("{}: {error}", empty.display())))?;
+        fs::write(&empty, "\n")?;
         let empty = empty.display().to_string();
         let options = Options {
             keyring: Some(PathBuf::from(&name)),

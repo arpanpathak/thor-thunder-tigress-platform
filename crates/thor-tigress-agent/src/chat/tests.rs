@@ -8,8 +8,8 @@ fn upstreams(model: &FakeServer, search: &FakeServer) -> Upstreams {
 
 fn upstreams_with(model: &FakeServer, search: &FakeServer, web: FakeWeb) -> Upstreams {
     Upstreams {
-        model: Endpoint::new(model.address(), None),
-        engines: Vec::new(),
+        default: Engine::new("nemotron".to_string(), model.address()),
+        others: Vec::new(),
         search: Endpoint::new(search.address(), None),
         web: Box::new(web),
     }
@@ -83,10 +83,12 @@ fn call_event_at(index: usize, name: &str, arguments: &str) -> String {
 
 #[test]
 fn the_mode_is_a_truth_table() {
-    assert_eq!(Mode::of(true, true), Mode::Search);
-    assert_eq!(Mode::of(true, false), Mode::Search);
-    assert_eq!(Mode::of(false, true), Mode::Stream);
-    assert_eq!(Mode::of(false, false), Mode::Relay);
+    assert_eq!(Mode::of(true, true, false), Mode::Search);
+    assert_eq!(Mode::of(true, false, true), Mode::Search);
+    assert_eq!(Mode::of(false, true, false), Mode::Stream);
+    assert_eq!(Mode::of(false, true, true), Mode::Relay);
+    assert_eq!(Mode::of(false, false, false), Mode::Relay);
+    assert_eq!(Mode::of(false, false, true), Mode::Relay);
 }
 
 #[test]
@@ -491,7 +493,7 @@ fn relays_a_request_that_does_not_stream() -> Outcome {
         &upstreams(&model, &search),
     )?;
     assert!(String::from_utf8_lossy(&client).ends_with(r#"{"choices":[]}"#));
-    assert!(model.requests()?[0].ends_with(r#"{"messages":[]}"#));
+    assert!(model.requests()?[0].ends_with(r#"{"messages":[],"model":"nemotron"}"#));
     Ok(())
 }
 
@@ -507,6 +509,29 @@ fn streams_tokens_and_ends_with_done() -> Outcome {
     )?;
     assert_eq!(events(&client), [token, DONE]);
     assert!(!model.requests()?[0].contains(SEARCH_HINT));
+    Ok(())
+}
+
+/// A chunk whose text is all tool-call tag still carries its thinking, so it
+/// is forwarded with the text emptied; one that carries nothing else is dropped.
+#[test]
+fn a_chunk_that_is_only_a_tag_is_forwarded_for_what_else_it_carries() -> Outcome {
+    let thinking = r#"{"choices":[{"delta":{"content":"<tool_call>","reasoning_content":"hm"}}]}"#;
+    let bare = r#"{"choices":[{"delta":{"content":"</tool_call>"}}]}"#;
+    let model = FakeServer::start(vec![event_stream(&[thinking, bare])])?;
+    let search = idle()?;
+    let mut client = Vec::new();
+
+    answer(
+        &mut client,
+        br#"{"messages":[],"stream":true}"#,
+        &upstreams(&model, &search),
+    )?;
+
+    let sent = events(&client);
+    assert_eq!(sent.len(), 2, "{sent:?}");
+    assert!(sent[0].contains(r#""reasoning_content":"hm""#), "{sent:?}");
+    assert!(sent[0].contains(r#""content":"""#), "{sent:?}");
     Ok(())
 }
 
@@ -1141,69 +1166,63 @@ fn a_round_under_the_cap_is_streamed_whole() -> Outcome {
     Ok(())
 }
 
-/// The upstreams, with `engine` serving the model `name` rather than llama-server.
-fn upstreams_serving(engine: &FakeServer, name: &str) -> Outcome<Upstreams> {
-    let mut upstreams = upstreams(engine, &idle()?);
-    upstreams.engines.push(Engine {
-        model: name.to_string(),
-        endpoint: Endpoint::new(engine.address(), None),
+/// A coding tool's request: a hosted model's name, fields the engine does not
+/// know, two system messages, and its own tools. It is fitted to the engine
+/// and the answer copied back, streamed as it was asked.
+#[test]
+fn a_coding_tools_request_is_fitted_and_relayed() -> Outcome {
+    let stream = event_stream(&[r#"{"choices":[{"delta":{"content":"<tool_call>"}}]}"#]);
+    let engine = FakeServer::start(vec![stream.clone()])?;
+    let request = json!({
+        "model": "gpt-5",
+        "stream": true,
+        "user": "someone",
+        "n_predict": 5,
+        "top_k": 40,
+        "tools": [{ "type": "function", "function": { "name": "read_file" } }],
+        "messages": [
+            { "role": "system", "content": "rules" },
+            { "role": "user", "content": "ask" },
+            { "role": "system", "content": "more" }
+        ]
     });
-    Ok(upstreams)
+    let mut client = Vec::new();
+    let body = serde_json::to_vec(&request)?;
+
+    answer(&mut client, &body, &upstreams(&engine, &idle()?))?;
+
+    let seen = engine.requests()?;
+    let sent: Value = serde_json::from_str(seen[0].split("\r\n\r\n").nth(1).unwrap_or_default())?;
+
+    assert_eq!(sent["model"], "nemotron");
+    assert_eq!(sent["top_k"], 40);
+    assert_eq!(sent["tools"], request["tools"]);
+    assert_eq!(sent.get("user"), None);
+    assert_eq!(sent.get("n_predict"), None);
+    assert_eq!(
+        sent[MESSAGES],
+        json!([
+            { "role": "system", "content": "rules\n\nmore" },
+            { "role": "user", "content": "ask" }
+        ])
+    );
+
+    let body = stream.split("\r\n\r\n").nth(1).unwrap_or_default();
+    assert!(String::from_utf8_lossy(&client).ends_with(body));
+    Ok(())
 }
 
-/// A field the engine does not know is a 400, so it is dropped; the fields the
-/// engine does accept have to survive, or the request quietly changes meaning.
 #[test]
-fn an_engine_is_not_sent_a_field_only_llama_server_understands() -> Outcome {
-    let engine = FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?;
-    let upstreams = upstreams_serving(&engine, "qwen")?;
-    let request = br#"{"model":"qwen","messages":[],"reasoning_budget_tokens":2048,
-        "reasoning_budget_message":"","n_predict":5,"grammar":"x","top_k":40,
-        "min_p":0.05,"seed":7,"chat_template_kwargs":{"enable_thinking":true}}"#;
+fn a_named_model_is_answered_by_its_own_engine() -> Outcome {
+    let qwen = FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?;
+    let mut upstreams = upstreams(&idle()?, &idle()?);
+    upstreams
+        .others
+        .push(Engine::new("qwen".to_string(), qwen.address()));
+    let request = br#"{"model":"qwen","messages":[]}"#;
 
     answer(&mut Vec::new(), request, &upstreams)?;
 
-    let seen = engine.requests()?;
-    assert!(!seen[0].contains("reasoning_budget"), "{}", seen[0]);
-    assert!(!seen[0].contains("n_predict"), "{}", seen[0]);
-    assert!(!seen[0].contains("grammar"), "{}", seen[0]);
-    assert!(seen[0].contains(r#""top_k":40"#), "{}", seen[0]);
-    assert!(seen[0].contains(r#""min_p":0.05"#), "{}", seen[0]);
-    assert!(seen[0].contains(r#""seed":7"#), "{}", seen[0]);
-    assert!(seen[0].contains(r#""chat_template_kwargs""#), "{}", seen[0]);
-    Ok(())
-}
-
-#[test]
-fn every_field_only_llama_server_understands_is_dropped_for_an_engine() -> Outcome {
-    for field in LLAMA_SERVER_ONLY {
-        let engine = FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?;
-        let upstreams = upstreams_serving(&engine, "qwen")?;
-        let mut fields = Fields::new();
-        fields.insert(MODEL.to_string(), json!("qwen"));
-        fields.insert(MESSAGES.to_string(), json!([]));
-        fields.insert(field.to_string(), json!(1));
-
-        answer(&mut Vec::new(), &serde_json::to_vec(&fields)?, &upstreams)?;
-
-        let seen = engine.requests()?;
-        assert_eq!(seen.len(), 1);
-        assert!(!seen[0].contains(field), "{field} reached the engine");
-    }
-    Ok(())
-}
-
-#[test]
-fn llama_server_still_gets_the_fields_only_it_understands() -> Outcome {
-    let model = FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?;
-    let request = br#"{"messages":[],"reasoning_budget_tokens":2048,
-        "reasoning_budget_message":"","n_predict":5,"grammar":"x"}"#;
-
-    answer(&mut Vec::new(), request, &upstreams(&model, &idle()?))?;
-
-    let seen = model.requests()?;
-    for field in ["reasoning_budget_tokens", "reasoning_budget_message", "n_predict", "grammar"] {
-        assert!(seen[0].contains(field), "{field} was dropped");
-    }
+    assert_eq!(qwen.requests()?.len(), 1);
     Ok(())
 }
