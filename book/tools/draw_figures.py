@@ -6,8 +6,8 @@
 import sys
 from pathlib import Path
 
-from figkit import (EDGE, INK, KINDS, MUTED, card, cylinder, icon, legend, person, save, sheet, stacked, swatches, tag,
-                    text, wire, zone)
+from figkit import (EDGE, INK, KINDS, MUTED, card, cub, cylinder, icon, legend, person, save, sheet, stacked, swatches, switch,
+                    tag, text, thor_kit, width_of, wire, zone)
 
 OUT = Path(sys.argv[1])
 FIGURES = {}
@@ -1356,6 +1356,195 @@ def boot_order():
          "unit per Edge-LLM model, searxng, and thor-tigress-agent after the model servers. Each service restarts "
          "itself five seconds after a crash.",
          "What starts at boot, and in what order", "Nobody has to log in for the chat to come back.", parts)
+
+
+# ---- chapter 29: a cluster of five Thors ----
+
+NODES = [137 + 196 * node for node in range(5)]
+
+# Each Thor's cub: (its style in figkit.CUBS, its name, the Thor's job).
+TEAM = [("volt", "Volt", "the front door"), ("ember", "Ember", "a second model"), ("frost", "Frost", "a third model"),
+        ("leaf", "Leaf", "training"), ("nova", "Nova", "batch work")]
+
+
+def kit_at(cx, y, w):
+    """A Thor whose front face is centred on x = `cx` with its top edge at `y`. The face is 0.2 `w` tall."""
+    return thor_kit(cx - 0.395 * w, y - 0.147 * w, w)
+
+
+@figure
+def thor_cluster_family():
+    parts = [zone(24, 96, 1016, 400, "One shelf · five Jetson AGX Thor")]
+    for node, cx in enumerate(NODES):
+        style, name, job = TEAM[node]
+        parts += [text(cx, 126, f"thor-{node + 1} · {name}", "name", "middle"), text(cx, 144, job, "sub", "middle"),
+                  wire([(cx, 346), (cx, 415)], arrow=False), tag(cx + 10, 372, "25 Gb/s", "good"),
+                  kit_at(cx, 318, 150), cub(style, cx - 72, 154, 150)]
+    parts += [switch(62, 408, 940, NODES, "25 GbE switch · every Thor reaches every other Thor through it", flip=True),
+              lines(24, 526, ["Five Thors, each with a cub of its own and a job of its own. One cable from each leads to the switch.",
+                              "Volt keeps the front door, Ember and Frost serve models, Leaf trains, and Nova runs the batch work."])]
+    save(OUT / "thor-cluster-family.svg", 1064, 566,
+         "Five different tiger cubs in a row, each sitting on its own Jetson AGX Thor developer kit. Volt, on "
+         "thor-1, the front door, is grey-blue with a winged helmet and a raised hammer. Ember, on thor-2, a "
+         "second model, is a lean orange cub with fierce eyes, a flame for a tail and both paws in the air. "
+         "Frost, on thor-3, a third model, is a round white cub with sleepy eyes, a knitted hat and a scarf, "
+         "holding an ice crystal. Leaf, on thor-4, training, is a small green cub with leaves for ears and "
+         "closed, smiling eyes, waving. Nova, on thor-5, batch work, is a violet cub with tall ears, a "
+         "wizard's hat and a star wand. A cable at 25 gigabits a second runs from each Thor down to one 25 GbE "
+         "switch.",
+         "The cluster", "Five Thors on one switch, and a job for each.", parts)
+
+
+@figure
+def thor_cluster_breakout():
+    steel, dark = "#9AA2AE", "#2B333F"
+    lanes = [130, 186, 242, 298]
+    parts = [
+        thor_kit(40, 132, 300),
+        card(40, 270, 300, 64, "model", "Jetson AGX Thor", "QSFP28 socket, on the short end", glyph="nvidia"),
+        f'  <path d="M366,206 H520" stroke="{dark}" stroke-width="8" stroke-linecap="round"/>',
+        f'  <rect x="330" y="195" width="38" height="22" rx="4" fill="{steel}" stroke="{dark}" stroke-width="1.4"/>',
+        tag(378, 172, "QSFP28 plug · four lanes", "model"),
+        *[f'  <path d="M556,206 H610 V{y} H712" fill="none" stroke="{dark}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>'
+          for y in lanes],
+        f'  <rect x="516" y="188" width="44" height="36" rx="7" fill="#3B4656" stroke="{dark}" stroke-width="1.4"/>',
+        tag(500, 236, "the cable divides", "idle"),
+    ]
+    for lane, y in enumerate(lanes):
+        parts += [f'  <rect x="708" y="{y - 9}" width="34" height="18" rx="4" fill="{steel}" stroke="{dark}" stroke-width="1.4"/>',
+                  card(764, y - 26, 276, 52, "good", f"SFP28 plug {lane + 1}", "one lane · 25 GbE · one switch port")]
+    parts.append(lines(40, 370, ["One breakout cable for each Thor. The wide plug goes into the Thor, and each narrow plug into a port of the switch.",
+                                 "Each lane is a separate 25 GbE link. A plug that is not connected leaves the other lanes working."]))
+    save(OUT / "thor-cluster-breakout.svg", 1064, 412,
+         "A Jetson AGX Thor developer kit with a breakout cable in the QSFP28 socket on its short end. The cable "
+         "has one wide QSFP28 plug carrying four lanes. It divides into four thinner cables, each ending in an "
+         "SFP28 plug. Each SFP28 plug is one lane of 25 GbE and goes into one port of the switch.",
+         "One breakout cable: one plug at the Thor, four at the switch", "The QSFP28 socket carries four lanes. The cable brings each lane out on a plug of its own.", parts)
+
+
+@figure
+def thor_cluster_wiring():
+    parts = [
+        zone(24, 108, 1016, 366, "One shelf · five Jetson AGX Thor"),
+        switch(62, 136, 940, NODES, "25 GbE switch, SFP28 ports · the cluster network, 10.10.0.0/24"),
+        card(62, 380, 940, 64, "idle", "The house network: your router, or a small switch beside it",
+             "internet, ssh and Tailscale", glyph="swap"),
+        card(24, 506, 300, 72, "client", "Your laptop", "ssh thor-3, at home or away", glyph="laptop"),
+        card(734, 506, 306, 72, "outside", "Tailscale", "the way in from outside the house", glyph="tailscale"),
+        wire([(174, 506), (174, 444)], "idle", arrow=False), wire([(887, 506), (887, 444)], "idle", arrow=False),
+    ]
+    for node, cx in enumerate(NODES):
+        parts += [wire([(cx, 189), (cx, 276)], arrow=False), tag(cx + 10, 212, "25 Gb/s", "good"),
+                  text(cx - 10, 218, f"thor-{node + 1}", "name", "end"),
+                  text(cx - 10, 236, f"10.10.0.{11 + node}", "mono dim", "end"),
+                  wire([(cx, 300), (cx, 380)], "idle", arrow=False), tag(cx + 10, 346, "RJ45", "idle"),
+                  kit_at(cx, 276, 140)]
+    parts.append(lines(360, 532, ["Solid lines: QSFP28 breakout cables to the 25 GbE switch.",
+                                  "Dotted lines: ordinary Ethernet cables to the house network."]))
+    save(OUT / "thor-cluster-wiring.svg", 1064, 604,
+         "Five Jetson AGX Thor developer kits on one shelf, named thor-1 to thor-5, with the cluster addresses "
+         "10.10.0.11 to 10.10.0.15. Each has a QSFP28 breakout cable, at 25 gigabits a second for each lane, to a "
+         "25 GbE switch above them: this is the cluster network. Each also has an ordinary Ethernet cable from "
+         "its RJ45 port to the house network below, which carries internet access, ssh and Tailscale. Your "
+         "laptop and Tailscale reach the Thors through the house network.",
+         "Five Thors, two networks", "The fast network joins the Thors to each other. The house network joins them to you.", parts)
+
+
+@figure
+def thor_cluster_links():
+    rows = [("model", 273.0, "Inside one Thor: memory to the GPU", "273 GB/s"),
+            ("good", 12.5, "Between two Thors: four 25 GbE lanes bonded", "12.5 GB/s"),
+            ("client", 3.125, "Between two Thors: one 25 GbE lane", "3.1 GB/s"),
+            ("idle", 0.625, "Between two Thors: the RJ45 port at 5 GbE", "0.6 GB/s")]
+    parts = []
+    for row, (kind, rate, name, shown) in enumerate(rows):
+        y, wide = 118 + 86 * row, max(900 * rate / 273, 1.6)
+        parts += [text(40, y, name, "name"),
+                  f'  <rect x="40" y="{y + 12}" width="{wide:.1f}" height="26" rx="{min(6, wide / 2):.1f}" fill="{KINDS[kind][0]}" filter="url(#lift)"/>']
+        if row:
+            parts += [text(40 + wide + 12, y + 30, shown, "pill", fill=KINDS[kind][0]),
+                      wire([(770, y + 26), (902, y + 26)], arrow=False), kit_at(738, y + 16, 96), kit_at(938, y + 16, 96)]
+        else:
+            parts.append(text(928, y + 30, shown, "pill", "end", "#FFFFFF"))
+    parts.append(lines(40, 462, ["The bars are to scale. The layers of a model exchange data at the top bar's speed.",
+                                 "A model split across two Thors would exchange it at one of the lower three."]))
+    save(OUT / "thor-cluster-links.svg", 1064, 506,
+         "Four bars to scale. Inside one Thor, memory feeds the GPU at 273 gigabytes a second. Between two Thors, "
+         "four bonded 25 gigabit lanes carry 12.5 gigabytes a second, one lane carries 3.1, and the RJ45 port at "
+         "5 gigabit carries 0.6. The three lower bars are short beside the first.",
+         "How fast data moves, inside a Thor and between two", "The fastest link is 22 times slower than the memory.", parts)
+
+
+@figure
+def thor_cluster_roles():
+    others = [("model", "thor-2 · serves", ["a second model", "at thor-2:8081"]),
+              ("model", "thor-3 · serves", ["a third model, or a", "student's fine-tune"]),
+              ("store", "thor-4 · trains", ["QLoRA runs; no chat", "request reaches it"]),
+              ("outside", "thor-5 · batch work", ["evaluation, distilling,", "reserved time slices"])]
+    parts = [
+        card(24, 236, 220, 80, "client", "Browser and tools", ["one address,", "one access key"], glyph="browser"),
+        kit_at(332, 276, 110), cub("volt", 300, 198, 66),
+        card(398, 236, 250, 80, "service", "thor-1 · the front door", ["thor-tigress-agent :8080", "and one model"]),
+        tag(398, 206, "sends each request by its model name", "service"),
+        wire([(244, 287), (286, 287)]),
+        wire([(648, 264), (682, 264), (682, 166), (720, 166)]),
+        wire([(648, 284), (698, 284), (698, 262), (720, 262)]),
+        wire([(720, 454), (523, 454), (523, 316)], "idle", label="asks like any client", on=0),
+    ]
+    for row, (kind, name, sub) in enumerate(others):
+        y = 108 + 96 * row
+        parts += [kit_at(762, y + 52, 96), cub(TEAM[row + 1][0], 734, y - 12, 58), card(824, y, 216, 76, kind, name, sub)]
+    parts.append(lines(24, 508, ["A model runs whole on one Thor. The agent takes a host and a port for each engine,",
+                                 "so sending a model's requests to another Thor is one setting."]))
+    save(OUT / "thor-cluster-roles.svg", 1064, 552,
+         "Browsers and coding tools use one address and one access key, which reach thor-1. thor-1 runs "
+         "thor-tigress-agent on port 8080 and one model, and sends each request by its model name to the Thor "
+         "that holds that model: thor-2 serves a second model and thor-3 a third or a student's fine-tune. "
+         "thor-4 trains and receives no chat request. thor-5 does batch work, such as evaluation and distilling, "
+         "and asks the agent for answers like any other client.",
+         "One job for each Thor", "Five Thors are five places to run a model or a job, behind one address.", parts)
+
+
+@figure
+def thor_cluster_schedule():
+    left, hour = 200, 34
+    day = [
+        [(0, 24, "service", "Volt keeps the chat open", "first model, awake all day", None)],
+        [(0, 24, "service", "Ember answers beside Volt", "second model, awake all day", None)],
+        [(7, 13, "client", "Mira · fine-tune", "teaches it poetry", "long"), (14, 20, "client", "Kofi · data curation", "sorts family recipes", "curly")],
+        [(0, 7, "store", "Night forge · QLoRA", "Leaf trains while you sleep", None),
+         (9, 16, "client", "Ms. Rao's class", "six seats, one lab", "glasses"), (22, 24, "store", "Forge", "", None)],
+        [(8, 12, "outside", "Report card", "evaluation batch", None), (13, 20, "client", "Yuki · the canvas", "draws a comic strip", "bun")],
+    ]
+    parts = [text(left + hour * at, 122, f"{at:02d}:00", "tab", "middle") for at in (0, 6, 12, 18, 24)]
+    parts += [f'  <path d="M{left + hour * at},130 V478" stroke="{EDGE}" stroke-width="1.2" stroke-dasharray="3 4"/>' for at in (0, 6, 12, 18, 24)]
+    for node, slots in enumerate(day):
+        y = 140 + 68 * node
+        parts += [cub(TEAM[node][0], 40, y - 4, 54), text(104, y + 30, f"thor-{node + 1}", "name"),
+                  f'  <rect x="{left}" y="{y}" width="{hour * 24}" height="48" rx="10" fill="#F1F4F7"/>']
+        for start, end, kind, name, sub, glyph in slots:
+            accent, tint = KINDS[kind]
+            x, wide = left + hour * start + 2, hour * (end - start) - 4
+            inset = 54 if glyph else 12
+            if max(width_of(name, 11, bold=True), width_of(sub)) > wide - inset - 8:
+                raise ValueError(f"{name!r} or {sub!r} does not fit its slot")
+            parts.append(f'  <rect x="{x}" y="{y + 2}" width="{wide}" height="44" rx="9" fill="{tint}" stroke="{accent}" stroke-width="1.3"/>')
+            if glyph:
+                parts.append(person(x + 5, y + 3, glyph, 42))
+            parts.append(text(x + inset, y + (22 if sub else 29), name, "pill", fill=accent))
+            if sub:
+                parts.append(text(x + inset, y + 37, sub, "note"))
+    parts += [legend(left, 508, [("service", "serving the chat"), ("client", "a booked slice"), ("store", "training"), ("outside", "batch work"),
+                                ("idle", "free")]),
+              lines(24, 540, ["An example day. A slice is one whole Thor for a window of time, so two people never share a Thor's memory."])]
+    save(OUT / "thor-cluster-schedule.svg", 1064, 566,
+         "An example day on five Thors, hour by hour. Volt on thor-1 and Ember on thor-2 serve the chat all "
+         "day. On thor-3, Mira fine-tunes a model for poetry from 07:00 to 13:00, and Kofi curates a set of "
+         "family recipes from 14:00 to 20:00. thor-4 runs the nightly QLoRA job from midnight to 07:00 and "
+         "again from 22:00, and Ms. Rao holds a class of six from 09:00 to 16:00. thor-5 runs an evaluation "
+         "batch from 08:00 to 12:00, and Yuki draws a comic strip on the canvas from 13:00 to 20:00. Each of "
+         "the four people is shown as a small portrait in their slot. The rest of each row is free.",
+         "Time slices: who has which Thor, and when", "A reservation names a Thor and a window. The rows are Thors, the columns are hours.", parts)
 
 
 wanted = sys.argv[2:] or list(FIGURES)

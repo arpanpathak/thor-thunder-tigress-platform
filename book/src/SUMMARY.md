@@ -23,6 +23,7 @@
 - [Security](ch10-security.md)
 - [Operations: recovery and hardening](ch18-operations.md)
 - [Sharing is caring](ch27-sharing-is-caring.md)
+- [A cluster of five Thors](ch29-thor-cluster.md)
 - [Memory, context and slots](ch20-memory-and-context.md)
 
 # Plans
