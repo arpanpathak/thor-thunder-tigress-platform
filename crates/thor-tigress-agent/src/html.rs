@@ -81,22 +81,16 @@ pub fn cut(text: &str, max: usize) -> String {
 }
 
 /// Every `href` value in the document, without its quotes.
+///
+/// Lowering ASCII keeps every byte where it was, so a match's position in the
+/// lowered copy is its position in `html`, and the byte after `href` starts a
+/// character.
 fn hrefs(html: &str) -> Vec<String> {
-    let lowered = html.to_ascii_lowercase();
-    let mut values = Vec::new();
-    let mut from = 0;
-    while let Some(at) = lowered[from..].find("href") {
-        let at = from + at;
-        let after = at + "href".len();
-        let rest = &html[after..];
-        let Some(value) = quoted(rest) else {
-            from = after;
-            continue;
-        };
-        values.push(value.to_string());
-        from = after + value.len();
-    }
-    values
+    html.to_ascii_lowercase()
+        .match_indices("href")
+        .filter_map(|(at, word)| quoted(&html[at + word.len()..]))
+        .map(ToString::to_string)
+        .collect()
 }
 
 /// The quoted text just after `href`, skipping spaces and an `=`.
@@ -278,6 +272,14 @@ mod tests {
         let found = links("<a href=x>1</a><a href>2</a><a href=\"\">3</a>", &base);
         assert_eq!(found, []);
         Ok(())
+    }
+
+    /// A page that took a request thread down: the scan resumed inside an
+    /// accented letter of the link before.
+    #[test]
+    fn a_link_with_accented_letters_does_not_stop_the_scan() {
+        let found = hrefs("<a href='/página/ááá'>1</a><a HREF=\"/next\">2</a>");
+        assert_eq!(found, ["/página/ááá", "/next"]);
     }
 
     #[test]

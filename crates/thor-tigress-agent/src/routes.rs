@@ -136,16 +136,10 @@ pub fn answer(client: &mut dyn Write, request: &Request, config: &Config) -> Out
         Route::Health => response::respond(client, Status::Ok, ContentType::Json, HEALTHY),
         Route::Models => models::list(client, upstreams),
         Route::ChatCompletions => chat::answer(client, &request.body, upstreams),
-        Route::Messages => messages::forward(
-            client,
-            &request.body,
-            upstreams.serving_body(&request.body),
-            upstreams.serves_engine_body(&request.body),
-        ),
-        Route::CountTokens => upstreams
-            .serving_body(&request.body)
-            .post(paths::COUNT_TOKENS, &request.body)?
-            .relay(client),
+        Route::Messages => messages::forward(client, paths::MESSAGES, &request.body, upstreams),
+        Route::CountTokens => {
+            messages::forward(client, paths::COUNT_TOKENS, &request.body, upstreams)
+        }
         Route::Request => request_access(client, &request.body, config),
         Route::NotFound => {
             response::respond(client, Status::NotFound, ContentType::Text, b"not found")
@@ -184,7 +178,6 @@ mod tests {
     use crate::{
         config::Engine,
         testing::{FakeServer, json_response},
-        upstream::Endpoint,
     };
 
     fn file(name: &str) -> Route {
@@ -250,8 +243,8 @@ mod tests {
         let arguments = [
             "--web".to_string(),
             folder.to_string_lossy().into_owned(),
-            "--model".to_string(),
-            model.address(),
+            "--engine".to_string(),
+            format!("nemotron={}", model.address()),
             "--key-file".to_string(),
             "/nonexistent".to_string(),
         ];
@@ -336,10 +329,8 @@ mod tests {
         let reply = json_response(r#"{"ok":true}"#);
         let engine = FakeServer::start(vec![reply.clone(), reply.clone(), reply])?;
         let mut setup = setup(Vec::new(), None)?;
-        setup.config.upstreams.engines.push(Engine {
-            model: "qwen".to_string(),
-            endpoint: Endpoint::new(engine.address(), None),
-        });
+        let qwen = Engine::new("qwen".to_string(), engine.address());
+        setup.config.upstreams.others.push(qwen);
         let answers = [
             paths::CHAT_COMPLETIONS,
             paths::MESSAGES,
@@ -370,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    fn passes_model_routes_through_with_the_key() -> Outcome {
+    fn answers_model_routes_from_the_engine_for_a_key() -> Outcome {
         let replies = vec![
             json_response(r#"{"data":[]}"#),
             json_response(r#"{"input_tokens":3}"#),
@@ -382,7 +373,10 @@ mod tests {
         let unknown = answered(&setup, &request("GET", "/v1/embeddings", Some("Bearer k")))?;
         fs::remove_dir_all(&setup.folder)?;
         let seen = setup.model.requests()?;
-        assert!(models.ends_with(r#"{"data":[]}"#) && count.ends_with(r#"{"input_tokens":3}"#));
+        assert!(
+            models.ends_with(r#"{"data":[],"object":"list"}"#)
+                && count.ends_with(r#"{"input_tokens":3}"#)
+        );
         assert!(unknown.starts_with("HTTP/1.1 404 Not Found"));
         assert!(
             seen[0].starts_with("GET /v1/models")
@@ -408,8 +402,8 @@ mod tests {
         let arguments = [
             "--web".to_string(),
             folder.display().to_string(),
-            "--model".to_string(),
-            "127.0.0.1:1".to_string(),
+            "--engine".to_string(),
+            "nemotron=127.0.0.1:1".to_string(),
             "--key-file".to_string(),
             "/nonexistent".to_string(),
             "--keyring".to_string(),

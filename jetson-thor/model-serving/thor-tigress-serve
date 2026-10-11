@@ -1,70 +1,51 @@
 #!/usr/bin/env python3
 """Serves models and the chat page on the Jetson Thor, on localhost only.
 
+Every model is served by TensorRT Edge-LLM, one engine and one service each.
+
 Models:
   thor-tigress-serve list                  the models on this Thor, each with a key
-  thor-tigress-serve list-latest           the newest chat models on Hugging Face that
-                                           fit, each with a key
-  thor-tigress-serve load KEY|NAME         load a model from "list"
-  thor-tigress-serve unload KEY|NAME       unload it
-  thor-tigress-serve download KEY|REPO     download a model from "list-latest"
-  thor-tigress-serve context               how much context a reply gets, and what it costs
-  thor-tigress-serve context TOKENS [USERS] set it, then reload the models that are loaded
-
-What a model costs: its weights, plus a KV cache that is reserved up front for
-the whole of CONTEXT x USERS. The KV cache is the part that surprises people.
-`thor-tigress-serve context` reads the GGUF and prints the estimate; `list`
-shows it for every model. A 30B model at "4 users x 1M context" reserves about
-24 GB of KV cache on top of its weights, so a big CONTEXT is a big reservation
-even when nobody is chatting. Lower CONTEXT (or USERS) and reload to get it back.
+  thor-tigress-serve load KEY|NAME         start a model's engine
+  thor-tigress-serve unload KEY|NAME       stop it and free its memory
 
 Services:
-  thor-tigress-serve install               run the model server and the chat page as
+  thor-tigress-serve install               run the engines and the chat page as
                                            services, started at boot
-  thor-tigress-serve uninstall             stop and remove both services
+  thor-tigress-serve uninstall             stop and remove them
   thor-tigress-serve key                   create a new access key
   thor-tigress-serve keyring-init          make the encrypted keyring and its passphrase
   thor-tigress-serve keyring CMD ...       run thor-tigress-keyring on that keyring
-  thor-tigress-serve logs                  follow both logs
+  thor-tigress-serve logs                  follow the logs
 
-The services run "thor-tigress-serve run" (llama-server in router mode on
-:8079), "thor-tigress-serve agent" (thor-tigress-agent: the page and API on
-:8080) and one "thor-tigress-serve edge [NAME]" per TensorRT Edge-LLM model.
+The services run "thor-tigress-serve edge [NAME]", one per model, and
+"thor-tigress-serve agent" (thor-tigress-agent: the page and API on :8080).
 Settings go in ~/.config/thor-chat/env as KEY=value lines:
 
-  MODEL         the default model's GGUF   Nemotron 3 Nano 30B-A3B Q8_0
-  MODEL_ON_STARTUP  load it when the server starts  true
-  USERS         its replies at once        4
-  CONTEXT       its tokens per reply       1048576
-  MODELS_MAX    models loaded at once      2
-  MIN_FREE_GB   memory kept free           8
-  EDGE_MODEL    a checkpoint folder served by TensorRT Edge-LLM   none
-  EDGE_PORT     its server's port          8081
-  EDGE_CONTEXT  its tokens per reply       32768
-  EDGE_PROMPT   its longest single prompt  half of EDGE_CONTEXT
-  EDGE_MODELS   more of them, FOLDER=PORT[:TOKENS]  none
-  AGENT_DEFAULT "edge": the agent's default is the first Edge-LLM model  none
-  PORT, MODEL_PORT, SEARCH_PORT            8080, 8079, 8888
+  EDGE_MODEL    the first model's checkpoint folder      none
+  EDGE_PORT     its engine's port                        8081
+  EDGE_CONTEXT  its tokens per reply                     32768
+  EDGE_MODELS   more models, FOLDER=PORT[:TOKENS]        none
+  EDGE_PROMPT   the longest single prompt                half a model's tokens
+  MIN_FREE_GB   memory kept free                         8
+  PORT, SEARCH_PORT                                      8080, 8888
 
-Every Edge-LLM model is offered in the chat page's picker: the agent is given
-one --engine per model, and a request naming one (the folder's name) is sent to
-that engine instead of llama-server. Adding a second one is two steps:
+The agent is given one --engine per model, EDGE_MODEL first. A request naming a
+model (its folder's name) goes to that model's engine; a request naming
+anything else, or nothing, goes to the first. That is what lets a coding tool
+that sends its own model name be answered.
 
-  echo 'EDGE_MODELS=Nemotron-3-Nano-30B-A3B-NVFP4=8082' >> ~/.config/thor-chat/env
+Adding a model is two steps; its checkpoint folder must sit next to
+EDGE_MODEL's, under ~/models/edge-llm:
+
+  echo 'EDGE_MODELS=NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4=8082:1048576' >> ~/.config/thor-chat/env
   thor-tigress-serve install
 
-That writes thor-edge-llm-<name>.service beside thor-edge-llm.service, starts
-it (the first start builds the engine, later ones reuse the cache), and reloads
-the agent so the picker grows a row. The checkpoint folder must sit next to
-EDGE_MODEL's, under ~/models/edge-llm.
+The first start of a model builds its engine; later ones reuse the cache.
 """
 
-import concurrent.futures
-import json
 import os
 import re
 import shutil
-import struct
 import subprocess
 import sys
 import time
@@ -74,49 +55,42 @@ from pathlib import Path
 
 HOME = Path.home()
 CONFIG = HOME / ".config" / "thor-chat"
-MODELS_DIR = HOME / "models" / "gguf"
 HERE = Path(__file__).resolve().parent
 WEB = HERE.parent / "web"
 UNITS = HOME / ".config" / "systemd" / "user"
-LATEST = HOME / ".cache" / "thor-tigress-serve" / "latest.json"
-LLAMA = HOME / ".local" / "src" / "llama.cpp"
 
-# One Edge-LLM unit holds the checkpoint it builds from, its weights, and the build's
+# One engine's unit holds the checkpoint it builds from, its weights, and the build's
 # GPU buffers at the same time. 48G killed a 30B NVFP4 build in a restart loop.
 EDGE_LIMITS = "MemoryMax=80G\nMemorySwapMax=0\n"
 
+# Units earlier versions installed and this one must take away: llama-server in
+# router mode, which loaded a model again on any request that named it.
+RETIRED_UNITS = ("thor-chat",)
+
+# (text in the model's name, reasoning parser, tool-call parser). These are the
+# pairs the two served models were measured with; any other model gets "auto".
+PARSERS = (
+    ("qwen", "qwen3", "qwen3_xml"),
+    ("nemotron", "nemotron", "nemotron"),
+)
+
 DEFAULTS = {
-    "MODEL": str(MODELS_DIR / "Nemotron-3-Nano-30B-A3B" / "NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf"),
-    "MODEL_ON_STARTUP": "true",
-    "USERS": "4",
-    "CONTEXT": "1048576",
-    "MODELS_MAX": "2",
-    "MIN_FREE_GB": "8",
     "EDGE_MODEL": "",
     "EDGE_PORT": "8081",
     "EDGE_CONTEXT": "32768",
     "EDGE_PROMPT": "",
     "EDGE_MODELS": "",
     "EDGE_SERVER": str(HOME / ".local" / "share" / "edge-llm" / "venv" / "bin" / "tensorrt-edgellm-serve"),
+    "MIN_FREE_GB": "8",
     "PORT": "8080",
-    "MODEL_PORT": "8079",
     "SEARCH_PORT": "8888",
-    "AGENT_DEFAULT": "",
-    "SERVER": str(LLAMA / "build" / "bin" / "llama-server"),
     "AGENT": str(HOME / ".cargo" / "bin" / "thor-tigress-agent"),
     "KEYRING_BIN": str(HOME / ".cargo" / "bin" / "thor-tigress-keyring"),
     "KEYRING": str(CONFIG / "keyring"),
     "KEYRING_PASSPHRASE": str(CONFIG / "keyring-passphrase"),
 }
 
-TRY_CONTEXT = 65536
 WORKING_GB = 2
-SYSTEM_GB = 5
-QUANTS = ["Q8_0", "Q6_K", "Q5_K_M", "Q4_K_M", "MXFP4"]
-CHAT_TAGS = {"text-generation", "image-text-to-text"}
-PUBLISHERS = ["unsloth", "ggml-org"]
-PART = re.compile(r"-0000[2-9]-of-|-000[1-9]\d-of-")
-HELPER = re.compile(r"(^|/)(mtp|dflash|dspark|draft|eagle|mmproj|shard_rewrite)[-_./]", re.I)
 
 
 def settings():
@@ -130,18 +104,6 @@ def settings():
                 values[key.strip()] = os.path.expanduser(os.path.expandvars(value.strip().strip("\"'")))
     values.update({key: os.environ[key] for key in DEFAULTS if key in os.environ})
     return values
-
-
-def model_id(path):
-    """The id a GGUF file is listed under: its name without .gguf or a part suffix."""
-    return re.sub(r"-00001-of-\d+$", "", Path(path).name.removesuffix(".gguf"))
-
-
-def label(name):
-    """A readable name: "NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0" -> "Nemotron 3 Nano 30B A3B · Q8_0"."""
-    name = re.sub(r"^NVIDIA-", "", name)
-    name = re.sub(r"-((?:UD-)?(?:I?Q\d\w*|MXFP4\w*|BF16|F16))$", r" · \1", name, flags=re.I)
-    return name.replace("-", " ")
 
 
 def gb(size):
@@ -159,588 +121,24 @@ def total_gb():
     return int(Path("/proc/meminfo").read_text().split()[1]) / 1024 / 1024
 
 
-# ---- presets ----
-
-def local_sections():
-    """The sections of models added from disk, as {id: text}."""
-    path = CONFIG / "models.local.ini"
-    if not path.exists():
-        return {}
-    sections = re.split(r"(?m)^(?=\[)", path.read_text())
-    return {re.match(r"\[([^\]]+)\]", text).group(1): text.strip() for text in sections if text.startswith("[")}
-
-
-def presets(values):
-    """models.ini: shared options, the default model, then the models added from disk."""
-    model = values["MODEL"]
-    users = int(values["USERS"])
-    on_startup = "true" if values["MODEL_ON_STARTUP"].strip().lower() in ("1", "true", "yes", "on") else "false"
-    default = "\n".join([
-        "version = 1",
-        "",
-        "[*]",
-        "n-gpu-layers = 999",
-        "flash-attn = on",
-        "jinja = true",
-        "load-on-startup = true",
-        "",
-        f"[{model_id(model)}]",
-        f"model = {model}",
-        f"alias = nemotron,nemotron-think,{model}",
-        f"parallel = {users}",
-        f"ctx-size = {int(values['CONTEXT']) * users}",
-        f"load-on-startup = {on_startup}",
-    ])
-    return "\n\n".join([default, *local_sections().values()]) + "\n"
-
-
-def remove_from_list(name):
-    """Takes a model added from disk off the list; its file stays."""
-    sections = local_sections()
-    sections.pop(name, None)
-    path = CONFIG / "models.local.ini"
-    if sections:
-        path.write_text("\n\n".join(sections.values()) + "\n")
-    else:
-        path.unlink(missing_ok=True)
-
-
-def add_from_disk(path):
-    """Lists a GGUF on disk with one reply at a time and a 64K context, not loaded at start."""
-    sections = local_sections()
-    sections[model_id(path)] = "\n".join([
-        f"[{model_id(path)}]",
-        f"model = {path}",
-        "parallel = 1",
-        f"ctx-size = {TRY_CONTEXT}",
-        "load-on-startup = false",
-    ])
-    (CONFIG / "models.local.ini").write_text("\n\n".join(sections.values()) + "\n")
-
-
-# ---- the router ----
-
-class Router:
-    """llama-server in router mode on localhost, called with the access key."""
-
-    def __init__(self, values):
-        self.base = f"http://127.0.0.1:{values['MODEL_PORT']}"
-        key = CONFIG / "api-key"
-        self.key = key.read_text().strip() if key.exists() else ""
-
-    def call(self, method, path, body=None, timeout=30):
-        request = urllib.request.Request(self.base + path, method=method,
-                                         data=json.dumps(body).encode() if body is not None else None)
-        request.add_header("Content-Type", "application/json")
-        if self.key:
-            request.add_header("Authorization", f"Bearer {self.key}")
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return json.load(response)
-
-    def models(self, reload=False):
-        """{id: state}, where state is loaded, loading, unloaded or failed."""
-        listing = self.call("GET", "/models?reload=1" if reload else "/models")["data"]
-        return {model["id"]: "failed" if model["status"].get("failed") else model["status"]["value"] for model in listing}
-
-    def reload(self, values):
-        (CONFIG / "models.ini").write_text(presets(values))
-        return self.models(reload=True)
-
-
-# ---- what can be picked ----
-
-def on_disk():
-    """Every GGUF under ~/models/gguf, one entry per model (first part only)."""
-    files = sorted(path for path in MODELS_DIR.rglob("*.gguf") if not HELPER.search(path.name) and not PART.search(path.name))
-    return {model_id(path): path for path in files}
-
-
-def size_of(path):
-    """The size of a model, all parts together."""
-    path = Path(path)
-    if "-00001-of-" not in path.name:
-        return path.stat().st_size
-    stem = path.name.split("-00001-of-")[0]
-    return sum(part.stat().st_size for part in path.parent.glob(f"{stem}-000*-of-*.gguf"))
-
-
-# ---- what a model costs in memory ----
-
-GGUF_SCALAR = {0: ("B", 1), 1: ("b", 1), 2: ("H", 2), 3: ("h", 2), 4: ("I", 4), 5: ("i", 4),
-               6: ("f", 4), 7: ("?", 1), 10: ("Q", 8), 11: ("q", 8), 12: ("d", 8)}
-WANTED_META = ("block_count", "attention.head_count", "attention.head_count_kv",
-               "attention.key_length", "attention.value_length", "embedding_length")
-
-
-def gguf_metadata(path, wanted=WANTED_META):
-    """The header metadata of a GGUF, as {key: value}, for keys containing one of
-    `wanted`. Everything else is skipped rather than read, so a 32 GB file costs ms."""
-    def skip(handle, kind):
-        if kind == 8:
-            handle.seek(struct.unpack("<Q", handle.read(8))[0], 1)
-        elif kind == 9:
-            element = struct.unpack("<I", handle.read(4))[0]
-            count = struct.unpack("<Q", handle.read(8))[0]
-            if element == 8:
-                for _ in range(count):
-                    handle.seek(struct.unpack("<Q", handle.read(8))[0], 1)
-            else:
-                handle.seek(GGUF_SCALAR[element][1] * count, 1)
-        else:
-            handle.seek(GGUF_SCALAR[kind][1], 1)
-
-    def read(handle, kind):
-        if kind == 8:
-            return handle.read(struct.unpack("<Q", handle.read(8))[0]).decode("utf-8", "replace")
-        if kind == 9:
-            element = struct.unpack("<I", handle.read(4))[0]
-            count = struct.unpack("<Q", handle.read(8))[0]
-            return [read(handle, element) for _ in range(count)]
-        fmt, size = GGUF_SCALAR[kind]
-        return struct.unpack("<" + fmt, handle.read(size))[0]
-
-    found = {}
-    with open(path, "rb") as handle:
-        if handle.read(4) != b"GGUF":
-            return found
-        handle.seek(12, 1)  # version and tensor count
-        for _ in range(struct.unpack("<Q", handle.read(8))[0]):
-            key = handle.read(struct.unpack("<Q", handle.read(8))[0]).decode("utf-8", "replace")
-            kind = struct.unpack("<I", handle.read(4))[0]
-            if any(name in key for name in wanted):
-                found[key] = read(handle, kind)
-            else:
-                skip(handle, kind)
-    return found
-
-
-def kv_bytes_per_token(meta):
-    """Bytes of KV cache per token. Only attention layers count: a hybrid model such
-    as Nemotron-H keeps state (not KV) in its Mamba blocks, and only the attention
-    ones grow with the context, which is why those models need so little KV."""
-    def first(*suffixes):
-        for suffix in suffixes:
-            for key, value in meta.items():
-                if key.endswith(suffix):
-                    return value
-        return None
-
-    blocks = first("block_count") or 0
-    heads = first("attention.head_count") or 1
-    kv_heads = first("attention.head_count_kv")
-    embedding = first("embedding_length") or 0
-    key_len = first("attention.key_length") or (embedding // heads if heads else 0)
-    value_len = first("attention.value_length") or key_len
-    if not kv_heads or not key_len:
-        return 0
-    per_layer = kv_heads if isinstance(kv_heads, list) else [kv_heads] * blocks
-    # K and V at 16 bits each: what llama.cpp uses unless --cache-type-k/-v says otherwise
-    return 2 * sum(head * (key_len + value_len) for head in per_layer if head)
-
-
-def context_for(path, values):
-    """The tokens reserved for a model: the default one gets CONTEXT x USERS, while a
-    model added from disk gets TRY_CONTEXT, because presets() gives those parallel = 1."""
-    if model_id(path) == model_id(values["MODEL"]):
-        return int(values["CONTEXT"]) * int(values["USERS"])
-    return TRY_CONTEXT
-
-
-def kv_gb(path, values):
-    """The KV cache a GGUF reserves at its context, in GB, or 0.0 if it cannot be read."""
-    try:
-        return kv_bytes_per_token(gguf_metadata(path)) * context_for(path, values) / 1e9
-    except (OSError, struct.error, KeyError):
-        return 0.0
-
-
-def need_gb(path, values):
-    """What loading a model costs: its weights, its KV cache and the working margin."""
-    return size_of(path) / 1e9 + kv_gb(path, values) + WORKING_GB
-
-
-def known_architectures():
-    source = LLAMA / "src" / "llama-arch.cpp"
-    return set(re.findall(r'\{\s*LLM_ARCH_\w+,\s*"([^"]+)"\s*\}', source.read_text())) if source.exists() else set()
-
-
-def hugging_face(path):
-    with urllib.request.urlopen("https://huggingface.co/api/" + path, timeout=30) as response:
-        return json.load(response)
-
-
-def best_quant(repo, room):
-    """The best quant of a repository that fits in `room` bytes, else the smallest one: (name, files, size)."""
-    files = [item for item in hugging_face(f"models/{repo}/tree/main?recursive=true")
-             if item["type"] == "file" and item["path"].endswith(".gguf") and not HELPER.search(item["path"])]
-    found = []
-    for quant in QUANTS:
-        chosen = [item for item in files if re.search(rf"(?<![A-Z\d]){quant}(?:_XL)?(?=[.-])", Path(item["path"]).name)]
-        unsplit = [item for item in chosen if "-of-" not in item["path"]]
-        if unsplit:
-            chosen = [min(unsplit, key=lambda item: item["size"])]
-        if chosen:
-            found.append((quant, [item["path"] for item in chosen], sum(item["size"] for item in chosen)))
-    fitting = [entry for entry in found if entry[2] <= room]
-    return fitting[0] if fitting else (min(found, key=lambda entry: entry[2]) if found else None)
-
-
-def latest(values, count=12):
-    """The newest chat models from unsloth and ggml-org that llama.cpp here can run and that fit alone."""
-    architectures = known_architectures()
-    alone = (total_gb() - SYSTEM_GB - int(values["MIN_FREE_GB"]) - WORKING_GB) * 1e9
-    room_now = (free_gb() - int(values["MIN_FREE_GB"]) - WORKING_GB) * 1e9
-    repos, seen = [], set()
-    for publisher in PUBLISHERS:
-        for repo in hugging_face(f"models?author={publisher}&filter=gguf&sort=createdAt&direction=-1&limit=40"
-                                 "&expand[]=gguf&expand[]=createdAt&expand[]=pipeline_tag&expand[]=tags"):
-            gguf = repo.get("gguf") or {}
-            name = repo["id"].split("/")[1].removesuffix("-GGUF").lower()
-            if (repo.get("pipeline_tag") in CHAT_TAGS and gguf.get("architecture") in architectures
-                    and (gguf.get("total") or 0) >= 1e9 and name not in seen):
-                seen.add(name)
-                repos.append(repo)
-    repos.sort(key=lambda repo: repo.get("createdAt", ""), reverse=True)
-    with concurrent.futures.ThreadPoolExecutor(8) as pool:
-        quants = list(pool.map(lambda repo: best_quant(repo["id"], room_now), repos))
-    picks = []
-    for repo, quant in zip(repos, quants):
-        if quant and quant[2] <= alone:
-            licence = next((tag[8:] for tag in repo.get("tags", []) if tag.startswith("license:")), "?")
-            picks.append({"repo": repo["id"], "date": repo.get("createdAt", "")[:10], "licence": licence,
-                          "quant": quant[0], "files": quant[1], "size": quant[2]})
-    return picks[:count]
-
-
-# ---- the list ----
-
-def entries(values, router):
-    """The models on this Thor: listed by the router first, then the rest on disk."""
-    served = router.models()
-    disk = on_disk()
-    default = model_id(values["MODEL"])
-    rows = []
-    for name, state in sorted(served.items(), key=lambda item: item[0] != default):
-        path = disk.get(name) or Path(values["MODEL"])
-        rows.append({"id": name, "state": state, "size": size_of(path) if path.exists() else 0,
-                     "path": path if path.exists() else None,
-                     "note": "default (nemotron)" if name == default else ""})
-    for name, path in disk.items():
-        if name not in served:
-            rows.append({"id": name, "state": "on disk", "size": size_of(path), "path": path, "note": ""})
-    rows.extend(edge_row(entry) for entry in edge_models(values))
-    return rows
-
-
-def edge_answering(port):
-    """Whether an Edge-LLM server on `port` answers; one that is down is left out,
-    so the page's picker keeps showing the models that are up."""
-    try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/v1/models", timeout=5):
-            return True
-    except (urllib.error.URLError, TimeoutError, ConnectionError):
-        return False
-
-
-def edge_row(entry):
-    """The model one Edge-LLM engine serves: loaded while its server answers."""
-    size = sum(path.stat().st_size for path in entry["path"].glob("*.safetensors"))
-    return {"id": entry["name"], "state": "loaded" if edge_answering(entry["port"]) else "on disk",
-            "size": size, "engine": "edge-llm", "unit": edge_unit(entry), "port": entry["port"],
-            "note": f"TensorRT Edge-LLM · :{entry['port']}"}
-
-
-def downloadable(values):
-    """The newest models on Hugging Face, as rows."""
-    print("asking Hugging Face for the newest models…", flush=True)
-    room = (free_gb() - int(values["MIN_FREE_GB"]) - WORKING_GB) * 1e9
-    return [{"id": model_id(pick["files"][0]), "state": "on Hugging Face", "size": pick["size"], "pick": pick,
-             "note": f"{pick['date']} · {pick['licence']} · {pick['repo']}"
-                     + ("" if pick["size"] <= room else " · fits only after unloading the default")}
-            for pick in latest(values)]
-
-
-def cost(row, values):
-    """The "loads ~x GB" column: weights plus the KV cache, where they can be worked out."""
-    path = row.get("path")
-    if row.get("engine") == "edge-llm":
-        head = f"~{row['size'] / 1e9 + WORKING_GB:.0f} GB engine"
-    elif path and Path(path).exists():
-        head = f"~{need_gb(path, values):.0f} GB · KV {kv_gb(path, values):.1f} GB"
-    else:
-        return row["note"]
-    return f"{head} · {row['note']}" if row["note"] else head
-
-
-def show(rows, values):
-    tokens, users = int(values["CONTEXT"]), int(values["USERS"])
-    print(f"\nThor: {free_gb():.1f} GB free of {total_gb():.1f} GB · keeps {values['MIN_FREE_GB']} GB free"
-          f" · at most {values['MODELS_MAX']} models loaded")
-    print(f"      context {tokens // 1024}K per reply x {users} replies = {tokens * users // 1024}K tokens"
-          f" · change it with: thor-tigress-serve context\n")
-    print(f"  {'key':<4} {'model':<46} {'state':<16} {'size':>9}  loads")
-    for key, row in enumerate(rows, 1):
-        print(f"  {key:<4} {label(row['id'])[:46]:<46} {row['state']:<16} {gb(row['size']):>9}  {cost(row, values)}")
-    print()
-
-
-def room_for(row, values, router):
-    """None if this model can be loaded now, else the reason it can't. Counts the KV
-    cache, not just the file: at a large CONTEXT the KV cache dwarfs the weights."""
-    loaded = [name for name, state in router.models().items() if state in ("loaded", "loading")]
-    if len(loaded) >= int(values["MODELS_MAX"]):
-        return f"{len(loaded)} loaded already, the most at once is {values['MODELS_MAX']} (MODELS_MAX); unload one first"
-    if row.get("engine") == "edge-llm":
-        needed = row["size"] / 1e9 + WORKING_GB
-        detail = f"{row['size'] / 1e9:.0f} GB engine"
-    else:
-        path = row.get("path") or values["MODEL"]
-        needed = need_gb(path, values)
-        detail = (f"{size_of(path) / 1e9:.0f} GB weights + {kv_gb(path, values):.1f} GB KV"
-                  f" at {context_for(path, values) // 1024}K")
-    room = max(0.0, free_gb() - int(values["MIN_FREE_GB"]))
-    if needed > room:
-        return f"needs about {needed:.0f} GB ({detail}), only {room:.0f} GB can be used while keeping {values['MIN_FREE_GB']} GB free"
-    return None
-
-
-def load(row, values, router):
-    """Lists the model if it is only on disk, loads it, and commits its memory with one token.
-    Memory on the Thor is committed on first use, so the first reply is watched too."""
-    if row["state"] in ("loaded", "loading"):
-        return print("already loaded")
-    reason = room_for(row, values, router)
-    if reason:
-        return print(f"not loaded: {reason}")
-    if row.get("engine") == "edge-llm":
-        return start_edge(row, values)
-    if row["state"] == "on disk":
-        add_from_disk(row["path"])
-        router.reload(values)
-    minimum = int(values["MIN_FREE_GB"])
-    started = time.time()
-    router.call("POST", "/models/load", {"model": row["id"]})
-    while (state := router.models().get(row["id"])) != "loaded":
-        if state == "failed":
-            return print("failed to load; see: journalctl --user -u thor-chat -n 50")
-        if free_gb() < minimum:
-            router.call("POST", "/models/unload", {"model": row["id"]})
-            return print(f"free memory fell below {minimum} GB while loading; unloaded again")
-        time.sleep(1)
-    print(f"loaded in {time.time() - started:.0f} s; sending one token to commit its memory")
-    with concurrent.futures.ThreadPoolExecutor(1) as pool:
-        warmup = pool.submit(router.call, "POST", "/v1/chat/completions",
-                             {"model": row["id"], "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]}, 300)
-        while not warmup.done():
-            if free_gb() < minimum:
-                router.call("POST", "/models/unload", {"model": row["id"]})
-                return print(f"free memory fell below {minimum} GB on the first reply; unloaded again")
-            time.sleep(0.5)
-    print(f"ready: {free_gb():.1f} GB free")
-
-
-def start_edge(row, values):
-    """Starts the service that serves one Edge-LLM model and waits until it answers,
-    stopping it again if free memory falls below MIN_FREE_GB."""
-    minimum, unit = int(values["MIN_FREE_GB"]), row["unit"]
-    before, started = free_gb(), time.time()
-    subprocess.run(["systemctl", "--user", "start", unit], check=True)
-    while not edge_answering(row["port"]):
-        if free_gb() < minimum:
-            subprocess.run(["systemctl", "--user", "stop", unit], check=False)
-            return print(f"free memory fell below {minimum} GB while loading; stopped again")
-        if subprocess.run(["systemctl", "--user", "is-failed", "-q", unit]).returncode == 0:
-            return print(f"failed to start; see: journalctl --user -u {unit} -n 50")
-        time.sleep(2)
-    print(f"loaded in {time.time() - started:.0f} s: {before - free_gb():.1f} GB used, {free_gb():.1f} GB free")
-
-
-def unload(row, values, router):
-    """Frees a model's memory. A model added from disk also leaves the list, so
-    the chat page stops offering it; it shows as "on disk" again."""
-    if row["state"] == "on disk":
-        return print("not loaded")
-    if row.get("engine") == "edge-llm":
-        before = free_gb()
-        subprocess.run(["systemctl", "--user", "stop", row["unit"]], check=True)
-        time.sleep(3)
-        return print(f"unloaded: {free_gb() - before:.1f} GB freed, {free_gb():.1f} GB free")
-    if row["id"] == model_id(values["MODEL"]):
-        try:
-            answer = input("This is the default model: the chat stops answering until it is loaded again. Unload? [y/N] ")
-        except EOFError:
-            answer = ""
-        if answer.strip().lower() != "y":
-            return
-    before = free_gb()
-    if row["state"] in ("loaded", "loading"):
-        router.call("POST", "/models/unload", {"model": row["id"]})
-        while router.models().get(row["id"]) not in ("unloaded", "failed"):
-            time.sleep(1)
-        time.sleep(2)
-        print(f"unloaded: {free_gb() - before:.1f} GB freed, {free_gb():.1f} GB free")
-    if row["id"] in local_sections():
-        remove_from_list(row["id"])
-        router.reload(values)
-        print("off the chat page's list; still on disk")
-
-
-def download(row, values, router):
-    pick = row["pick"]
-    folder = MODELS_DIR / pick["repo"].split("/")[1].removesuffix("-GGUF")
-    folder.mkdir(parents=True, exist_ok=True)
-    for file in pick["files"]:
-        target = folder / Path(file).name
-        print(f"downloading {file} into {folder}")
-        url = f"https://huggingface.co/{pick['repo']}/resolve/main/{file}"
-        if subprocess.run(["curl", "-L", "-C", "-", "--fail", "--progress-bar", "-o", str(target), url]).returncode:
-            return print("download failed; run the same action again to resume")
-    print(f"downloaded {gb(pick['size'])}; see thor-tigress-serve list, then load it")
-
-
-def find(rows, wanted, command):
-    """The row a key ("2") or a name (id, alias or repository) points to."""
-    if wanted.isdigit() and 1 <= int(wanted) <= len(rows):
-        return rows[int(wanted) - 1]
-    for row in rows:
-        names = {row["id"].lower(), row.get("pick", {}).get("repo", "").lower()}
-        if wanted.lower() in names:
-            return row
-    sys.exit(f"no model {wanted!r}; see thor-tigress-serve {command}")
-
-
-def list_here(values):
-    show(entries(values, Router(values)), values)
-
-
-def list_latest(values):
-    rows = downloadable(values)
-    LATEST.parent.mkdir(parents=True, exist_ok=True)
-    LATEST.write_text(json.dumps(rows))
-    show(rows, values)
-
-
-def act(action, values, wanted, command):
-    router = Router(values)
-    try:
-        action(find(entries(values, router), wanted, command), values, router)
-    except (urllib.error.URLError, TimeoutError) as error:
-        sys.exit(f"the model server said: {error}")
-
-
-def load_command(values, wanted):
-    act(load, values, wanted, "list")
-
-
-def unload_command(values, wanted):
-    act(unload, values, wanted, "list")
-
-
-def download_command(values, wanted):
-    if not LATEST.exists():
-        sys.exit("run thor-tigress-serve list-latest first")
-    download(find(json.loads(LATEST.read_text()), wanted, "list-latest"), values, None)
-
-
-def set_env(key, value):
-    """Writes KEY=value into ~/.config/thor-chat/env, replacing the line if it is there."""
-    CONFIG.mkdir(parents=True, exist_ok=True)
-    path = CONFIG / "env"
-    lines = path.read_text().splitlines() if path.exists() else []
-    for index, line in enumerate(lines):
-        name, sep, _ = line.partition("=")
-        if sep and name.strip() == key:
-            lines[index] = f"{key}={value}"
-            break
-    else:
-        lines.append(f"{key}={value}")
-    path.write_text("\n".join(lines) + "\n")
-
-
-def wait_for(router, name, wanted, seconds=900):
-    """Waits until a model reaches one of `wanted` states, then returns the state it is in."""
-    started = time.time()
-    while time.time() - started < seconds:
-        state = router.models().get(name)
-        if state in wanted:
-            return state
-        time.sleep(2)
-    return router.models().get(name)
-
-
-def context_command(values, rest):
-    """Shows what CONTEXT x USERS costs, or sets it and reloads the models that are loaded.
-
-    The whole context is reserved when a model loads, so this is a memory knob as much
-    as a quality knob: 4 replies x 1M tokens on a 30B model is about 24 GB of KV cache,
-    held for as long as it is loaded, whether or not anybody is chatting."""
-    path, tokens, users = values["MODEL"], int(values["CONTEXT"]), int(values["USERS"])
-    if not rest:
-        print(f"context  {tokens // 1024}K tokens per reply x {users} replies at once = {tokens * users // 1024}K tokens")
-        print(f"costs    {kv_gb(path, values):.1f} GB of KV cache, reserved the whole time it is loaded")
-        print(f"         {gb(size_of(path))} of weights + KV + {gb(WORKING_GB * 1e9)} working room"
-              f" = about {need_gb(path, values):.0f} GB to load")
-        print("change   thor-tigress-serve context TOKENS [USERS]   (the loaded models then reload)")
-        return
-    tokens, users = int(rest[0]), int(rest[1]) if len(rest) > 1 else users
-    if tokens < 1024 or users < 1:
-        sys.exit("TOKENS must be at least 1024 and USERS at least 1")
-    router = Router(values)
-    values = dict(values, CONTEXT=str(tokens), USERS=str(users))
-    before = free_gb()
-    set_env("CONTEXT", tokens)
-    set_env("USERS", users)
-    router.reload(values)
-    print(f"CONTEXT={tokens} ({tokens // 1024}K per reply), USERS={users}: "
-          f"the KV cache becomes about {kv_gb(path, values):.1f} GB")
-    for name, state in sorted(router.models().items()):
-        if state not in ("loaded", "loading"):
-            continue
-        print(f"  {name}: unloading")
-        router.call("POST", "/models/unload", {"model": name})
-        if wait_for(router, name, ("unloaded", "failed")) == "failed":
-            return print(f"  {name} failed to unload; see: journalctl --user -u thor-chat -n 50")
-        print(f"  {name}: loading")
-        router.call("POST", "/models/load", {"model": name})
-        if wait_for(router, name, ("loaded", "failed")) != "loaded":
-            return print(f"  {name} failed to load; see: journalctl --user -u thor-chat -n 50")
-        router.call("POST", "/v1/chat/completions",
-                    {"model": name, "max_tokens": 1, "messages": [{"role": "user", "content": "hi"}]}, 600)
-        print(f"  {name}: loaded")
-    print(f"done: {before:.1f} GB free before, {free_gb():.1f} GB free now")
-
-
-# ---- services ----
-
-def run(values):
-    CONFIG.mkdir(parents=True, exist_ok=True)
-    (CONFIG / "models.ini").write_text(presets(values))
-    key = CONFIG / "api-key"
-    arguments = [values["SERVER"], "--models-preset", str(CONFIG / "models.ini"), "--models-max", values["MODELS_MAX"],
-                 "--host", "127.0.0.1", "--port", values["MODEL_PORT"]]
-    if key.exists() and key.stat().st_size:
-        arguments += ["--api-key-file", str(key)]
-    os.execv(values["SERVER"], arguments)
-
+# ---- the models ----
 
 def edge_root(values):
     """Where the TensorRT Edge-LLM checkpoints live: beside EDGE_MODEL, else ~/models/edge-llm."""
     if values["EDGE_MODEL"]:
         return Path(values["EDGE_MODEL"]).parent
-    return MODELS_DIR.parent / "edge-llm"
+    return HOME / "models" / "edge-llm"
 
 
 def edge_models(values):
-    """Every TensorRT Edge-LLM model: the one EDGE_MODEL names, then the ones EDGE_MODELS adds.
+    """Every model: the one EDGE_MODEL names, then the ones EDGE_MODELS adds.
 
     EDGE_MODELS is a comma- or space-separated list of FOLDER=PORT or FOLDER=PORT:TOKENS, each
     FOLDER under the same directory as EDGE_MODEL. TOKENS is that model's own context window,
     because one number cannot fit every model: Nemotron 3.5 Lightning spends 3.5 KiB of cache
     per token at 1M tokens while Qwen3.6 35B spends 80 KiB, so the same window would ask Qwen
     for 80 GB. Without TOKENS the model gets EDGE_CONTEXT. A folder's name is what the chat
-    page's picker shows and what a request must name, so adding a second engine is one line in
-    ~/.config/thor-chat/env and then `thor-tigress-serve install`: the agent gets a second
-    `--engine`, the model appears in the picker, and requests for it are routed there."""
+    page's picker shows and what a request names."""
     found = []
     if values["EDGE_MODEL"]:
         path = Path(values["EDGE_MODEL"])
@@ -748,7 +146,7 @@ def edge_models(values):
                       "context": values["EDGE_CONTEXT"], "primary": True})
     for entry in values["EDGE_MODELS"].replace(",", " ").split():
         folder, separator, rest = entry.partition("=")
-        port, colon, tokens = rest.partition(":")
+        port, _, tokens = rest.partition(":")
         if not separator or not folder or not port:
             sys.exit(f"EDGE_MODELS {entry!r}: expected FOLDER=PORT or FOLDER=PORT:TOKENS")
         found.append({"name": folder, "path": edge_root(values) / folder, "port": port,
@@ -757,7 +155,7 @@ def edge_models(values):
 
 
 def edge_unit(entry):
-    """The service unit serving one Edge-LLM model: thor-edge-llm, then thor-edge-llm-NAME."""
+    """The service that serves one model: thor-edge-llm for EDGE_MODEL, thor-edge-llm-<name> for the others."""
     if entry["primary"]:
         return "thor-edge-llm"
     return "thor-edge-llm-" + re.sub(r"[^a-z0-9]+", "-", entry["name"].lower()).strip("-")
@@ -767,8 +165,8 @@ def edge_prompt(entry, values):
     """The longest single prompt this engine takes: EDGE_PROMPT when it is set, never more
     than half the model's window, because the rest of the window has to hold the answer.
 
-    The window and the longest prompt are separate costs. The KV cache is small — Lightning
-    spends 3 GB on a million tokens — while the activation buffers an engine reserves for its
+    The window and the longest prompt are separate costs. The KV cache is small (Lightning
+    spends 3 GB on a million tokens) while the activation buffers an engine reserves for its
     longest prompt are not: half a window of 1M asked for ~45 GB of them and took the whole
     board down. A capped prompt keeps the million-token window and gives the memory back."""
     half = int(entry["context"]) // 2
@@ -778,53 +176,142 @@ def edge_prompt(entry, values):
     return min(int(wanted), half)
 
 
-def edge(values, wanted=None):
-    """TensorRT Edge-LLM's OpenAI-compatible server for one Edge-LLM model: EDGE_MODEL
-    when NAME is left out, else the EDGE_MODELS entry with that folder name. It builds
-    the engine on first start and reuses it from the cache afterwards."""
+def edge_parsers(name):
+    """The reasoning and tool-call parsers for a model, by its family."""
+    lowered = name.lower()
+    for family, reasoning, tool_call in PARSERS:
+        if family in lowered:
+            return reasoning, tool_call
+    return "auto", "auto"
+
+
+def edge_command(entry, values):
+    """The command line of one model's engine."""
+    reasoning, tool_call = edge_parsers(entry["name"])
+    return [values["EDGE_SERVER"], str(entry["path"]), "--host", "127.0.0.1",
+            "--port", entry["port"], "--served-model-name", entry["name"],
+            "--reasoning-parser", reasoning,
+            "--tool-call-parser", tool_call, "--enable-auto-tool-choice",
+            "--cache-dir", str(edge_root(values) / "cache"),
+            "--max-input-len", str(edge_prompt(entry, values)),
+            "--max-kv-cache-capacity", str(entry["context"]),
+            "--max-batch-size", "1"]
+
+
+def agent_command(values):
+    """The command line of the page and API: one --engine per model, EDGE_MODEL first,
+    which makes it the one that answers a request naming no model here."""
     entries = edge_models(values)
     if not entries:
-        sys.exit("EDGE_MODEL is not set in ~/.config/thor-chat/env")
-    entry = next((one for one in entries if one["name"] == wanted), None if wanted else entries[0])
+        sys.exit("no model to serve: set EDGE_MODEL in ~/.config/thor-chat/env")
+    engines = [item for entry in entries
+               for item in ("--engine", f"{entry['name']}=127.0.0.1:{entry['port']}")]
+    return [values["AGENT"], "--listen", f"127.0.0.1:{values['PORT']}", *engines,
+            "--search", f"127.0.0.1:{values['SEARCH_PORT']}",
+            "--web", str(WEB), "--key-file", str(CONFIG / "api-key"),
+            *keyring_arguments(values)]
+
+
+# ---- the list ----
+
+def edge_answering(port):
+    """Whether the engine on `port` answers."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/v1/models", timeout=5):
+            return True
+    except (urllib.error.URLError, TimeoutError, ConnectionError):
+        return False
+
+
+def rows(values):
+    """The models on this Thor: loaded while its engine answers."""
+    found = []
+    for entry in edge_models(values):
+        size = sum(path.stat().st_size for path in entry["path"].glob("*.safetensors"))
+        found.append({"id": entry["name"], "state": "loaded" if edge_answering(entry["port"]) else "on disk",
+                      "size": size, "unit": edge_unit(entry), "port": entry["port"],
+                      "context": int(entry["context"]), "prompt": edge_prompt(entry, values)})
+    return found
+
+
+def list_here(values):
+    print(f"\nThor: {free_gb():.1f} GB free of {total_gb():.1f} GB · keeps {values['MIN_FREE_GB']} GB free\n")
+    print(f"  {'key':<4} {'model':<46} {'state':<9} {'size':>9}  {'port':<5} context · longest prompt")
+    for key, row in enumerate(rows(values), 1):
+        print(f"  {key:<4} {row['id'][:46]:<46} {row['state']:<9} {gb(row['size']):>9}  {row['port']:<5}"
+              f" {row['context'] // 1024}K · {row['prompt'] // 1024}K")
+    print()
+
+
+def find(values, wanted):
+    """The row a key ("2") or a name points to."""
+    found = rows(values)
+    if wanted.isdigit() and 1 <= int(wanted) <= len(found):
+        return found[int(wanted) - 1]
+    for row in found:
+        if wanted.lower() == row["id"].lower():
+            return row
+    sys.exit(f"no model {wanted!r}; see thor-tigress-serve list")
+
+
+def load(values, wanted):
+    """Starts a model's engine and waits until it answers, stopping it again if free
+    memory falls below MIN_FREE_GB."""
+    row = find(values, wanted)
+    if row["state"] == "loaded":
+        return print("already loaded")
+    minimum, unit_name = int(values["MIN_FREE_GB"]), row["unit"]
+    needed, room = row["size"] / 1e9 + WORKING_GB, max(0.0, free_gb() - minimum)
+    if needed > room:
+        return print(f"not loaded: needs about {needed:.0f} GB, only {room:.0f} GB can be used"
+                     f" while keeping {minimum} GB free")
+    before, started = free_gb(), time.time()
+    subprocess.run(["systemctl", "--user", "start", unit_name], check=True)
+    while not edge_answering(row["port"]):
+        if free_gb() < minimum:
+            subprocess.run(["systemctl", "--user", "stop", unit_name], check=False)
+            return print(f"free memory fell below {minimum} GB while loading; stopped again")
+        if subprocess.run(["systemctl", "--user", "is-failed", "-q", unit_name]).returncode == 0:
+            return print(f"failed to start; see: journalctl --user -u {unit_name} -n 50")
+        time.sleep(2)
+    return print(f"loaded in {time.time() - started:.0f} s: {before - free_gb():.1f} GB used, {free_gb():.1f} GB free")
+
+
+def unload(values, wanted):
+    """Stops a model's engine. It stays in the settings, so it starts again at boot."""
+    row = find(values, wanted)
+    if row["state"] == "on disk":
+        return print("not loaded")
+    before = free_gb()
+    subprocess.run(["systemctl", "--user", "stop", row["unit"]], check=True)
+    time.sleep(3)
+    return print(f"unloaded: {free_gb() - before:.1f} GB freed, {free_gb():.1f} GB free")
+
+
+# ---- services ----
+
+def edge(values, wanted=None):
+    """The engine for one model: EDGE_MODEL when NAME is left out, else the EDGE_MODELS
+    entry with that folder name. It builds the engine the first time."""
+    entry = next((item for item in edge_models(values)
+                  if (item["primary"] if wanted is None else item["name"] == wanted)), None)
     if entry is None:
-        sys.exit(f"no Edge-LLM model {wanted!r}; defined: " + ", ".join(one["name"] for one in entries))
-    context = int(entry["context"])
-    os.execv(values["EDGE_SERVER"], [values["EDGE_SERVER"], str(entry["path"]), "--host", "127.0.0.1",
-                                     "--port", entry["port"], "--served-model-name", entry["name"],
-                                     "--reasoning-parser", "auto",
-                                     "--tool-call-parser", "auto", "--enable-auto-tool-choice",
-                                     "--cache-dir", str(edge_root(values) / "cache"),
-                                     "--max-input-len", str(edge_prompt(entry, values)),
-                                     "--max-kv-cache-capacity", str(context),
-                                     "--max-batch-size", "1"])
+        sys.exit(f"no Edge-LLM model {wanted!r} in EDGE_MODELS" if wanted else "set EDGE_MODEL to a checkpoint folder")
+    command = edge_command(entry, values)
+    os.execv(command[0], command)
 
 
 def agent(values):
-    """The page and API. Each Edge-LLM model is passed as --engine, so the page's picker
-    lists it and a request naming it is sent to that engine instead of llama-server.
-
-    With AGENT_DEFAULT=edge the first Edge-LLM model takes the default slot instead, so
-    the page serves the Edge-LLM models on their own, with no llama-server behind it."""
-    entries = edge_models(values)
-    model = f"127.0.0.1:{values['MODEL_PORT']}"
-    if values["AGENT_DEFAULT"].strip().lower() == "edge" and entries:
-        model = f"127.0.0.1:{entries[0]['port']}"
-        entries = entries[1:]
-    engines = [item for entry in entries
-               for item in ("--engine", f"{entry['name']}=127.0.0.1:{entry['port']}")]
-    os.execv(values["AGENT"], [values["AGENT"], "--listen", f"127.0.0.1:{values['PORT']}",
-                               "--model", model, *engines,
-                               "--search", f"127.0.0.1:{values['SEARCH_PORT']}",
-                               "--web", str(WEB), "--key-file", str(CONFIG / "api-key"),
-                               *keyring_arguments(values)])
+    command = agent_command(values)
+    os.execv(command[0], command)
 
 
 def keyring_arguments(values):
     """--keyring and its passphrase, only when both are there, so the agent starts either way."""
-    keyring = Path(values["KEYRING"])
+    keyring_file = Path(values["KEYRING"])
     passphrase = Path(values["KEYRING_PASSPHRASE"])
-    if keyring.exists() and passphrase.exists():
-        return ["--keyring", str(keyring), "--keyring-passphrase-file", str(passphrase)]
+    if keyring_file.exists() and passphrase.exists():
+        return ["--keyring", str(keyring_file), "--keyring-passphrase-file", str(passphrase)]
     return []
 
 
@@ -844,20 +331,20 @@ WantedBy=default.target
 
 
 def install(values):
-    """Writes one unit per service and starts them: the page, llama-server, and one
-    engine per Edge-LLM model. An edge unit left over from an earlier EDGE_MODELS is
-    stopped and removed first, because it still holds the port it was given, and the
-    symlink on the PATH is pointed at this file."""
+    """Writes one unit per model and one for the page, and starts them. A unit this
+    install no longer wants is stopped and removed first, because it still holds the
+    port it was given, and the symlink on the PATH is pointed at this file."""
+    entries = edge_models(values)
+    if not entries:
+        sys.exit("no model to serve: set EDGE_MODEL in ~/.config/thor-chat/env")
     UNITS.mkdir(parents=True, exist_ok=True)
-    unit("thor-chat", f"Models (llama-server) on 127.0.0.1:{values['MODEL_PORT']}", "run", "")
-    unit("thor-tigress-agent", f"Chat page and web search on 127.0.0.1:{values['PORT']}", "agent", "thor-chat.service")
-    services = ["thor-chat", "thor-tigress-agent"]
-    for entry in edge_models(values):
-        name = edge_unit(entry)
+    engines = [edge_unit(entry) for entry in entries]
+    for entry, name in zip(entries, engines):
         unit(name, f"{entry['name']} (TensorRT Edge-LLM) on 127.0.0.1:{entry['port']}",
-             "edge" if entry["primary"] else f"edge {entry['name']}", "thor-chat.service",
-             EDGE_LIMITS)
-        services.append(name)
+             "edge" if entry["primary"] else f"edge {entry['name']}", "", EDGE_LIMITS)
+    unit("thor-tigress-agent", f"Chat page and web search on 127.0.0.1:{values['PORT']}", "agent",
+         " ".join(f"{name}.service" for name in engines))
+    services = [*engines, "thor-tigress-agent"]
     source = Path(__file__).resolve()
     command = HOME / ".local" / "bin" / "thor-tigress-serve"
     command.parent.mkdir(parents=True, exist_ok=True)
@@ -865,47 +352,44 @@ def install(values):
         command.unlink(missing_ok=True)
         command.symlink_to(source)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
-    for name in drop_stale_edge_units(services):
-        print(f"removed {name}: it is no longer in EDGE_MODELS")
+    for name in drop_units(stale_units(services)):
+        print(f"removed {name}: this install does not run it")
     subprocess.run(["systemctl", "--user", "enable", *services], check=True, capture_output=True)
     subprocess.run(["systemctl", "--user", "restart", *services], check=True)
     subprocess.run(["loginctl", "enable-linger", os.environ.get("USER", "")], check=False)
-    print(f"running: {', '.join(services)}; all start at boot. {command} is on your PATH.")
-    for entry in edge_models(values):
-        print(f"  the page offers {entry['name']} from TensorRT Edge-LLM on :{entry['port']}"
+    print(f"running: http://127.0.0.1:{values['PORT']}")
+    for entry in entries:
+        print(f"  {entry['name']} (TensorRT Edge-LLM) on 127.0.0.1:{entry['port']}"
               f" (service {edge_unit(entry)})")
 
 
-def edge_unit_names():
-    """Every thor-edge-llm unit file on disk, by name."""
-    return [path.stem for path in sorted(UNITS.glob("thor-edge-llm*.service"))]
+def installed_units():
+    """Every unit this script has ever written that is on disk, by name."""
+    names = [path.stem for path in sorted(UNITS.glob("thor-edge-llm*.service"))]
+    return names + [name for name in (*RETIRED_UNITS, "thor-tigress-agent") if (UNITS / f"{name}.service").exists()]
 
 
-def drop_stale_edge_units(wanted):
-    """Stops and deletes the edge units an earlier EDGE_MODELS left behind, with the
-    drop-ins they carry: the model is gone from the config but its engine still holds
-    the port it was given, so the engine that replaced it cannot bind that port."""
-    stale = [name for name in edge_unit_names() if name not in wanted]
-    if not stale:
-        return stale
-    subprocess.run(["systemctl", "--user", "disable", "--now", *stale], check=False)
-    for name in stale:
+def stale_units(wanted):
+    """The installed units that are not in `wanted`: engines an earlier EDGE_MODELS
+    left behind, and the retired llama-server unit."""
+    return [name for name in installed_units() if name not in wanted]
+
+
+def drop_units(names):
+    """Stops and deletes units, with the drop-ins they carry."""
+    if not names:
+        return names
+    subprocess.run(["systemctl", "--user", "disable", "--now", *names], check=False)
+    for name in names:
         (UNITS / f"{name}.service").unlink(missing_ok=True)
         shutil.rmtree(UNITS / f"{name}.service.d", ignore_errors=True)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
-    return stale
+    return names
 
 
 def uninstall(values):
-    """Stops and removes the services. Edge-LLM units are found by name, so ones
-    left over from an earlier EDGE_MODELS are removed too."""
-    edge_units = edge_unit_names()
-    subprocess.run(["systemctl", "--user", "disable", "--now", "thor-tigress-agent", "thor-chat", *edge_units],
-                   check=False)
-    for name in ("thor-chat", "thor-tigress-agent", *edge_units):
-        (UNITS / f"{name}.service").unlink(missing_ok=True)
-        shutil.rmtree(UNITS / f"{name}.service.d", ignore_errors=True)
-    subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+    """Stops and removes every service, the retired ones too."""
+    drop_units(installed_units())
     print("stopped and removed")
 
 
@@ -914,7 +398,7 @@ def key(values):
     path = CONFIG / "api-key"
     path.write_text(os.urandom(24).hex() + "\n")
     path.chmod(0o600)
-    print(f"new key written to {path}\napply it: systemctl --user restart thor-chat thor-tigress-agent")
+    print(f"new key written to {path}\napply it: systemctl --user restart thor-tigress-agent")
 
 
 def keyring_init(values):
@@ -945,18 +429,17 @@ def keyring(values, rest):
 
 
 def logs(values):
-    """Follows the services: the models, the page, and each Edge-LLM engine."""
-    units = ["thor-chat", "thor-tigress-agent", *(edge_unit(entry) for entry in edge_models(values))]
+    """Follows the services: each engine, and the page."""
+    units = [*(edge_unit(entry) for entry in edge_models(values)), "thor-tigress-agent"]
     arguments = [item for name in units for item in ("-u", name)]
     os.execvp("journalctl", ["journalctl", "--user", *arguments, "-f"])
 
 
 COMMANDS = {
-    "list": list_here, "list-latest": list_latest,
-    "install": install, "uninstall": uninstall, "key": key, "keyring-init": keyring_init,
-    "logs": logs, "run": run, "agent": agent,
+    "list": list_here, "install": install, "uninstall": uninstall, "key": key,
+    "keyring-init": keyring_init, "logs": logs, "agent": agent,
 }
-COMMANDS_WITH_NAME = {"load": load_command, "unload": unload_command, "download": download_command}
+COMMANDS_WITH_NAME = {"load": load, "unload": unload}
 
 
 def main():
@@ -964,8 +447,6 @@ def main():
     command, *rest = sys.argv[1:] or ["help"]
     if command == "keyring":
         return keyring(values, rest)
-    if command == "context" and len(rest) <= 2:
-        return context_command(values, rest)
     if command == "edge" and len(rest) <= 1:
         return edge(values, rest[0] if rest else None)
     if command in COMMANDS and not rest:

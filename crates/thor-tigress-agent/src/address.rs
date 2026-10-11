@@ -374,6 +374,7 @@ mod tests {
             "https://user@example.com/",
             "https://example.com:8443/",
             "https://example.com:notaport/",
+            "https://[::1]:notaport/",
             "https://[::1/x",
             "https://::1/x",
             "https://[::1]x",
@@ -414,10 +415,7 @@ mod tests {
                 .map(|url| url.as_string()),
             Some("https://cdn.example.net/y".to_string())
         );
-        assert_eq!(
-            base.absolute("//not a host/").map(|url| url.as_string()),
-            None
-        );
+        assert!(base.absolute("//not a host/").is_none());
         Ok(())
     }
 
