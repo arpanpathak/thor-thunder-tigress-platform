@@ -33,6 +33,7 @@ The services run "thor-tigress-serve run" (llama-server in router mode on
 Settings go in ~/.config/thor-chat/env as KEY=value lines:
 
   MODEL         the default model's GGUF   Nemotron 3 Nano 30B-A3B Q8_0
+  MODEL_ON_STARTUP  load it when the server starts  true
   USERS         its replies at once        4
   CONTEXT       its tokens per reply       1048576
   MODELS_MAX    models loaded at once      2
@@ -40,7 +41,8 @@ Settings go in ~/.config/thor-chat/env as KEY=value lines:
   EDGE_MODEL    a checkpoint folder served by TensorRT Edge-LLM   none
   EDGE_PORT     its server's port          8081
   EDGE_CONTEXT  its tokens per reply       32768
-  EDGE_MODELS   more of them, FOLDER=PORT  none
+  EDGE_PROMPT   its longest single prompt  half of EDGE_CONTEXT
+  EDGE_MODELS   more of them, FOLDER=PORT[:TOKENS]  none
   PORT, MODEL_PORT, SEARCH_PORT            8080, 8079, 8888
 
 Every Edge-LLM model is offered in the chat page's picker: the agent is given
@@ -60,6 +62,7 @@ import concurrent.futures
 import json
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -77,8 +80,13 @@ UNITS = HOME / ".config" / "systemd" / "user"
 LATEST = HOME / ".cache" / "thor-tigress-serve" / "latest.json"
 LLAMA = HOME / ".local" / "src" / "llama.cpp"
 
+# One Edge-LLM unit holds the checkpoint it builds from, its weights, and the build's
+# GPU buffers at the same time. 48G killed a 30B NVFP4 build in a restart loop.
+EDGE_LIMITS = "MemoryMax=80G\nMemorySwapMax=0\n"
+
 DEFAULTS = {
     "MODEL": str(MODELS_DIR / "Nemotron-3-Nano-30B-A3B" / "NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0.gguf"),
+    "MODEL_ON_STARTUP": "true",
     "USERS": "4",
     "CONTEXT": "1048576",
     "MODELS_MAX": "2",
@@ -86,6 +94,7 @@ DEFAULTS = {
     "EDGE_MODEL": "",
     "EDGE_PORT": "8081",
     "EDGE_CONTEXT": "32768",
+    "EDGE_PROMPT": "",
     "EDGE_MODELS": "",
     "EDGE_SERVER": str(HOME / ".local" / "share" / "edge-llm" / "venv" / "bin" / "tensorrt-edgellm-serve"),
     "PORT": "8080",
@@ -163,6 +172,7 @@ def presets(values):
     """models.ini: shared options, the default model, then the models added from disk."""
     model = values["MODEL"]
     users = int(values["USERS"])
+    on_startup = "true" if values["MODEL_ON_STARTUP"].strip().lower() in ("1", "true", "yes", "on") else "false"
     default = "\n".join([
         "version = 1",
         "",
@@ -177,6 +187,7 @@ def presets(values):
         f"alias = nemotron,nemotron-think,{model}",
         f"parallel = {users}",
         f"ctx-size = {int(values['CONTEXT']) * users}",
+        f"load-on-startup = {on_startup}",
     ])
     return "\n\n".join([default, *local_sections().values()]) + "\n"
 
@@ -720,9 +731,12 @@ def edge_root(values):
 def edge_models(values):
     """Every TensorRT Edge-LLM model: the one EDGE_MODEL names, then the ones EDGE_MODELS adds.
 
-    EDGE_MODELS is a comma- or space-separated list of FOLDER=PORT, each FOLDER under the
-    same directory as EDGE_MODEL. A folder's name is what the chat page's picker shows and
-    what a request must name, so adding a second engine is one line in
+    EDGE_MODELS is a comma- or space-separated list of FOLDER=PORT or FOLDER=PORT:TOKENS, each
+    FOLDER under the same directory as EDGE_MODEL. TOKENS is that model's own context window,
+    because one number cannot fit every model: Nemotron 3.5 Lightning spends 3.5 KiB of cache
+    per token at 1M tokens while Qwen3.6 35B spends 80 KiB, so the same window would ask Qwen
+    for 80 GB. Without TOKENS the model gets EDGE_CONTEXT. A folder's name is what the chat
+    page's picker shows and what a request must name, so adding a second engine is one line in
     ~/.config/thor-chat/env and then `thor-tigress-serve install`: the agent gets a second
     `--engine`, the model appears in the picker, and requests for it are routed there."""
     found = []
@@ -731,11 +745,12 @@ def edge_models(values):
         found.append({"name": path.name, "path": path, "port": values["EDGE_PORT"],
                       "context": values["EDGE_CONTEXT"], "primary": True})
     for entry in values["EDGE_MODELS"].replace(",", " ").split():
-        folder, separator, port = entry.partition("=")
+        folder, separator, rest = entry.partition("=")
+        port, colon, tokens = rest.partition(":")
         if not separator or not folder or not port:
-            sys.exit(f"EDGE_MODELS {entry!r}: expected FOLDER=PORT")
+            sys.exit(f"EDGE_MODELS {entry!r}: expected FOLDER=PORT or FOLDER=PORT:TOKENS")
         found.append({"name": folder, "path": edge_root(values) / folder, "port": port,
-                      "context": values["EDGE_CONTEXT"], "primary": False})
+                      "context": tokens or values["EDGE_CONTEXT"], "primary": False})
     return found
 
 
@@ -744,6 +759,21 @@ def edge_unit(entry):
     if entry["primary"]:
         return "thor-edge-llm"
     return "thor-edge-llm-" + re.sub(r"[^a-z0-9]+", "-", entry["name"].lower()).strip("-")
+
+
+def edge_prompt(entry, values):
+    """The longest single prompt this engine takes: EDGE_PROMPT when it is set, never more
+    than half the model's window, because the rest of the window has to hold the answer.
+
+    The window and the longest prompt are separate costs. The KV cache is small — Lightning
+    spends 3 GB on a million tokens — while the activation buffers an engine reserves for its
+    longest prompt are not: half a window of 1M asked for ~45 GB of them and took the whole
+    board down. A capped prompt keeps the million-token window and gives the memory back."""
+    half = int(entry["context"]) // 2
+    wanted = values["EDGE_PROMPT"]
+    if not wanted:
+        return half
+    return min(int(wanted), half)
 
 
 def edge(values, wanted=None):
@@ -759,9 +789,11 @@ def edge(values, wanted=None):
     context = int(entry["context"])
     os.execv(values["EDGE_SERVER"], [values["EDGE_SERVER"], str(entry["path"]), "--host", "127.0.0.1",
                                      "--port", entry["port"], "--served-model-name", entry["name"],
-                                     "--reasoning-parser", "auto", "--tool-call-parser", "auto", "--enable-auto-tool-choice",
+                                     "--reasoning-parser", "auto",
+                                     "--tool-call-parser", "auto", "--enable-auto-tool-choice",
                                      "--cache-dir", str(edge_root(values) / "cache"),
-                                     "--max-input-len", str(context // 2), "--max-kv-cache-capacity", str(context),
+                                     "--max-input-len", str(edge_prompt(entry, values)),
+                                     "--max-kv-cache-capacity", str(context),
                                      "--max-batch-size", "1"])
 
 
@@ -803,6 +835,10 @@ WantedBy=default.target
 
 
 def install(values):
+    """Writes one unit per service and starts them: the page, llama-server, and one
+    engine per Edge-LLM model. An edge unit left over from an earlier EDGE_MODELS is
+    stopped and removed first, because it still holds the port it was given, and the
+    symlink on the PATH is pointed at this file."""
     UNITS.mkdir(parents=True, exist_ok=True)
     unit("thor-chat", f"Models (llama-server) on 127.0.0.1:{values['MODEL_PORT']}", "run", "")
     unit("thor-tigress-agent", f"Chat page and web search on 127.0.0.1:{values['PORT']}", "agent", "thor-chat.service")
@@ -811,13 +847,17 @@ def install(values):
         name = edge_unit(entry)
         unit(name, f"{entry['name']} (TensorRT Edge-LLM) on 127.0.0.1:{entry['port']}",
              "edge" if entry["primary"] else f"edge {entry['name']}", "thor-chat.service",
-             "MemoryMax=48G\nMemorySwapMax=0\n")
+             EDGE_LIMITS)
         services.append(name)
+    source = Path(__file__).resolve()
     command = HOME / ".local" / "bin" / "thor-tigress-serve"
     command.parent.mkdir(parents=True, exist_ok=True)
-    command.unlink(missing_ok=True)
-    command.symlink_to(Path(__file__).resolve())
+    if source != command:
+        command.unlink(missing_ok=True)
+        command.symlink_to(source)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+    for name in drop_stale_edge_units(services):
+        print(f"removed {name}: it is no longer in EDGE_MODELS")
     subprocess.run(["systemctl", "--user", "enable", *services], check=True, capture_output=True)
     subprocess.run(["systemctl", "--user", "restart", *services], check=True)
     subprocess.run(["loginctl", "enable-linger", os.environ.get("USER", "")], check=False)
@@ -827,14 +867,35 @@ def install(values):
               f" (service {edge_unit(entry)})")
 
 
+def edge_unit_names():
+    """Every thor-edge-llm unit file on disk, by name."""
+    return [path.stem for path in sorted(UNITS.glob("thor-edge-llm*.service"))]
+
+
+def drop_stale_edge_units(wanted):
+    """Stops and deletes the edge units an earlier EDGE_MODELS left behind, with the
+    drop-ins they carry: the model is gone from the config but its engine still holds
+    the port it was given, so the engine that replaced it cannot bind that port."""
+    stale = [name for name in edge_unit_names() if name not in wanted]
+    if not stale:
+        return stale
+    subprocess.run(["systemctl", "--user", "disable", "--now", *stale], check=False)
+    for name in stale:
+        (UNITS / f"{name}.service").unlink(missing_ok=True)
+        shutil.rmtree(UNITS / f"{name}.service.d", ignore_errors=True)
+    subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+    return stale
+
+
 def uninstall(values):
     """Stops and removes the services. Edge-LLM units are found by name, so ones
     left over from an earlier EDGE_MODELS are removed too."""
-    edge_units = [path.stem for path in sorted(UNITS.glob("thor-edge-llm*.service"))]
+    edge_units = edge_unit_names()
     subprocess.run(["systemctl", "--user", "disable", "--now", "thor-tigress-agent", "thor-chat", *edge_units],
                    check=False)
     for name in ("thor-chat", "thor-tigress-agent", *edge_units):
         (UNITS / f"{name}.service").unlink(missing_ok=True)
+        shutil.rmtree(UNITS / f"{name}.service.d", ignore_errors=True)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     print("stopped and removed")
 
