@@ -35,39 +35,51 @@
   <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">A sandbox playground where a model works on a canvas, with tools it may reach for. All 6 uses below are planned.</text>
   <rect x="40" y="104" width="300" height="116" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
   <path d="M52,104.7 H46 V219.3 H52 A11.3,11.3 0 0 1 40.7,208 V116 A11.3,11.3 0 0 1 52,104.7 Z" fill="#B7791F"/>
-  <text x="60.0" y="140.0" class="name" text-anchor="start" xml:space="preserve">roleplay</text>
-  <text x="60.0" y="158.0" class="sub" text-anchor="start" xml:space="preserve">characters who remember</text>
-  <text x="60.0" y="176.0" class="sub" text-anchor="start" xml:space="preserve">the scene, with the scene</text>
-  <text x="60.0" y="194.0" class="sub" text-anchor="start" xml:space="preserve">kept on the canvas</text>
+  <rect x="56" y="138.0" width="48" height="48" rx="12" fill="#FFFFFF"/>
+  <g transform="translate(65.0,147.0) scale(1.2500)"><path d="M4 3h16v9a8 8 0 0 1-16 0zM7.5 7h3v2.2h-3zM13.5 7h3v2.2h-3zM8.2 12.6h7.6a3.8 3.8 0 0 1-7.6 0z" fill="#7A4FD0" fill-rule="evenodd"/></g>
+  <text x="114.0" y="140.0" class="name" text-anchor="start" xml:space="preserve">roleplay</text>
+  <text x="114.0" y="158.0" class="sub" text-anchor="start" xml:space="preserve">characters who remember</text>
+  <text x="114.0" y="176.0" class="sub" text-anchor="start" xml:space="preserve">the scene, with the scene</text>
+  <text x="114.0" y="194.0" class="sub" text-anchor="start" xml:space="preserve">kept on the canvas</text>
   <rect x="370" y="104" width="300" height="116" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
   <path d="M382,104.7 H376 V219.3 H382 A11.3,11.3 0 0 1 370.7,208 V116 A11.3,11.3 0 0 1 382,104.7 Z" fill="#B7791F"/>
-  <text x="390.0" y="140.0" class="name" text-anchor="start" xml:space="preserve">a therapist</text>
-  <text x="390.0" y="158.0" class="sub" text-anchor="start" xml:space="preserve">a calm listener, with</text>
-  <text x="390.0" y="176.0" class="sub" text-anchor="start" xml:space="preserve">nothing written down</text>
-  <text x="390.0" y="194.0" class="sub" text-anchor="start" xml:space="preserve">on the server</text>
+  <rect x="386" y="138.0" width="48" height="48" rx="12" fill="#FFFFFF"/>
+  <g transform="translate(395.0,147.0) scale(1.2500)"><path d="M4 3h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-8.5L6 21.5V17H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zM12 14.3l-3.4-3.2a2.1 2.1 0 0 1 3.4-2.4 2.1 2.1 0 0 1 3.4 2.4z" fill="#CF4526" fill-rule="evenodd"/></g>
+  <text x="444.0" y="140.0" class="name" text-anchor="start" xml:space="preserve">a therapist</text>
+  <text x="444.0" y="158.0" class="sub" text-anchor="start" xml:space="preserve">a calm listener, with</text>
+  <text x="444.0" y="176.0" class="sub" text-anchor="start" xml:space="preserve">nothing written down</text>
+  <text x="444.0" y="194.0" class="sub" text-anchor="start" xml:space="preserve">on the server</text>
   <rect x="700" y="104" width="300" height="116" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
   <path d="M712,104.7 H706 V219.3 H712 A11.3,11.3 0 0 1 700.7,208 V116 A11.3,11.3 0 0 1 712,104.7 Z" fill="#B7791F"/>
-  <text x="720.0" y="140.0" class="name" text-anchor="start" xml:space="preserve">immigration</text>
-  <text x="720.0" y="158.0" class="sub" text-anchor="start" xml:space="preserve">forms and covering letters</text>
-  <text x="720.0" y="176.0" class="sub" text-anchor="start" xml:space="preserve">drafted with you, checked</text>
-  <text x="720.0" y="194.0" class="sub" text-anchor="start" xml:space="preserve">against the rules</text>
+  <rect x="716" y="138.0" width="48" height="48" rx="12" fill="#FFFFFF"/>
+  <g transform="translate(725.0,147.0) scale(1.2500)"><path d="M6 2h12a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM12 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 8.2a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6zM8.5 16.5h7v1.6h-7z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="774.0" y="140.0" class="name" text-anchor="start" xml:space="preserve">immigration</text>
+  <text x="774.0" y="158.0" class="sub" text-anchor="start" xml:space="preserve">forms and covering letters</text>
+  <text x="774.0" y="176.0" class="sub" text-anchor="start" xml:space="preserve">drafted with you, checked</text>
+  <text x="774.0" y="194.0" class="sub" text-anchor="start" xml:space="preserve">against the rules</text>
   <rect x="40" y="244" width="300" height="116" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
   <path d="M52,244.7 H46 V359.3 H52 A11.3,11.3 0 0 1 40.7,348 V256 A11.3,11.3 0 0 1 52,244.7 Z" fill="#B7791F"/>
-  <text x="60.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">creative story writing</text>
-  <text x="60.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">story bibles, drafts and</text>
-  <text x="60.0" y="316.0" class="sub" text-anchor="start" xml:space="preserve">revisions standing side</text>
-  <text x="60.0" y="334.0" class="sub" text-anchor="start" xml:space="preserve">by side</text>
+  <rect x="56" y="278.0" width="48" height="48" rx="12" fill="#FFFFFF"/>
+  <g transform="translate(65.0,287.0) scale(1.2500)"><path d="M3 21l1.5-5.5L15.2 4.8l4 4L8.5 19.5zM16.6 3.4l1.3-1.3a1 1 0 0 1 1.4 0l2.6 2.6a1 1 0 0 1 0 1.4l-1.3 1.3z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="114.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">creative story writing</text>
+  <text x="114.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">story bibles, drafts and</text>
+  <text x="114.0" y="316.0" class="sub" text-anchor="start" xml:space="preserve">revisions standing side</text>
+  <text x="114.0" y="334.0" class="sub" text-anchor="start" xml:space="preserve">by side</text>
   <rect x="370" y="244" width="300" height="116" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
   <path d="M382,244.7 H376 V359.3 H382 A11.3,11.3 0 0 1 370.7,348 V256 A11.3,11.3 0 0 1 382,244.7 Z" fill="#B7791F"/>
-  <text x="390.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">music generation</text>
-  <text x="390.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">a timeline the model can</text>
-  <text x="390.0" y="316.0" class="sub" text-anchor="start" xml:space="preserve">add notes to, and play</text>
-  <text x="390.0" y="334.0" class="sub" text-anchor="start" xml:space="preserve">back</text>
+  <rect x="386" y="278.0" width="48" height="48" rx="12" fill="#FFFFFF"/>
+  <g transform="translate(395.0,287.0) scale(1.2500)"><path d="M10.5 3H19v4h-6v10.5a3.5 3.5 0 1 1-2.5-3.35z" fill="#1F8A70" fill-rule="evenodd"/></g>
+  <text x="444.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">music generation</text>
+  <text x="444.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">a timeline the model can</text>
+  <text x="444.0" y="316.0" class="sub" text-anchor="start" xml:space="preserve">add notes to, and play</text>
+  <text x="444.0" y="334.0" class="sub" text-anchor="start" xml:space="preserve">back</text>
   <rect x="700" y="244" width="300" height="116" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
   <path d="M712,244.7 H706 V359.3 H712 A11.3,11.3 0 0 1 700.7,348 V256 A11.3,11.3 0 0 1 712,244.7 Z" fill="#B7791F"/>
-  <text x="720.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">vector graphics</text>
-  <text x="720.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">drawing commands it can</text>
-  <text x="720.0" y="316.0" class="sub" text-anchor="start" xml:space="preserve">run, and then look at</text>
-  <text x="720.0" y="334.0" class="sub" text-anchor="start" xml:space="preserve">what it drew</text>
+  <rect x="716" y="278.0" width="48" height="48" rx="12" fill="#FFFFFF"/>
+  <g transform="translate(725.0,287.0) scale(1.2500)"><path d="M10 2h4v4h-4zM2 15h5v5H2zM17 15h5v5h-5zM3.6 15a8.4 8.4 0 0 1 16.8 0h-1.8a6.6 6.6 0 0 0-13.2 0z" fill="#5E9400" fill-rule="evenodd"/></g>
+  <text x="774.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">vector graphics</text>
+  <text x="774.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">drawing commands it can</text>
+  <text x="774.0" y="316.0" class="sub" text-anchor="start" xml:space="preserve">run, and then look at</text>
+  <text x="774.0" y="334.0" class="sub" text-anchor="start" xml:space="preserve">what it drew</text>
   <text x="40.0" y="410.0" class="note" text-anchor="start" xml:space="preserve">Amber and dashed means planned, in this book and on the page.</text>
 </svg>

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1064 356" width="1064" height="356" role="img" aria-label="Three things to do over the ssh connection. One: a shell, to look at the GPU with nvidia-smi, tegrastats and free. Two: a port forwarded to the laptop, so a server that listens only on the Thor&#x27;s localhost opens in the laptop&#x27;s browser. Three: a job started with systemd-run, which keeps running after the laptop is closed and is followed with journalctl.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1064" height="356" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Three things the connection is for</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Once ssh thor works from outside, these work too.</text>
+  <path d="M34,108 H334 L352,126 V288 A10,10 0 0 1 342,298 H34 A10,10 0 0 1 24,288 V118 A10,10 0 0 1 34,108 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M334,108 V126 H352 Z" fill="#E4F4EF" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="40" y="124" width="4" height="14" rx="2" fill="#1F8A70"/>
+  <text x="52.0" y="135.5" class="tab" text-anchor="start" style="fill:#1F8A70" xml:space="preserve">1 · A SHELL</text>
+  <text x="40.0" y="164.0" class="mono" text-anchor="start" xml:space="preserve">ssh thor</text>
+  <text x="40.0" y="182.0" class="mono" text-anchor="start" xml:space="preserve">nvidia-smi</text>
+  <text x="40.0" y="200.0" class="mono" text-anchor="start" xml:space="preserve">tegrastats --interval 2000</text>
+  <text x="40.0" y="218.0" class="mono" text-anchor="start" xml:space="preserve">free -h</text>
+  <text x="40.0" y="282.0" class="note" text-anchor="start" style="fill:#1F8A70" xml:space="preserve">Look at the GPU and the memory.</text>
+  <path d="M378,108 H678 L696,126 V288 A10,10 0 0 1 686,298 H378 A10,10 0 0 1 368,288 V118 A10,10 0 0 1 378,108 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M678,108 V126 H696 Z" fill="#EAF1FD" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="384" y="124" width="4" height="14" rx="2" fill="#2F6FDB"/>
+  <text x="396.0" y="135.5" class="tab" text-anchor="start" style="fill:#2F6FDB" xml:space="preserve">2 · A PORT, BROUGHT TO YOU</text>
+  <text x="384.0" y="164.0" class="mono" text-anchor="start" xml:space="preserve">ssh -N -L 8080:127.0.0.1:8080 thor</text>
+  <text x="384.0" y="182.0" class="mono dim" text-anchor="start" xml:space="preserve"># then, in the browser:</text>
+  <text x="384.0" y="200.0" class="mono" text-anchor="start" xml:space="preserve">http://localhost:8080</text>
+  <text x="384.0" y="282.0" class="note" text-anchor="start" style="fill:#2F6FDB" xml:space="preserve">Servers on the Thor stay on localhost.</text>
+  <path d="M722,108 H1022 L1040,126 V288 A10,10 0 0 1 1030,298 H722 A10,10 0 0 1 712,288 V118 A10,10 0 0 1 722,108 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M1022,108 V126 H1040 Z" fill="#EEF6DC" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="728" y="124" width="4" height="14" rx="2" fill="#5E9400"/>
+  <text x="740.0" y="135.5" class="tab" text-anchor="start" style="fill:#5E9400" xml:space="preserve">3 · A JOB THAT STAYS</text>
+  <text x="728.0" y="164.0" class="mono" text-anchor="start" xml:space="preserve">systemd-run --user --unit job \</text>
+  <text x="728.0" y="182.0" class="mono" text-anchor="start" xml:space="preserve">    ./train.sh</text>
+  <text x="728.0" y="200.0" class="mono" text-anchor="start" xml:space="preserve">journalctl --user -u job -f</text>
+  <text x="728.0" y="282.0" class="note" text-anchor="start" style="fill:#5E9400" xml:space="preserve">Close the lid; it keeps running.</text>
+  <text x="24.0" y="330.0" class="note" text-anchor="start" xml:space="preserve">All three ride the same ssh connection. Nothing else is installed on the laptop.</text>
+</svg>
