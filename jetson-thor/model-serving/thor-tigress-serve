@@ -43,6 +43,7 @@ Settings go in ~/.config/thor-chat/env as KEY=value lines:
   EDGE_CONTEXT  its tokens per reply       32768
   EDGE_PROMPT   its longest single prompt  half of EDGE_CONTEXT
   EDGE_MODELS   more of them, FOLDER=PORT[:TOKENS]  none
+  AGENT_DEFAULT "edge": the agent's default is the first Edge-LLM model  none
   PORT, MODEL_PORT, SEARCH_PORT            8080, 8079, 8888
 
 Every Edge-LLM model is offered in the chat page's picker: the agent is given
@@ -100,6 +101,7 @@ DEFAULTS = {
     "PORT": "8080",
     "MODEL_PORT": "8079",
     "SEARCH_PORT": "8888",
+    "AGENT_DEFAULT": "",
     "SERVER": str(LLAMA / "build" / "bin" / "llama-server"),
     "AGENT": str(HOME / ".cargo" / "bin" / "thor-tigress-agent"),
     "KEYRING_BIN": str(HOME / ".cargo" / "bin" / "thor-tigress-keyring"),
@@ -799,12 +801,19 @@ def edge(values, wanted=None):
 
 def agent(values):
     """The page and API. Each Edge-LLM model is passed as --engine, so the page's picker
-    lists it and a request naming it is sent to that engine instead of llama-server."""
-    engines = []
-    for entry in edge_models(values):
-        engines += ["--engine", f"{entry['name']}=127.0.0.1:{entry['port']}"]
+    lists it and a request naming it is sent to that engine instead of llama-server.
+
+    With AGENT_DEFAULT=edge the first Edge-LLM model takes the default slot instead, so
+    the page serves the Edge-LLM models on their own, with no llama-server behind it."""
+    entries = edge_models(values)
+    model = f"127.0.0.1:{values['MODEL_PORT']}"
+    if values["AGENT_DEFAULT"].strip().lower() == "edge" and entries:
+        model = f"127.0.0.1:{entries[0]['port']}"
+        entries = entries[1:]
+    engines = [item for entry in entries
+               for item in ("--engine", f"{entry['name']}=127.0.0.1:{entry['port']}")]
     os.execv(values["AGENT"], [values["AGENT"], "--listen", f"127.0.0.1:{values['PORT']}",
-                               "--model", f"127.0.0.1:{values['MODEL_PORT']}", *engines,
+                               "--model", model, *engines,
                                "--search", f"127.0.0.1:{values['SEARCH_PORT']}",
                                "--web", str(WEB), "--key-file", str(CONFIG / "api-key"),
                                *keyring_arguments(values)])
