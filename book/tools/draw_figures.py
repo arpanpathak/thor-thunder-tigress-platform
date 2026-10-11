@@ -6,8 +6,8 @@
 import sys
 from pathlib import Path
 
-from figkit import (EDGE, INK, KINDS, MUTED, card, cylinder, legend, save, sheet, stacked, swatches, tag, text,
-                    wire, zone)
+from figkit import (EDGE, INK, KINDS, MUTED, card, cylinder, icon, legend, person, save, sheet, stacked, swatches, tag,
+                    text, wire, zone)
 
 OUT = Path(sys.argv[1])
 FIGURES = {}
@@ -803,14 +803,15 @@ def web_search_bars():
 
 @figure
 def vision_canvas():
-    uses = [("roleplay", ["characters who remember", "the scene, with the scene", "kept on the canvas"]),
-            ("a therapist", ["a calm listener, with", "nothing written down", "on the server"]),
-            ("immigration", ["forms and covering letters", "drafted with you, checked", "against the rules"]),
-            ("creative story writing", ["story bibles, drafts and", "revisions standing side", "by side"]),
-            ("music generation", ["a timeline the model can", "add notes to, and play", "back"]),
-            ("vector graphics", ["drawing commands it can", "run, and then look at", "what it drew"])]
-    parts = [card(40 + 330 * (index % 3), 104 + 140 * (index // 3), 300, 116, "store", name, sub, dashed=True)
-             for index, (name, sub) in enumerate(uses)]
+    uses = [("roleplay", "mask", "#7A4FD0", ["characters who remember", "the scene, with the scene", "kept on the canvas"]),
+            ("a therapist", "listen", "#CF4526", ["a calm listener, with", "nothing written down", "on the server"]),
+            ("immigration", "passport", "#2F6FDB", ["forms and covering letters", "drafted with you, checked", "against the rules"]),
+            ("creative story writing", "pencil", "#B7791F", ["story bibles, drafts and", "revisions standing side", "by side"]),
+            ("music generation", "note", "#1F8A70", ["a timeline the model can", "add notes to, and play", "back"]),
+            ("vector graphics", "curve", "#5E9400", ["drawing commands it can", "run, and then look at", "what it drew"])]
+    parts = [card(40 + 330 * (index % 3), 104 + 140 * (index // 3), 300, 116, "store", name, sub, glyph=glyph,
+                  glyph_fill=colour, dashed=True, tile="#FFFFFF", big=True)
+             for index, (name, glyph, colour, sub) in enumerate(uses)]
     parts.append(text(40, 410, "Amber and dashed means planned, in this book and on the page.", "note"))
     save(OUT / "vision-canvas.svg", 1040, 432,
          "6 planned uses of the agentic canvas: roleplay with characters who remember the scene; a therapist with "
@@ -1124,6 +1125,55 @@ def thor_sync_flow():
          "files from ~/.config/thor-sync, and copies each folder with rsync over ssh, one way, to the same place "
          "under the Thor's home folder. It skips what .gitignore and the exclude list skip, and never deletes on the Thor.",
          "What thor-sync copies, and where it lands", "One direction only: from your machine to the Thor.", parts)
+
+
+@figure
+def coffee_shop_ssh():
+    friends = ["long", "beard", "curly", "glasses", "bun", "cap"]
+    parts = [
+        zone(24, 108, 340, 380, "A coffee shop, anywhere"), zone(700, 108, 340, 380, "At home · Jetson AGX Thor"),
+        *[person(54 + 100 * (seat % 3), 132 + 92 * (seat // 3), look, 80) for seat, look in enumerate(friends)],
+        text(194, 326, "you, and the friends you gave a login", "note", "middle"),
+        card(48, 346, 292, 84, "client", "A laptop each", ["Tailscale on, signed in", "ssh thor"], glyph="laptop"),
+        icon("cup", 48, 446, 22, KINDS["store"][0]), text(78, 462, "café Wi-Fi: nothing to set up on it", "note"),
+        card(412, 346, 240, 84, "outside", "Tailscale", ["WireGuard, end to end", "direct, or by a relay"], glyph="tailscale"),
+        card(724, 140, 292, 72, "service", "Tailscale SSH", "checks who you are", glyph="key", pill="tailnet only"),
+        card(724, 260, 292, 72, "client", "Your shell", "nvidia-smi · tegrastats", glyph="terminal"),
+        card(724, 380, 292, 72, "model", "NVIDIA Thor", "one GPU, time-shared", glyph="nvidia"),
+        wire([(340, 388), (412, 388)]),
+        wire([(652, 388), (676, 388), (676, 176), (724, 176)]),
+        wire([(870, 212), (870, 260)]), wire([(870, 332), (870, 380)]),
+        lines(24, 522, ["No port is opened on the home router, and the café's network sees only encrypted packets.",
+                        "The public Funnel address carries the chat page. A shell needs a device on the tailnet."]),
+    ]
+    save(OUT / "coffee-shop-ssh.svg", 1064, 562,
+         "Six people in a coffee shop, women and men, each with a laptop that has Tailscale on and signed in. Their ssh "
+         "connections go through Tailscale, as WireGuard from end to end, either direct or by a relay, to the "
+         "Jetson AGX Thor at home. There, Tailscale SSH checks who each person is, gives them their shell, and "
+         "the shell reaches the one GPU they share.",
+         "A shell on the Thor, from a coffee shop", "The laptop and the Thor are on one private network, wherever the laptop is.", parts)
+
+
+@figure
+def tunnel_uses():
+    parts = [
+        sheet(24, 108, 328, 190, "service", "1 · A SHELL", [
+            ("", "ssh thor"), ("", "nvidia-smi"), ("", "tegrastats --interval 2000"), ("", "free -h")],
+            ["Look at the GPU and the memory."]),
+        sheet(368, 108, 328, 190, "client", "2 · A PORT, BROUGHT TO YOU", [
+            ("", "ssh -N -L 8080:127.0.0.1:8080 thor"), ("dim", "# then, in the browser:"), ("", "http://localhost:8080")],
+            ["Servers on the Thor stay on localhost."]),
+        sheet(712, 108, 328, 190, "model", "3 · A JOB THAT STAYS", [
+            ("", "systemd-run --user --unit job \\"), ("", "    ./train.sh"), ("", "journalctl --user -u job -f")],
+            ["Close the lid; it keeps running."]),
+        lines(24, 330, ["All three ride the same ssh connection. Nothing else is installed on the laptop."]),
+    ]
+    save(OUT / "tunnel-uses.svg", 1064, 356,
+         "Three things to do over the ssh connection. One: a shell, to look at the GPU with nvidia-smi, tegrastats "
+         "and free. Two: a port forwarded to the laptop, so a server that listens only on the Thor's localhost "
+         "opens in the laptop's browser. Three: a job started with systemd-run, which keeps running after the "
+         "laptop is closed and is followed with journalctl.",
+         "Three things the connection is for", "Once ssh thor works from outside, these work too.", parts)
 
 
 # ---- chapter 14: writing the papers (planned) ----
