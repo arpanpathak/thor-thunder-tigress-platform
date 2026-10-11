@@ -99,6 +99,12 @@ STYLE = f"""  <style>
     <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
       <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
     </filter>
+    <linearGradient id="thor-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C6CCD5"/><stop offset="1" stop-color="#979EA9"/>
+    </linearGradient>
+    <linearGradient id="switch-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B4656"/><stop offset="1" stop-color="#232B37"/>
+    </linearGradient>
     <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
       <path d="M0.5,1 L9,5 L0.5,9 Z" fill="{WIRE}"/>
     </marker>
@@ -190,6 +196,251 @@ def person(x, y, look, size=56):
                      f' fill="none" stroke="{INK}" stroke-width="1.1"/>')
     parts += ["</g>", "</g>"]
     return "\n".join(parts)
+
+
+# The five cubs of the cluster: one cub for each Thor, each a different kind.
+# colours: fur light, fur dark, fur flat, markings, cloth top, cloth bottom, accent, eyes.
+CUBS = {
+    "volt": dict(colours=("#B3C0D9", "#8F9DBA", "#97A5C1", "#3E4F78", "#4A6396", "#2E4170", "#5ED3F3", "#F2B84B"),
+                 head=(116, 98), body=(72, 62), foot=27, ears="round", cheeks="jag", hat="helm", marks="stripes", eyes="round",
+                 mouth="fang", tail="curl", outfit="cape", pose="hammer", emblem="bolt"),
+    "ember": dict(colours=("#F9C48E", "#E88D48", "#EFA060", "#A3421D", "#D0482F", "#8E2A1E", "#FFC93C", "#FFE08A"),
+                  head=(108, 94), body=(64, 58), foot=24, ears="flame", cheeks="jag", hat="tuft", marks="blaze", eyes="fierce",
+                  mouth="grin", tail="flame", outfit="bandana", pose="cheer", emblem="flame"),
+    "frost": dict(colours=("#F5FAFE", "#CCE1F2", "#DCEBF7", "#6FA3C7", "#3AA6CC", "#1F7397", "#9BE7FF", "#63C1F5"),
+                  head=(128, 102), body=(90, 66), foot=32, ears="small", cheeks="fluff", hat="beanie", marks="spots", eyes="sleepy",
+                  mouth="tiny", tail="fluffy", outfit="scarf", pose="hold", emblem="crystal"),
+    "leaf": dict(colours=("#D2E8B0", "#9DC972", "#B0D686", "#4E7F2E", "#2F8551", "#1D5A35", "#F4A6B6", "#F2B84B"),
+                 head=(102, 98), body=(58, 56), foot=22, ears="leaf", cheeks="none", hat="sprout", marks="freckles", eyes="happy",
+                 mouth="open", tail="sprig", outfit="collar", pose="wave", emblem="leaf"),
+    "nova": dict(colours=("#C3B2E4", "#8E79C0", "#A08CCD", "#47327D", "#4A3690", "#22174A", "#FFD86B", "#F7A8D8"),
+                 head=(112, 94), body=(68, 60), foot=26, ears="bat", cheeks="jag", hat="wizard", marks="moon", eyes="star",
+                 mouth="smirk", tail="star", outfit="cloak", pose="wand", emblem="star"),
+}
+
+# Emblems, each drawn about 30 units tall around the origin.
+EMBLEMS = {
+    "bolt": "M3,-15 L-9,2 L-1,2 L-6,15 L9,-4 L1,-4 Z",
+    "flame": "M0,-16 C7,-8 11,-2 10,6 C9,12 5,15 0,15 C-5,15 -10,11 -10,5 C-10,0 -7,-3 -5,-7 C-3,-4 -2,-3 -1,-3 C1,-7 1,-12 0,-16 Z",
+    "crystal": "M0,-16 L9,-5 L5,15 L-5,15 L-9,-5 Z",
+    "leaf": "M0,-16 C11,-9 12,5 0,16 C-12,5 -11,-9 0,-16 Z",
+    "star": "M0,-16 L4.2,-5.8 L15.2,-4.9 L6.8,2.2 L9.4,12.9 L0,7.2 L-9.4,12.9 L-6.8,2.2 L-15.2,-4.9 L-4.2,-5.8 Z",
+}
+FIRE, GREEN = "#F2622E", "#6FB13F"
+
+
+def emblem(name, cx, cy, scale, fill, width=2.5, turn=0):
+    return (f'<path d="{EMBLEMS[name]}" transform="translate({cx},{cy}) rotate({turn}) scale({scale})" fill="{fill}"'
+            f' stroke-width="{width / scale:.2f}"/>')
+
+
+def both(shape):
+    """A drawing and its mirror image across the cub's centre line, x = 210."""
+    return shape + f'<g transform="translate(420,0) scale(-1,1)">{shape}</g>'
+
+
+def cub(style, x, y, size=150):
+    """One of the cluster's five cubs, `size` wide and 1.05 `size` tall, top-left at (x, y).
+
+    `style` is a key of CUBS. The five differ in build, ears, eyes, mouth, tail, clothes,
+    headgear and pose, so each has a silhouette of its own."""
+    spec = CUBS[style]
+    light, deep, flat, stripe, cloth_top, cloth_low, accent, iris = spec["colours"]
+    (hx, hy), (bx, by), foot, mark = spec["head"], spec["body"], spec["foot"], spec["emblem"]
+    ink, steel, white = "#131B2E", f"url(#cub-steel-{style})", "#FFFFFF"
+    fur, cloth = f"url(#cub-fur-{style})", f"url(#cub-cloth-{style})"
+    limb = lambda path, wide: (f'<path d="{path}" fill="none" stroke-width="{wide + 10}"/>'
+                               f'<path d="{path}" fill="none" stroke="{flat}" stroke-width="{wide}"/>')
+    on_head = lambda art: f'<g transform="translate(210,206) scale({hx / 116:.3f},{hy / 98:.3f}) translate(-210,-206)">{art}</g>'
+    ring = lambda cx, cy, r=7: f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{stripe}" stroke-width="4"/>'
+
+    ears = {
+        "round": both(f'<circle cx="124" cy="112" r="34" fill="{flat}"/><circle cx="124" cy="115" r="17" fill="#E9B7C1" stroke-width="3"/>'),
+        "flame": both(f'<path d="M96,150 L98,56 L168,108 Z" fill="{flat}"/><path d="M112,128 L113,84 L146,108 Z" fill="#E9B7C1" stroke-width="3"/>'
+                      + emblem("flame", 98, 48, 1.3, FIRE, 3, -10)),
+        "small": both(f'<circle cx="122" cy="126" r="25" fill="{flat}"/><circle cx="122" cy="128" r="11" fill="#E9B7C1" stroke-width="3"/>'),
+        "leaf": both(emblem("leaf", 86, 142, 4.2, GREEN, 4, -64) + '<path d="M54,158 L120,128" fill="none" stroke="#4E7F2E" stroke-width="3"/>'),
+        "bat": both(f'<path d="M100,162 L76,28 L178,100 Z" fill="{flat}"/><path d="M112,134 L96,62 L152,104 Z" fill="{iris}" stroke-width="3"/>'),
+    }[spec["ears"]]
+    cheeks = {
+        "jag": both(f'<path d="M104,184 L78,206 L100,214 L80,238 L106,240 L94,262 L126,250 Z" fill="{flat}"/>'),
+        "spiky": both(f'<path d="M100,176 L58,194 L92,210 L56,238 L98,242 L78,274 L128,254 Z" fill="{flat}"/>'),
+        "fluff": both(f'<circle cx="84" cy="222" r="23" fill="{flat}"/><circle cx="96" cy="254" r="21" fill="{flat}"/>'),
+        "none": "",
+    }[spec["cheeks"]]
+    band = lambda fill: f'<rect x="112" y="140" width="196" height="24" rx="11" fill="{fill}"/>'
+    hat = {
+        "helm": (f'<path d="M118,152 C120,86 300,86 302,152 Z" fill="{steel}"/>'
+                 f'<path d="M150,104 C176,92 206,90 226,92" fill="none" stroke="{white}" stroke-width="6" opacity="0.8"/>'
+                 f'<path d="M202,94 C204,80 206,72 210,62 C214,72 216,80 218,94 Z" fill="{cloth_low}" stroke-width="4"/>'
+                 + band("#8E9AB3") + f'<path d="M210,138 L224,152 L210,166 L196,152 Z" fill="{accent}" stroke-width="4"/>'
+                 + both(f'<path d="M118,146 C92,138 70,112 58,74 C80,90 92,96 104,100 C92,86 86,70 88,54 C106,80 122,108 130,136 Z" fill="{steel}"/>')),
+        "tuft": (emblem("flame", 180, 118, 1.9, FIRE, 4, -24) + emblem("flame", 240, 118, 1.9, FIRE, 4, 24)
+                 + emblem("flame", 210, 100, 3.0, FIRE, 4) + emblem("flame", 210, 112, 1.6, accent, 3)),
+        "beanie": (f'<path d="M114,152 C118,70 302,70 306,152 Z" fill="{cloth}"/>'
+                   f'<path d="M136,124 L154,110 L172,124 L191,110 L210,124 L229,110 L248,124 L266,110 L284,124" fill="none" stroke="{white}" stroke-width="5"/>'
+                   f'<rect x="106" y="138" width="208" height="28" rx="13" fill="{white}"/><circle cx="210" cy="70" r="23" fill="{white}"/>'),
+        "sprout": ('<path d="M210,116 C206,98 210,84 210,70" fill="none" stroke-width="13"/>'
+                   '<path d="M210,116 C206,98 210,84 210,70" fill="none" stroke="#4E7F2E" stroke-width="5"/>'
+                   + emblem("leaf", 182, 58, 2.5, GREEN, 4, -60) + emblem("leaf", 240, 52, 3.0, GREEN, 4, 54)
+                   + "".join(f'<circle cx="{210 + 12 * dx}" cy="{118 + 12 * dy}" r="8" fill="{accent}" stroke-width="3"/>'
+                             for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)))
+                   + f'<circle cx="210" cy="118" r="7" fill="#FFD86B" stroke-width="3"/>'),
+        "wizard": (f'<path d="M122,152 C150,112 198,56 268,10 C256,62 278,112 298,152 Z" fill="{cloth}"/>'
+                   + emblem("star", 226, 104, 1.1, accent, 3, 10) + emblem("star", 258, 50, 0.5, white, 2)
+                   + f'<ellipse cx="210" cy="152" rx="130" ry="17" fill="{cloth_low}"/>'),
+    }[spec["hat"]]
+    marks = {
+        "stripes": (f'<g stroke="{stripe}" stroke-width="6"><path d="M186,170 L190,182"/><path d="M234,170 L230,182"/>'
+                    + both('<path d="M100,196 L124,202"/><path d="M98,218 L120,220"/>') + "</g>" + emblem("bolt", 210, 183, 0.72, accent, 2.5)),
+        "blaze": (emblem("flame", 210, 178, 1.0, FIRE, 2.5)
+                  + f'<g stroke="{stripe}" stroke-width="6" fill="none">' + both('<path d="M102,198 L122,206 L102,216"/>') + "</g>"),
+        "spots": "".join(ring(cx, cy) for cx, cy in ((184, 174), (236, 174), (210, 164))) + both(ring(108, 204) + ring(116, 228, 6)),
+        "freckles": (emblem("leaf", 210, 176, 0.7, GREEN, 2.5)
+                     + f'<g fill="{stripe}" stroke="none">' + both('<circle cx="124" cy="238" r="3.5"/><circle cx="136" cy="246" r="3.5"/>') + "</g>"),
+        "moon": (f'<path d="M214,164 A14,14 0 1 0 224,186 A11,11 0 1 1 214,164 Z" fill="{accent}" stroke-width="2.5"/>'
+                 + both(emblem("star", 114, 212, 0.5, accent, 2))),
+    }[spec["marks"]]
+    pupil = lambda cx, px, rx=12: (f'<ellipse cx="{px}" cy="217" rx="{rx}" ry="16" fill="{ink}" stroke="none"/>'
+                                   f'<circle cx="{px + 6}" cy="207" r="6" fill="{white}" stroke="none"/><circle cx="{px - 6}" cy="225" r="3" fill="{white}" stroke="none"/>')
+    ball = lambda cx, rx=23, ry=26: f'<ellipse cx="{cx}" cy="214" rx="{rx}" ry="{ry}" fill="{iris}" stroke-width="4"/>'
+    eyes = {
+        "round": ball(164) + pupil(164, 166) + ball(256) + pupil(256, 254),
+        "fierce": (ball(164) + pupil(164, 168, 8) + ball(256) + pupil(256, 252, 8)
+                   + both('<path d="M136,182 L192,200" fill="none" stroke-width="10"/>')),
+        "sleepy": both(f'<path d="M141,212 A23,24 0 0 0 187,212 Z" fill="{iris}" stroke-width="4"/>'
+                       f'<path d="M153,212 A12,14 0 0 0 177,212 Z" fill="{ink}" stroke="none"/><path d="M136,212 H192" fill="none" stroke-width="6"/>'),
+        "happy": both('<path d="M142,224 Q164,190 186,224" fill="none" stroke-width="7"/>'),
+        "star": (ball(164, 26, 29) + pupil(164, 166, 14) + ball(256, 26, 29) + pupil(256, 254, 14)
+                 + f'<g stroke="none">{emblem("star", 160, 220, 0.42, white)}{emblem("star", 248, 220, 0.42, white)}</g>'),
+    }[spec["eyes"]]
+    nose = '<path d="M196,236 Q210,229 224,236 Q219,250 210,252 Q201,250 196,236 Z" fill="#D98C99" stroke-width="4"/>'
+    mouth = nose + {
+        "fang": ('<path d="M210,252 L210,260" stroke-width="4"/><path d="M190,259 Q200,272 210,260 Q220,272 230,259" fill="none" stroke-width="4"/>'
+                 f'<path d="M216,265 L220,276 L224,264 Z" fill="{white}" stroke-width="2.5"/>'),
+        "grin": ('<path d="M184,257 Q210,296 236,257 Z" fill="#7A2330" stroke-width="4"/>'
+                 f'<path d="M193,259 L199,273 L205,260 Z" fill="{white}" stroke-width="2.5"/><path d="M215,260 L221,273 L227,259 Z" fill="{white}" stroke-width="2.5"/>'),
+        "tiny": '<path d="M210,252 L210,258" stroke-width="4"/><path d="M201,261 Q210,268 219,261" fill="none" stroke-width="4"/>',
+        "open": ('<path d="M190,257 Q210,296 230,257 Z" fill="#C7455E" stroke-width="4"/>'
+                 '<ellipse cx="210" cy="276" rx="10" ry="6" fill="#F4A6B6" stroke="none"/>'),
+        "smirk": ('<path d="M210,252 L210,259" stroke-width="4"/><path d="M194,260 Q212,272 232,255" fill="none" stroke-width="4"/>'
+                  f'<path d="M218,264 L222,275 L227,261 Z" fill="{white}" stroke-width="2.5"/>'),
+    }[spec["mouth"]]
+    curl = "M152,388 C102,392 66,370 64,328 C62,298 84,282 104,292"
+    tail = {
+        "curl": (limb(curl, 20) + f'<g stroke="{stripe}" stroke-width="5"><path d="M120,384 L116,396"/><path d="M90,372 L80,380"/>'
+                 '<path d="M70,346 L58,348"/><path d="M70,312 L58,306"/></g>'),
+        "flame": limb("M152,392 C112,404 74,400 50,372", 18) + emblem("flame", 42, 336, 2.7, FIRE, 4, -16) + emblem("flame", 44, 346, 1.4, accent, 3, -16),
+        "fluffy": (limb("M150,394 C96,402 54,376 52,328 C52,298 76,284 100,298", 30) + ring(118, 394, 6) + ring(84, 380) + ring(60, 350, 6)
+                   + ring(58, 316) + ring(82, 296, 5)),
+        "sprig": limb("M152,392 C112,398 80,382 70,342", 9) + emblem("leaf", 64, 318, 2.3, GREEN, 4, -22),
+        "star": limb("M152,390 C100,398 62,372 60,332 C60,306 76,296 90,304", 11) + emblem("star", 98, 298, 1.5, accent, 3, -12),
+    }[spec["tail"]]
+    back = {
+        "cape": f'<path d="M150,282 C128,330 112,384 104,428 C170,442 250,442 316,428 C308,384 292,330 270,282 Z" fill="{cloth}"/>',
+        "cloak": (f'<path d="M144,280 C112,328 92,384 84,430 C170,446 250,446 336,430 C328,384 308,328 276,280 Z" fill="{cloth}"/>'
+                  + emblem("star", 112, 404, 0.6, accent, 2) + emblem("star", 308, 396, 0.7, accent, 2) + emblem("star", 296, 350, 0.4, white, 2)),
+    }.get(spec["outfit"], "")
+    front = {
+        "cape": f'<circle cx="210" cy="328" r="15" fill="{steel}" stroke-width="4"/>' + emblem("bolt", 210, 328, 0.62, accent, 2),
+        "cloak": emblem("star", 210, 308, 0.8, accent, 2.5),
+        "bandana": (f'<path d="M150,290 C184,304 236,304 270,290 L258,304 L210,350 L162,304 Z" fill="{cloth}"/>' + emblem("flame", 210, 318, 0.7, accent, 2)),
+        "scarf": (f'<path d="M236,300 L266,298 L274,374 L244,378 Z" fill="{cloth}"/>'
+                  f'<path d="M240,340 L270,336 M242,358 L272,354" fill="none" stroke="{white}" stroke-width="5"/>'
+                  f'<rect x="136" y="284" width="148" height="28" rx="14" fill="{cloth}"/>'),
+        "collar": (emblem("leaf", 176, 302, 1.3, GREEN, 3, -52) + emblem("leaf", 244, 302, 1.3, GREEN, 3, 52)
+                   + f'<circle cx="210" cy="308" r="9" fill="{accent}" stroke-width="3"/>'),
+    }[spec["outfit"]]
+    arm = "M262,326 C290,312 318,292 336,262"
+    raised = limb(arm, 22)
+    stick = '<path d="M340,256 L356,172" stroke-width="16"/><path d="M340,256 L356,172" stroke="#8A5A33" stroke-width="8"/>'
+    paw = f'<circle cx="338" cy="260" r="18" fill="{flat}"/>'
+    idle_arm = f'<ellipse cx="146" cy="356" rx="17" ry="27" fill="{flat}" transform="rotate(14 146 356)"/>'
+    pose = {
+        "hammer": (idle_arm, raised + stick + '<g transform="rotate(12 360 156)">'
+                   f'<rect x="322" y="134" width="76" height="42" rx="7" fill="{steel}"/><rect x="322" y="163" width="76" height="13" rx="4" fill="#8E9AB3" stroke-width="4"/>'
+                   f'<path d="M363,139 L352,155 L361,155 L354,169 L370,150 L361,150 Z" fill="{accent}" stroke-width="2.5"/></g>' + paw
+                   + emblem("bolt", 412, 112, 1.3, accent, 3, 8) + emblem("bolt", 424, 180, 0.7, accent, 3, -6)),
+        "wand": (idle_arm, raised + stick + emblem("star", 360, 142, 2.5, accent, 4, 10) + paw
+                 + emblem("star", 414, 104, 0.9, accent, 3) + emblem("star", 424, 186, 0.6, white, 2.5) + emblem("star", 28, 150, 0.7, accent, 3)),
+        "cheer": ("", both(raised + paw) + both(emblem("flame", 372, 212, 1.5, FIRE, 3) + emblem("flame", 372, 218, 0.8, accent, 2))),
+        "hold": ("", emblem("crystal", 210, 336, 2.3, accent, 3.5) + f'<path d="M204,318 L202,348" fill="none" stroke="{white}" stroke-width="4" opacity="0.9"/>'
+                 + both(f'<ellipse cx="176" cy="358" rx="20" ry="16" fill="{flat}"/>')
+                 + emblem("crystal", 396, 150, 0.9, accent, 3, 12) + emblem("crystal", 30, 180, 0.7, accent, 3, -12)
+                 + f'<g fill="{white}">' + "".join(f'<circle cx="{cx}" cy="{cy}" r="5" stroke-width="2.5"/>' for cx, cy in ((412, 196), (380, 110), (44, 130))) + "</g>"),
+        "wave": (idle_arm, raised + f'<circle cx="338" cy="258" r="21" fill="{flat}"/>'
+                 '<path d="M330,246 L328,254 M340,243 L340,252 M350,247 L351,255" fill="none" stroke-width="3"/>'
+                 f'<g fill="none" stroke="{stripe}" stroke-width="4"><path d="M372,236 Q384,256 374,276"/><path d="M390,226 Q406,256 392,286"/></g>'
+                 + "".join(f'<circle cx="{cx}" cy="{cy}" r="7" fill="{accent}" stroke-width="2.5"/>' for cx, cy in ((404, 150), (34, 170), (56, 120)))),
+    }[spec["pose"]]
+    body_spots = ring(152, 344) + ring(268, 340) + ring(160, 372, 6) if spec["marks"] == "spots" else ""
+    return "\n".join([
+        f'  <g transform="translate({x:.1f},{y:.1f}) scale({size / 440:.4f})">',
+        f'<defs><linearGradient id="cub-cloth-{style}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="{cloth_top}"/><stop offset="1" stop-color="{cloth_low}"/></linearGradient>'
+        f'<linearGradient id="cub-steel-{style}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F4F7FC"/><stop offset="1" stop-color="#C9D3E4"/></linearGradient>'
+        f'<radialGradient id="cub-fur-{style}" cx="0.45" cy="0.35" r="0.75"><stop offset="0" stop-color="{light}"/><stop offset="1" stop-color="{deep}"/></radialGradient></defs>',
+        f'<g stroke="{ink}" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">',
+        back, tail,
+        f'<ellipse cx="210" cy="{418 - by}" rx="{bx}" ry="{by}" fill="{fur}"/>'
+        f'<ellipse cx="210" cy="{430 - by}" rx="{bx * 0.58:.0f}" ry="{by * 0.6:.0f}" fill="{white}" opacity="0.75" stroke="none"/>',
+        body_spots,
+        both(f'<ellipse cx="{210 - bx * 0.53:.0f}" cy="414" rx="{foot}" ry="16" fill="{flat}"/>'
+             f'<path d="M{202 - bx * 0.53:.0f},410 v10 M{218 - bx * 0.53:.0f},410 v10" fill="none" stroke-width="3"/>'),
+        front, pose[0], cheeks, on_head(ears),
+        f'<ellipse cx="210" cy="206" rx="{hx}" ry="{hy}" fill="{fur}"/>',
+        on_head(hat + marks),
+        f'<ellipse cx="210" cy="252" rx="54" ry="38" fill="{white}" opacity="0.85"/>',
+        eyes,
+        both('<ellipse cx="140" cy="252" rx="15" ry="8" fill="#F4A6B6" stroke="none" opacity="0.7"/>'),
+        mouth,
+        f'<g fill="{ink}" stroke="none">' + both('<circle cx="182" cy="256" r="2.5"/><circle cx="176" cy="264" r="2.5"/><circle cx="188" cy="266" r="2.5"/>') + "</g>",
+        '<g stroke="#5D6C8D" stroke-width="3">' + both('<path d="M160,262 L108,256"/><path d="M160,270 L112,276"/>') + "</g>",
+        pose[1],
+        "</g>", "</g>",
+    ])
+
+
+def thor_kit(x, y, w=150):
+    """The Jetson AGX Thor developer kit, seen from above its long side: a low silver-grey
+    slab on a dark base, with the black ribbed fan grille on top and the ports on the short
+    end. `w` wide and 0.38 `w` tall, top-left at (x, y); the front face is the left 0.79 of it."""
+    top = lambda u, v: f"{u + 40 * v:.1f},{28 - 26 * v:.1f}"
+    ribs = "".join(f'<path d="M{top(11, v / 100)} L{top(73, v / 100)}" stroke="#3A3F48" stroke-width="0.9"/>' for v in range(22, 84, 9))
+    return "\n".join([
+        f'  <g transform="translate({x:.1f},{y:.1f}) scale({w / 190:.4f})">',
+        '<ellipse cx="96" cy="68" rx="94" ry="5" fill="#1B2430" opacity="0.14"/>',
+        '<path d="M0,47 H150 V66 H128 V60 H98 V66 H0 Z" fill="#25282E"/>',
+        '<rect x="8" y="51" width="78" height="10" rx="2" fill="#0B0C0F"/>',
+        '<path d="M150,47 L190,21 V40 L150,66 Z" fill="#17191D"/>',
+        '<g transform="matrix(1,-0.65,0,1,150,47)"><rect x="5" y="6" width="6" height="6" rx="1" fill="#9AA2AE"/>'
+        '<rect x="14" y="6" width="9" height="5" rx="1" fill="#5D6470"/><rect x="26" y="5" width="5" height="8" rx="1" fill="#5D6470"/>'
+        '<rect x="33" y="8" width="4" height="4" rx="1" fill="#5D6470"/></g>',
+        '<rect x="0" y="28" width="150" height="19" fill="url(#thor-body)"/>',
+        '<path d="M150,28 L190,2 V21 L150,47 Z" fill="#7B828D"/>',
+        f'<path d="M{top(0, 0)} L{top(150, 0)} L{top(150, 1)} L{top(0, 1)} Z" fill="#50545D"/>',
+        f'<path d="M{top(9, 0.15)} L{top(75, 0.15)} L{top(75, 0.85)} L{top(9, 0.85)} Z" fill="#121418" stroke="#121418" stroke-width="4" stroke-linejoin="round"/>',
+        ribs,
+        '<path d="M0,28 H150 L190,2" fill="none" stroke="#E3E7EC" stroke-width="0.9"/>',
+        '<path d="M118,28 V47" stroke="#737A85" stroke-width="0.7"/>',
+        icon("nvidia", 127, 32, 11, BRAND["nvidia"]).strip(),
+        "</g>",
+    ])
+
+
+def switch(x, y, w, ports, label, uplink=None, flip=False):
+    """A network switch, 60 tall: one socket above each x in `ports` along the bottom edge
+    (the top edge when `flip`), `label` printed on its face, and a socket for an uplink at
+    x `uplink` along the top edge."""
+    must_fit(label, (uplink - 24 if uplink else x + w - 20) - (x + 20), 12, bold=True)
+    socket = lambda cx, top, light: (f'  <rect x="{cx - 12}" y="{top}" width="24" height="15" rx="3" fill="#0F151D" stroke="#5A6779" stroke-width="1"/>\n'
+                                     f'  <rect x="{cx - 5}" y="{top + (0 if flip else 9)}" width="10" height="6" fill="#5A6779"/>\n'
+                                     f'  <circle cx="{cx + 18}" cy="{top + 7.5}" r="2.2" fill="{light}"/>')
+    return "\n".join([
+        f'  <rect x="{x}" y="{y}" width="{w}" height="60" rx="10" fill="url(#switch-body)" stroke="#1B2430" stroke-width="1.3" filter="url(#lift)"/>',
+        text(x + 20, y + (46 if flip else 22), label, "pill", fill="#DCE3EC"),
+        *([socket(uplink, y + 7, "#F2B544")] if uplink else []),
+        *[socket(cx, y + (7 if flip else 38), "#8FE000") for cx in ports],
+    ])
 
 
 def card(x, y, w, h, kind, name, sub=(), glyph=None, glyph_fill=None, dashed=False, pill=None, tile=None, big=False):
