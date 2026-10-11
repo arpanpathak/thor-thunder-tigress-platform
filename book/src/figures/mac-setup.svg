@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1064 388" width="1064" height="388" role="img" aria-label="Four steps on the Mac, done at home. One: install the Tailscale app and sign in with the account the Thor is on. Two: make sure the Mac has an ssh key on the Thor, creating one with ssh-keygen and installing it with ssh-copy-id if not. Three: write one alias, Host thor, pointing at the Thor&#x27;s tailnet name. Four: turn Wi-Fi off, use a phone hotspot, and run ssh thor to prove it works away from home.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1064" height="388" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Setting up a Mac, once</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Four steps at home, then the same command works anywhere.</text>
+  <rect x="24" y="108" width="496" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M36,108.7 H30 V203.3 H36 A11.3,11.3 0 0 1 24.7,192 V120 A11.3,11.3 0 0 1 36,108.7 Z" fill="#2F6FDB"/>
+  <rect x="40" y="140.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(46.0,146.0) scale(0.8333)"><path d="M24 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm-9 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm0-9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6-6a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 24a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm18 .5a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM6 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm9-9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm-3 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM6 3a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM3 5.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" fill="#242424" fill-rule="evenodd"/></g>
+  <text x="82.0" y="143.0" class="name" text-anchor="start" xml:space="preserve">1 · Join the tailnet</text>
+  <text x="82.0" y="161.0" class="sub" text-anchor="start" xml:space="preserve">Install the Tailscale app and sign in with the account</text>
+  <text x="82.0" y="179.0" class="sub" text-anchor="start" xml:space="preserve">the Thor is on. The Thor then shows up as arpanpathak.</text>
+  <rect x="544" y="108" width="496" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M556,108.7 H550 V203.3 H556 A11.3,11.3 0 0 1 544.7,192 V120 A11.3,11.3 0 0 1 556,108.7 Z" fill="#B7791F"/>
+  <rect x="560" y="140.0" width="32" height="32" rx="8" fill="#FBF1DC"/>
+  <g transform="translate(566.0,146.0) scale(0.8333)"><path d="M14.5 2a7.5 7.5 0 0 0-7.2 9.6L2 16.9V22h5.1v-2.5h2.5V17h2.4l1-1a7.5 7.5 0 1 0 1.5-14zm2.2 4.3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="602.0" y="143.0" class="name" text-anchor="start" xml:space="preserve">2 · Have a key on the Thor</text>
+  <text x="602.0" y="161.0" class="sub" text-anchor="start" xml:space="preserve">ls ~/.ssh/*.pub. None? Run ssh-keygen, then ssh-copy-id,</text>
+  <text x="602.0" y="179.0" class="sub" text-anchor="start" xml:space="preserve">at home, where the Thor still takes your password.</text>
+  <rect x="24" y="232" width="496" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M36,232.7 H30 V327.3 H36 A11.3,11.3 0 0 1 24.7,316 V244 A11.3,11.3 0 0 1 36,232.7 Z" fill="#1F8A70"/>
+  <rect x="40" y="264.0" width="32" height="32" rx="8" fill="#E4F4EF"/>
+  <g transform="translate(46.0,270.0) scale(0.8333)"><path d="M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm3.3 4.3-1.4 1.4L7.2 12l-2.3 2.3 1.4 1.4L10 12zM11 14v2h7v-2z" fill="#1F8A70" fill-rule="evenodd"/></g>
+  <text x="82.0" y="267.0" class="name" text-anchor="start" xml:space="preserve">3 · Write one alias</text>
+  <text x="82.0" y="285.0" class="sub" text-anchor="start" xml:space="preserve">Host thor in ~/.ssh/config, with HostName</text>
+  <text x="82.0" y="303.0" class="sub" text-anchor="start" xml:space="preserve">arpanpathak.taildb9a39.ts.net</text>
+  <rect x="544" y="232" width="496" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M556,232.7 H550 V327.3 H556 A11.3,11.3 0 0 1 544.7,316 V244 A11.3,11.3 0 0 1 556,232.7 Z" fill="#2E8B3D"/>
+  <rect x="560" y="264.0" width="32" height="32" rx="8" fill="#E7F5E9"/>
+  <g transform="translate(566.0,270.0) scale(0.8333)"><path d="M5 4h14a1 1 0 0 1 1 1v10H4V5a1 1 0 0 1 1-1zm1 2v7h12V6zM2 16.5h20V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z" fill="#2E8B3D" fill-rule="evenodd"/></g>
+  <text x="602.0" y="267.0" class="name" text-anchor="start" xml:space="preserve">4 · Try it on a phone hotspot</text>
+  <text x="602.0" y="285.0" class="sub" text-anchor="start" xml:space="preserve">Wi-Fi off, hotspot on, ssh thor.</text>
+  <text x="602.0" y="303.0" class="sub" text-anchor="start" xml:space="preserve">If that gives a prompt, the coffee shop will too.</text>
+  <path class="wire" d="M520,156 L544,156" marker-end="url(#head)"/>
+  <path class="wire" d="M792,204 L792.0,211.0 Q792,218 783,218 L281,218 Q272,218 272.0,225.0 L272,232" marker-end="url(#head)"/>
+  <path class="wire" d="M520,280 L544,280" marker-end="url(#head)"/>
+  <text x="24.0" y="362.0" class="note" text-anchor="start" xml:space="preserve">All four are done on the Mac, at home. Nothing is changed on the Thor except one line in authorized_keys.</text>
+</svg>
