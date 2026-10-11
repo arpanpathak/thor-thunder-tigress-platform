@@ -1,53 +1,60 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320" width="960" height="320" role="img" aria-label="A request makes a requested record; approve mints a key and makes it active; revoke takes the key away and keeps the record. revoke-all stops every active key at once with one command. The agent re-reads the file when it changes, so no restart is needed.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 358" width="1040" height="358" role="img" aria-label="A form request creates a requested record. approve mints a key and makes it active. revoke takes a key away. approve again brings the person back. revoke-all stops every active key with one command. The chat server reloads the file when it changes, so no restart is needed.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .label { fill: #1E88A8; font-size: 12px; }
-    .warn { fill: #D9542B; font-size: 12px; }
-    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .box { fill: #F4F7FA; stroke-width: 2; }
-    .built { stroke: #4E8A16; }
-    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
-    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
-    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
-    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
-    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="320" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">The life of a key</text>
-
-  <rect x="60" y="110" width="220" height="96" rx="10" class="box built"/>
-  <text x="170" y="142" class="name" text-anchor="middle">requested</text>
-  <text x="170" y="166" class="note" text-anchor="middle">waiting, no key yet</text>
-
-  <rect x="370" y="110" width="220" height="96" rx="10" class="box built"/>
-  <text x="480" y="142" class="name" text-anchor="middle">active</text>
-  <text x="480" y="166" class="note" text-anchor="middle">the chat lets it in</text>
-
-  <rect x="680" y="110" width="220" height="96" rx="10" class="box built"/>
-  <text x="790" y="142" class="name" text-anchor="middle">revoked</text>
-  <text x="790" y="166" class="note" text-anchor="middle">key erased,</text>
-  <text x="790" y="184" class="note" text-anchor="middle">record kept</text>
-
-  <text x="320" y="100" class="label" text-anchor="middle">approve EMAIL</text>
-  <path class="flow" d="M280,158 L358,158" marker-end="url(#arrow)"/>
-  <text x="630" y="100" class="label" text-anchor="middle">revoke EMAIL|KEY</text>
-  <path class="flow" d="M590,158 L668,158" marker-end="url(#arrow)"/>
-
-  <path class="deny" d="M480,206 L480,238" marker-end="url(#arrow-deny)"/>
-  <text x="480" y="262" class="warn" text-anchor="middle">revoke-all: every active key at once</text>
-
-  <text x="30" y="302" class="note">The agent re-reads the file when it changes: no restart.</text>
+  <rect width="1040" height="358" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">The life of a key</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Three states, and the commands that move a person between them.</text>
+  <rect x="60" y="130" width="200" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M72,130.7 H66 V209.3 H72 A11.3,11.3 0 0 1 60.7,198 V142 A11.3,11.3 0 0 1 72,130.7 Z" fill="#7F8EA0"/>
+  <text x="80.0" y="166.0" class="name" text-anchor="start" xml:space="preserve">requested</text>
+  <text x="80.0" y="184.0" class="sub" text-anchor="start" xml:space="preserve">waiting, no key yet</text>
+  <rect x="420" y="130" width="200" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M432,130.7 H426 V209.3 H432 A11.3,11.3 0 0 1 420.7,198 V142 A11.3,11.3 0 0 1 432,130.7 Z" fill="#2E8B3D"/>
+  <text x="440.0" y="166.0" class="name" text-anchor="start" xml:space="preserve">active</text>
+  <text x="440.0" y="184.0" class="sub" text-anchor="start" xml:space="preserve">the chat lets it in</text>
+  <rect x="780" y="130" width="200" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M792,130.7 H786 V209.3 H792 A11.3,11.3 0 0 1 780.7,198 V142 A11.3,11.3 0 0 1 792,130.7 Z" fill="#CF4526"/>
+  <text x="800.0" y="157.0" class="name" text-anchor="start" xml:space="preserve">revoked</text>
+  <text x="800.0" y="175.0" class="sub" text-anchor="start" xml:space="preserve">key erased,</text>
+  <text x="800.0" y="193.0" class="sub" text-anchor="start" xml:space="preserve">record kept</text>
+  <path class="wire" d="M260,158 L420,158" marker-end="url(#head)"/>
+  <rect x="290.1" y="149.0" width="99.8" height="18" rx="9" fill="#FBFAF6" stroke="#3F5873" stroke-width="1"/>
+  <text x="340.0" y="161.8" class="pill" text-anchor="middle" style="fill:#3F5873" xml:space="preserve">approve EMAIL</text>
+  <path class="wire" d="M620,158 L780,158" marker-end="url(#head)"/>
+  <rect x="640.2" y="149.0" width="119.6" height="18" rx="9" fill="#FBFAF6" stroke="#3F5873" stroke-width="1"/>
+  <text x="700.0" y="161.8" class="pill" text-anchor="middle" style="fill:#3F5873" xml:space="preserve">revoke EMAIL|KEY</text>
+  <path class="wire idle" d="M880,210 L880,247 Q880,256 871,256 L529,256 Q520,256 520,247 L520,210" marker-end="url(#head-idle)"/>
+  <rect x="650.1" y="247.0" width="99.8" height="18" rx="9" fill="#FBFAF6" stroke="#7F8EA0" stroke-width="1"/>
+  <text x="700.0" y="259.8" class="pill" text-anchor="middle" style="fill:#7F8EA0" xml:space="preserve">approve again</text>
+  <text x="520.0" y="300.0" class="note" text-anchor="middle" xml:space="preserve">revoke-all: every active key at once</text>
+  <text x="60.0" y="336.0" class="note" text-anchor="start" xml:space="preserve">The agent re-reads the file when it changes: no restart.</text>
 </svg>

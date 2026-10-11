@@ -25,6 +25,18 @@ what was decided so it can resume without starting over.
 | Page fetching | done by the agent, not the container; refuses private, loopback, link-local, Tailscale (100.64.0.0/10) and other local addresses, so no one can reach the home network through it |
 | Page | a file panel beside the chat; tool calls shown as they run |
 
+<figure>
+<img src="figures/workspace-sandbox.svg" alt="Planned design. The browser sends a random workspace id with every request. thor-tigress-agent maps the id to a folder and runs the tool loop. Commands and file tools run in a container per workspace, as a non-root user with CPU, memory and time limits, no network, and only that workspace's folder mounted. Web search and page fetching are run by the agent outside the container and reach public addresses only.">
+<figcaption>The planned sandbox: where each tool runs, and what it can reach.</figcaption>
+</figure>
+
+The design separates two kinds of risk. Code the model writes and runs could
+do anything a program can, so it gets a container with no network and one
+folder. Fetching a page needs the network, so it is done by the agent itself,
+which runs code we wrote and checks every address first. Neither side holds
+both powers: nothing in the container can reach the home network, and nothing
+that reaches the network runs the model's code.
+
 ## Before it can run on the Thor
 
 - Docker needs sudo for the `arpanpathak` user. Options: rootless Docker or

@@ -118,6 +118,11 @@ relative paths and never contain the name, so the chat needs no change.
    `thor-tigress-agent` (ordered after `thor-chat`).
 3. Each service restarts itself 5 seconds after a crash (`Restart=on-failure`).
 
+<figure>
+<img src="figures/boot-order.svg" alt="At power on, tailscaled starts as a system service, joins the tailnet and restores Funnel. Because of linger, the user's systemd then starts with nobody logged in and brings up thor-chat, one thor-edge-llm unit per Edge-LLM model, searxng, and thor-tigress-agent after the model servers. Each service restarts itself five seconds after a crash.">
+<figcaption>What starts at boot. Since 2026-10-08 each TensorRT Edge-LLM model also has a unit of its own, started the same way.</figcaption>
+</figure>
+
 Measured: the last start of `thor-chat` (2026-10-05 05:17:55) loaded the model
 and listened 6 seconds later, with the model file already in memory cache.
 **Not measured yet:** the time from power-on to the first answer, when the

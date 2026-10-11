@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 466" width="1050" height="466" role="img" aria-label="Three planned reports, each needing something first: Stage 1 and slop flags for the dataset report, Stage 2 and the evaluation for the fine-tuning report, Stage 2 measurements for the Jetson report. Between what exists and each report stands one gate: a claim goes in only if its evidence row is met.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1050" height="466" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">What each report needs, and the gate every claim passes</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Left: what has to exist first. Right: the report it allows.</text>
+  <rect x="400" y="116" width="240" height="296" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M412,116.7 H406 V411.3 H412 A11.3,11.3 0 0 1 400.7,400 V128 A11.3,11.3 0 0 1 412,116.7 Z" fill="#CF4526"/>
+  <text x="420.0" y="197.0" class="name" text-anchor="start" xml:space="preserve">Claims and evidence</text>
+  <text x="420.0" y="215.0" class="sub" text-anchor="start" xml:space="preserve">A claim goes into a</text>
+  <text x="420.0" y="233.0" class="sub" text-anchor="start" xml:space="preserve">report only if its</text>
+  <text x="420.0" y="251.0" class="sub" text-anchor="start" xml:space="preserve">evidence row is met:</text>
+  <text x="420.0" y="269.0" class="sub" text-anchor="start" xml:space="preserve"></text>
+  <text x="420.0" y="287.0" class="sub" text-anchor="start" xml:space="preserve">a paired test,</text>
+  <text x="420.0" y="305.0" class="sub" text-anchor="start" xml:space="preserve">an interval,</text>
+  <text x="420.0" y="323.0" class="sub" text-anchor="start" xml:space="preserve">frozen held-out items,</text>
+  <text x="420.0" y="341.0" class="sub" text-anchor="start" xml:space="preserve">a second rater.</text>
+  <rect x="40" y="116" width="290" height="76" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,116.7 H46 V191.3 H52 A11.3,11.3 0 0 1 40.7,180 V128 A11.3,11.3 0 0 1 52,116.7 Z" fill="#1F8A70"/>
+  <text x="60.0" y="150.0" class="name" text-anchor="start" xml:space="preserve">Stage 1 (done)</text>
+  <text x="60.0" y="168.0" class="sub" text-anchor="start" xml:space="preserve">and a few hundred slop flags</text>
+  <rect x="710" y="116" width="300" height="76" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M722,116.7 H716 V191.3 H722 A11.3,11.3 0 0 1 710.7,180 V128 A11.3,11.3 0 0 1 722,116.7 Z" fill="#B7791F"/>
+  <text x="730.0" y="150.0" class="name" text-anchor="start" xml:space="preserve">1. Dataset and curation</text>
+  <text x="730.0" y="168.0" class="sub" text-anchor="start" xml:space="preserve">arXiv report; data workshop</text>
+  <path class="wire idle" d="M330,154 L400,154" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M640,154 L710,154" marker-end="url(#head-idle)"/>
+  <rect x="40" y="226" width="290" height="76" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,226.7 H46 V301.3 H52 A11.3,11.3 0 0 1 40.7,290 V238 A11.3,11.3 0 0 1 52,226.7 Z" fill="#7F8EA0"/>
+  <text x="60.0" y="260.0" class="name" text-anchor="start" xml:space="preserve">Stage 2</text>
+  <text x="60.0" y="278.0" class="sub" text-anchor="start" xml:space="preserve">and the evaluation design</text>
+  <rect x="710" y="226" width="300" height="76" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M722,226.7 H716 V301.3 H722 A11.3,11.3 0 0 1 710.7,290 V238 A11.3,11.3 0 0 1 722,226.7 Z" fill="#B7791F"/>
+  <text x="730.0" y="260.0" class="name" text-anchor="start" xml:space="preserve">2. Fine-tuning results</text>
+  <text x="730.0" y="278.0" class="sub" text-anchor="start" xml:space="preserve">arXiv; workshop paper</text>
+  <path class="wire idle" d="M330,264 L400,264" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M640,264 L710,264" marker-end="url(#head-idle)"/>
+  <rect x="40" y="336" width="290" height="76" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,336.7 H46 V411.3 H52 A11.3,11.3 0 0 1 40.7,400 V348 A11.3,11.3 0 0 1 52,336.7 Z" fill="#7F8EA0"/>
+  <text x="60.0" y="370.0" class="name" text-anchor="start" xml:space="preserve">Stage 2 measurements</text>
+  <text x="60.0" y="388.0" class="sub" text-anchor="start" xml:space="preserve">memory, throughput, step time</text>
+  <rect x="710" y="336" width="300" height="76" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M722,336.7 H716 V411.3 H722 A11.3,11.3 0 0 1 710.7,400 V348 A11.3,11.3 0 0 1 722,336.7 Z" fill="#B7791F"/>
+  <text x="730.0" y="370.0" class="name" text-anchor="start" xml:space="preserve">3. Jetson AGX Thor</text>
+  <text x="730.0" y="388.0" class="sub" text-anchor="start" xml:space="preserve">systems workshop; blog</text>
+  <path class="wire idle" d="M330,374 L400,374" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M640,374 L710,374" marker-end="url(#head-idle)"/>
+  <text x="40.0" y="444.0" class="note" text-anchor="start" xml:space="preserve">Results that did not improve are reported with the same detail as those that did.</text>
+</svg>

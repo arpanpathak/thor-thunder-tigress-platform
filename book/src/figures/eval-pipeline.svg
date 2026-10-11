@@ -1,89 +1,107 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 616" width="1080" height="616" role="img" aria-label="Frozen inputs (held_out.jsonl, public benchmarks, privacy probes) feed a runner that sends identical requests to the base and fine-tuned trtllm-serve endpoints. Answers go to automatic scorers and to the reviewer. Scores and a summary with 95 percent intervals are written per run. An overlap report checks held-out items against train.jsonl.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .box { fill: #F4F7FA; stroke-width: 2; }
-    .planned { stroke: #B7791F; stroke-dasharray: 7 5; }
-    .file { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 1.8; }
-    .human { fill: #E8EEF6; stroke: #00838F; stroke-width: 2.5; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="520" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">Evaluation: frozen inputs, two endpoints, per-item scores, intervals (planned)</text>
-
-  <!-- Frozen inputs -->
-  <rect x="30" y="70" width="190" height="56" rx="6" class="file"/>
-  <text x="125" y="94" class="name mono" text-anchor="middle">eval/held_out.jsonl</text>
-  <text x="125" y="112" class="note" text-anchor="middle">frozen before Stage 2</text>
-  <rect x="30" y="140" width="190" height="56" rx="6" class="file"/>
-  <text x="125" y="164" class="name mono" text-anchor="middle">eval/public/</text>
-  <text x="125" y="182" class="note" text-anchor="middle">MultiPL-E, GSM8K, XSTest...</text>
-  <rect x="30" y="210" width="190" height="56" rx="6" class="file"/>
-  <text x="125" y="234" class="name mono" text-anchor="middle">eval/probes.jsonl</text>
-  <text x="125" y="252" class="note" text-anchor="middle">privacy leakage prompts</text>
-
-  <rect x="30" y="300" width="190" height="56" rx="6" class="file"/>
-  <text x="125" y="324" class="name mono" text-anchor="middle">overlap_report.md</text>
-  <text x="125" y="342" class="note" text-anchor="middle">13-gram check vs train.jsonl</text>
-  <path class="flow" d="M125,268 L125,296" marker-end="url(#arrow)"/>
-
-  <!-- Runner -->
-  <path class="flow" d="M222,98 C250,98 250,160 272,160" marker-end="url(#arrow)"/>
-  <path class="flow" d="M222,168 L272,168" marker-end="url(#arrow)"/>
-  <path class="flow" d="M222,238 C250,238 250,176 272,176" marker-end="url(#arrow)"/>
-  <rect x="274" y="126" width="170" height="90" rx="10" class="box planned"/>
-  <text x="359" y="156" class="name" text-anchor="middle">runner</text>
-  <text x="359" y="176" class="note" text-anchor="middle">same prompts, decoding,</text>
-  <text x="359" y="192" class="note" text-anchor="middle">seeds for both models</text>
-
-  <!-- Endpoints -->
-  <rect x="500" y="70" width="170" height="56" rx="10" class="box planned"/>
-  <text x="585" y="94" class="name" text-anchor="middle">base endpoint</text>
-  <text x="585" y="112" class="note mono" text-anchor="middle">trtllm-serve</text>
-  <rect x="500" y="216" width="170" height="56" rx="10" class="box planned"/>
-  <text x="585" y="240" class="name" text-anchor="middle">fine-tuned endpoint</text>
-  <text x="585" y="258" class="note mono" text-anchor="middle">trtllm-serve</text>
-  <path class="flow" d="M446,150 C470,150 470,98 496,98" marker-end="url(#arrow)"/>
-  <path class="flow" d="M446,192 C470,192 470,244 496,244" marker-end="url(#arrow)"/>
-
-  <!-- Answers -->
-  <rect x="730" y="142" width="200" height="56" rx="6" class="file"/>
-  <text x="830" y="166" class="name mono" text-anchor="middle">answers.jsonl</text>
-  <text x="830" y="184" class="note" text-anchor="middle">runs/&lt;run_id&gt;/</text>
-  <path class="flow" d="M672,98 C700,98 700,160 726,160" marker-end="url(#arrow)"/>
-  <path class="flow" d="M672,244 C700,244 700,180 726,180" marker-end="url(#arrow)"/>
-
-  <!-- Scorers -->
-  <rect x="300" y="330" width="290" height="110" rx="10" class="box planned"/>
-  <text x="445" y="356" class="name" text-anchor="middle">automatic scorers</text>
-  <text x="318" y="380" class="note">compile and tests · five rules · false claims</text>
-  <text x="318" y="400" class="note">slop density · knowledge judge (κ-validated)</text>
-  <text x="318" y="420" class="note">refusal · over-refusal · leakage</text>
-
-  <rect x="620" y="330" width="150" height="110" rx="10" class="human"/>
-  <text x="695" y="370" class="name" text-anchor="middle">reviewer</text>
-  <text x="695" y="390" class="note" text-anchor="middle">blind A/B,</text>
-  <text x="695" y="406" class="note" text-anchor="middle">slop spans</text>
-
-  <path class="flow" d="M800,200 C800,280 540,280 520,326" marker-end="url(#arrow)"/>
-  <path class="flow" d="M830,200 C830,290 720,290 705,326" marker-end="url(#arrow)"/>
-
-  <!-- Outputs -->
-  <rect x="800" y="370" width="140" height="70" rx="6" class="file"/>
-  <text x="870" y="396" class="name mono" text-anchor="middle">scores.jsonl</text>
-  <text x="870" y="414" class="note mono" text-anchor="middle">summary.md</text>
-  <text x="870" y="430" class="note" text-anchor="middle">rates with 95% CI</text>
-  <path class="flow" d="M592,452 C700,470 800,470 860,444" marker-end="url(#arrow)"/>
-  <path class="flow" d="M772,392 L796,400" marker-end="url(#arrow)"/>
-
-  <text x="30" y="490" class="note">Every run writes runs/&lt;run_id&gt;/manifest.json: model, quantization, build command, max sequence length,</text>
-  <text x="30" y="506" class="note">batch size, decoding settings, seed, git commit, tokens per second, peak memory.</text>
+  <rect width="1080" height="616" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Evaluation: frozen inputs, two endpoints, per-item scores, intervals (planned)</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Both models get the same prompts, the same decoding and the same seeds.</text>
+  <rect x="70" y="110" width="240" height="60" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M82,110.7 H76 V169.3 H82 A11.3,11.3 0 0 1 70.7,158 V122 A11.3,11.3 0 0 1 82,110.7 Z" fill="#B7791F"/>
+  <rect x="86" y="124.0" width="32" height="32" rx="8" fill="#FBF1DC"/>
+  <g transform="translate(92.0,130.0) scale(0.8333)"><path d="M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.5V8h4.5zM8 11v1.6h8V11zm0 3.2v1.6h8v-1.6zm0 3.2V19h5v-1.6z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="128.0" y="136.0" class="name" text-anchor="start" xml:space="preserve">eval/held_out.jsonl</text>
+  <text x="128.0" y="154.0" class="sub" text-anchor="start" xml:space="preserve">frozen before Stage 2</text>
+  <rect x="70" y="186" width="240" height="60" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M82,186.7 H76 V245.3 H82 A11.3,11.3 0 0 1 70.7,234 V198 A11.3,11.3 0 0 1 82,186.7 Z" fill="#B7791F"/>
+  <rect x="86" y="200.0" width="32" height="32" rx="8" fill="#FBF1DC"/>
+  <g transform="translate(92.0,206.0) scale(0.8333)"><path d="M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.5V8h4.5zM8 11v1.6h8V11zm0 3.2v1.6h8v-1.6zm0 3.2V19h5v-1.6z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="128.0" y="212.0" class="name" text-anchor="start" xml:space="preserve">eval/public/</text>
+  <text x="128.0" y="230.0" class="sub" text-anchor="start" xml:space="preserve">MultiPL-E, GSM8K, XSTest…</text>
+  <rect x="70" y="262" width="240" height="60" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M82,262.7 H76 V321.3 H82 A11.3,11.3 0 0 1 70.7,310 V274 A11.3,11.3 0 0 1 82,262.7 Z" fill="#B7791F"/>
+  <rect x="86" y="276.0" width="32" height="32" rx="8" fill="#FBF1DC"/>
+  <g transform="translate(92.0,282.0) scale(0.8333)"><path d="M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.5V8h4.5zM8 11v1.6h8V11zm0 3.2v1.6h8v-1.6zm0 3.2V19h5v-1.6z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="128.0" y="288.0" class="name" text-anchor="start" xml:space="preserve">eval/probes.jsonl</text>
+  <text x="128.0" y="306.0" class="sub" text-anchor="start" xml:space="preserve">privacy leakage prompts</text>
+  <rect x="70" y="340" width="240" height="56" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M82,340.7 H76 V395.3 H82 A11.3,11.3 0 0 1 70.7,384 V352 A11.3,11.3 0 0 1 82,340.7 Z" fill="#7F8EA0"/>
+  <text x="90.0" y="364.0" class="name" text-anchor="start" xml:space="preserve">overlap_report.md</text>
+  <text x="90.0" y="382.0" class="sub" text-anchor="start" xml:space="preserve">13-gram check vs train.jsonl</text>
+  <path class="wire idle" d="M70,140 L55,140 Q46,140 46,149 L46,359 Q46,368 55,368 L70,368" marker-end="url(#head-idle)"/>
+  <rect x="380" y="176" width="200" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M392,176.7 H386 V255.3 H392 A11.3,11.3 0 0 1 380.7,244 V188 A11.3,11.3 0 0 1 392,176.7 Z" fill="#1F8A70"/>
+  <text x="400.0" y="203.0" class="name" text-anchor="start" xml:space="preserve">runner</text>
+  <text x="400.0" y="221.0" class="sub" text-anchor="start" xml:space="preserve">same prompts, decoding,</text>
+  <text x="400.0" y="239.0" class="sub" text-anchor="start" xml:space="preserve">seeds for both models</text>
+  <path class="wire" d="M310,140 L336,140 Q345,140 345,149 L345,195 Q345,204 354,204 L380,204" marker-end="url(#head)"/>
+  <path class="wire" d="M310,216 L380,216" marker-end="url(#head)"/>
+  <path class="wire" d="M310,292 L336,292 Q345,292 345,283 L345,237 Q345,228 354,228 L380,228" marker-end="url(#head)"/>
+  <rect x="650" y="120" width="210" height="64" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M662,120.7 H656 V183.3 H662 A11.3,11.3 0 0 1 650.7,172 V132 A11.3,11.3 0 0 1 662,120.7 Z" fill="#5E9400"/>
+  <rect x="666" y="136.0" width="32" height="32" rx="8" fill="#EEF6DC"/>
+  <g transform="translate(672.0,142.0) scale(0.8333)"><path d="M8 2h2v3h4V2h2v3h2a1 1 0 0 1 1 1v2h3v2h-3v4h3v2h-3v2a1 1 0 0 1-1 1h-2v3h-2v-3h-4v3H8v-3H6a1 1 0 0 1-1-1v-2H2v-2h3v-4H2V8h3V6a1 1 0 0 1 1-1h2zM7 7v10h10V7zm2.5 2.5h5v5h-5z" fill="#5E9400" fill-rule="evenodd"/></g>
+  <text x="708.0" y="148.0" class="name" text-anchor="start" xml:space="preserve">base endpoint</text>
+  <text x="708.0" y="166.0" class="sub" text-anchor="start" xml:space="preserve">trtllm-serve</text>
+  <rect x="650" y="250" width="210" height="64" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M662,250.7 H656 V313.3 H662 A11.3,11.3 0 0 1 650.7,302 V262 A11.3,11.3 0 0 1 662,250.7 Z" fill="#5E9400"/>
+  <text x="670.0" y="278.0" class="name" text-anchor="start" xml:space="preserve">fine-tuned endpoint</text>
+  <text x="670.0" y="296.0" class="sub" text-anchor="start" xml:space="preserve">trtllm-serve</text>
+  <path class="wire" d="M580,204 L606,204 Q615,204 615,195 L615,161 Q615,152 624,152 L650,152" marker-end="url(#head)"/>
+  <path class="wire" d="M580,228 L606,228 Q615,228 615,237 L615,273 Q615,282 624,282 L650,282" marker-end="url(#head)"/>
+  <path d="M900,179 A75.0,9 0 0 1 1050,179 V253 A75.0,9 0 0 1 900,253 Z" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="975.0" cy="179" rx="75.0" ry="9" fill="#FFFFFF" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="975.0" y="219.0" class="name" text-anchor="middle" xml:space="preserve">answers.jsonl</text>
+  <text x="975.0" y="237.0" class="sub" text-anchor="middle" xml:space="preserve">runs/&lt;run_id&gt;/</text>
+  <path class="wire" d="M860,152 L871,152 Q880,152 880,161 L880,195 Q880,204 889,204 L900,204" marker-end="url(#head)"/>
+  <path class="wire" d="M860,282 L871,282 Q880,282 880,273 L880,237 Q880,228 889,228 L900,228" marker-end="url(#head)"/>
+  <rect x="380" y="420" width="410" height="100" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M392,420.7 H386 V519.3 H392 A11.3,11.3 0 0 1 380.7,508 V432 A11.3,11.3 0 0 1 392,420.7 Z" fill="#1F8A70"/>
+  <text x="400.0" y="448.0" class="name" text-anchor="start" xml:space="preserve">automatic scorers</text>
+  <text x="400.0" y="466.0" class="sub" text-anchor="start" xml:space="preserve">compile and tests · five rules · false claims</text>
+  <text x="400.0" y="484.0" class="sub" text-anchor="start" xml:space="preserve">slop density · knowledge judge (κ-validated)</text>
+  <text x="400.0" y="502.0" class="sub" text-anchor="start" xml:space="preserve">refusal · over-refusal · leakage</text>
+  <rect x="870" y="430" width="180" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M882,430.7 H876 V509.3 H882 A11.3,11.3 0 0 1 870.7,498 V442 A11.3,11.3 0 0 1 882,430.7 Z" fill="#2F6FDB"/>
+  <text x="890.0" y="457.0" class="name" text-anchor="start" xml:space="preserve">reviewer</text>
+  <text x="890.0" y="475.0" class="sub" text-anchor="start" xml:space="preserve">blind A/B,</text>
+  <text x="890.0" y="493.0" class="sub" text-anchor="start" xml:space="preserve">slop spans</text>
+  <path d="M70,429 A120.0,9 0 0 1 310,429 V511 A120.0,9 0 0 1 70,511 Z" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="190.0" cy="429" rx="120.0" ry="9" fill="#FFFFFF" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="190.0" y="464.0" class="name" text-anchor="middle" xml:space="preserve">scores.jsonl</text>
+  <text x="190.0" y="482.0" class="sub" text-anchor="middle" xml:space="preserve">summary.md</text>
+  <text x="190.0" y="500.0" class="sub" text-anchor="middle" xml:space="preserve">rates with 95% CI</text>
+  <path class="wire" d="M975,262 L975,430" marker-end="url(#head)"/>
+  <path class="wire" d="M975,262 L975,371 Q975,380 966,380 L594,380 Q585,380 585,389 L585,420" marker-end="url(#head)"/>
+  <path class="wire" d="M380,470 L310,470" marker-end="url(#head)"/>
+  <path class="wire" d="M960,510 L960,539 Q960,548 951,548 L199,548 Q190,548 190,539 L190,520" marker-end="url(#head)"/>
+  <text x="70.0" y="578.0" class="note" text-anchor="start" xml:space="preserve">Every run writes runs/&lt;run_id&gt;/manifest.json: model, quantization, build command, max sequence length, batch size,</text>
+  <text x="70.0" y="595.0" class="note" text-anchor="start" xml:space="preserve">decoding settings, seed, git commit, tokens per second, peak memory.</text>
 </svg>

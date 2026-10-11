@@ -34,6 +34,11 @@ Three things happen when someone types `voltforge.tech/thor-tigress-cub`:
 3. **Answer.** The server returns a page, which may send the browser on to
    another address.
 
+<figure>
+<img src="figures/domain-hops.svg" alt="Three steps. One, the browser asks Namecheap's nameservers, whose A records give GitHub's addresses. Two, it connects to GitHub Pages, which holds a Let's Encrypt certificate for voltforge.tech and returns the forwarding page. Three, the page sends the browser to the .ts.net name, where Tailscale Funnel answers and passes the request to thor-tigress-agent on the Thor at 127.0.0.1:8080.">
+<figcaption>The three steps as they happen for <code>voltforge.tech</code>, with the forwarding page this chapter chooses.</figcaption>
+</figure>
+
 The Thor's chat is published by Tailscale Funnel. Funnel only answers for the
 name it was given, `arpanpathak.taildb9a39.ts.net`: it holds a certificate for
 that name and routes traffic by it. Pointing `voltforge.tech`'s records at

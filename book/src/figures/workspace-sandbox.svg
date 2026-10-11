@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1064 484" width="1064" height="484" role="img" aria-label="Planned design. The browser sends a random workspace id with every request. thor-tigress-agent maps the id to a folder and runs the tool loop. Commands and file tools run in a container per workspace, as a non-root user with CPU, memory and time limits, no network, and only that workspace&#x27;s folder mounted. Web search and page fetching are run by the agent outside the container and reach public addresses only.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1064" height="484" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">The workspace agent&#x27;s sandbox (planned)</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Code the model runs is boxed in. Only the agent itself may reach the network.</text>
+  <rect x="40" y="206" width="200" height="80" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M52,206.7 H46 V285.3 H52 A11.3,11.3 0 0 1 40.7,274 V218 A11.3,11.3 0 0 1 52,206.7 Z" fill="#B7791F"/>
+  <text x="60.0" y="233.0" class="name" text-anchor="start" xml:space="preserve">Browser</text>
+  <text x="60.0" y="251.0" class="sub" text-anchor="start" xml:space="preserve">a random workspace id</text>
+  <text x="60.0" y="269.0" class="sub" text-anchor="start" xml:space="preserve">with every request</text>
+  <rect x="300" y="196" width="230" height="100" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M312,196.7 H306 V295.3 H312 A11.3,11.3 0 0 1 300.7,284 V208 A11.3,11.3 0 0 1 312,196.7 Z" fill="#B7791F"/>
+  <text x="320.0" y="233.0" class="name" text-anchor="start" xml:space="preserve">thor-tigress-agent</text>
+  <text x="320.0" y="251.0" class="sub" text-anchor="start" xml:space="preserve">maps the id to a folder</text>
+  <text x="320.0" y="269.0" class="sub" text-anchor="start" xml:space="preserve">and runs the tool loop</text>
+  <rect x="590" y="108" width="450" height="200" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="608" y="97" width="326.9" height="22" rx="11" fill="#1B2430"/>
+  <text x="771.5" y="112.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">A CONTAINER PER WORKSPACE · NO NETWORK</text>
+  <rect x="610" y="134" width="210" height="72" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M622,134.7 H616 V205.3 H622 A11.3,11.3 0 0 1 610.7,194 V146 A11.3,11.3 0 0 1 622,134.7 Z" fill="#B7791F"/>
+  <text x="630.0" y="157.0" class="name" text-anchor="start" xml:space="preserve">run_command</text>
+  <text x="630.0" y="175.0" class="sub" text-anchor="start" xml:space="preserve">non-root, with CPU,</text>
+  <text x="630.0" y="193.0" class="sub" text-anchor="start" xml:space="preserve">memory and time limits</text>
+  <rect x="610" y="222" width="210" height="64" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M622,222.7 H616 V285.3 H622 A11.3,11.3 0 0 1 610.7,274 V234 A11.3,11.3 0 0 1 622,222.7 Z" fill="#B7791F"/>
+  <text x="630.0" y="250.0" class="name" text-anchor="start" xml:space="preserve">list, read, write</text>
+  <text x="630.0" y="268.0" class="sub" text-anchor="start" xml:space="preserve">files in that folder</text>
+  <path d="M856,159 A82.0,9 0 0 1 1020,159 V245 A82.0,9 0 0 1 856,245 Z" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="938.0" cy="159" rx="82.0" ry="9" fill="#FFFFFF" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="938.0" y="196.0" class="name" text-anchor="middle" xml:space="preserve">the folder</text>
+  <text x="938.0" y="214.0" class="sub" text-anchor="middle" xml:space="preserve">the only thing</text>
+  <text x="938.0" y="232.0" class="sub" text-anchor="middle" xml:space="preserve">mounted</text>
+  <rect x="610" y="350" width="210" height="80" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M622,350.7 H616 V429.3 H622 A11.3,11.3 0 0 1 610.7,418 V362 A11.3,11.3 0 0 1 622,350.7 Z" fill="#B7791F"/>
+  <text x="630.0" y="377.0" class="name" text-anchor="start" xml:space="preserve">web_search, fetch</text>
+  <text x="630.0" y="395.0" class="sub" text-anchor="start" xml:space="preserve">run by the agent,</text>
+  <text x="630.0" y="413.0" class="sub" text-anchor="start" xml:space="preserve">not in the container</text>
+  <rect x="876" y="350" width="164" height="80" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M888,350.7 H882 V429.3 H888 A11.3,11.3 0 0 1 876.7,418 V362 A11.3,11.3 0 0 1 888,350.7 Z" fill="#B7791F"/>
+  <text x="896.0" y="377.0" class="name" text-anchor="start" xml:space="preserve">The internet</text>
+  <text x="896.0" y="395.0" class="sub" text-anchor="start" xml:space="preserve">public addresses</text>
+  <text x="896.0" y="413.0" class="sub" text-anchor="start" xml:space="preserve">only</text>
+  <path class="wire idle" d="M240,246 L300,246" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M530,234 L551,234 Q560,234 560,225 L560,179 Q560,170 569,170 L610,170" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M530,258 L551,258 Q560,258 560,267 L560,381 Q560,390 569,390 L610,390" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M820,170 L856,170" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M820,254 L829,254 Q838,254 838,245 L838,231 Q838,222 847,222 L856,222" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M820,390 L876,390" marker-end="url(#head-idle)"/>
+  <text x="40.0" y="462.0" class="note" text-anchor="start" xml:space="preserve">Everything here is planned, and the work is paused. Page fetching is the one part already built, for the chat.</text>
+</svg>

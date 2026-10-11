@@ -2,6 +2,11 @@
 
 # Model serving
 
+> **2026-10-11.** llama-server now runs with `--no-models-autoload`: it loads a model at
+> startup or when `load` asks, and no longer because a request named one.
+> Everything else in this chapter is unchanged. The details are in chapter
+> [Coding tools on TensorRT Edge-LLM](ch28-coding-tools-on-edge-llm.md).
+
 `thor-tigress-serve` manages the models on the Thor. It lists them, loads and
 unloads a specific one, and finds and downloads the newest ones from
 Hugging Face.

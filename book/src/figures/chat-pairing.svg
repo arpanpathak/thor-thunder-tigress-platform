@@ -1,74 +1,83 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" width="960" height="470">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 596" width="1000" height="596" role="img" aria-label="Four messages: a human question, an assistant message with thinking, two text blocks and a tool call, a human message with an image, and an assistant answer. They become pair 1, kept, and pair 2, skipped with AboutImage.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .head { fill: #5B6B7C; font-size: 12px; letter-spacing: 1px; }
-    .msg { fill: #1D2733; font-size: 13px; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; font-size: 12px; }
-    .human { fill: #F4F7FA; stroke: #3B6FD4; stroke-width: 2; }
-    .assistant { fill: #F4F7FA; stroke: #1E88A8; stroke-width: 2; }
-    .hidden { fill: #CFD8DC; }
-    .kept { fill: #F7F9FB; stroke: #4E8A16; stroke-width: 2; }
-    .skipped { fill: #F7F9FB; stroke: #C62828; stroke-width: 2; stroke-dasharray: 6 4; }
-    .flow { stroke: #1E88A8; stroke-width: 1.8; fill: none; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="470" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">Chat pairing: four messages, two pairs, one example</text>
-
-  <text x="40" y="70" class="head">MESSAGES, IN ORDER</text>
-  <text x="560" y="70" class="head">PAIRS, THEN EXAMPLES</text>
-
-  <!-- Message 1 -->
-  <rect x="40" y="84" width="380" height="44" rx="8" class="human"/>
-  <text x="56" y="111" class="mono" fill="#3B6FD4" style="fill:#3B6FD4">human</text>
-  <text x="120" y="111" class="msg">What is a futex?</text>
-
-  <!-- Message 2 with hidden blocks -->
-  <rect x="40" y="140" width="380" height="132" rx="8" class="assistant"/>
-  <text x="56" y="164" class="mono" style="fill:#1E88A8">assistant</text>
-  <rect x="56" y="174" width="348" height="20" rx="4" class="hidden" fill-opacity="0.35"/>
-  <text x="66" y="188" class="mono" style="fill:#5B6B7C">thinking: dropped</text>
-  <text x="66" y="212" class="msg">text: "A fast userspace mutex."</text>
-  <rect x="56" y="222" width="348" height="20" rx="4" class="hidden" fill-opacity="0.35"/>
-  <text x="66" y="236" class="mono" style="fill:#5B6B7C">tool_use: dropped</text>
-  <text x="66" y="260" class="msg">text: "The kernel only steps in on contention."</text>
-
-  <!-- Message 3 -->
-  <rect x="40" y="284" width="380" height="54" rx="8" class="human"/>
-  <text x="56" y="306" class="mono" style="fill:#3B6FD4">human</text>
-  <text x="120" y="306" class="msg">Look at this</text>
-  <text x="120" y="326" class="mono" style="fill:#B7791F">files: screen.PNG (not in the export)</text>
-
-  <!-- Message 4 -->
-  <rect x="40" y="350" width="380" height="44" rx="8" class="assistant"/>
-  <text x="56" y="377" class="mono" style="fill:#1E88A8">assistant</text>
-  <text x="140" y="377" class="msg">The picture shows a graph.</text>
-
-  <!-- Pair 1 -->
-  <path class="flow" d="M422,106 C490,106 492,156 558,156" marker-end="url(#arrow)"/>
-  <path class="flow" d="M422,206 C490,206 492,196 558,196" marker-end="url(#arrow)"/>
-  <rect x="560" y="110" width="370" height="132" rx="10" class="kept"/>
-  <text x="578" y="136" class="msg" style="font-weight:600">Pair 1, turn 1</text>
-  <text x="578" y="160" class="note">question: What is a futex?</text>
-  <text x="578" y="180" class="note">answer: the two text blocks, joined</text>
-  <text x="578" y="200" class="note">asks_about_image: false</text>
-  <text x="578" y="226" class="mono" style="fill:#4E8A16">Ok(Example)  origin: c1/1</text>
-
-  <!-- Pair 2 -->
-  <path class="flow" d="M422,311 C490,311 492,306 558,306" marker-end="url(#arrow)"/>
-  <path class="flow" d="M422,372 C490,372 492,350 558,350" marker-end="url(#arrow)"/>
-  <rect x="560" y="270" width="370" height="122" rx="10" class="skipped"/>
-  <text x="578" y="296" class="msg" style="font-weight:600">Pair 2, turn 2</text>
-  <text x="578" y="320" class="note">question: Look at this</text>
-  <text x="578" y="340" class="note">asks_about_image: true</text>
-  <text x="578" y="376" class="mono" style="fill:#C62828">Err(SkipReason::AboutImage)</text>
-
-  <text x="40" y="430" class="note">Human message: extends an unanswered pair, otherwise starts a new pair.</text>
-  <text x="40" y="450" class="note">Assistant message: text blocks appended to the current answer; hidden blocks dropped.</text>
+  <rect width="1000" height="596" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Chat pairing: four messages, two pairs, one example</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Grey lines are parts of a message the pairing drops.</text>
+  <text x="40.0" y="100.0" class="tab" text-anchor="start" xml:space="preserve">MESSAGES, IN ORDER</text>
+  <text x="560.0" y="100.0" class="tab" text-anchor="start" xml:space="preserve">PAIRS, THEN EXAMPLES</text>
+  <path d="M50,112 H452 L470,130 V178 A10,10 0 0 1 460,188 H50 A10,10 0 0 1 40,178 V122 A10,10 0 0 1 50,112 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M452,112 V130 H470 Z" fill="#EAF1FD" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="56" y="128" width="4" height="14" rx="2" fill="#2F6FDB"/>
+  <text x="68.0" y="139.5" class="tab" text-anchor="start" style="fill:#2F6FDB" xml:space="preserve">HUMAN</text>
+  <text x="56.0" y="168.0" class="mono" text-anchor="start" xml:space="preserve">What is a futex?</text>
+  <path d="M50,202 H452 L470,220 V322 A10,10 0 0 1 460,332 H50 A10,10 0 0 1 40,322 V212 A10,10 0 0 1 50,202 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M452,202 V220 H470 Z" fill="#E4F4EF" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="56" y="218" width="4" height="14" rx="2" fill="#1F8A70"/>
+  <text x="68.0" y="229.5" class="tab" text-anchor="start" style="fill:#1F8A70" xml:space="preserve">ASSISTANT</text>
+  <text x="56.0" y="258.0" class="mono dim" text-anchor="start" xml:space="preserve">thinking: dropped</text>
+  <text x="56.0" y="276.0" class="mono" text-anchor="start" xml:space="preserve">text: &quot;A fast userspace mutex.&quot;</text>
+  <text x="56.0" y="294.0" class="mono dim" text-anchor="start" xml:space="preserve">tool_use: dropped</text>
+  <text x="56.0" y="312.0" class="mono" text-anchor="start" xml:space="preserve">text: &quot;The kernel only steps in on contention.&quot;</text>
+  <path d="M50,346 H452 L470,364 V430 A10,10 0 0 1 460,440 H50 A10,10 0 0 1 40,430 V356 A10,10 0 0 1 50,346 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M452,346 V364 H470 Z" fill="#EAF1FD" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="56" y="362" width="4" height="14" rx="2" fill="#2F6FDB"/>
+  <text x="68.0" y="373.5" class="tab" text-anchor="start" style="fill:#2F6FDB" xml:space="preserve">HUMAN</text>
+  <text x="56.0" y="402.0" class="mono" text-anchor="start" xml:space="preserve">Look at this</text>
+  <text x="56.0" y="420.0" class="mono dim" text-anchor="start" xml:space="preserve">files: screen.PNG (not in the export)</text>
+  <path d="M50,454 H452 L470,472 V520 A10,10 0 0 1 460,530 H50 A10,10 0 0 1 40,520 V464 A10,10 0 0 1 50,454 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M452,454 V472 H470 Z" fill="#E4F4EF" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="56" y="470" width="4" height="14" rx="2" fill="#1F8A70"/>
+  <text x="68.0" y="481.5" class="tab" text-anchor="start" style="fill:#1F8A70" xml:space="preserve">ASSISTANT</text>
+  <text x="56.0" y="510.0" class="mono" text-anchor="start" xml:space="preserve">The picture shows a graph.</text>
+  <path d="M570,136 H942 L960,154 V276 A10,10 0 0 1 950,286 H570 A10,10 0 0 1 560,276 V146 A10,10 0 0 1 570,136 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M942,136 V154 H960 Z" fill="#E7F5E9" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="576" y="152" width="4" height="14" rx="2" fill="#2E8B3D"/>
+  <text x="588.0" y="163.5" class="tab" text-anchor="start" style="fill:#2E8B3D" xml:space="preserve">PAIR 1 · TURN 1</text>
+  <text x="576.0" y="192.0" class="mono" text-anchor="start" xml:space="preserve">question: What is a futex?</text>
+  <text x="576.0" y="210.0" class="mono" text-anchor="start" xml:space="preserve">answer: the two text blocks, joined</text>
+  <text x="576.0" y="228.0" class="mono dim" text-anchor="start" xml:space="preserve">asks_about_image: false</text>
+  <text x="576.0" y="270.0" class="note" text-anchor="start" style="fill:#2E8B3D" xml:space="preserve">Ok(Example)   origin: c1/1</text>
+  <path d="M570,372 H942 L960,390 V494 A10,10 0 0 1 950,504 H570 A10,10 0 0 1 560,494 V382 A10,10 0 0 1 570,372 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M942,372 V390 H960 Z" fill="#FCEBE6" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="576" y="388" width="4" height="14" rx="2" fill="#CF4526"/>
+  <text x="588.0" y="399.5" class="tab" text-anchor="start" style="fill:#CF4526" xml:space="preserve">PAIR 2 · TURN 2</text>
+  <text x="576.0" y="428.0" class="mono" text-anchor="start" xml:space="preserve">question: Look at this</text>
+  <text x="576.0" y="446.0" class="mono dim" text-anchor="start" xml:space="preserve">asks_about_image: true</text>
+  <text x="576.0" y="488.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">Err(SkipReason::AboutImage)</text>
+  <path class="wire" d="M470,150 L506,150 Q515,150 515,159 L515,190 Q515,199 524,199 L560,199" marker-end="url(#head)"/>
+  <path class="wire" d="M470,267 L506,267 Q515,267 515,258 L515,232 Q515,223 524,223 L560,223" marker-end="url(#head)"/>
+  <path class="wire" d="M470,393 L506,393 Q515,393 515,402 L515,417 Q515,426 524,426 L560,426" marker-end="url(#head)"/>
+  <path class="wire" d="M470,492 L506,492 Q515,492 515,483 L515,459 Q515,450 524,450 L560,450" marker-end="url(#head)"/>
+  <text x="40.0" y="560.0" class="note" text-anchor="start" xml:space="preserve">A human message extends an unanswered pair; otherwise it starts a new pair.</text>
+  <text x="40.0" y="577.0" class="note" text-anchor="start" xml:space="preserve">An assistant message adds its text blocks to the current answer; hidden blocks are dropped.</text>
 </svg>

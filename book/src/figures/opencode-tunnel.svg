@@ -1,58 +1,76 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 310" width="960" height="310" role="img" aria-label="opencode on your machine calls 127.0.0.1:8079 and 127.0.0.1:8888, which an SSH tunnel carries to llama-server and SearXNG on the Thor.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 372" width="1000" height="372" role="img" aria-label="opencode on your machine calls 127.0.0.1:8079 and 127.0.0.1:8888; an SSH tunnel carries both to llama-server and SearXNG on the Thor.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .label { fill: #1E88A8; font-size: 12px; }
-    .warn { fill: #D9542B; font-size: 12px; }
-    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .box { fill: #F4F7FA; stroke-width: 2; }
-    .built { stroke: #4E8A16; }
-    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
-    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
-    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
-    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
-    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="310" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">OpenCode on your machine, the model on the Thor</text>
-  <rect x="24" y="56" width="330" height="230" rx="14" class="zone"/>
-  <text x="38" y="76" class="zonelabel">Your machine</text>
-  <rect x="44" y="120" width="120" height="80" rx="10" class="outside"/>
-  <text x="104" y="148" class="name" text-anchor="middle">opencode</text>
-  <text x="104" y="167" class="note" text-anchor="middle">reads, edits,</text>
-  <text x="104" y="184" class="note" text-anchor="middle">runs commands</text>
-  <rect x="200" y="84" width="136" height="56" rx="10" class="outside"/>
-  <text x="268" y="117" class="name mono" text-anchor="middle">127.0.0.1:8079</text>
-  <rect x="200" y="180" width="136" height="56" rx="10" class="outside"/>
-  <text x="268" y="213" class="name mono" text-anchor="middle">127.0.0.1:8888</text>
-  <path class="flow" d="M164,140 L173.0,140.0 Q182,140 182.0,130.0 L182.0,122.0 Q182,112 190.0,112.0 L198,112" marker-end="url(#arrow)"/>
-  <path class="flow" d="M164,180 L173.0,180.0 Q182,180 182.0,190.0 L182.0,198.0 Q182,208 190.0,208.0 L198,208" marker-end="url(#arrow)"/>
-  <rect x="400" y="120" width="170" height="80" rx="10" class="outside"/>
-  <text x="485" y="148" class="name" text-anchor="middle">SSH tunnel</text>
-  <text x="485" y="167" class="note" text-anchor="middle">your SSH login;</text>
-  <text x="485" y="184" class="note" text-anchor="middle">nothing new exposed</text>
-  <path class="flow" d="M336,112 L358.0,112.0 Q368,112 368.0,122.0 L368.0,136.0 Q368,146 378.0,146.0 L398,146" marker-end="url(#arrow)"/>
-  <path class="flow" d="M336,208 L358.0,208.0 Q368,208 368.0,198.0 L368.0,184.0 Q368,174 378.0,174.0 L398,174" marker-end="url(#arrow)"/>
-  <rect x="610" y="56" width="322" height="230" rx="14" class="zone"/>
-  <text x="624" y="76" class="zonelabel">Jetson AGX Thor</text>
-  <rect x="640" y="84" width="270" height="56" rx="10" class="box built"/>
-  <text x="775" y="108" class="name mono" text-anchor="middle">llama-server :8079</text>
-  <text x="775" y="128" class="note" text-anchor="middle">Nemotron</text>
-  <rect x="640" y="180" width="270" height="56" rx="10" class="box built"/>
-  <text x="775" y="204" class="name mono" text-anchor="middle">SearXNG :8888</text>
-  <text x="775" y="224" class="note" text-anchor="middle">web search</text>
-  <path class="flow" d="M570,146 L594.0,146.0 Q604,146 604.0,136.0 L604.0,122.0 Q604,112 614.0,112.0 L638,112" marker-end="url(#arrow)"/>
-  <path class="flow" d="M570,174 L594.0,174.0 Q604,174 604.0,184.0 L604.0,198.0 Q604,208 614.0,208.0 L638,208" marker-end="url(#arrow)"/>
+  <rect width="1000" height="372" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">OpenCode on your machine, the model on the Thor</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Two local ports, each carried to the Thor inside one SSH connection.</text>
+  <rect x="24" y="108" width="430" height="216" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="42" y="97" width="122.4" height="22" rx="11" fill="#1B2430"/>
+  <text x="103.2" y="112.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">YOUR MACHINE</text>
+  <rect x="600" y="108" width="376" height="216" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="618" y="97" width="146.0" height="22" rx="11" fill="#1B2430"/>
+  <text x="691.0" y="112.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">JETSON AGX THOR</text>
+  <rect x="48" y="176" width="176" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M60,176.7 H54 V255.3 H60 A11.3,11.3 0 0 1 48.7,244 V188 A11.3,11.3 0 0 1 60,176.7 Z" fill="#2F6FDB"/>
+  <rect x="64" y="200.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(70.0,206.0) scale(0.8333)"><path d="M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm3.3 4.3-1.4 1.4L7.2 12l-2.3 2.3 1.4 1.4L10 12zM11 14v2h7v-2z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="106.0" y="203.0" class="name" text-anchor="start" xml:space="preserve">opencode</text>
+  <text x="106.0" y="221.0" class="sub" text-anchor="start" xml:space="preserve">reads, edits,</text>
+  <text x="106.0" y="239.0" class="sub" text-anchor="start" xml:space="preserve">runs commands</text>
+  <rect x="276" y="150" width="156" height="50" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M288,150.7 H282 V199.3 H288 A11.3,11.3 0 0 1 276.7,188 V162 A11.3,11.3 0 0 1 288,150.7 Z" fill="#7F8EA0"/>
+  <text x="296.0" y="180.0" class="name" text-anchor="start" xml:space="preserve">127.0.0.1:8079</text>
+  <rect x="276" y="232" width="156" height="50" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M288,232.7 H282 V281.3 H288 A11.3,11.3 0 0 1 276.7,270 V244 A11.3,11.3 0 0 1 288,232.7 Z" fill="#7F8EA0"/>
+  <text x="296.0" y="262.0" class="name" text-anchor="start" xml:space="preserve">127.0.0.1:8888</text>
+  <rect x="630" y="147" width="320" height="56" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M642,147.7 H636 V202.3 H642 A11.3,11.3 0 0 1 630.7,191 V159 A11.3,11.3 0 0 1 642,147.7 Z" fill="#1F8A70"/>
+  <rect x="646" y="159.0" width="32" height="32" rx="8" fill="#E4F4EF"/>
+  <g transform="translate(652.0,165.0) scale(0.8333)"><path d="M12 2 2 7l10 5 10-5zm-7.8 8.6L2 11.7l10 5 10-5-2.2-1.1L12 14.5zm0 4.7L2 16.4l10 5 10-5-2.2-1.1L12 19.2z" fill="#1F8A70" fill-rule="evenodd"/></g>
+  <text x="688.0" y="171.0" class="name" text-anchor="start" xml:space="preserve">llama-server :8079</text>
+  <text x="688.0" y="189.0" class="sub" text-anchor="start" xml:space="preserve">Nemotron</text>
+  <rect x="630" y="229" width="320" height="56" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M642,229.7 H636 V284.3 H642 A11.3,11.3 0 0 1 630.7,273 V241 A11.3,11.3 0 0 1 642,229.7 Z" fill="#1F8A70"/>
+  <rect x="646" y="241.0" width="32" height="32" rx="8" fill="#E4F4EF"/>
+  <g transform="translate(652.0,247.0) scale(0.8333)"><path d="m13.716 17.261 6.873 6.582L24 20.282l-6.824-6.536a9.11 9.11 0 0 0 1.143-4.43c0-5.055-4.105-9.159-9.16-9.159S0 4.261 0 9.316c0 5.055 4.104 9.159 9.159 9.159a9.11 9.11 0 0 0 4.557-1.214ZM9.159 2.773a6.546 6.546 0 0 1 6.543 6.543 6.545 6.545 0 0 1-6.543 6.542 6.545 6.545 0 0 1-6.542-6.542 6.545 6.545 0 0 1 6.542-6.543ZM7.26 5.713a4.065 4.065 0 0 1 4.744.747 4.064 4.064 0 0 1 .707 4.749l1.157.611a5.376 5.376 0 0 0-.935-6.282 5.377 5.377 0 0 0-6.274-.987l.601 1.162Z" fill="#3050FF" fill-rule="evenodd"/></g>
+  <text x="688.0" y="253.0" class="name" text-anchor="start" xml:space="preserve">SearXNG :8888</text>
+  <text x="688.0" y="271.0" class="sub" text-anchor="start" xml:space="preserve">web search</text>
+  <path class="wire" d="M224,204 L241,204 Q250,204 250,195 L250,184 Q250,175 259,175 L276,175" marker-end="url(#head)"/>
+  <path class="wire" d="M224,228 L241,228 Q250,228 250,237 L250,248 Q250,257 259,257 L276,257" marker-end="url(#head)"/>
+  <path class="wire" d="M432,175 L630,175" marker-end="url(#head)"/>
+  <rect x="491.0" y="166.0" width="80.0" height="18" rx="9" fill="#FBFAF6" stroke="#3F5873" stroke-width="1"/>
+  <text x="531.0" y="178.8" class="pill" text-anchor="middle" style="fill:#3F5873" xml:space="preserve">SSH tunnel</text>
+  <path class="wire" d="M432,257 L630,257" marker-end="url(#head)"/>
+  <rect x="491.0" y="248.0" width="80.0" height="18" rx="9" fill="#FBFAF6" stroke="#3F5873" stroke-width="1"/>
+  <text x="531.0" y="260.8" class="pill" text-anchor="middle" style="fill:#3F5873" xml:space="preserve">SSH tunnel</text>
+  <text x="48.0" y="352.0" class="note" text-anchor="start" xml:space="preserve">The tunnel uses your SSH login. Nothing new is exposed on the Thor.</text>
 </svg>

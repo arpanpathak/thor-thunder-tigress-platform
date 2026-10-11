@@ -1,34 +1,55 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 330" width="900" height="330">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 372" width="960" height="372" role="img" aria-label="A bar of 128 GB with about 115 GB usable. Reported peak memory: QLoRA on a 27B model about 28 GB, full fine-tuning of a 4B model about 42 GB, LoRA on a 9B model about 50 GB.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .label { fill: #1D2733; font-size: 13px; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
-  <rect width="900" height="330" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">128 GB of unified memory, shared by the CPU and the GPU</text>
-
-  <!-- Scale: 780 px for 128 GB, so 6.094 px per GB, starting at x = 60 -->
-  <rect x="60" y="62" width="780" height="34" rx="6" fill="#F4F7FA" stroke="#B0BEC5"/>
-  <rect x="60" y="62" width="700.8" height="34" rx="6" fill="#E8EEF6" stroke="#3B6FD4" stroke-width="1.5"/>
-  <text x="70" y="84" class="label">about 115 GB usable for a training job</text>
-  <text x="772" y="84" class="note">OS</text>
-  <text x="60" y="114" class="note mono">0</text>
-  <text x="840" y="114" class="note mono" text-anchor="end">128 GB</text>
-
-  <!-- Reported budgets -->
-  <text x="60" y="150" class="note">Reported peak memory per training method (from the project notes, not measured here):</text>
-
-  <rect x="60" y="164" width="170.6" height="28" rx="5" fill="#4E8A16" fill-opacity="0.18" stroke="#4E8A16"/>
-  <text x="240" y="183" class="label">QLoRA, 27B model: about 28 GB</text>
-
-  <rect x="60" y="202" width="255.9" height="28" rx="5" fill="#B7791F" fill-opacity="0.15" stroke="#B7791F"/>
-  <text x="326" y="221" class="label">Full fine-tune, 4B model: about 42 GB</text>
-
-  <rect x="60" y="240" width="304.7" height="28" rx="5" fill="#1E88A8" fill-opacity="0.15" stroke="#1E88A8"/>
-  <text x="375" y="259" class="label">LoRA, 9B model: about 50 GB</text>
-
-  <text x="60" y="300" class="note">Bandwidth: 273 GB/s. Each training step reads all weights,</text>
-  <text x="60" y="318" class="note">so step time is bound by memory bandwidth, not compute.</text>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="960" height="372" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">128 GB of unified memory, shared by the CPU and the GPU</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">The three bars below are drawn on the same scale as the 128 GB bar.</text>
+  <clipPath id="clip-60-96"><rect x="60" y="96" width="840" height="40" rx="6"/></clipPath>
+  <g clip-path="url(#clip-60-96)" filter="url(#lift)">
+  <rect x="60.0" y="96" width="85.3" height="40" fill="#8A99AB"/>
+  <text x="102.7" y="120.2" class="pill" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">OS</text>
+  <rect x="145.3" y="96" width="754.7" height="40" fill="#1F8A70"/>
+  <text x="522.7" y="120.2" class="pill" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">about 115 GB usable for a training job</text>
+  </g>
+  <rect x="60" y="96" width="840" height="40" rx="6" fill="none" stroke="#D5DBE3" stroke-width="1.2"/>
+  <text x="60.0" y="156.0" class="mono dim" text-anchor="start" xml:space="preserve">0</text>
+  <text x="900.0" y="156.0" class="mono dim" text-anchor="end" xml:space="preserve">128 GB</text>
+  <text x="60.0" y="192.0" class="note" text-anchor="start" xml:space="preserve">Reported peak memory per training method (from the project notes, not measured here):</text>
+  <rect x="60" y="206" width="183.8" height="22" rx="5" fill="#5E9400" filter="url(#lift)"/>
+  <text x="255.8" y="221.5" class="note" text-anchor="start" style="fill:#5E9400" xml:space="preserve">QLoRA, 27B model: about 28 GB</text>
+  <rect x="60" y="240" width="275.6" height="22" rx="5" fill="#2F6FDB" filter="url(#lift)"/>
+  <text x="347.6" y="255.5" class="note" text-anchor="start" style="fill:#2F6FDB" xml:space="preserve">Full fine-tune, 4B model: about 42 GB</text>
+  <rect x="60" y="274" width="328.1" height="22" rx="5" fill="#B7791F" filter="url(#lift)"/>
+  <text x="400.1" y="289.5" class="note" text-anchor="start" style="fill:#B7791F" xml:space="preserve">LoRA, 9B model: about 50 GB</text>
+  <text x="60.0" y="330.0" class="note" text-anchor="start" xml:space="preserve">Bandwidth: 273 GB/s. Each training step reads all the weights, so step time is bound by memory</text>
+  <text x="60.0" y="347.0" class="note" text-anchor="start" xml:space="preserve">bandwidth, not by compute.</text>
 </svg>

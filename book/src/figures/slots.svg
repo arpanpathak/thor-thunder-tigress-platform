@@ -1,86 +1,103 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" width="960" height="460" role="img" aria-label="Any number of people send requests with the same key. llama-server keeps a queue and four slots; each request borrows a free slot for one reply, up to 1,048,576 tokens, and gives it back. All slots share one copy of the model weights.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1044 500" width="1044" height="500" role="img" aria-label="Any number of people send requests with the same key. llama-server keeps a queue and four slots; each request borrows a free slot for one reply, up to 1,048,576 tokens, and gives it back. All slots share one copy of the model weights.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .label { fill: #1E88A8; font-size: 12px; }
-    .warn { fill: #D9542B; font-size: 12px; }
-    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .box { fill: #F4F7FA; stroke-width: 2; }
-    .built { stroke: #4E8A16; }
-    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
-    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
-    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
-    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
-    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="460" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">People, slots and the model</text>
-  <rect x="30" y="70" width="130" height="50" rx="10" class="outside"/>
-  <text x="95" y="100" class="name" text-anchor="middle">Browser</text>
-  <path class="flow" d="M160,95 L186.0,95.0 Q196,95 196.0,105.0 L196.0,226.0 Q196,236 206.0,236.0 L228,236" marker-end="url(#arrow)"/>
-  <rect x="30" y="136" width="130" height="50" rx="10" class="outside"/>
-  <text x="95" y="166" class="name" text-anchor="middle">Browser</text>
-  <path class="flow" d="M160,161 L186.0,161.0 Q196,161 196.0,171.0 L196.0,226.0 Q196,236 206.0,236.0 L228,236" marker-end="url(#arrow)"/>
-  <rect x="30" y="202" width="130" height="50" rx="10" class="outside"/>
-  <text x="95" y="232" class="name" text-anchor="middle">Agent</text>
-  <path class="flow" d="M160,236 L228,236" marker-end="url(#arrow)"/>
-  <rect x="30" y="268" width="130" height="50" rx="10" class="outside"/>
-  <text x="95" y="298" class="name" text-anchor="middle">Browser</text>
-  <path class="flow" d="M160,293 L186.0,293.0 Q196,293 196.0,283.0 L196.0,246.0 Q196,236 206.0,236.0 L228,236" marker-end="url(#arrow)"/>
-  <rect x="30" y="334" width="130" height="50" rx="10" class="outside"/>
-  <text x="95" y="364" class="name" text-anchor="middle">Agent</text>
-  <path class="flow" d="M160,359 L186.0,359.0 Q196,359 196.0,349.0 L196.0,246.0 Q196,236 206.0,236.0 L228,236" marker-end="url(#arrow)"/>
-  <text x="95" y="410" class="note" text-anchor="middle">any number of people,</text>
-  <text x="95" y="426" class="note" text-anchor="middle">one key</text>
-  <rect x="250" y="56" width="682" height="390" rx="14" class="zone"/>
-  <text x="264" y="76" class="zonelabel">Jetson AGX Thor: llama-server, --parallel 4</text>
-  <rect x="270" y="186" width="150" height="100" rx="10" class="box built"/>
-  <text x="345" y="216" class="name" text-anchor="middle">Queue</text>
-  <text x="345" y="234" class="note" text-anchor="middle">requests wait here</text>
-  <text x="345" y="252" class="note" text-anchor="middle">when all 4 slots</text>
-  <text x="345" y="268" class="note" text-anchor="middle">are busy</text>
-  <path class="flow" d="M420,236 L448,236" marker-end="url(#arrow)"/>
-  <rect x="472" y="84" width="200" height="66" rx="10" class="box built"/>
-  <text x="572" y="105" class="name" text-anchor="middle">Slot 0</text>
-  <text x="572" y="124" class="note" text-anchor="middle">up to 1,048,576 tokens</text>
-  <text x="572" y="141" class="note" text-anchor="middle">borrowed for one reply</text>
-  <path class="flow" d="M450,236 L450.0,127.0 Q450,117 460.0,117.0 L470,117" marker-end="url(#arrow)"/>
-  <rect x="472" y="170" width="200" height="66" rx="10" class="box built"/>
-  <text x="572" y="191" class="name" text-anchor="middle">Slot 1</text>
-  <text x="572" y="210" class="note" text-anchor="middle">up to 1,048,576 tokens</text>
-  <text x="572" y="227" class="note" text-anchor="middle">borrowed for one reply</text>
-  <path class="flow" d="M450,203 L470,203" marker-end="url(#arrow)"/>
-  <rect x="472" y="256" width="200" height="66" rx="10" class="box built"/>
-  <text x="572" y="277" class="name" text-anchor="middle">Slot 2</text>
-  <text x="572" y="296" class="note" text-anchor="middle">up to 1,048,576 tokens</text>
-  <text x="572" y="313" class="note" text-anchor="middle">borrowed for one reply</text>
-  <path class="flow" d="M450,289 L470,289" marker-end="url(#arrow)"/>
-  <rect x="472" y="342" width="200" height="66" rx="10" class="box built"/>
-  <text x="572" y="363" class="name" text-anchor="middle">Slot 3</text>
-  <text x="572" y="382" class="note" text-anchor="middle">up to 1,048,576 tokens</text>
-  <text x="572" y="399" class="note" text-anchor="middle">borrowed for one reply</text>
-  <path class="flow" d="M450,236 L450.0,365.0 Q450,375 460.0,375.0 L470,375" marker-end="url(#arrow)"/>
-  <rect x="722" y="140" width="190" height="190" rx="10" class="box built"/>
-  <text x="817" y="198" class="name" text-anchor="middle">Model weights</text>
-  <text x="817" y="216" class="note" text-anchor="middle">one copy, 32 GB,</text>
-  <text x="817" y="234" class="note" text-anchor="middle">shared by all slots;</text>
-  <text x="817" y="250" class="note" text-anchor="middle">every step reads</text>
-  <text x="817" y="268" class="note" text-anchor="middle">the weights it uses</text>
-  <text x="817" y="284" class="note" text-anchor="middle">once for all slots</text>
-  <path class="flow" d="M672,203 L720,203" marker-end="url(#arrow)"/>
-  <path class="flow" d="M672,289 L720,289" marker-end="url(#arrow)"/>
-  <path class="flow" d="M672,117 L686.0,117.0 Q696,117 696.0,127.0 L696.0,160.0 Q696,170 706.0,170.0 L720,170" marker-end="url(#arrow)"/>
-  <path class="flow" d="M672,375 L686.0,375.0 Q696,375 696.0,365.0 L696.0,310.0 Q696,300 706.0,300.0 L720,300" marker-end="url(#arrow)"/>
+  <rect width="1044" height="500" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">People, slots and the model</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">A slot is borrowed for one reply and handed back. The weights are loaded once.</text>
+  <rect x="250" y="108" width="770" height="366" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="268" y="97" width="374.1" height="22" rx="11" fill="#1B2430"/>
+  <text x="455.1" y="112.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">JETSON AGX THOR · LLAMA-SERVER, --PARALLEL 4</text>
+  <rect x="40" y="120" width="150" height="46" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,120.7 H46 V165.3 H52 A11.3,11.3 0 0 1 40.7,154 V132 A11.3,11.3 0 0 1 52,120.7 Z" fill="#2F6FDB"/>
+  <text x="60.0" y="148.0" class="name" text-anchor="start" xml:space="preserve">Browser</text>
+  <path class="wire" d="M190,143 L211,143 Q220,143 220,152 L220,258 Q220,267 229,267 L280,267" marker-end="url(#head)"/>
+  <rect x="40" y="182" width="150" height="46" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,182.7 H46 V227.3 H52 A11.3,11.3 0 0 1 40.7,216 V194 A11.3,11.3 0 0 1 52,182.7 Z" fill="#2F6FDB"/>
+  <text x="60.0" y="210.0" class="name" text-anchor="start" xml:space="preserve">Browser</text>
+  <path class="wire" d="M190,205 L211,205 Q220,205 220,214 L220,258 Q220,267 229,267 L280,267" marker-end="url(#head)"/>
+  <rect x="40" y="244" width="150" height="46" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,244.7 H46 V289.3 H52 A11.3,11.3 0 0 1 40.7,278 V256 A11.3,11.3 0 0 1 52,244.7 Z" fill="#2F6FDB"/>
+  <text x="60.0" y="272.0" class="name" text-anchor="start" xml:space="preserve">Agent</text>
+  <path class="wire" d="M190,267 L211,267 Q220,267 220.0,267.0 L220.0,267.0 Q220,267 229,267 L280,267" marker-end="url(#head)"/>
+  <rect x="40" y="306" width="150" height="46" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,306.7 H46 V351.3 H52 A11.3,11.3 0 0 1 40.7,340 V318 A11.3,11.3 0 0 1 52,306.7 Z" fill="#2F6FDB"/>
+  <text x="60.0" y="334.0" class="name" text-anchor="start" xml:space="preserve">Browser</text>
+  <path class="wire" d="M190,329 L211,329 Q220,329 220,320 L220,276 Q220,267 229,267 L280,267" marker-end="url(#head)"/>
+  <rect x="40" y="368" width="150" height="46" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,368.7 H46 V413.3 H52 A11.3,11.3 0 0 1 40.7,402 V380 A11.3,11.3 0 0 1 52,368.7 Z" fill="#2F6FDB"/>
+  <text x="60.0" y="396.0" class="name" text-anchor="start" xml:space="preserve">Agent</text>
+  <path class="wire" d="M190,391 L211,391 Q220,391 220,382 L220,276 Q220,267 229,267 L280,267" marker-end="url(#head)"/>
+  <text x="40.0" y="446.0" class="note" text-anchor="start" xml:space="preserve">any number of people,</text>
+  <text x="40.0" y="463.0" class="note" text-anchor="start" xml:space="preserve">one key</text>
+  <rect x="280" y="217" width="170" height="100" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M292,217.7 H286 V316.3 H292 A11.3,11.3 0 0 1 280.7,305 V229 A11.3,11.3 0 0 1 292,217.7 Z" fill="#7F8EA0"/>
+  <text x="300.0" y="245.0" class="name" text-anchor="start" xml:space="preserve">Queue</text>
+  <text x="300.0" y="263.0" class="sub" text-anchor="start" xml:space="preserve">requests wait here</text>
+  <text x="300.0" y="281.0" class="sub" text-anchor="start" xml:space="preserve">when all 4 slots</text>
+  <text x="300.0" y="299.0" class="sub" text-anchor="start" xml:space="preserve">are busy</text>
+  <path d="M830,189 A85.0,9 0 0 1 1000,189 V345 A85.0,9 0 0 1 830,345 Z" fill="#EEF6DC" stroke="#5E9400" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="915.0" cy="189" rx="85.0" ry="9" fill="#FFFFFF" stroke="#5E9400" stroke-width="1.4"/>
+  <text x="915.0" y="234.0" class="name" text-anchor="middle" xml:space="preserve">Model weights</text>
+  <text x="915.0" y="252.0" class="sub" text-anchor="middle" xml:space="preserve">one copy, 32 GB,</text>
+  <text x="915.0" y="270.0" class="sub" text-anchor="middle" xml:space="preserve">shared by all slots;</text>
+  <text x="915.0" y="288.0" class="sub" text-anchor="middle" xml:space="preserve">every step reads</text>
+  <text x="915.0" y="306.0" class="sub" text-anchor="middle" xml:space="preserve">the weights it uses</text>
+  <text x="915.0" y="324.0" class="sub" text-anchor="middle" xml:space="preserve">once for all slots</text>
+  <rect x="520" y="127" width="230" height="70" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M532,127.7 H526 V196.3 H532 A11.3,11.3 0 0 1 520.7,185 V139 A11.3,11.3 0 0 1 532,127.7 Z" fill="#1F8A70"/>
+  <text x="540.0" y="149.0" class="name" text-anchor="start" xml:space="preserve">Slot 0</text>
+  <text x="540.0" y="167.0" class="sub" text-anchor="start" xml:space="preserve">up to 1,048,576 tokens</text>
+  <text x="540.0" y="185.0" class="sub" text-anchor="start" xml:space="preserve">borrowed for one reply</text>
+  <path class="wire" d="M450,267 L476,267 Q485,267 485,258 L485,171 Q485,162 494,162 L520,162" marker-end="url(#head)"/>
+  <path class="wire idle" d="M750,162 L781,162 Q790,162 790,171 L790,258 Q790,267 799,267 L830,267" marker-end="url(#head-idle)"/>
+  <rect x="520" y="211" width="230" height="70" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M532,211.7 H526 V280.3 H532 A11.3,11.3 0 0 1 520.7,269 V223 A11.3,11.3 0 0 1 532,211.7 Z" fill="#1F8A70"/>
+  <text x="540.0" y="233.0" class="name" text-anchor="start" xml:space="preserve">Slot 1</text>
+  <text x="540.0" y="251.0" class="sub" text-anchor="start" xml:space="preserve">up to 1,048,576 tokens</text>
+  <text x="540.0" y="269.0" class="sub" text-anchor="start" xml:space="preserve">borrowed for one reply</text>
+  <path class="wire" d="M450,267 L476,267 Q485,267 485,258 L485,255 Q485,246 494,246 L520,246" marker-end="url(#head)"/>
+  <path class="wire idle" d="M750,246 L781,246 Q790,246 790,255 L790,258 Q790,267 799,267 L830,267" marker-end="url(#head-idle)"/>
+  <rect x="520" y="295" width="230" height="70" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M532,295.7 H526 V364.3 H532 A11.3,11.3 0 0 1 520.7,353 V307 A11.3,11.3 0 0 1 532,295.7 Z" fill="#1F8A70"/>
+  <text x="540.0" y="317.0" class="name" text-anchor="start" xml:space="preserve">Slot 2</text>
+  <text x="540.0" y="335.0" class="sub" text-anchor="start" xml:space="preserve">up to 1,048,576 tokens</text>
+  <text x="540.0" y="353.0" class="sub" text-anchor="start" xml:space="preserve">borrowed for one reply</text>
+  <path class="wire" d="M450,267 L476,267 Q485,267 485,276 L485,321 Q485,330 494,330 L520,330" marker-end="url(#head)"/>
+  <path class="wire idle" d="M750,330 L781,330 Q790,330 790,321 L790,276 Q790,267 799,267 L830,267" marker-end="url(#head-idle)"/>
+  <rect x="520" y="379" width="230" height="70" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M532,379.7 H526 V448.3 H532 A11.3,11.3 0 0 1 520.7,437 V391 A11.3,11.3 0 0 1 532,379.7 Z" fill="#1F8A70"/>
+  <text x="540.0" y="401.0" class="name" text-anchor="start" xml:space="preserve">Slot 3</text>
+  <text x="540.0" y="419.0" class="sub" text-anchor="start" xml:space="preserve">up to 1,048,576 tokens</text>
+  <text x="540.0" y="437.0" class="sub" text-anchor="start" xml:space="preserve">borrowed for one reply</text>
+  <path class="wire" d="M450,267 L476,267 Q485,267 485,276 L485,405 Q485,414 494,414 L520,414" marker-end="url(#head)"/>
+  <path class="wire idle" d="M750,414 L781,414 Q790,414 790,405 L790,276 Q790,267 799,267 L830,267" marker-end="url(#head-idle)"/>
 </svg>

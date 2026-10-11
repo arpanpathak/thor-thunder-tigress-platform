@@ -18,6 +18,17 @@ stops writing AI slop, in prose and in Rust.
 | `thor-tigress-keyring`: the encrypted registry of who may chat, one key per person | built |
 | Fine-tuning and before/after scoring | planned |
 
+<figure>
+<img src="figures/project-map.svg" alt="Two groups. The tigress, the platform: spark scores answers, thor-hammer-trainer builds the training set, reinforcer is the review page, lasso makes conversations from books, and fine-tuning with before and after scoring is planned. The cub, on the Jetson Thor: the chat page, thor-tigress-agent serving the page, keys, tools and API, thor-tigress-keyring holding who may chat, the model servers llama.cpp and TensorRT Edge-LLM, and thor-tigress-serve managing the models.">
+<figcaption>The parts of the project, and which of them exist.</figcaption>
+</figure>
+
+The two halves meet in one place. The platform's job is to produce a model
+that writes better, and to prove it with `spark`'s numbers. The cub's job is to
+put a model in front of people. Today the cub serves models that other
+people trained. When the fine-tune exists, the cub will serve it, and `spark`
+will say whether it was worth serving.
+
 ## Meet the cub
 
 <img class="cub" src="art/cub.svg" alt="The Thor Tigress Cub: a grey-blue tiger cub in a winged helmet, raising a small hammer that throws sparks">

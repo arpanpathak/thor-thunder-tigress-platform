@@ -1,69 +1,98 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" width="960" height="430" role="img" aria-label="Every earlier token has a key and a value. The query of the token being written is compared with every key before it, and the matching values decide the next token. The keys and values kept are the KV cache, so memory grows with the conversation. This model is a hybrid: only 6 of its 52 layers use attention this way.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 456" width="1050" height="456" role="img" aria-label="Every earlier token has a key and a value. The query of the token being written is compared with every key before it, and the matching values decide the next token. The keys and values kept are the KV cache, so memory grows with the conversation. This model is a hybrid: only 6 of its 52 layers use attention this way.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .label { fill: #1E88A8; font-size: 12px; }
-    .warn { fill: #D9542B; font-size: 12px; }
-    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .box { fill: #F4F7FA; stroke-width: 2; }
-    .built { stroke: #4E8A16; }
-    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
-    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
-    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
-    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
-    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="430" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">What KV means: a key and a value per token</text>
-
-  <rect x="30" y="64" width="290" height="48" rx="8" class="outside"/>
-  <text x="175" y="94" class="note" text-anchor="middle">Query: what it wants now</text>
-  <rect x="335" y="64" width="290" height="48" rx="8" class="outside"/>
-  <text x="480" y="94" class="note" text-anchor="middle">Key: what each token offers</text>
-  <rect x="640" y="64" width="290" height="48" rx="8" class="outside"/>
-  <text x="785" y="94" class="note" text-anchor="middle">Value: what each token gives</text>
-
-  <text x="30" y="140" class="label">every earlier token</text>
-  <rect x="30" y="150" width="86" height="36" rx="6" class="box built"/><text x="73" y="173" class="note mono" text-anchor="middle">t1</text>
-  <rect x="136" y="150" width="86" height="36" rx="6" class="box built"/><text x="179" y="173" class="note mono" text-anchor="middle">t2</text>
-  <rect x="242" y="150" width="86" height="36" rx="6" class="box built"/><text x="285" y="173" class="note mono" text-anchor="middle">t3</text>
-  <rect x="348" y="150" width="86" height="36" rx="6" class="box built"/><text x="391" y="173" class="note mono" text-anchor="middle">t4</text>
-  <rect x="454" y="150" width="86" height="36" rx="6" class="box built"/><text x="497" y="173" class="note mono" text-anchor="middle">t5</text>
-  <rect x="560" y="150" width="86" height="36" rx="6" class="box built"/><text x="603" y="173" class="note mono" text-anchor="middle">t6</text>
-
-  <rect x="30" y="200" width="86" height="34" rx="6" class="outside"/><text x="73" y="222" class="note" text-anchor="middle">K V</text>
-  <rect x="136" y="200" width="86" height="34" rx="6" class="outside"/><text x="179" y="222" class="note" text-anchor="middle">K V</text>
-  <rect x="242" y="200" width="86" height="34" rx="6" class="outside"/><text x="285" y="222" class="note" text-anchor="middle">K V</text>
-  <rect x="348" y="200" width="86" height="34" rx="6" class="outside"/><text x="391" y="222" class="note" text-anchor="middle">K V</text>
-  <rect x="454" y="200" width="86" height="34" rx="6" class="outside"/><text x="497" y="222" class="note" text-anchor="middle">K V</text>
-  <rect x="560" y="200" width="86" height="34" rx="6" class="outside"/><text x="603" y="222" class="note" text-anchor="middle">K V</text>
-
-  <rect x="700" y="150" width="230" height="84" rx="10" class="box built"/>
-  <text x="815" y="180" class="name" text-anchor="middle">the token being written</text>
-  <text x="815" y="202" class="note" text-anchor="middle">its query reads every</text>
-  <text x="815" y="220" class="note" text-anchor="middle">key before it</text>
-
-  <rect x="700" y="270" width="230" height="84" rx="10" class="box built"/>
-  <text x="815" y="300" class="name" text-anchor="middle">the next token</text>
-  <text x="815" y="322" class="note" text-anchor="middle">the matching values</text>
-  <text x="815" y="340" class="note" text-anchor="middle">decide the word</text>
-
-  <path class="flow" d="M698,192 L650,192" marker-end="url(#arrow)"/>
-
-  <rect x="30" y="276" width="640" height="84" rx="10" class="outside"/>
-  <text x="350" y="306" class="name" text-anchor="middle">The KV cache</text>
-  <text x="350" y="328" class="note" text-anchor="middle">those keys and values, kept so they are not recomputed</text>
-  <text x="350" y="346" class="note" text-anchor="middle">memory grows with the conversation, one entry per token</text>
-
-  <text x="30" y="392" class="warn">This model is a hybrid: only 6 of its 52 layers use attention this way.</text>
-  <text x="30" y="416" class="note">The rest keep a fixed state, which is why a million tokens fit on the Thor.</text>
+  <rect width="1050" height="456" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">What KV means: a key and a value per token</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Each token leaves two things behind for the tokens after it.</text>
+  <rect x="60.0" y="100" width="172.4" height="18" rx="9" fill="#E7F5E9"/>
+  <text x="146.2" y="112.6" class="pill" text-anchor="middle" style="fill:#2E8B3D" xml:space="preserve">Query: what it wants now</text>
+  <rect x="250.0" y="100" width="192.2" height="18" rx="9" fill="#EAF1FD"/>
+  <text x="346.1" y="112.6" class="pill" text-anchor="middle" style="fill:#2F6FDB" xml:space="preserve">Key: what each token offers</text>
+  <rect x="458.0" y="100" width="198.8" height="18" rx="9" fill="#FBF1DC"/>
+  <text x="557.4" y="112.6" class="pill" text-anchor="middle" style="fill:#B7791F" xml:space="preserve">Value: what each token gives</text>
+  <text x="60.0" y="152.0" class="note" text-anchor="start" xml:space="preserve">every earlier token</text>
+  <rect x="60" y="164" width="84" height="84" rx="10" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <text x="102.0" y="194.0" class="name" text-anchor="middle" xml:space="preserve">t1</text>
+  <rect x="72" y="210" width="26" height="22" rx="6" fill="#EAF1FD"/>
+  <text x="85.0" y="225.5" class="pill" text-anchor="middle" style="fill:#2F6FDB" xml:space="preserve">K</text>
+  <rect x="106" y="210" width="26" height="22" rx="6" fill="#FBF1DC"/>
+  <text x="119.0" y="225.5" class="pill" text-anchor="middle" style="fill:#B7791F" xml:space="preserve">V</text>
+  <rect x="160" y="164" width="84" height="84" rx="10" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <text x="202.0" y="194.0" class="name" text-anchor="middle" xml:space="preserve">t2</text>
+  <rect x="172" y="210" width="26" height="22" rx="6" fill="#EAF1FD"/>
+  <text x="185.0" y="225.5" class="pill" text-anchor="middle" style="fill:#2F6FDB" xml:space="preserve">K</text>
+  <rect x="206" y="210" width="26" height="22" rx="6" fill="#FBF1DC"/>
+  <text x="219.0" y="225.5" class="pill" text-anchor="middle" style="fill:#B7791F" xml:space="preserve">V</text>
+  <rect x="260" y="164" width="84" height="84" rx="10" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <text x="302.0" y="194.0" class="name" text-anchor="middle" xml:space="preserve">t3</text>
+  <rect x="272" y="210" width="26" height="22" rx="6" fill="#EAF1FD"/>
+  <text x="285.0" y="225.5" class="pill" text-anchor="middle" style="fill:#2F6FDB" xml:space="preserve">K</text>
+  <rect x="306" y="210" width="26" height="22" rx="6" fill="#FBF1DC"/>
+  <text x="319.0" y="225.5" class="pill" text-anchor="middle" style="fill:#B7791F" xml:space="preserve">V</text>
+  <rect x="360" y="164" width="84" height="84" rx="10" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <text x="402.0" y="194.0" class="name" text-anchor="middle" xml:space="preserve">t4</text>
+  <rect x="372" y="210" width="26" height="22" rx="6" fill="#EAF1FD"/>
+  <text x="385.0" y="225.5" class="pill" text-anchor="middle" style="fill:#2F6FDB" xml:space="preserve">K</text>
+  <rect x="406" y="210" width="26" height="22" rx="6" fill="#FBF1DC"/>
+  <text x="419.0" y="225.5" class="pill" text-anchor="middle" style="fill:#B7791F" xml:space="preserve">V</text>
+  <rect x="460" y="164" width="84" height="84" rx="10" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <text x="502.0" y="194.0" class="name" text-anchor="middle" xml:space="preserve">t5</text>
+  <rect x="472" y="210" width="26" height="22" rx="6" fill="#EAF1FD"/>
+  <text x="485.0" y="225.5" class="pill" text-anchor="middle" style="fill:#2F6FDB" xml:space="preserve">K</text>
+  <rect x="506" y="210" width="26" height="22" rx="6" fill="#FBF1DC"/>
+  <text x="519.0" y="225.5" class="pill" text-anchor="middle" style="fill:#B7791F" xml:space="preserve">V</text>
+  <rect x="560" y="164" width="84" height="84" rx="10" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <text x="602.0" y="194.0" class="name" text-anchor="middle" xml:space="preserve">t6</text>
+  <rect x="572" y="210" width="26" height="22" rx="6" fill="#EAF1FD"/>
+  <text x="585.0" y="225.5" class="pill" text-anchor="middle" style="fill:#2F6FDB" xml:space="preserve">K</text>
+  <rect x="606" y="210" width="26" height="22" rx="6" fill="#FBF1DC"/>
+  <text x="619.0" y="225.5" class="pill" text-anchor="middle" style="fill:#B7791F" xml:space="preserve">V</text>
+  <rect x="720" y="164" width="290" height="84" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M732,164.7 H726 V247.3 H732 A11.3,11.3 0 0 1 720.7,236 V176 A11.3,11.3 0 0 1 732,164.7 Z" fill="#2E8B3D"/>
+  <text x="740.0" y="193.0" class="name" text-anchor="start" xml:space="preserve">the token being written</text>
+  <text x="740.0" y="211.0" class="sub" text-anchor="start" xml:space="preserve">its query reads every</text>
+  <text x="740.0" y="229.0" class="sub" text-anchor="start" xml:space="preserve">key before it</text>
+  <path class="wire" d="M720,206 L652,206" marker-end="url(#head)"/>
+  <rect x="60" y="290" width="584" height="90" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M72,290.7 H66 V379.3 H72 A11.3,11.3 0 0 1 60.7,368 V302 A11.3,11.3 0 0 1 72,290.7 Z" fill="#1F8A70"/>
+  <text x="80.0" y="322.0" class="name" text-anchor="start" xml:space="preserve">The KV cache</text>
+  <text x="80.0" y="340.0" class="sub" text-anchor="start" xml:space="preserve">those keys and values, kept so they are not recomputed</text>
+  <text x="80.0" y="358.0" class="sub" text-anchor="start" xml:space="preserve">memory grows with the conversation, one entry per token</text>
+  <rect x="720" y="290" width="290" height="90" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M732,290.7 H726 V379.3 H732 A11.3,11.3 0 0 1 720.7,368 V302 A11.3,11.3 0 0 1 732,290.7 Z" fill="#7A4FD0"/>
+  <text x="740.0" y="322.0" class="name" text-anchor="start" xml:space="preserve">the next token</text>
+  <text x="740.0" y="340.0" class="sub" text-anchor="start" xml:space="preserve">the matching values</text>
+  <text x="740.0" y="358.0" class="sub" text-anchor="start" xml:space="preserve">decide the word</text>
+  <path class="wire" d="M865,248 L865,290" marker-end="url(#head)"/>
+  <text x="60.0" y="416.0" class="note" text-anchor="start" xml:space="preserve">This model is a hybrid: only 6 of its 52 layers use attention this way.</text>
+  <text x="60.0" y="436.0" class="note" text-anchor="start" xml:space="preserve">The rest keep a fixed state, which is why a million tokens fit on the Thor.</text>
 </svg>
