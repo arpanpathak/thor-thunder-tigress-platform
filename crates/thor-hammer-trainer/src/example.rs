@@ -74,6 +74,7 @@ impl Example {
     pub fn dedup_key(&self) -> String {
         let instruction_words: Vec<&str> = self.instruction.split_whitespace().collect();
         let response_words: Vec<&str> = self.response.split_whitespace().collect();
+
         format!(
             "{}\n{}",
             instruction_words.join(" "),
@@ -92,10 +93,13 @@ impl Example {
 /// The FNV-1a hash of `text`, as 16 hex digits.
 pub fn stable_id(text: &str) -> String {
     const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+
     const FNV_PRIME: u64 = 0x0100_0000_01b3;
+
     let hash = text.bytes().fold(FNV_OFFSET_BASIS, |hash, byte| {
         (hash ^ u64::from(byte)).wrapping_mul(FNV_PRIME)
     });
+
     format!("{hash:016x}")
 }
 

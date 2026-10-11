@@ -4,20 +4,24 @@
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
-    sync::mpsc,
     thread,
 };
 
+use axum::http::StatusCode;
+
 use crate::{
-    address::Url,
+    web::{
+        address::Url,
+        http::{Fetched, Web},
+    },
     error::{AgentError, Outcome},
-    http::{Fetched, Web},
+    server::response::Client,
 };
 
 /// A server on `127.0.0.1` at a free port, serving canned responses in order.
 pub struct FakeServer {
     address: String,
-    received: mpsc::Receiver<Outcome<String>>,
+    serving: thread::JoinHandle<Vec<Outcome<String>>>,
 }
 
 impl FakeServer {
@@ -25,13 +29,14 @@ impl FakeServer {
     pub fn start(responses: Vec<String>) -> Outcome<Self> {
         let listener = TcpListener::bind("127.0.0.1:0")?;
         let address = listener.local_addr()?.to_string();
-        let (sender, received) = mpsc::channel();
-        thread::spawn(move || {
-            for response in responses {
-                let _ = sender.send(serve_one(&listener, &response));
-            }
+        let serving = thread::spawn(move || {
+            responses
+                .iter()
+                .map(|response| serve_one(&listener, response))
+                .collect()
         });
-        Ok(FakeServer { address, received })
+
+        Ok(FakeServer { address, serving })
     }
 
     /// The `host:port` to call.
@@ -41,7 +46,11 @@ impl FakeServer {
 
     /// Waits until every response is sent, and returns the requests received.
     pub fn requests(self) -> Outcome<Vec<String>> {
-        self.received.into_iter().collect()
+        self.serving
+            .join()
+            .map_err(|_| AgentError::Upstream("the fake server panicked".to_string()))?
+            .into_iter()
+            .collect()
     }
 }
 
@@ -49,7 +58,9 @@ impl FakeServer {
 fn serve_one(listener: &TcpListener, response: &str) -> Outcome<String> {
     let (mut stream, _) = listener.accept()?;
     let request = read_raw_request(&stream)?;
+
     stream.write_all(response.as_bytes())?;
+
     Ok(request)
 }
 
@@ -73,9 +84,11 @@ fn read_raw_request(stream: &TcpStream) -> Outcome<String> {
             length = value.trim().parse().unwrap_or(0);
         }
     }
+
     let mut body = vec![0; length];
     reader.read_exact(&mut body)?;
     raw.push_str(&String::from_utf8_lossy(&body));
+
     Ok(raw)
 }
 
@@ -96,7 +109,9 @@ pub fn event_stream(events: &[&str]) -> String {
         response.push_str(event);
         response.push_str("\n\n");
     }
+
     response.push_str("data: [DONE]\n\n");
+
     response
 }
 
@@ -113,6 +128,23 @@ impl Write for Gone {
     }
 }
 
+impl Client for Gone {
+    fn begin(&mut self, _: StatusCode, _: &str) -> Outcome {
+        Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe).into())
+    }
+}
+
+/// A client kept in memory: the answer's head as text, then its body.
+impl Client for Vec<u8> {
+    fn begin(&mut self, status: StatusCode, content_type: &str) -> Outcome {
+        let head = format!("HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\n\r\n");
+
+        self.extend_from_slice(head.as_bytes());
+
+        Ok(())
+    }
+}
+
 /// A stand-in for the real web: canned pages, keyed by address.
 #[derive(Debug, Default)]
 pub struct FakeWeb {
@@ -124,9 +156,11 @@ impl FakeWeb {
     #[must_use]
     pub fn new(pages: Vec<(&str, Fetched)>) -> Self {
         let mut fake = FakeWeb::default();
+
         for (url, page) in pages {
             fake.pages.insert((*url).to_string(), page);
         }
+
         fake
     }
 }

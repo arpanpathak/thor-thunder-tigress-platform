@@ -1,15 +1,18 @@
 //! The one error type of the crate.
 
-use std::{fmt, io, path::PathBuf};
+use std::{io, path::PathBuf};
+
+use thiserror::Error;
 
 /// A keyring result, before it is returned.
 pub type Outcome<T> = Result<T, KeyringError>;
 
 /// Everything that can go wrong while reading, writing or changing the
 /// registry.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum KeyringError {
     /// A file could not be read or written.
+    #[error("{}: {source}", path.display())]
     Io {
         /// The file involved.
         path: PathBuf,
@@ -17,6 +20,7 @@ pub enum KeyringError {
         source: io::Error,
     },
     /// The file exists but is not a keyring this version can read.
+    #[error("{}: {message}", path.display())]
     Format {
         /// The file involved.
         path: PathBuf,
@@ -25,8 +29,10 @@ pub enum KeyringError {
     },
     /// The file did not open: the passphrase is wrong, or the file was changed
     /// outside the tool.
+    #[error("wrong passphrase, or the file was changed")]
     Sealed,
     /// The decrypted contents are not the JSON this version writes.
+    #[error("{}: {source}", path.display())]
     Json {
         /// The file involved.
         path: PathBuf,
@@ -34,27 +40,37 @@ pub enum KeyringError {
         source: serde_json::Error,
     },
     /// The passphrase could not be turned into a key.
-    Kdf(argon2::Error),
+    #[error("passphrase key: {0}")]
+    Kdf(#[source] argon2::Error),
     /// The operating system refused to give random bytes.
-    Random(getrandom::Error),
+    #[error("randomness: {0}")]
+    Random(#[source] getrandom::Error),
     /// A keyring already exists at the given path.
+    #[error("{}: already exists", path.display())]
     Exists {
         /// The file involved.
         path: PathBuf,
     },
     /// No record matches what was asked for.
+    #[error("no record for {0}")]
     NotFound(String),
     /// The person already has a working key.
+    #[error("{0} already has a key")]
     AlreadyActive(String),
     /// A name, an email address or a request is not acceptable.
+    #[error("{0}")]
     Invalid(String),
     /// The passphrase is empty.
+    #[error("the passphrase is empty")]
     EmptyPassphrase,
     /// A key handed to the cipher is not the 32 bytes it must be.
+    #[error("the key must be 32 bytes")]
     KeyLength,
     /// A nonce handed to the cipher is not the 24 bytes it must be.
+    #[error("the nonce must be 24 bytes")]
     NonceLength,
     /// The command line was not understood.
+    #[error("{0}")]
     Usage(String),
 }
 
@@ -62,58 +78,8 @@ impl KeyringError {
     /// A closure that wraps an I/O error with the path it happened on.
     pub fn io(path: impl Into<PathBuf>) -> impl FnOnce(io::Error) -> KeyringError {
         let path = path.into();
+
         move |source| KeyringError::Io { path, source }
-    }
-}
-
-impl fmt::Display for KeyringError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            KeyringError::Io { path, source } => write!(formatter, "{}: {source}", path.display()),
-            KeyringError::Format { path, message } => {
-                write!(formatter, "{}: {message}", path.display())
-            }
-            KeyringError::Sealed => {
-                formatter.write_str("wrong passphrase, or the file was changed")
-            }
-            KeyringError::Json { path, source } => {
-                write!(formatter, "{}: {source}", path.display())
-            }
-            KeyringError::Kdf(error) => write!(formatter, "passphrase key: {error}"),
-            KeyringError::Random(error) => write!(formatter, "randomness: {error}"),
-            KeyringError::Exists { path } => {
-                write!(formatter, "{}: already exists", path.display())
-            }
-            KeyringError::NotFound(who) => write!(formatter, "no record for {who}"),
-            KeyringError::AlreadyActive(who) => write!(formatter, "{who} already has a key"),
-            KeyringError::Invalid(message) | KeyringError::Usage(message) => {
-                formatter.write_str(message)
-            }
-            KeyringError::EmptyPassphrase => formatter.write_str("the passphrase is empty"),
-            KeyringError::KeyLength => formatter.write_str("the key must be 32 bytes"),
-            KeyringError::NonceLength => formatter.write_str("the nonce must be 24 bytes"),
-        }
-    }
-}
-
-impl std::error::Error for KeyringError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            KeyringError::Io { source, .. } => Some(source),
-            KeyringError::Json { source, .. } => Some(source),
-            KeyringError::Kdf(error) => Some(error),
-            KeyringError::Random(error) => Some(error),
-            KeyringError::Format { .. }
-            | KeyringError::Sealed
-            | KeyringError::Exists { .. }
-            | KeyringError::NotFound(_)
-            | KeyringError::AlreadyActive(_)
-            | KeyringError::Invalid(_)
-            | KeyringError::EmptyPassphrase
-            | KeyringError::KeyLength
-            | KeyringError::NonceLength
-            | KeyringError::Usage(_) => None,
-        }
     }
 }
 
@@ -154,6 +120,7 @@ mod tests {
     #[test]
     fn every_error_says_what_went_wrong() {
         let said: Vec<String> = every_error().iter().map(ToString::to_string).collect();
+
         assert_eq!(said[0], "keyring: disk full");
         assert_eq!(said[1], "keyring: not a keyring");
         assert_eq!(said[2], "wrong passphrase, or the file was changed");
@@ -176,6 +143,7 @@ mod tests {
             .iter()
             .map(|error| std::error::Error::source(error).is_some())
             .collect();
+
         assert_eq!(
             sources,
             [

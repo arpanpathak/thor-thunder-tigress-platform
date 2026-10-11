@@ -96,22 +96,40 @@ pub fn usage() -> String {
 /// [`DistillError::Usage`] for an unknown option, a missing value or a value
 /// that should be a number and is not.
 pub fn options(arguments: &[String], key: Option<String>) -> Result<Options, DistillError> {
-    let mut options = Options {
-        train: PathBuf::from("data/train.jsonl"),
-        out: PathBuf::from("data/conversations.jsonl"),
-        books: Vec::new(),
-        turns: 3,
-        limit: None,
-        client: Client {
-            address: DEFAULT_SERVER.to_string(),
-            model: "teacher".to_string(),
-            key: key.filter(|key| !key.is_empty()),
-        },
-        dry_run: false,
-    };
+    let mut options = Options::with_key(key);
     let mut rest = arguments.iter();
 
     while let Some(argument) = rest.next() {
+        options.set(argument, &mut rest)?;
+    }
+
+    Ok(options)
+}
+
+impl Options {
+    /// The defaults, with the server's access key when it is not empty.
+    fn with_key(key: Option<String>) -> Self {
+        Options {
+            train: PathBuf::from("data/train.jsonl"),
+            out: PathBuf::from("data/conversations.jsonl"),
+            books: Vec::new(),
+            turns: 3,
+            limit: None,
+            client: Client {
+                address: DEFAULT_SERVER.to_string(),
+                model: "teacher".to_string(),
+                key: key.filter(|key| !key.is_empty()),
+            },
+            dry_run: false,
+        }
+    }
+
+    /// Records the option `argument`, reading its value from `rest`.
+    fn set<'a>(
+        &mut self,
+        argument: &str,
+        rest: &mut impl Iterator<Item = &'a String>,
+    ) -> Result<(), DistillError> {
         let mut value = || {
             rest.next()
                 .cloned()
@@ -122,25 +140,48 @@ pub fn options(arguments: &[String], key: Option<String>) -> Result<Options, Dis
                 .map_err(|_| DistillError::Usage(format!("{argument} needs a number, not {text}")))
         };
 
-        match argument.as_str() {
-            "--train" => options.train = PathBuf::from(value()?),
-            "--out" => options.out = PathBuf::from(value()?),
-            "--books" => options.books = value()?.split(',').map(str::to_string).collect(),
-            "--turns" => options.turns = number(value()?)?,
-            "--limit" => options.limit = Some(number(value()?)?),
-            "--server" => options.client.address = value()?,
-            "--model" => options.client.model = value()?,
-            "--dry-run" => options.dry_run = true,
+        match argument {
+            "--train" => self.train = PathBuf::from(value()?),
+            "--out" => self.out = PathBuf::from(value()?),
+            "--books" => self.books = value()?.split(',').map(str::to_string).collect(),
+            "--turns" => self.turns = number(value()?)?,
+            "--limit" => self.limit = Some(number(value()?)?),
+            "--server" => self.client.address = value()?,
+            "--model" => self.client.model = value()?,
+            "--dry-run" => self.dry_run = true,
             other => {
-                return Err(DistillError::Usage(format!(
-                    "unknown option {other}\n{}",
-                    usage()
-                )));
+                let message = format!("unknown option {other}\n{}", usage());
+
+                return Err(DistillError::Usage(message));
             }
         }
+
+        Ok(())
+    }
+}
+
+/// Writes how many conversations and turns are planned, in all and per book.
+fn report_plan(planned: &[Vec<Passage>], out: &mut impl Write) -> Result<(), DistillError> {
+    let counts = conversations::plan_counts(planned);
+    let turns: usize = planned.iter().map(Vec::len).sum();
+
+    writeln!(
+        out,
+        "{} conversations, {turns} turns, from {} books and doc sets",
+        planned.len(),
+        counts.len()
+    )
+    .map_err(DistillError::io("standard output"))?;
+
+    for (book, (talks, turns)) in &counts {
+        writeln!(
+            out,
+            "  {book:<44} {talks:>5} conversations {turns:>6} turns"
+        )
+        .map_err(DistillError::io("standard output"))?;
     }
 
-    Ok(options)
+    Ok(())
 }
 
 /// Plans the conversations, skips the ones already written, and writes the
@@ -153,30 +194,16 @@ pub fn options(arguments: &[String], key: Option<String>) -> Result<Options, Dis
 pub fn run(options: &Options, out: &mut impl Write) -> Result<(), DistillError> {
     let passages = conversations::read_passages(&options.train, &options.books)?;
     let planned = conversations::plan(passages, options.turns);
-    let counts = conversations::plan_counts(&planned);
-    let turns: usize = planned.iter().map(Vec::len).sum();
-    let console = DistillError::io("standard output");
-    writeln!(
-        out,
-        "{} conversations, {turns} turns, from {} books and doc sets",
-        planned.len(),
-        counts.len()
-    )
-    .map_err(console)?;
 
-    for (book, (talks, turns)) in &counts {
-        writeln!(
-            out,
-            "  {book:<44} {talks:>5} conversations {turns:>6} turns"
-        )
-        .map_err(DistillError::io("standard output"))?;
-    }
+    report_plan(&planned, out)?;
+
     let finished = finished_keys(&options.out)?;
     let remaining: Vec<&Vec<Passage>> = planned
         .iter()
         .filter(|sections| !finished.contains(&conversations::conversation_key(sections)))
         .collect();
     let done = planned.len() - remaining.len();
+
     writeln!(
         out,
         "{done} already in {}, {} left",
@@ -184,6 +211,7 @@ pub fn run(options: &Options, out: &mut impl Write) -> Result<(), DistillError> 
         remaining.len()
     )
     .map_err(DistillError::io("standard output"))?;
+
     let chosen: Vec<&Vec<Passage>> = remaining
         .into_iter()
         .take(options.limit.unwrap_or(usize::MAX))
@@ -211,10 +239,12 @@ fn write_prompts(
                 .iter()
                 .map(|message| json!({ "role": message.role, "content": message.content }))
                 .collect();
+
             json!({ "origin": passage.origin, "messages": messages }).to_string()
         })
         .collect();
     fs::write(&path, lines.join("\n") + "\n").map_err(DistillError::io(&path))?;
+
     writeln!(
         out,
         "dry run: wrote {} first-turn prompts to {}",
@@ -231,6 +261,7 @@ fn finished_keys(path: &Path) -> Result<HashSet<String>, DistillError> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(HashSet::new()),
         Err(error) => return Err(DistillError::io(path)(error)),
     };
+
     Ok(text
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
@@ -265,6 +296,7 @@ fn generate(
             let line = conversation.to_json(&options.client.model);
             writeln!(file, "{line}").map_err(DistillError::io(&options.out))?;
         }
+
         let count = done + 1;
 
         if count % PROGRESS_EVERY == 0 || count == chosen.len() {
@@ -276,6 +308,7 @@ fn generate(
             writeln!(out, "{line}").map_err(DistillError::io("standard output"))?;
         }
     }
+
     writeln!(out, "wrote {}", options.out.display()).map_err(DistillError::io("standard output"))
 }
 
@@ -288,16 +321,13 @@ mod tests {
         list.iter().map(ToString::to_string).collect()
     }
 
-    struct Folder {
-        path: PathBuf,
-    }
+    /// A fresh folder holding a small training file, removed when dropped.
+    struct Folder(tempfile::TempDir);
 
     impl Folder {
-        fn new(name: &str) -> Result<Self, DistillError> {
-            let path =
-                std::env::temp_dir().join(format!("thor-lasso-cli-{name}-{}", std::process::id()));
-            fs::create_dir_all(&path).map_err(DistillError::io(&path))?;
-            let train = path.join("train.jsonl");
+        fn new() -> Result<Self, DistillError> {
+            let folder = tempfile::tempdir().map_err(DistillError::io("temporary folder"))?;
+            let train = folder.path().join("train.jsonl");
             let lines = [
                 r##"{"instruction":"","response":"# Vectors\n\nUse push to grow a vector.","origin":"trpl/src/ch08.md"}"##,
                 r##"{"instruction":"","response":"# Strings\n\nUse push_str to append.","origin":"trpl/src/ch08.md"}"##,
@@ -305,44 +335,34 @@ mod tests {
                 r##"{"instruction":"Q","response":"A","origin":"chat"}"##,
             ];
             fs::write(&train, lines.join("\n")).map_err(DistillError::io(&train))?;
-            Ok(Self { path })
+
+            Ok(Self(folder))
+        }
+
+        fn path(&self) -> &Path {
+            self.0.path()
         }
 
         fn arguments(&self, extra: &[&str]) -> Vec<String> {
-            let train = self.path.join("train.jsonl").display().to_string();
-            let out = self.path.join("conversations.jsonl").display().to_string();
+            let train = self.path().join("train.jsonl").display().to_string();
+            let out = self
+                .path()
+                .join("conversations.jsonl")
+                .display()
+                .to_string();
             let mut arguments = words(&["conversations", "--train", &train, "--out", &out]);
             arguments.extend(words(extra));
-            arguments
-        }
-    }
 
-    impl Drop for Folder {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.path);
+            arguments
         }
     }
 
     #[test]
     fn reads_every_option() -> Result<(), DistillError> {
-        let arguments = words(&[
-            "--train",
-            "t",
-            "--out",
-            "o",
-            "--books",
-            "trpl,rbe",
-            "--turns",
-            "2",
-            "--limit",
-            "5",
-            "--server",
-            "h:1",
-            "--model",
-            "m",
-            "--dry-run",
-        ]);
+        let line = "--train t --out o --books trpl,rbe --turns 2 --limit 5 --server h:1 --model m --dry-run";
+        let arguments: Vec<String> = line.split(' ').map(str::to_string).collect();
         let options = options(&arguments, Some("key".to_string()))?;
+
         assert_eq!(options.books, ["trpl", "rbe"]);
         assert_eq!(
             (options.turns, options.limit, options.dry_run),
@@ -357,6 +377,7 @@ mod tests {
             }
         );
         assert_eq!(super::options(&[], Some(String::new()))?.client.key, None);
+
         Ok(())
     }
 
@@ -367,6 +388,7 @@ mod tests {
                 .err()
                 .map(|error| error.to_string())
         };
+
         assert_eq!(
             refused(&["--turns"]).as_deref(),
             Some("--turns needs a value")
@@ -379,7 +401,9 @@ mod tests {
             refused(&["--colour"])
                 .is_some_and(|message| message.starts_with("unknown option --colour"))
         );
+
         let mut out = Vec::new();
+
         assert!(matches!(
             main_with(&words(&["help"]), None, &mut out),
             Err(DistillError::Usage(_))
@@ -388,21 +412,26 @@ mod tests {
 
     #[test]
     fn a_dry_run_writes_prompts_and_counts() -> Result<(), DistillError> {
-        let folder = Folder::new("dry")?;
+        let folder = Folder::new()?;
         let mut out = Vec::new();
         main_with(&folder.arguments(&["--dry-run"]), None, &mut out)?;
+
         let printed = String::from_utf8_lossy(&out).into_owned();
+
         assert!(printed.starts_with("2 conversations, 3 turns, from 2 books and doc sets"));
         assert!(printed.contains("dry run: wrote 2 first-turn prompts"));
-        let prompts = fs::read_to_string(folder.path.join("conversations.prompts.jsonl"))
-            .map_err(DistillError::io(&folder.path))?;
+
+        let prompts = fs::read_to_string(folder.path().join("conversations.prompts.jsonl"))
+            .map_err(DistillError::io(folder.path()))?;
+
         assert_eq!(prompts.lines().count(), 2);
+
         Ok(())
     }
 
     #[test]
     fn generates_and_then_skips_what_is_written() -> Result<(), DistillError> {
-        let folder = Folder::new("generate")?;
+        let folder = Folder::new()?;
         let model = FakeModel::start(&[
             "How do I grow a vector?",
             "yes",
@@ -415,35 +444,45 @@ mod tests {
         let server = model.client.address.clone();
         let mut out = Vec::new();
         main_with(&folder.arguments(&["--server", &server]), None, &mut out)?;
-        let written = fs::read_to_string(folder.path.join("conversations.jsonl"))
-            .map_err(DistillError::io(&folder.path))?;
+
+        let written = fs::read_to_string(folder.path().join("conversations.jsonl"))
+            .map_err(DistillError::io(folder.path()))?;
+
         assert_eq!(written.lines().count(), 1);
+
         let printed = String::from_utf8_lossy(&out).into_owned();
+
         assert!(
             printed.contains("2/2 conversations, 2 questions kept, 3 rejected"),
             "{printed}"
         );
         assert!(!printed.contains("1/2 conversations"));
+
         let mut again = Vec::new();
         let arguments = folder.arguments(&["--books", "trpl", "--dry-run"]);
         main_with(&arguments, None, &mut again)?;
+
         assert!(String::from_utf8_lossy(&again).contains("1 already in"));
+
         Ok(())
     }
 
     #[test]
     fn an_unreadable_output_path_is_an_error() -> Result<(), DistillError> {
-        let folder = Folder::new("unreadable")?;
+        let folder = Folder::new()?;
         let mut arguments = folder.arguments(&["--dry-run"]);
 
         if let Some(out) = arguments.get_mut(4) {
-            *out = folder.path.display().to_string();
+            *out = folder.path().display().to_string();
         }
+
         let mut out = Vec::new();
+
         assert!(matches!(
             main_with(&arguments, None, &mut out),
             Err(DistillError::Io { .. })
         ));
+
         Ok(())
     }
 }

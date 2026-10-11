@@ -284,7 +284,7 @@ name. `slop_flags::span_counts` counts spans per category for `stats.md`.
 | `cargo build` | no warnings, Rust 1.99.0 |
 | `cargo clippy --all-targets -- -D warnings` | clean |
 | `cargo test` | 17 tests pass |
-| Project rules | no `unwrap`/`expect`, hand-written error enum, doc comments on all items, no comments in function bodies, no index loops |
+| Project rules | no `unwrap`/`expect`, error enum (by hand or `thiserror`) or `anyhow`, doc comments on all items, no comments in function bodies, no index loops |
 
 Tests cover:
 

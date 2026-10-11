@@ -4,4 +4,5 @@ doc-valid-idents = ["SearXNG", "OpenAI", "..", "DuckDuckGo", "GitHub", "TensorRT
 # The readability budget: a function that needs more than this is doing more
 # than one job, and a reader cannot hold it in their head.
 cognitive-complexity-threshold = 15
-too-many-lines-threshold = 55
+too-many-lines-threshold = 30
+excessive-nesting-threshold = 4

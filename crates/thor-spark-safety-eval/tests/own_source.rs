@@ -6,7 +6,7 @@ use std::{fs, path::Path};
 use thor_spark_safety_eval::{
     cli,
     error::{EvalError, Outcome},
-    rules,
+    code::rules,
 };
 
 /// Fewer files than this means the walk looked in the wrong place.
@@ -16,6 +16,7 @@ const FEWEST_FILES: usize = 10;
 fn every_crate_in_the_workspace_passes_the_five_rules() -> Outcome {
     let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let files = cli::rust_files(std::slice::from_ref(&crates))?;
+
     assert!(
         files.len() > FEWEST_FILES,
         "found only {} files under {}",
@@ -25,6 +26,7 @@ fn every_crate_in_the_workspace_passes_the_five_rules() -> Outcome {
 
     for file in &files {
         let report = rules::check(&fs::read_to_string(file).map_err(EvalError::io(file))?);
+
         assert_eq!(
             report.parse_error,
             None,
@@ -38,5 +40,6 @@ fn every_crate_in_the_workspace_passes_the_five_rules() -> Outcome {
             report.violations
         );
     }
+
     Ok(())
 }

@@ -133,12 +133,14 @@ pub fn read(path: &Path) -> Result<HashMap<String, SlopFlag>, DataError> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(HashMap::new()),
         Err(error) => return Err(DataError::io(path)(error)),
     };
+
     let mut flags_by_id = HashMap::new();
 
     for line in flags_jsonl.lines().filter(|line| !line.trim().is_empty()) {
         let flag: SlopFlag = serde_json::from_str(line)?;
         flags_by_id.insert(flag.id.clone(), flag);
     }
+
     Ok(flags_by_id)
 }
 
@@ -176,6 +178,7 @@ pub fn separate_flagged(
             Some(flag) => {
                 skip_reasons.push(SkipReason::FlaggedSlop);
                 matched_ids.insert(id.clone());
+
                 flagged.push(FlaggedExample {
                     id,
                     note: flag.note.clone(),
@@ -186,6 +189,15 @@ pub fn separate_flagged(
             None => kept.push(example),
         }
     }
+
+    (kept, flagged, unmatched(flags_by_id, &matched_ids))
+}
+
+/// The reviewed flags whose id is not among `matched_ids`, in id order.
+fn unmatched(
+    flags_by_id: &HashMap<String, SlopFlag>,
+    matched_ids: &std::collections::HashSet<String>,
+) -> Vec<UnmatchedFlag> {
     let mut unmatched: Vec<UnmatchedFlag> = flags_by_id
         .iter()
         .filter(|(id, flag)| !matched_ids.contains(*id) && flag.is_reviewed())
@@ -195,7 +207,8 @@ pub fn separate_flagged(
         })
         .collect();
     unmatched.sort_by(|left, right| left.id.cmp(&right.id));
-    (kept, flagged, unmatched)
+
+    unmatched
 }
 
 /// How many flagged spans fall in each category, in [`SlopCategory::ALL`] order.
@@ -204,6 +217,7 @@ pub fn span_counts(flagged: &[FlaggedExample]) -> Vec<(SlopCategory, usize)> {
         .iter()
         .flat_map(|flagged_example| &flagged_example.spans)
         .collect();
+
     SlopCategory::ALL
         .into_iter()
         .map(|category| {
@@ -211,6 +225,7 @@ pub fn span_counts(flagged: &[FlaggedExample]) -> Vec<(SlopCategory, usize)> {
                 .iter()
                 .filter(|span| span.category == category)
                 .count();
+
             (category, count)
         })
         .collect()
@@ -251,8 +266,10 @@ mod tests {
         let mut skip_reasons = Vec::new();
         let (kept, flagged, unmatched) =
             separate_flagged(vec![guessed.clone()], &flags_by_id, &mut skip_reasons);
+
         assert_eq!(kept, [guessed]);
         assert!(flagged.is_empty() && unmatched.is_empty() && skip_reasons.is_empty());
+
         Ok(())
     }
 
@@ -274,17 +291,22 @@ mod tests {
         assert_eq!(kept, [plain]);
         assert_eq!(skip_reasons, [SkipReason::FlaggedSlop]);
         assert!(unmatched.is_empty());
+
         let counts = span_counts(&flagged);
+
         assert!(counts.contains(&(SlopCategory::FlatteryFillerOpener, 1)));
         assert!(counts.contains(&(SlopCategory::WrapUpRepeat, 1)));
         assert!(counts.contains(&(SlopCategory::RhythmTrick, 0)));
+
         Ok(())
     }
 
     #[test]
     fn flag_without_spans_is_still_a_flag() -> Result<(), DataError> {
         let flag: SlopFlag = serde_json::from_str(r#"{"id":"abc","note":"filler"}"#)?;
+
         assert!(flag.spans.is_empty());
+
         Ok(())
     }
 
@@ -308,6 +330,7 @@ mod tests {
                 note: String::from("Bad training data"),
             }]
         );
+
         Ok(())
     }
 
@@ -316,13 +339,16 @@ mod tests {
         let parsed = serde_json::from_str::<SlopFlag>(
             r#"{"id":"abc","spans":[{"field":"response","text":"x","category":"vibes"}]}"#,
         );
+
         assert!(parsed.is_err());
     }
 
     #[test]
     fn missing_flags_file_means_no_flags() -> Result<(), DataError> {
         let flags_by_id = read(Path::new("labels/does-not-exist.jsonl"))?;
+
         assert!(flags_by_id.is_empty());
+
         Ok(())
     }
 }

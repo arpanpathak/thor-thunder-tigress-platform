@@ -93,7 +93,7 @@ safety rule lives.
 
 ## `web_search`
 
-| Property | Value (`crates/thor-tigress-agent/src/search.rs`, `research.rs`) |
+| Property | Value (`crates/thor-tigress-agent/src/web/search.rs`, `research.rs`) |
 |---|---|
 | Arguments | `query`, a string; `queries`, up to three more; `kind`, `general`, `jobs` or `people`; `time_range`, optional |
 | Backend | SearXNG on `127.0.0.1:8888`, which asks several search engines |

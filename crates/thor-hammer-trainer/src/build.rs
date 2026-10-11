@@ -35,10 +35,10 @@ use std::{
 use serde::Serialize;
 
 use crate::{
-    book, chat, clever_vs_readable, code, corpus,
+    sources::{book, chat, clever_vs_readable, code, corpus, readability},
     error::DataError,
     example::{Example, SkipReason},
-    readability, report,
+    report,
     report::ReportInput,
     slop_flags,
 };
@@ -174,6 +174,21 @@ pub struct Built {
     pub report: String,
 }
 
+/// What is printed for a reviewed flag that matched no example.
+fn warning(unmatched: &slop_flags::UnmatchedFlag) -> String {
+    format!(
+        "warning: flag {} matched no example and was NOT applied: {}",
+        unmatched.id, unmatched.note
+    )
+}
+
+/// The preference pairs of the clever-versus-readable file in the datastore.
+fn preference_pairs(inputs: &Inputs) -> Result<Vec<clever_vs_readable::PreferencePair>, DataError> {
+    let file = inputs.datastore.join(CLEVER_VS_READABLE_DPO);
+
+    clever_vs_readable::preference_pairs(&read_file(&file)?)
+}
+
 /// Reads every input, filters the examples, and writes `train.jsonl`,
 /// `slop.jsonl`, `preferences.jsonl` and `stats.md` to `output_dir`.
 ///
@@ -188,17 +203,8 @@ pub fn build_training_set(inputs: &Inputs, output_dir: &Path) -> Result<Built, D
     let slop_flags_by_id = slop_flags::read(&inputs.slop_flags)?;
     let (training_set, flagged_examples, unmatched_flags) =
         slop_flags::separate_flagged(unique_examples, &slop_flags_by_id, &mut skip_reasons);
-    let warnings = unmatched_flags
-        .iter()
-        .map(|unmatched| {
-            format!(
-                "warning: flag {} matched no example and was NOT applied: {}",
-                unmatched.id, unmatched.note
-            )
-        })
-        .collect();
-    let preference_file = inputs.datastore.join(CLEVER_VS_READABLE_DPO);
-    let preference_pairs = clever_vs_readable::preference_pairs(&read_file(&preference_file)?)?;
+    let warnings = unmatched_flags.iter().map(warning).collect();
+    let preference_pairs = preference_pairs(inputs)?;
     let slop_span_counts = slop_flags::span_counts(&flagged_examples);
     let report = report::render(&ReportInput {
         training_set: &training_set,
@@ -209,11 +215,13 @@ pub fn build_training_set(inputs: &Inputs, output_dir: &Path) -> Result<Built, D
     });
     let training_records: Vec<TrainingRecord> =
         training_set.iter().map(TrainingRecord::new).collect();
+
     fs::create_dir_all(output_dir).map_err(DataError::io(output_dir))?;
     write_jsonl(&output_dir.join("train.jsonl"), &training_records)?;
     write_jsonl(&output_dir.join("slop.jsonl"), &flagged_examples)?;
     write_jsonl(&output_dir.join("preferences.jsonl"), &preference_pairs)?;
     write_file(&output_dir.join("stats.md"), &report)?;
+
     Ok(Built {
         corpus_lines,
         warnings,
@@ -238,11 +246,15 @@ fn read_all_examples(
     examples.extend(clever);
     examples.extend(chat::examples(&chat_export, skip_reasons)?);
     examples.extend(chat::example_from_question_file(&single_chat, "chat_0.md"));
+
     let book = book_repository_examples(&inputs.book_repository, skip_reasons)?;
     examples.extend(book);
+
     let fetched = corpus::examples(&inputs.corpus, &inputs.manifest)?;
     let corpus_lines = fetched.reports.iter().map(corpus_line).collect();
+
     examples.extend(fetched.examples);
+
     Ok((examples, corpus_lines))
 }
 
@@ -294,6 +306,7 @@ fn book_repository_examples(
     let mut book_files = Vec::new();
     collect_book_files(root, &mut book_files)?;
     book_files.sort();
+
     let mut examples = Vec::new();
 
     for (path, kind) in book_files {
@@ -387,6 +400,7 @@ fn rejection(example: &Example, seen_texts: &mut HashSet<String>) -> Option<Skip
     }
 
     let is_first_copy = seen_texts.insert(example.dedup_key());
+
     (!is_first_copy).then_some(SkipReason::Duplicate)
 }
 
@@ -398,245 +412,9 @@ fn write_jsonl<Record: Serialize>(path: &Path, records: &[Record]) -> Result<(),
         jsonl.push_str(&serde_json::to_string(record)?);
         jsonl.push('\n');
     }
+
     write_file(path, &jsonl)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::example::Source;
-
-    /// A small tree of every input, removed when dropped.
-    struct Fixture {
-        root: PathBuf,
-    }
-
-    impl Fixture {
-        fn new(name: &str) -> Result<Self, DataError> {
-            let root = std::env::temp_dir()
-                .join(format!("thor-hammer-build-{name}-{}", std::process::id()));
-            let fixture = Self { root };
-            let long =
-                "A page is a fixed-size block of virtual memory that the kernel maps. ".repeat(4);
-            let readability =
-                format!("# Set\n---\n### Instruction\nWhat is a page?\n### Response\n{long}\n");
-            fixture.write("store/readability_training.md", &readability)?;
-            let sft = format!(
-                r#"{{"messages": [{{"role": "user", "content": "Rewrite this loop."}}, {{"role": "assistant", "content": "{long}"}}], "meta": {{"id": "rs-x"}}}}"#
-            );
-            fixture.write("store/clever_vs_readable/clever_vs_readable_sft.jsonl", &sft)?;
-            let dpo = r#"{"prompt":[{"role":"user","content":"Q"}],"chosen":[{"role":"assistant","content":"good"}],"rejected":[{"role":"assistant","content":"bad"}],"meta":{"id":"rs-x"}}"#;
-            fixture.write("store/clever_vs_readable/clever_vs_readable_dpo.jsonl", dpo)?;
-            let export = format!(
-                r#"[{{"uuid": "c1", "chat_messages": [{{"sender": "human", "content": [{{"type": "text", "text": "What is a futex?"}}]}}, {{"sender": "assistant", "content": [{{"type": "text", "text": "A fast userspace mutex. {long}"}}]}}]}}]"#
-            );
-            fixture.write("store/work/extracted/conversations.json", &export)?;
-            let chat =
-                format!("#Question\nWhat is a TLB?\n#Answer\nA cache of page translations. {long}\n");
-            fixture.write("store/chat_0.md", &chat)?;
-            let chapter = format!("# Memory\n\n## Pages\n\n{long}\n");
-            fixture.write("books/book/ch01.md", &chapter)?;
-            fixture.write("books/book/WORKLOG.md", "notes")?;
-            let topk =
-                format!("//! Top K frequent elements, using a heap. {long}\nfn main() {{}}\n");
-            fixture.write("books/lab/topk.rs", &topk)?;
-            fixture.write("books/lab/bare.rs", "fn main() {}\n")?;
-            fixture.write("books/target/skip.md", "build output")?;
-            fixture.write("books/.git/HEAD.md", "hidden")?;
-            let review = format!("# Review\n\n## Design\n\n{long}\n");
-            fixture.write("corpus/eng-practices/review/index.md", &review)?;
-            fixture.write("corpus/closed/review/a.md", "# Closed\n")?;
-            fixture.write("corpus/empty/README.txt", "nothing")?;
-            let manifest = "source\tkind\tcommit\tlicence_file\tlicence\neng-practices\tdocs\tabc\tLICENSE\tAttribution 4.0 International\nclosed\tdocs\tabc\tLICENSE\tAll rights reserved\nempty\tdocs\tabc\tLICENSE\tMIT License\nlib\tcode\tabc\tLICENSE\tMIT License\n";
-            fixture.write("manifest.tsv", manifest)?;
-            Ok(fixture)
-        }
-
-        fn write(&self, path: &str, text: &str) -> Result<(), DataError> {
-            let file = self.root.join(path);
-            let parent = file.parent().unwrap_or(&self.root);
-            fs::create_dir_all(parent).map_err(DataError::io(parent))?;
-            fs::write(&file, text).map_err(DataError::io(&file))
-        }
-
-        fn inputs(&self) -> Inputs {
-            Inputs {
-                datastore: self.root.join("store"),
-                book_repository: self.root.join("books"),
-                corpus: self.root.join("corpus"),
-                manifest: self.root.join("manifest.tsv"),
-                slop_flags: self.root.join("flags.jsonl"),
-            }
-        }
-
-        fn read(&self, path: &str) -> Result<String, DataError> {
-            read_file(&self.root.join(path))
-        }
-    }
-
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.root);
-        }
-    }
-
-    #[test]
-    fn builds_every_output_from_every_input() -> Result<(), DataError> {
-        let fixture = Fixture::new("all")?;
-        let built = build_training_set(&fixture.inputs(), &fixture.root.join("out"))?;
-        let train = fixture.read("out/train.jsonl")?;
-        let sources: Vec<String> = train
-            .lines()
-            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-            .filter_map(|record| {
-                record
-                    .get("source")
-                    .and_then(serde_json::Value::as_str)
-                    .map(String::from)
-            })
-            .collect();
-        assert_eq!(
-            sources,
-            [
-                "readability",
-                "clever_vs_readable",
-                "chat",
-                "chat",
-                "book",
-                "code",
-                "corpus"
-            ]
-        );
-        assert_eq!(fixture.read("out/preferences.jsonl")?.lines().count(), 1);
-        assert_eq!(fixture.read("out/slop.jsonl")?, "");
-        assert!(built.report.contains("1 markdown files of notes"));
-        assert!(
-            built
-                .report
-                .contains("1 code files without a header comment")
-        );
-        assert_eq!(
-            built.corpus_lines,
-            [
-                "  eng-practices               1 examples  CC-BY",
-                "  closed                 refused, licence unrecognised",
-                "  empty                  no markdown found",
-                "  lib                    code repository, read by the teacher",
-            ]
-        );
-        assert!(built.warnings.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn a_flag_moves_its_example_to_slop_and_a_stale_flag_warns() -> Result<(), DataError> {
-        let fixture = Fixture::new("flags")?;
-        let first = build_training_set(&fixture.inputs(), &fixture.root.join("out"))?;
-        let train = fixture.read("out/train.jsonl")?;
-        let id = train
-            .lines()
-            .next()
-            .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-            .and_then(|record| {
-                record
-                    .get("id")
-                    .and_then(serde_json::Value::as_str)
-                    .map(String::from)
-            })
-            .unwrap_or_default();
-        fixture.write("flags.jsonl", &format!("{{\"id\":\"{id}\",\"note\":\"opens with filler\",\"spans\":[]}}\n{{\"id\":\"gone\",\"note\":\"old\",\"spans\":[]}}\n{{\"id\":\"also-gone\",\"note\":\"older\",\"spans\":[]}}\n"))?;
-        let second = build_training_set(&fixture.inputs(), &fixture.root.join("out"))?;
-        assert_eq!(
-            fixture.read("out/train.jsonl")?.lines().count(),
-            train.lines().count() - 1
-        );
-        assert_eq!(fixture.read("out/slop.jsonl")?.lines().count(), 1);
-        assert_eq!(
-            second.warnings,
-            [
-                "warning: flag also-gone matched no example and was NOT applied: older",
-                "warning: flag gone matched no example and was NOT applied: old"
-            ]
-        );
-        assert_ne!(first.report, second.report);
-        Ok(())
-    }
-
-    #[test]
-    fn a_missing_input_is_an_error_naming_the_file() -> Result<(), DataError> {
-        let fixture = Fixture::new("missing")?;
-        fs::remove_file(fixture.root.join("store/chat_0.md"))
-            .map_err(DataError::io(&fixture.root))?;
-        let error = build_training_set(&fixture.inputs(), &fixture.root.join("out"))
-            .err()
-            .map(|error| error.to_string());
-        assert!(error.is_some_and(|message| message.contains("chat_0.md")));
-        Ok(())
-    }
-
-    #[test]
-    fn a_capped_source_says_so() {
-        let report = corpus::SourceReport {
-            name: "kubernetes-website".to_string(),
-            outcome: corpus::SourceOutcome::Used {
-                examples: 10,
-                before_cap: 40,
-                licence: corpus::Licence::CreativeCommons,
-            },
-        };
-        assert_eq!(
-            corpus_line(&report),
-            "  kubernetes-website         10 examples  CC-BY  (capped from 40)"
-        );
-    }
-
-    #[test]
-    fn the_usual_inputs_sit_under_home() {
-        let inputs = Inputs::under_home(Path::new("/home/a"));
-        assert_eq!(inputs.datastore, Path::new("/home/a").join(DATASTORE));
-        assert_eq!(inputs.slop_flags, PathBuf::from(SLOP_FLAGS_FILE));
-    }
-
-    fn chat_example(response: &str) -> Example {
-        Example {
-            instruction: "What is a page?".to_string(),
-            response: response.to_string(),
-            source: Source::Chat,
-            origin: String::new(),
-        }
-    }
-
-    #[test]
-    fn removes_short_and_duplicate_examples() {
-        let long_answer = "A page is a fixed-size block of virtual memory. ".repeat(5);
-        let examples = vec![
-            chat_example(&long_answer),
-            chat_example(&long_answer),
-            chat_example("Too short."),
-        ];
-        let mut skip_reasons = Vec::new();
-        let training_set = remove_short_and_duplicate(examples, &mut skip_reasons);
-        assert_eq!(training_set, [chat_example(&long_answer)]);
-        assert_eq!(skip_reasons, [SkipReason::Duplicate, SkipReason::TooShort]);
-    }
-
-    #[test]
-    fn classifies_notes_and_chapters() {
-        assert!(matches!(
-            classify(Path::new("book/WORKLOG.md")),
-            CorpusFile::File(BookFile::Notes)
-        ));
-        assert!(matches!(
-            classify(Path::new("book/ch01.md")),
-            CorpusFile::File(BookFile::Chapter)
-        ));
-        assert!(matches!(
-            classify(Path::new("lab/topk.rs")),
-            CorpusFile::File(BookFile::Code)
-        ));
-        assert!(matches!(
-            classify(Path::new("lab/notes.txt")),
-            CorpusFile::Ignored
-        ));
-    }
-}
+mod tests;

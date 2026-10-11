@@ -51,9 +51,11 @@ pub fn derive_key(passphrase: &[u8], salt: &[u8]) -> Outcome<Key> {
     let params = Params::new(MEMORY_KIB, PASSES, 1, Some(KEY_LEN)).map_err(KeyringError::Kdf)?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
     let mut key = Zeroizing::new([0u8; KEY_LEN]);
+
     argon2
         .hash_password_into(passphrase, salt, key.as_mut())
         .map_err(KeyringError::Kdf)?;
+
     Ok(key)
 }
 
@@ -89,6 +91,7 @@ pub fn seal(key: &[u8], nonce_bytes: &[u8], aad: &[u8], plaintext: &[u8]) -> Out
             aad,
         },
     );
+
     sealed.map_err(|error| KeyringError::Invalid(error.to_string()))
 }
 
@@ -111,6 +114,7 @@ pub fn open(
             aad,
         },
     );
+
     opened.map(Zeroizing::new).map_err(|_| KeyringError::Sealed)
 }
 
@@ -126,7 +130,9 @@ mod tests {
     fn random_fills_the_whole_buffer() -> Outcome<()> {
         let mut bytes = [0u8; 64];
         random(&mut bytes)?;
+
         assert!(bytes.iter().any(|byte| *byte != 0));
+
         Ok(())
     }
 
@@ -136,8 +142,10 @@ mod tests {
         let once = derive_key(b"correct horse", &salt)?;
         let twice = derive_key(b"correct horse", &salt)?;
         let other = derive_key(b"correct horse", &[4u8; SALT_LEN])?;
+
         assert_eq!(once.as_ref(), twice.as_ref());
         assert_ne!(once.as_ref(), other.as_ref());
+
         Ok(())
     }
 
@@ -153,8 +161,11 @@ mod tests {
     fn what_is_sealed_comes_back_only_with_the_same_key_and_aad() -> Outcome<()> {
         let nonce_bytes = [9u8; NONCE_LEN];
         let sealed = seal(&key(), &nonce_bytes, b"thor", b"ada@example.com")?;
+
         assert_ne!(sealed, b"ada@example.com");
+
         let opened = open(&key(), &nonce_bytes, b"thor", &sealed)?;
+
         assert_eq!(opened.as_slice(), b"ada@example.com");
         assert!(matches!(
             open(&[8u8; KEY_LEN], &nonce_bytes, b"thor", &sealed),
@@ -164,12 +175,15 @@ mod tests {
             open(&key(), &nonce_bytes, b"other", &sealed),
             Err(KeyringError::Sealed)
         ));
+
         let mut changed = sealed.clone();
         changed.truncate(changed.len() - 1);
+
         assert!(matches!(
             open(&key(), &nonce_bytes, b"thor", &changed),
             Err(KeyringError::Sealed)
         ));
+
         Ok(())
     }
 

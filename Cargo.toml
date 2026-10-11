@@ -8,3 +8,8 @@ members = [
     "crates/thor-tigress-keyring",
     "crates/thor-tigress-reinforcer-frontend",
 ]
+
+[workspace.lints.clippy]
+too_many_lines = "warn"
+let_underscore_must_use = "warn"
+let_underscore_untyped = "warn"

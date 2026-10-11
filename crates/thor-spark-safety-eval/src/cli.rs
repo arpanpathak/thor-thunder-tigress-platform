@@ -25,7 +25,8 @@ use crate::{
     answer::{self, AnswerScore},
     error::{EvalError, Outcome},
     report::Summary,
-    rules, slop,
+    code::rules,
+    prose::slop,
 };
 
 /// The JSONL field an answer is read from unless `--field` says otherwise.
@@ -130,45 +131,66 @@ fn paths(arguments: &[String]) -> Outcome<Vec<PathBuf>> {
 
 impl ScoreOptions {
     fn parse(arguments: &[String]) -> Outcome<ScoreOptions> {
-        let mut input = None;
-        let mut field = DEFAULT_FIELD.to_string();
-        let mut code_field = None;
-        let mut label = None;
-        let mut output = None;
+        let mut given = Given::default();
         let mut rest = arguments.iter();
 
         while let Some(argument) = rest.next() {
-            let mut value = || {
-                rest.next()
-                    .cloned()
-                    .ok_or_else(|| EvalError::Usage(format!("{argument} needs a value")))
-            };
-
-            match argument.as_str() {
-                "--field" => field = value()?,
-                "--code-field" => code_field = Some(value()?),
-                "--label" => label = Some(value()?),
-                "--out" => output = Some(PathBuf::from(value()?)),
-                flag if flag.starts_with("--") => {
-                    return Err(EvalError::Usage(format!(
-                        "unknown option {flag}\n{}",
-                        usage()
-                    )));
-                }
-                path => input = Some(PathBuf::from(path)),
-            }
+            given.take(argument, &mut rest)?;
         }
 
-        let Some(input) = input else {
+        given.into_options()
+    }
+}
+
+/// The `score` arguments as given, before the defaults are filled in.
+#[derive(Default)]
+struct Given {
+    input: Option<PathBuf>,
+    field: Option<String>,
+    code_field: Option<String>,
+    label: Option<String>,
+    output: Option<PathBuf>,
+}
+
+impl Given {
+    /// Records `argument`, reading its value from `rest` when it is an option.
+    fn take<'a>(&mut self, argument: &str, rest: &mut impl Iterator<Item = &'a String>) -> Outcome {
+        let mut value = || {
+            rest.next()
+                .cloned()
+                .ok_or_else(|| EvalError::Usage(format!("{argument} needs a value")))
+        };
+
+        match argument {
+            "--field" => self.field = Some(value()?),
+            "--code-field" => self.code_field = Some(value()?),
+            "--label" => self.label = Some(value()?),
+            "--out" => self.output = Some(PathBuf::from(value()?)),
+            flag if flag.starts_with("--") => {
+                let message = format!("unknown option {flag}\n{}", usage());
+
+                return Err(EvalError::Usage(message));
+            }
+            path => self.input = Some(PathBuf::from(path)),
+        }
+
+        Ok(())
+    }
+
+    /// The options, with the output and the label named after the input.
+    fn into_options(self) -> Outcome<ScoreOptions> {
+        let Some(input) = self.input else {
             return Err(EvalError::Usage(usage()));
         };
 
         Ok(ScoreOptions {
-            output: output.unwrap_or_else(|| input.with_extension("scored.jsonl")),
-            label: label.unwrap_or_else(|| stem(&input)),
+            output: self
+                .output
+                .unwrap_or_else(|| input.with_extension("scored.jsonl")),
+            label: self.label.unwrap_or_else(|| stem(&input)),
             input,
-            field,
-            code_field,
+            field: self.field.unwrap_or_else(|| DEFAULT_FIELD.to_string()),
+            code_field: self.code_field,
         })
     }
 }
@@ -191,19 +213,30 @@ pub fn rust_files(paths: &[PathBuf]) -> Outcome<Vec<PathBuf>> {
 
     while let Some(path) = pending.pop() {
         if path.is_dir() {
-            for entry in fs::read_dir(&path).map_err(EvalError::io(&path))? {
-                let entry = entry.map_err(EvalError::io(&path))?.path();
-
-                if !is_skipped(&entry) {
-                    pending.push(entry);
-                }
-            }
+            pending.extend(entries(&path)?);
         } else if path.extension().is_some_and(|extension| extension == "rs") {
             files.push(path);
         }
     }
+
     files.sort();
+
     Ok(files)
+}
+
+/// What is directly inside `folder`, without the entries that are skipped.
+fn entries(folder: &Path) -> Outcome<Vec<PathBuf>> {
+    let mut kept = Vec::new();
+
+    for entry in fs::read_dir(folder).map_err(EvalError::io(folder))? {
+        let entry = entry.map_err(EvalError::io(folder))?.path();
+
+        if !is_skipped(&entry) {
+            kept.push(entry);
+        }
+    }
+
+    Ok(kept)
 }
 
 fn is_skipped(path: &Path) -> bool {
@@ -233,8 +266,10 @@ fn check_rust(paths: &[PathBuf]) -> Outcome<Report> {
             ));
         }
     }
+
     let problems = lines.len();
     lines.push(format!("{} files, {problems} problems", files.len()));
+
     Ok(Report {
         lines,
         exit: exit_for(problems),
@@ -251,6 +286,7 @@ fn check_text(paths: &[PathBuf]) -> Outcome<Report> {
 
         for hit in &report.hits {
             let line = text[..hit.start].matches('\n').count() + 1;
+
             lines.push(format!(
                 "{}:{line}: {}: {}",
                 path.display(),
@@ -258,6 +294,7 @@ fn check_text(paths: &[PathBuf]) -> Outcome<Report> {
                 hit.text
             ));
         }
+
         lines.push(format!(
             "{}: {} phrases, {} em dashes, {} words",
             path.display(),
@@ -267,6 +304,7 @@ fn check_text(paths: &[PathBuf]) -> Outcome<Report> {
         ));
         total += report.score();
     }
+
     Ok(Report {
         lines,
         exit: exit_for(total),
@@ -287,6 +325,41 @@ struct Scored {
     score: AnswerScore,
 }
 
+impl Scored {
+    /// The answer's record with its score and the run's label added.
+    fn labelled(self, options: &ScoreOptions, number: usize) -> Outcome<Value> {
+        let Scored { mut record, score } = self;
+        let spark =
+            serde_json::to_value(&score).map_err(EvalError::json(&options.output, number))?;
+
+        if let Value::Object(fields) = &mut record {
+            fields.insert("spark".to_string(), spark);
+            fields.insert(
+                "spark_run".to_string(),
+                Value::String(options.label.clone()),
+            );
+        }
+
+        Ok(record)
+    }
+}
+
+/// What a scored run prints: the table, the slop found and where it was written.
+fn summary_lines(summary: &Summary, options: &ScoreOptions) -> Vec<String> {
+    let categories: Vec<String> = summary
+        .categories
+        .iter()
+        .map(|(category, count)| format!("{} {count}", category.label()))
+        .collect();
+
+    vec![
+        Summary::header(),
+        summary.row(&options.label),
+        format!("\nslop by category: {}", categories.join(", ")),
+        format!("wrote {}", options.output.display()),
+    ]
+}
+
 fn score_run(options: &ScoreOptions) -> Outcome<Report> {
     let text = fs::read_to_string(&options.input).map_err(EvalError::io(&options.input))?;
     let file = fs::File::create(&options.output).map_err(EvalError::io(&options.output))?;
@@ -298,34 +371,18 @@ fn score_run(options: &ScoreOptions) -> Outcome<Report> {
         .zip(1..)
         .filter(|(line, _)| !line.trim().is_empty())
     {
-        let Scored { mut record, score } = score_line(line, number, options)?;
-        summary.add(&score);
-        let spark =
-            serde_json::to_value(&score).map_err(EvalError::json(&options.output, number))?;
+        let scored = score_line(line, number, options)?;
+        summary.add(&scored.score);
 
-        if let Value::Object(fields) = &mut record {
-            fields.insert("spark".to_string(), spark);
-            fields.insert(
-                "spark_run".to_string(),
-                Value::String(options.label.clone()),
-            );
-        }
+        let record = scored.labelled(options, number)?;
+
         writeln!(writer, "{record}").map_err(EvalError::io(&options.output))?;
     }
+
     writer.flush().map_err(EvalError::io(&options.output))?;
-    let categories: Vec<String> = summary
-        .categories
-        .iter()
-        .map(|(category, count)| format!("{} {count}", category.label()))
-        .collect();
-    let lines = vec![
-        Summary::header(),
-        summary.row(&options.label),
-        format!("\nslop by category: {}", categories.join(", ")),
-        format!("wrote {}", options.output.display()),
-    ];
+
     Ok(Report {
-        lines,
+        lines: summary_lines(&summary, options),
         exit: Exit::Clean,
     })
 }
@@ -346,178 +403,14 @@ fn score_line(line: &str, number: usize, options: &ScoreOptions) -> Outcome<Scor
             })
     };
     let prose = read(&options.field)?;
+
     let score = match &options.code_field {
         Some(code_field) => answer::score_parts(&prose, &read(code_field)?),
         None => answer::score(&prose),
     };
+
     Ok(Scored { record, score })
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A fresh folder for one test, removed when dropped.
-    struct Folder(PathBuf);
-
-    impl Folder {
-        fn new(name: &str) -> Outcome<Folder> {
-            let path =
-                std::env::temp_dir().join(format!("spark-cli-{}-{name}", std::process::id()));
-            fs::create_dir_all(&path).map_err(EvalError::io(&path))?;
-            Ok(Folder(path))
-        }
-
-        fn file(&self, name: &str, text: &str) -> Outcome<PathBuf> {
-            let path = self.0.join(name);
-            let parent = path.parent().unwrap_or(&self.0);
-            fs::create_dir_all(parent).map_err(EvalError::io(parent))?;
-            fs::write(&path, text).map_err(EvalError::io(&path))?;
-            Ok(path)
-        }
-    }
-
-    impl Drop for Folder {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-
-    fn args(words: &[&str]) -> Vec<String> {
-        words.iter().map(ToString::to_string).collect()
-    }
-
-    #[test]
-    fn reads_each_command() -> Outcome {
-        assert_eq!(
-            Command::from_args(&args(&["rs", "src"]))?,
-            Command::Rust(vec![PathBuf::from("src")])
-        );
-        assert_eq!(
-            Command::from_args(&args(&["text", "a.md"]))?,
-            Command::Text(vec![PathBuf::from("a.md")])
-        );
-        let expected = ScoreOptions {
-            input: PathBuf::from("runs/base.jsonl"),
-            field: "text".to_string(),
-            code_field: Some("code".to_string()),
-            label: "base".to_string(),
-            output: PathBuf::from("runs/base.scored.jsonl"),
-        };
-        assert_eq!(
-            Command::from_args(&args(&["score", "runs/base.jsonl", "--code-field", "code"]))?,
-            Command::Score(expected)
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn refuses_what_it_does_not_understand() {
-        for words in [
-            &[][..],
-            &["lint"],
-            &["rs"],
-            &["score"],
-            &["score", "a", "--colour"],
-            &["score", "a", "--label"],
-        ] {
-            assert!(
-                matches!(Command::from_args(&args(words)), Err(EvalError::Usage(_))),
-                "{words:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn checks_rust_files_and_skips_build_output() -> Outcome {
-        let folder = Folder::new("rs")?;
-        let good = "/// Adds.\npub fn add(a: i32, b: i32) -> i32 { a + b }\n";
-        folder.file("src/good.rs", good)?;
-        folder.file("src/bad.rs", "fn a() { b().unwrap(); }\n")?;
-        folder.file("src/broken.rs", "fn a( {\n")?;
-        folder.file("target/skip.rs", "fn a() { b().unwrap(); }\n")?;
-        folder.file(".hidden/skip.rs", "fn a() { b().unwrap(); }\n")?;
-        let report = Command::Rust(vec![folder.0.clone()]).run()?;
-        assert_eq!(report.exit, Exit::Problems);
-        assert!(
-            report
-                .lines
-                .iter()
-                .any(|line| line.ends_with("bad.rs:1: R1 no unwrap: .unwrap()"))
-        );
-        assert!(
-            report
-                .lines
-                .iter()
-                .any(|line| line.contains("broken.rs: does not parse"))
-        );
-        assert_eq!(
-            report.lines.last().map(String::as_str),
-            Some("3 files, 2 problems")
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn clean_rust_is_clean() -> Outcome {
-        let folder = Folder::new("clean")?;
-        let file = folder.file("a.rs", "fn add(a: i32) -> i32 { a + 1 }\n")?;
-        assert_eq!(Command::Rust(vec![file]).run()?.exit, Exit::Clean);
-        Ok(())
-    }
-
-    #[test]
-    fn finds_slop_in_text_with_its_line() -> Outcome {
-        let folder = Folder::new("text")?;
-        let file = folder.file("answer.md", "Fine.\nGreat question! Here it is.\n")?;
-        let report = Command::Text(vec![file]).run()?;
-        assert_eq!(report.exit, Exit::Problems);
-        assert!(
-            report.lines[0].ends_with("answer.md:2: flattery and filler openers: Great question")
-        );
-        assert!(report.lines[1].ends_with("1 phrases, 0 em dashes, 6 words"));
-        Ok(())
-    }
-
-    #[test]
-    fn scores_a_run_and_writes_each_line_back() -> Outcome {
-        let folder = Folder::new("score")?;
-        let lines = "{\"text\":\"Great question!\",\"code\":\"fn a() { b().unwrap(); }\"}\n\n{\"text\":\"Plain.\",\"code\":\"\"}\n";
-        let run = folder.file("run.jsonl", lines)?;
-        let report = Command::from_args(&args(&[
-            "score",
-            &run.to_string_lossy(),
-            "--code-field",
-            "code",
-            "--label",
-            "base",
-        ]))?
-        .run()?;
-        assert!(report.lines[1].starts_with("| base | 2 | 1 |"));
-        let written = fs::read_to_string(folder.0.join("run.scored.jsonl"))
-            .map_err(EvalError::io(&folder.0))?;
-        let first: Value = serde_json::from_str(written.lines().next().unwrap_or_default())
-            .map_err(EvalError::json(&folder.0, 1))?;
-        assert_eq!(first["spark_run"], "base");
-        assert_eq!(first["spark"]["rules"]["no_unwrap"], "fail");
-        Ok(())
-    }
-
-    #[test]
-    fn a_line_without_the_field_is_named() -> Outcome {
-        let folder = Folder::new("missing")?;
-        let run = folder.file("run.jsonl", "{\"text\":\"ok\"}\n{\"other\":1}\n")?;
-        let outcome = Command::from_args(&args(&["score", &run.to_string_lossy()]))?.run();
-        assert!(outcome.is_err_and(|error| {
-            error
-                .to_string()
-                .ends_with("run.jsonl:2: no string field \"text\"")
-        }));
-        let bad = folder.file("bad.jsonl", "not json\n")?;
-        assert!(matches!(
-            Command::from_args(&args(&["score", &bad.to_string_lossy()]))?.run(),
-            Err(EvalError::Json { line: 1, .. })
-        ));
-        Ok(())
-    }
-}
+mod tests;

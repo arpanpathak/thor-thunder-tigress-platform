@@ -1,11 +1,14 @@
 //! The one error type of the crate.
 
-use std::{fmt, io, path::PathBuf};
+use std::{io, path::PathBuf};
+
+use thiserror::Error;
 
 /// Everything that can go wrong while building conversations.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum DistillError {
     /// A file could not be read or written.
+    #[error("{}: {source}", path.display())]
     Io {
         /// The file involved.
         path: PathBuf,
@@ -13,6 +16,7 @@ pub enum DistillError {
         source: io::Error,
     },
     /// A line of the training file is not valid JSON.
+    #[error("{}:{line}: {source}", path.display())]
     Json {
         /// The file involved.
         path: PathBuf,
@@ -22,8 +26,10 @@ pub enum DistillError {
         source: serde_json::Error,
     },
     /// The model server could not be reached or answered with an error.
+    #[error("model server: {0}")]
     Server(String),
     /// The command line was not understood.
+    #[error("{0}")]
     Usage(String),
 }
 
@@ -31,30 +37,8 @@ impl DistillError {
     /// A closure that wraps an I/O error with the path it happened on.
     pub fn io(path: impl Into<PathBuf>) -> impl FnOnce(io::Error) -> DistillError {
         let path = path.into();
+
         move |source| DistillError::Io { path, source }
-    }
-}
-
-impl fmt::Display for DistillError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            DistillError::Io { path, source } => write!(formatter, "{}: {source}", path.display()),
-            DistillError::Json { path, line, source } => {
-                write!(formatter, "{}:{line}: {source}", path.display())
-            }
-            DistillError::Server(message) => write!(formatter, "model server: {message}"),
-            DistillError::Usage(message) => formatter.write_str(message),
-        }
-    }
-}
-
-impl std::error::Error for DistillError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            DistillError::Io { source, .. } => Some(source),
-            DistillError::Json { source, .. } => Some(source),
-            DistillError::Server(_) | DistillError::Usage(_) => None,
-        }
     }
 }
 
@@ -75,6 +59,7 @@ mod tests {
             });
         let server = DistillError::Server("engine not loaded".to_string());
         let usage = DistillError::Usage("usage: lasso".to_string());
+
         assert_eq!(io.to_string(), "data/train.jsonl: disk full");
         assert!(
             json.as_ref()

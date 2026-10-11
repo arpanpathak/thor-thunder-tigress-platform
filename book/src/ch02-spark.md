@@ -7,7 +7,7 @@
 **The five Rust rules**
 
 1. No `unwrap()` or `expect()`, not even in tests.
-2. Errors are a hand-written enum implementing `Display` and `std::error::Error`.
+2. Errors are an enum implementing `Display` and `std::error::Error`, written by hand or derived with `thiserror`; `anyhow` is allowed. No `String` or `Box<dyn Error>` errors.
 3. Every `pub` item has a `///` doc comment.
 4. No comments inside function bodies.
 5. No index loops like `for i in 0..n`.

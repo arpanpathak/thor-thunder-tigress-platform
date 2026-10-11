@@ -4,7 +4,7 @@
 
 use serde_json::{Map, Value, json};
 
-use crate::body::Fields;
+use crate::engines::body::Fields;
 
 /// The request field holding the conversation.
 const MESSAGES: &str = "messages";
@@ -146,11 +146,12 @@ fn text_of(message: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{body, error::Outcome};
+    use crate::{engines::body, error::Outcome};
 
     fn fitted(request: &Value) -> Outcome<Fields> {
         let mut fields = body::fields(&serde_json::to_vec(request)?)?;
         fit(&mut fields);
+
         Ok(fields)
     }
 
@@ -171,6 +172,7 @@ mod tests {
         names.sort_unstable();
 
         assert_eq!(names, ENGINE_FIELDS);
+
         Ok(())
     }
 
@@ -196,6 +198,7 @@ mod tests {
                 { "role": "assistant", "content": "answer" }
             ])
         );
+
         Ok(())
     }
 
@@ -231,6 +234,7 @@ mod tests {
                 &json!("[1]")
             ]
         );
+
         Ok(())
     }
 
@@ -240,6 +244,7 @@ mod tests {
 
         assert_eq!(fitted(&request)?[MESSAGES], request[MESSAGES]);
         assert_eq!(fitted(&json!({ "messages": "text" }))?[MESSAGES], "text");
+
         Ok(())
     }
 }

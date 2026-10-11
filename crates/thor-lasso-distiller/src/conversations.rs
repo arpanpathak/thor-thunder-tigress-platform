@@ -15,10 +15,10 @@
 //! one line, ending in `?`, not mentioning "the passage" or "the book", and
 //! with none of the slop phrases Stage 0 knows.
 
-use std::{collections::BTreeMap, fmt, fs, path::Path};
+use std::{collections::BTreeMap, fs, path::Path};
 
 use serde_json::{Value, json};
-use thor_spark_safety_eval::slop;
+use thor_spark_safety_eval::prose::slop;
 
 use crate::{
     client::{Client, Message},
@@ -101,6 +101,7 @@ impl Passage {
     /// its own book, chapter or section.
     pub fn reads_as_answer(&self) -> bool {
         let lowered = self.text.to_lowercase();
+
         !BOOK_REFERENCES
             .iter()
             .any(|phrase| lowered.contains(phrase))
@@ -155,6 +156,7 @@ pub fn read_passages(path: &Path, collections: &[String]) -> Result<Vec<Passage>
             passages.push(passage);
         }
     }
+
     Ok(passages)
 }
 
@@ -190,6 +192,7 @@ pub fn plan(passages: Vec<Passage>, turns: usize) -> Vec<Vec<Passage>> {
 /// The messages that ask the teacher for the next question.
 pub fn question_prompt(previous_questions: &[String], passage: &Passage) -> Vec<Message> {
     let shown: String = passage.text.chars().take(MAX_PROMPT_PASSAGE).collect();
+
     let earlier = match previous_questions.is_empty() {
         true => "This is the first question of the conversation.".to_string(),
         false => format!(
@@ -201,6 +204,7 @@ pub fn question_prompt(previous_questions: &[String], passage: &Passage) -> Vec<
                 .join("\n")
         ),
     };
+
     vec![
         Message {
             role: "system",
@@ -214,42 +218,33 @@ pub fn question_prompt(previous_questions: &[String], passage: &Passage) -> Vec<
 }
 
 /// Why a question the teacher wrote was not kept.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Rejection {
     /// Nothing usable came back.
+    #[error("empty reply")]
     Empty,
     /// More than one line.
+    #[error("more than one line")]
     NotOneLine,
     /// It does not end with a question mark.
+    #[error("does not end with a question mark")]
     NotAQuestion,
     /// Longer than [`MAX_QUESTION`].
+    #[error("longer than {MAX_QUESTION} characters")]
     TooLong,
     /// It talks about the text instead of the problem.
+    #[error("mentions \"{0}\"")]
     MentionsSource(&'static str),
     /// It contains a slop phrase.
+    #[error("slop phrase \"{0}\"")]
     Slop(String),
     /// It repeats a question asked earlier in the conversation.
+    #[error("repeats an earlier question")]
     Repeats,
     /// The section does not answer it.
+    #[error("the section does not answer it")]
     NotAnswered,
 }
-
-impl fmt::Display for Rejection {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Rejection::Empty => formatter.write_str("empty reply"),
-            Rejection::NotOneLine => formatter.write_str("more than one line"),
-            Rejection::NotAQuestion => formatter.write_str("does not end with a question mark"),
-            Rejection::TooLong => write!(formatter, "longer than {MAX_QUESTION} characters"),
-            Rejection::MentionsSource(word) => write!(formatter, "mentions \"{word}\""),
-            Rejection::Slop(phrase) => write!(formatter, "slop phrase \"{phrase}\""),
-            Rejection::Repeats => formatter.write_str("repeats an earlier question"),
-            Rejection::NotAnswered => formatter.write_str("the section does not answer it"),
-        }
-    }
-}
-
-impl std::error::Error for Rejection {}
 
 /// The question in `reply`, tidied, or why it cannot be used. Surrounding
 /// quotes and a leading `Question:` are removed first, since models add them.
@@ -314,6 +309,7 @@ impl Conversation {
             .iter()
             .map(|(question, reason)| json!({ "question": question, "reason": reason }))
             .collect();
+
         json!({
             "id": fnv_hex(&serde_json::to_string(&messages).unwrap_or_default()),
             "source": "conversation",
@@ -346,42 +342,64 @@ pub fn converse(client: &Client, sections: &[Passage]) -> Result<Conversation, D
             .iter()
             .map(|(question, _)| question.clone())
             .collect();
-        let prompt = question_prompt(&asked, passage);
-        let mut question = None;
 
-        for _ in 0..ATTEMPTS {
-            let reply = client.complete(&prompt, 80, 0.7)?;
-            let verdict = match check_question(&reply) {
-                Ok(checked)
-                    if asked
-                        .iter()
-                        .any(|earlier| overlap(earlier, &checked) >= REPEAT_OVERLAP) =>
-                {
-                    Err(Rejection::Repeats)
-                }
-                Ok(checked) if !answers(client, &checked, passage)? => Err(Rejection::NotAnswered),
-                other => other,
-            };
-
-            match verdict {
-                Ok(checked) => {
-                    question = Some(checked);
-
-                    break;
-                }
-                Err(reason) => conversation
-                    .rejected
-                    .push((reply.trim().to_string(), reason.to_string())),
-            }
-        }
-
-        match question {
+        match ask(client, &asked, passage, &mut conversation.rejected)? {
             Some(question) => conversation.turns.push((question, passage.answer())),
             None => break,
         }
     }
 
     Ok(conversation)
+}
+
+/// Asks for a question about `passage` until one is kept, at most
+/// [`ATTEMPTS`] times. Every reply that is not kept goes to `rejected` with
+/// the reason.
+fn ask(
+    client: &Client,
+    asked: &[String],
+    passage: &Passage,
+    rejected: &mut Vec<(String, String)>,
+) -> Result<Option<String>, DistillError> {
+    let prompt = question_prompt(asked, passage);
+
+    for _ in 0..ATTEMPTS {
+        let reply = client.complete(&prompt, 80, 0.7)?;
+
+        match judged(client, &reply, asked, passage)? {
+            Ok(question) => return Ok(Some(question)),
+            Err(reason) => rejected.push((reply.trim().to_string(), reason.to_string())),
+        }
+    }
+
+    Ok(None)
+}
+
+/// The question in `reply` when it is well formed, new to the conversation
+/// and answered by `passage`; otherwise why it is not kept.
+fn judged(
+    client: &Client,
+    reply: &str,
+    asked: &[String],
+    passage: &Passage,
+) -> Result<Result<String, Rejection>, DistillError> {
+    let question = match check_question(reply) {
+        Ok(question) => question,
+        Err(reason) => return Ok(Err(reason)),
+    };
+    let repeats = asked
+        .iter()
+        .any(|earlier| overlap(earlier, &question) >= REPEAT_OVERLAP);
+
+    if repeats {
+        return Ok(Err(Rejection::Repeats));
+    }
+
+    if !answers(client, &question, passage)? {
+        return Ok(Err(Rejection::NotAnswered));
+    }
+
+    Ok(Ok(question))
 }
 
 /// Asks the model whether `passage` answers `question`; only a reply that
@@ -401,6 +419,7 @@ pub fn answers(client: &Client, question: &str, passage: &Passage) -> Result<boo
         },
     ];
     let reply = client.complete(&prompt, 4, 0.0)?;
+
     Ok(reply.trim().to_lowercase().starts_with("yes"))
 }
 
@@ -432,6 +451,7 @@ pub fn conversation_key(sections: &[Passage]) -> String {
             passage.text.chars().take(200).collect::<String>()
         )
     });
+
     fnv_hex(&first)
 }
 
@@ -446,6 +466,7 @@ pub fn plan_counts(planned: &[Vec<Passage>]) -> BTreeMap<String, (usize, usize)>
             entry.1 += conversation.len();
         }
     }
+
     counts
 }
 
@@ -455,277 +476,11 @@ fn fnv_hex(text: &str) -> String {
     let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
         (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
     });
+
     format!("{hash:016x}")
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn passage(origin: &str, text: &str) -> Passage {
-        Passage {
-            origin: origin.to_string(),
-            text: text.to_string(),
-        }
-    }
-
-    #[test]
-    fn keeps_an_engineers_question() {
-        assert_eq!(
-            check_question("  \"How do I share a Vec<u8> between threads without copying it?\"\n"),
-            Ok("How do I share a Vec<u8> between threads without copying it?".to_string())
-        );
-    }
-
-    #[test]
-    fn rejects_questions_about_the_text_or_with_slop() {
-        assert_eq!(
-            check_question("What does this section say about traits?"),
-            Err(Rejection::MentionsSource("this section"))
-        );
-        assert_eq!(
-            check_question("Explain vectors."),
-            Err(Rejection::NotAQuestion)
-        );
-        assert_eq!(
-            check_question("Great question! Why use Arc?"),
-            Err(Rejection::Slop("Great question".to_string()))
-        );
-        assert_eq!(check_question("Why?\nBecause."), Err(Rejection::NotOneLine));
-    }
-
-    #[test]
-    fn plans_conversations_per_chapter_in_order() {
-        let passages = vec![
-            passage("trpl/a.md", "# A\n\none"),
-            passage("trpl/a.md", "# A\n\n## B\n\ntwo"),
-            passage("trpl/a.md", "# A\n\n## C\n\nthree"),
-            passage("trpl/b.md", "# B\n\nfour"),
-        ];
-        let planned = plan(passages, 2);
-        let sizes: Vec<usize> = planned.iter().map(Vec::len).collect();
-        assert_eq!(sizes, [2, 1, 1]);
-        assert_eq!(plan_counts(&planned).get("trpl"), Some(&(3, 4)));
-    }
-
-    #[test]
-    fn a_section_that_points_into_its_book_is_not_an_answer() {
-        assert!(!passage("x", "As we saw in Chapter 3, tasks share memory.").reads_as_answer());
-        assert!(passage("x", "Tasks share memory.").reads_as_answer());
-    }
-
-    #[test]
-    fn an_answer_drops_the_title_lines() {
-        assert_eq!(
-            passage("x", "# Vectors\n\n## Growing\n\nPush appends.").answer(),
-            "Push appends."
-        );
-    }
-
-    #[test]
-    fn retries_a_rejected_question_and_answers_with_the_book_text() -> Result<(), DistillError> {
-        use std::{
-            io::{Read, Write},
-            net::TcpListener,
-            thread,
-        };
-        let listener = TcpListener::bind("127.0.0.1:0").map_err(DistillError::io("listener"))?;
-        let address = listener
-            .local_addr()
-            .map_err(DistillError::io("listener"))?
-            .to_string();
-        let replies = [
-            "What does this section explain?",
-            "Why does push sometimes reallocate a Vec?",
-            "yes",
-        ];
-        thread::spawn(move || {
-            replies.iter().for_each(|reply| {
-                if let Ok((mut stream, _)) = listener.accept() {
-                    let mut buffer = [0u8; 16_384];
-                    let _ = stream.read(&mut buffer);
-                    let body =
-                        json!({ "choices": [{ "message": { "content": reply } }] }).to_string();
-                    let _ = write!(
-                        stream,
-                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{body}",
-                        body.len()
-                    );
-                }
-            });
-        });
-        let client = Client {
-            address,
-            model: "teacher".to_string(),
-            key: None,
-        };
-        let section = passage("trpl/v.md", "# Vectors\n\nPush may reallocate.");
-        let conversation = converse(&client, &[section])?;
-        assert_eq!(
-            conversation.turns,
-            [(
-                "Why does push sometimes reallocate a Vec?".to_string(),
-                "Push may reallocate.".to_string()
-            )]
-        );
-        assert_eq!(conversation.rejected.len(), 1);
-        Ok(())
-    }
-
-    #[test]
-    fn measures_how_much_two_questions_overlap() {
-        assert!(
-            overlap(
-                "Why does Vec push reallocate?",
-                "Why does push on a Vec reallocate?"
-            ) >= REPEAT_OVERLAP
-        );
-        assert!(
-            overlap(
-                "Why does Vec push reallocate?",
-                "How do I share an Arc between threads?"
-            ) < REPEAT_OVERLAP
-        );
-    }
-
-    #[test]
-    fn a_follow_up_prompt_lists_the_earlier_questions() {
-        let messages = question_prompt(&["Why Vec?".to_string()], &passage("x", "text"));
-        let user = messages
-            .last()
-            .map(|message| message.content.as_str())
-            .unwrap_or_default();
-        assert!(user.contains("- Why Vec?") && user.contains("follow-up"));
-    }
-}
-
+mod conversation_tests;
 #[cfg(test)]
-mod conversation_tests {
-    use super::*;
-    use crate::testing::FakeModel;
-
-    fn section(text: &str) -> Passage {
-        Passage {
-            origin: "trpl/src/ch08.md".to_string(),
-            text: format!("## Heading\n\n{text}"),
-        }
-    }
-
-    #[test]
-    fn keeps_checked_questions_and_records_every_rejection() -> Result<(), DistillError> {
-        let replies = [
-            "Not a question",
-            "How do I grow a vector?",
-            "yes",
-            "How do I grow a vector?",
-            "What about strings?",
-            "no",
-            "How do I append to a String?",
-            "yes",
-        ];
-        let model = FakeModel::start(&replies)?;
-        let sections = [
-            section("Use push to grow a vector."),
-            section("Use push_str to append to a String."),
-        ];
-        let conversation = converse(&model.client, &sections)?;
-        let questions: Vec<&str> = conversation
-            .turns
-            .iter()
-            .map(|(question, _)| question.as_str())
-            .collect();
-        assert_eq!(
-            questions,
-            ["How do I grow a vector?", "How do I append to a String?"]
-        );
-        assert_eq!(conversation.turns[0].1, "Use push to grow a vector.");
-        let reasons: Vec<&str> = conversation
-            .rejected
-            .iter()
-            .map(|(_, reason)| reason.as_str())
-            .collect();
-        assert_eq!(
-            reasons,
-            [
-                "does not end with a question mark",
-                "repeats an earlier question",
-                "the section does not answer it"
-            ]
-        );
-        assert_eq!(model.request_count(), replies.len());
-        let line = conversation.to_json("teacher");
-        assert_eq!(line["messages"].as_array().map(Vec::len), Some(4));
-        assert_eq!(line["rejected"].as_array().map(Vec::len), Some(3));
-        assert_eq!(line["model"], "teacher");
-        Ok(())
-    }
-
-    #[test]
-    fn ends_the_conversation_after_three_failed_attempts() -> Result<(), DistillError> {
-        let model = FakeModel::start(&["one", "two", "three"])?;
-        let conversation = converse(&model.client, &[section("Text."), section("More text.")])?;
-        assert!(conversation.turns.is_empty());
-        assert_eq!(conversation.rejected.len(), ATTEMPTS);
-        Ok(())
-    }
-
-    #[test]
-    fn describes_every_rejection() {
-        let reasons: Vec<String> = [
-            Rejection::Empty,
-            Rejection::NotOneLine,
-            Rejection::NotAQuestion,
-            Rejection::TooLong,
-            Rejection::MentionsSource("chapter"),
-            Rejection::Slop("great question".to_string()),
-            Rejection::Repeats,
-            Rejection::NotAnswered,
-        ]
-        .iter()
-        .map(ToString::to_string)
-        .collect();
-        assert_eq!(reasons[3], format!("longer than {MAX_QUESTION} characters"));
-        assert_eq!(reasons[4], "mentions \"chapter\"");
-        assert_eq!(reasons[5], "slop phrase \"great question\"");
-    }
-
-    #[test]
-    fn checks_every_kind_of_bad_question() {
-        assert_eq!(check_question("  "), Err(Rejection::Empty));
-        assert_eq!(check_question("Why?\nAnd why?"), Err(Rejection::NotOneLine));
-        assert_eq!(
-            check_question(&format!("{}?", "a".repeat(MAX_QUESTION))),
-            Err(Rejection::TooLong)
-        );
-        assert!(matches!(
-            check_question("What does this chapter say?"),
-            Err(Rejection::MentionsSource(_))
-        ));
-        assert!(matches!(
-            check_question("Great question, how do I start?"),
-            Err(Rejection::Slop(_))
-        ));
-        assert_eq!(
-            check_question("Question: \"How do I start?\""),
-            Ok("How do I start?".to_string())
-        );
-    }
-
-    #[test]
-    fn a_bad_line_in_the_training_file_names_its_line() -> Result<(), DistillError> {
-        let path =
-            std::env::temp_dir().join(format!("thor-lasso-bad-{}.jsonl", std::process::id()));
-        fs::write(&path, "{\"instruction\":\"\"}\nnot json\n").map_err(DistillError::io(&path))?;
-        let error = read_passages(&path, &[])
-            .err()
-            .map(|error| error.to_string());
-        fs::remove_file(&path).map_err(DistillError::io(&path))?;
-        assert!(error.is_some_and(|message| message.contains(":2: ")));
-        Ok(())
-    }
-
-    #[test]
-    fn overlap_of_questions_without_long_words_is_zero() {
-        assert!(overlap("a b", "c d").abs() < f64::EPSILON);
-    }
-}
+mod tests;

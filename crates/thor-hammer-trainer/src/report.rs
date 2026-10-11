@@ -44,6 +44,7 @@ pub fn render(input: &ReportInput) -> String {
     report_lines.push(String::new());
     report_lines.extend(unmatched_flag_list(input.unmatched_flags));
     report_lines.push(String::new());
+
     report_lines.join("\n")
 }
 
@@ -68,6 +69,7 @@ fn unmatched_flag_list(unmatched_flags: &[UnmatchedFlag]) -> Vec<String> {
     for unmatched in unmatched_flags {
         list_lines.push(format!("- `{}`: {}", unmatched.id, unmatched.note));
     }
+
     list_lines
 }
 
@@ -87,17 +89,21 @@ fn source_table(training_set: &[Example]) -> Vec<String> {
             .iter()
             .map(|example| estimated_tokens(example))
             .sum();
+
         table_lines.push(format!(
             "| {} | {} | {source_tokens} |",
             source.name(),
             from_source.len()
         ));
     }
+
     let total_tokens: usize = training_set.iter().map(estimated_tokens).sum();
+
     table_lines.push(format!(
         "| total | {} | {total_tokens} |",
         training_set.len()
     ));
+
     table_lines
 }
 
@@ -112,6 +118,7 @@ fn left_out_list(skip_reasons: &[SkipReason]) -> Vec<String> {
             .count();
         list_lines.push(format!("- {reason_count} {}", reason.description()));
     }
+
     list_lines
 }
 
@@ -125,6 +132,7 @@ fn slop_span_list(slop_span_counts: &[(SlopCategory, usize)]) -> Vec<String> {
     for (category, span_count) in slop_span_counts {
         list_lines.push(format!("- {span_count} {}", category.description()));
     }
+
     list_lines
 }
 

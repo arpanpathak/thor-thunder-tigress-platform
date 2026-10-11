@@ -21,7 +21,9 @@ fn main() -> ExitCode {
             } else {
                 1
             };
+
             eprintln!("thor-tigress-keyring: {error}");
+
             ExitCode::from(code)
         }
     }

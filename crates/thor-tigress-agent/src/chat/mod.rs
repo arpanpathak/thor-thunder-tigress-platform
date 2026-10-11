@@ -2,7 +2,7 @@
 //! on, run as a loop in which the model may call a tool before it answers.
 //!
 //! ```text
-//!   client ── request ──► server ── stream ──► the engine
+//!   client ── request ──► server ── stream ──► llama-server or an engine
 //!      ▲                    │  tool call: web_search("…", time_range)
 //!      │                    │             fetch_page_content_recursive(url)
 //!      │                    ▼
@@ -14,32 +14,39 @@
 //! The first round is sent with `tool_choice: "required"`, so both models look
 //! something up before they answer; later rounds go back to `auto`. A model that
 //! writes a call into the text instead of into `tool_calls` is understood too:
-//! [`crate::tooltext`] takes it out of the answer and hands it to the loop.
+//! [`crate::chat::tooltext`] takes it out of the answer and hands it to the loop.
 //!
 //! A request that brings its own tools comes from a coding tool running its
-//! own loop, so the engine's answer is copied back untouched, streamed or not.
-//! Every request is first given the shape the engine takes; see [`shape`].
+//! own loop, so the answer is copied back untouched, streamed or not. A
+//! request for an Edge-LLM engine is first given the shape that engine takes;
+//! see [`shape`].
 
 mod shape;
+pub mod tooltext;
+mod wire;
 
 use std::io::{BufRead, Write};
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 
+use self::wire::{Added, Round, Source, ThorEvent, ToolCall};
 use crate::{
-    address::Url,
-    body::{self, Fields},
-    config::Upstreams,
+    web::{
+        address::Url,
+        fetch::{self, Allowed},
+        http::Web,
+        research::{Kind, Ledger, MAX_READS, MAX_SEARCHES},
+        search::{self, SearchResult, TimeRange},
+    },
+    engines::{
+        body::{self, Fields},
+        upstream::{Endpoint, UpstreamResponse},
+    },
+    config::{Engine, Upstreams},
     error::{AgentError, Outcome},
-    fetch::{self, Allowed},
-    http::Web,
     paths,
-    research::{Kind, Ledger, MAX_QUERIES_PER_CALL, MAX_READS, MAX_SEARCHES},
-    response::{self, DONE, EVENT_PREFIX},
-    search::{self, SearchResult, TimeRange},
-    tooltext::Sieve,
-    upstream::Endpoint,
+    server::response::{self, Client, DONE, EVENT_PREFIX},
+    chat::tooltext::Sieve,
 };
 
 /// Tool rounds per answer. Deep research is not round count — it is the
@@ -171,187 +178,62 @@ impl Tool {
         Tool::ALL.into_iter().find(|tool| tool.name() == name)
     }
 
+    /// What the tool is for, as the model reads it.
+    fn description(self) -> &'static str {
+        match self {
+            Tool::WebSearch => concat!(
+                "Research the web. Returns titles, addresses, dates and short snippets, each ",
+                "with a number to cite. `query` is the sub-question to search; `queries` ",
+                "adds up to three more, so one call can fan out over the parts of a ",
+                "question. `kind` widens the search: \"jobs\" looks for postings, ",
+                "\"people\" for the recruiter and hiring manager behind one, whose posts ",
+                "often mention a role first. `time_range` keeps results recent: day, ",
+                "week, month or year."
+            ),
+            Tool::FetchPage => concat!(
+                "Read a web page as plain text, following the page's own links up to two hops, ",
+                "so the answer can use the page itself and not only a snippet. Only an https ",
+                "address from this answer's search results, or one the user wrote, can be opened."
+            ),
+        }
+    }
+
+    /// The tool's arguments, as a JSON schema.
+    fn parameters(self) -> Value {
+        match self {
+            Tool::WebSearch => json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "The sub-question to search for" },
+                    "queries": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Up to three more sub-questions to search in the same call"
+                    },
+                    "kind": { "type": "string", "enum": Kind::ALL.map(Kind::as_str), "description": "How to widen the search" },
+                    "time_range": { "type": "string", "enum": ["day", "week", "month", "year"], "description": "Keep results no older than this" }
+                },
+                "required": ["query"],
+            }),
+            Tool::FetchPage => json!({
+                "type": "object",
+                "properties": { "url": { "type": "string", "description": "An https address from this answer's search results" } },
+                "required": ["url"],
+            }),
+        }
+    }
+
     /// The tool as the model sees it: name, purpose, and arguments.
     fn definition(self) -> Value {
-        let (description, parameters) = match self {
-            Tool::WebSearch => (
-                concat!(
-                    "Research the web. Returns titles, addresses, dates and short snippets, each ",
-                    "with a number to cite. `query` is the sub-question to search; `queries` ",
-                    "adds up to three more, so one call can fan out over the parts of a ",
-                    "question. `kind` widens the search: \"jobs\" looks for postings, ",
-                    "\"people\" for the recruiter and hiring manager behind one, whose posts ",
-                    "often mention a role first. `time_range` keeps results recent: day, ",
-                    "week, month or year."
-                ),
-                json!({
-                    "type": "object",
-                    "properties": {
-                        "query": { "type": "string", "description": "The sub-question to search for" },
-                        "queries": {
-                            "type": "array",
-                            "items": { "type": "string" },
-                            "description": "Up to three more sub-questions to search in the same call"
-                        },
-                        "kind": { "type": "string", "enum": Kind::ALL.map(Kind::as_str), "description": "How to widen the search" },
-                        "time_range": { "type": "string", "enum": ["day", "week", "month", "year"], "description": "Keep results no older than this" }
-                    },
-                    "required": ["query"],
-                }),
-            ),
-            Tool::FetchPage => (
-                "Read a web page as plain text, following the page's own links up to two hops, so the answer can use the page itself and not only a snippet. Only an https address from this answer's search results, or one the user wrote, can be opened.",
-                json!({
-                    "type": "object",
-                    "properties": { "url": { "type": "string", "description": "An https address from this answer's search results" } },
-                    "required": ["url"],
-                }),
-            ),
-        };
-        json!({ "type": "function", "function": { "name": self.name(), "description": description, "parameters": parameters } })
+        json!({
+            "type": "function",
+            "function": {
+                "name": self.name(),
+                "description": self.description(),
+                "parameters": self.parameters(),
+            },
+        })
     }
-}
-
-/// The arguments of one `web_search` call: a sub-question, more sub-questions,
-/// how to widen them, and how recent the answers must be.
-#[derive(Deserialize)]
-struct SearchArguments {
-    #[serde(default)]
-    query: Option<String>,
-    #[serde(default)]
-    queries: Option<Vec<String>>,
-    #[serde(default)]
-    kind: Option<String>,
-    #[serde(default)]
-    time_range: Option<String>,
-}
-
-/// One `web_search` call, worked out: the queries to run and the recency asked
-/// for. The queries are already widened by `kind` and capped.
-#[derive(Debug, PartialEq, Eq)]
-struct SearchPlan {
-    /// The searches to run, in order.
-    queries: Vec<String>,
-    /// The recency to ask SearXNG for.
-    range: Option<TimeRange>,
-}
-
-/// The arguments of one `fetch_page_content_recursive` call.
-#[derive(Deserialize)]
-struct FetchArguments {
-    url: String,
-}
-
-/// One streamed chunk from the engine, as far as this server reads it.
-#[derive(Deserialize)]
-struct Chunk {
-    #[serde(default)]
-    choices: Vec<Choice>,
-}
-
-#[derive(Deserialize)]
-struct Choice {
-    #[serde(default)]
-    delta: Delta,
-}
-
-/// What one chunk adds to the reply: text, pieces of tool calls, or both.
-#[derive(Deserialize, Default)]
-struct Delta {
-    content: Option<String>,
-    tool_calls: Option<Vec<CallPiece>>,
-}
-
-/// A piece of a tool call; the id, name and arguments arrive in parts.
-#[derive(Deserialize)]
-struct CallPiece {
-    #[serde(default)]
-    index: usize,
-    id: Option<String>,
-    function: Option<FunctionPiece>,
-}
-
-#[derive(Deserialize)]
-struct FunctionPiece {
-    name: Option<String>,
-    arguments: Option<String>,
-}
-
-/// One tool call, assembled from its pieces.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct ToolCall {
-    id: String,
-    name: String,
-    arguments: String,
-}
-
-/// What one streamed round produced besides the tokens already forwarded.
-#[derive(Debug, Default, PartialEq, Eq)]
-struct Round {
-    content: String,
-    calls: Vec<ToolCall>,
-    /// Whether the round was cut off at [`MAX_ROUND_CHARS`].
-    cut: bool,
-}
-
-/// A message this server adds to the conversation, in OpenAI's shape.
-#[derive(Serialize)]
-#[serde(tag = "role", rename_all = "lowercase")]
-enum Added<'a> {
-    /// The model's turn that asked for tools.
-    Assistant {
-        content: &'a str,
-        tool_calls: Vec<CallRecord<'a>>,
-    },
-    /// One tool's result.
-    Tool {
-        tool_call_id: &'a str,
-        content: &'a str,
-    },
-}
-
-/// A tool call as it is written back into the conversation.
-#[derive(Serialize)]
-struct CallRecord<'a> {
-    id: &'a str,
-    #[serde(rename = "type")]
-    kind: &'static str,
-    function: FunctionRecord<'a>,
-}
-
-#[derive(Serialize)]
-struct FunctionRecord<'a> {
-    name: &'a str,
-    arguments: &'a str,
-}
-
-/// An event this server adds to the stream, under a `thor` key so the page
-/// can tell it from the model's own events.
-#[derive(Serialize)]
-#[serde(rename_all = "lowercase")]
-enum ThorEvent<'a> {
-    /// A search ran: the query and the sources it found.
-    Search {
-        query: &'a str,
-        results: Vec<Source<'a>>,
-    },
-    /// A page was read: its address, its title, and the host to show.
-    Read {
-        url: &'a str,
-        title: &'a str,
-        domain: String,
-    },
-    /// Something failed after the stream started.
-    Error(String),
-}
-
-#[derive(Serialize)]
-struct Source<'a> {
-    title: &'a str,
-    url: &'a str,
-    domain: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    published: Option<&'a str>,
 }
 
 /// Answers one chat request on `client`.
@@ -361,7 +243,7 @@ struct Source<'a> {
 /// `AgentError::BadRequest` when the body isn't a JSON object, and upstream
 /// or I/O errors before the answer starts. Errors after an event stream has
 /// started are sent to the client as a `{"thor":{"error":…}}` event instead.
-pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Outcome {
+pub fn answer(client: &mut dyn Client, body: &[u8], upstreams: &Upstreams) -> Outcome {
     let mut fields = body::fields(body)?;
     let web_search = fields
         .remove(WEB_SEARCH_SWITCH)
@@ -369,22 +251,24 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
         .unwrap_or(false);
 
     let engine = upstreams.serving(body::model(&fields));
-    body::name(&mut fields, &engine.model);
-    shape::fit(&mut fields);
+    fit(&mut fields, engine);
 
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
-    let model = &engine.endpoint;
+    let model = engine.endpoint();
 
     match Mode::of(web_search, streamed, brings_tools(&fields)) {
         Mode::Relay => model
             .post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?
             .relay(client),
         Mode::Stream => as_events(client, &mut |client| {
-            stream_round(client, &fields, model).map(drop)
+            stream_round(client, &fields, model)?;
+
+            Ok(())
         }),
         Mode::Search => {
             fields.insert(STREAM.to_string(), Value::Bool(true));
             nudge_to_search(&mut fields);
+
             as_events(client, &mut |client| {
                 search_loop(client, fields.clone(), upstreams, model)
             })
@@ -392,14 +276,28 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
     }
 }
 
+/// Shapes a request for the server that will answer it. An Edge-LLM server
+/// needs its own model name and the shape in [`shape`]; llama-server takes
+/// what an OpenAI client sends, and its own fields besides.
+fn fit(fields: &mut Fields, engine: &Engine) {
+    match engine {
+        Engine::Edge { model, .. } => {
+            body::name(fields, model);
+            shape::fit(fields);
+        }
+        Engine::Llama { .. } => {}
+    }
+}
+
 /// Runs `body` inside an event stream: an error becomes an error event, and
 /// the stream always ends with `[DONE]`.
-fn as_events(client: &mut dyn Write, body: &mut dyn FnMut(&mut dyn Write) -> Outcome) -> Outcome {
+fn as_events(client: &mut dyn Client, body: &mut dyn FnMut(&mut dyn Write) -> Outcome) -> Outcome {
     response::start_events(client)?;
 
     if let Err(error) = body(client) {
         send_thor(client, &ThorEvent::Error(error.to_string()))?;
     }
+
     response::send_event(client, DONE)
 }
 
@@ -464,6 +362,7 @@ fn tool_rounds(
 ) -> Outcome<Ending> {
     for round in 1..=MAX_ROUNDS {
         prepare(fields, Phase::of_tool_round(round));
+
         let reply = stream_round(client, fields, model)?;
 
         if reply.cut || reply.calls.is_empty() {
@@ -513,6 +412,7 @@ fn answer_rounds(
         if reply.cut || (reply.calls.is_empty() && !reply.content.trim().is_empty()) {
             return Ok(Ending::Replied);
         }
+
         if reply.calls.is_empty() {
             continue;
         }
@@ -537,6 +437,7 @@ fn numbered_sources(ledger: &Ledger) -> String {
 /// the page ends with sources rather than with an excuse.
 fn note(client: &mut dyn Write, ledger: &Ledger) -> Outcome {
     let head = "The tool rounds are over and no round wrote an answer.";
+
     let text = if ledger.is_empty() {
         format!("{head} Ask again, or narrow the question.")
     } else {
@@ -636,6 +537,7 @@ fn set_system(fields: &mut Fields, content: String) {
         .get_mut(MESSAGES)
         .and_then(Value::as_array_mut)
         .and_then(|messages| messages.first_mut());
+
     if let Some(first) = first {
         first["content"] = Value::String(content);
     }
@@ -716,6 +618,7 @@ fn append_round(fields: &mut Fields, round: &Round, results: &[String]) -> Outco
         };
         messages.push(serde_json::to_value(record)?);
     }
+
     Ok(())
 }
 
@@ -769,9 +672,11 @@ impl Research {
         upstreams: &Upstreams,
     ) -> Outcome<String> {
         let signature = signature(call);
+
         if self.ran.contains(&signature) {
             return Ok(ALREADY_RAN.to_string());
         }
+
         self.ran.push(signature);
 
         match Tool::named(&call.name) {
@@ -801,6 +706,7 @@ impl Research {
         };
 
         let mut blocks: Vec<String> = Vec::new();
+
         for query in &plan.queries {
             if self.ledger.searches_left(MAX_SEARCHES) == 0 {
                 blocks.push(format!(
@@ -808,25 +714,8 @@ impl Research {
                 ));
                 break;
             }
-            self.ledger.count_search();
 
-            let hits = match search::search(searxng, query, plan.range) {
-                Ok(hits) => hits,
-                Err(error) => {
-                    blocks.push(format!("The search \"{query}\" failed: {error}"));
-                    continue;
-                }
-            };
-            for result in &hits.results {
-                self.allowed.add_url(&result.url);
-            }
-            let event = ThorEvent::Search {
-                query,
-                results: sources(&hits.results),
-            };
-            send_thor(client, &event)?;
-
-            blocks.push(search_block(query, &hits, &mut self.ledger));
+            blocks.push(self.search_one(client, query, plan.range, searxng)?);
         }
 
         blocks.push(format!(
@@ -835,7 +724,37 @@ impl Research {
             self.ledger.reads(),
             self.ledger.len()
         ));
+
         Ok(blocks.join("\n\n"))
+    }
+
+    /// Runs one search, tells the page what it found, and returns the results
+    /// as the model reads them, or that the search failed.
+    fn search_one(
+        &mut self,
+        client: &mut dyn Write,
+        query: &str,
+        range: Option<TimeRange>,
+        searxng: &Endpoint,
+    ) -> Outcome<String> {
+        self.ledger.count_search();
+
+        let hits = match search::search(searxng, query, range) {
+            Ok(hits) => hits,
+            Err(error) => return Ok(format!("The search \"{query}\" failed: {error}")),
+        };
+
+        for result in &hits.results {
+            self.allowed.add_url(&result.url);
+        }
+
+        let event = ThorEvent::Search {
+            query,
+            results: sources(&hits.results),
+        };
+        send_thor(client, &event)?;
+
+        Ok(search_block(query, &hits, &mut self.ledger))
     }
 
     /// Reads one page and its same-site links, up to what is left of the page
@@ -846,24 +765,31 @@ impl Research {
         let Some(raw) = call.url_argument() else {
             return Ok("The fetch needs an address.".to_string());
         };
+
         let url = match Url::parse(&raw) {
             Ok(url) => url,
             Err(error) => return Ok(error.to_string()),
         };
+
         let left = self.ledger.reads_left(MAX_READS);
+
         if left == 0 {
             return Ok(format!(
                 "The page budget is spent ({MAX_READS} pages). Answer with what you have."
             ));
         }
+
         let report =
             match fetch::read_recursive(web, &url, &self.allowed, left.min(fetch::MAX_PAGES)) {
                 Ok(report) => report,
                 Err(error) => return Ok(format!("Could not read the page: {error}")),
             };
+
         self.ledger.count_reads(report.pages.len());
+
         for page in &report.pages {
             self.ledger.add_page(&page.url, &page.title);
+
             let event = ThorEvent::Read {
                 url: &page.url,
                 title: &page.title,
@@ -871,6 +797,7 @@ impl Research {
             };
             send_thor(client, &event)?;
         }
+
         Ok(report.text)
     }
 }
@@ -887,9 +814,11 @@ fn search_block(query: &str, hits: &search::Hits, ledger: &mut Ledger) -> String
             .iter()
             .map(|result| {
                 let number = ledger.add(result);
+
                 search::as_entry(result, number)
             })
             .collect();
+
         format!("Query: {query}\n{}", entries.join("\n\n"))
     };
 
@@ -899,6 +828,7 @@ fn search_block(query: &str, hits: &search::Hits, ledger: &mut Ledger) -> String
             hits.down.join(", ")
         ));
     }
+
     block
 }
 
@@ -923,23 +853,15 @@ fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
 /// model writes into the text is taken out by [`Sieve`] and runs like a
 /// structured one, and the reader never sees the tags.
 fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
-    let response = model.post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(fields)?)?;
-
-    if !response.is_ok() {
-        let status = response.status;
-
-        return Err(AgentError::Upstream(format!(
-            "model server returned {status}: {}",
-            response.text()?
-        )));
-    }
-
+    let request = serde_json::to_vec(fields)?;
+    let response = accepted(model.post(paths::CHAT_COMPLETIONS, &request)?)?;
     let mut round = Round::default();
     let mut sieve = Sieve::new();
     let mut streamed = 0_usize;
 
     for line in response.body.lines() {
         let line = line?;
+
         let Some(data) = line.strip_prefix(EVENT_PREFIX).map(str::trim) else {
             continue;
         };
@@ -948,15 +870,11 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
             break;
         }
 
-        let mut value: Value = serde_json::from_str(data)?;
-        streamed += text_length(&value);
-        if let Some(event) = forward(&mut value, data, &mut sieve) {
-            response::send_event(client, &event)?;
-        }
-        round.absorb(serde_json::from_value(value)?);
+        streamed += relay_chunk(client, data, &mut sieve, &mut round)?;
 
         if streamed > MAX_ROUND_CHARS {
             round.cut = true;
+
             let event =
                 json!({ "choices": [{ "delta": {}, "finish_reason": "length" }] }).to_string();
             response::send_event(client, &event)?;
@@ -964,12 +882,58 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
         }
     }
 
+    finish_round(client, sieve, &mut round)?;
+
+    Ok(round)
+}
+
+/// The model server's response when it took the request, or what it said
+/// when it did not.
+fn accepted(response: UpstreamResponse) -> Outcome<UpstreamResponse> {
+    if response.is_ok() {
+        return Ok(response);
+    }
+
+    let status = response.status;
+
+    Err(AgentError::Upstream(format!(
+        "model server returned {status}: {}",
+        response.text()?
+    )))
+}
+
+/// Sends one chunk of the model's reply on to the client and adds it to
+/// `round`. Returns how many characters of text the chunk carried.
+fn relay_chunk(
+    client: &mut dyn Write,
+    data: &str,
+    sieve: &mut Sieve,
+    round: &mut Round,
+) -> Outcome<usize> {
+    let mut value: Value = serde_json::from_str(data)?;
+    let length = text_length(&value);
+
+    if let Some(event) = forward(&mut value, data, sieve) {
+        response::send_event(client, &event)?;
+    }
+
+    round.absorb(serde_json::from_value(value)?);
+
+    Ok(length)
+}
+
+/// Ends a round: sends the text the sieve was still holding, and adds the
+/// tool calls it took out of the text.
+fn finish_round(client: &mut dyn Write, mut sieve: Sieve, round: &mut Round) -> Outcome {
     let tail = sieve.finish();
+
     if !tail.is_empty() {
         round.content.push_str(&tail);
+
         let event = json!({ "choices": [{ "delta": { "content": tail } }] }).to_string();
         response::send_event(client, &event)?;
     }
+
     for (number, call) in sieve.take_calls().into_iter().enumerate() {
         round.calls.push(ToolCall {
             id: format!("text-{number}"),
@@ -977,7 +941,8 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
             arguments: call.arguments,
         });
     }
-    Ok(round)
+
+    Ok(())
 }
 
 /// Rewrites one chunk so only the visible part of its text is forwarded, and
@@ -994,13 +959,17 @@ fn forward(value: &mut Value, data: &str, sieve: &mut Sieve) -> Option<String> {
 
     let was_open = sieve.is_open();
     let visible = sieve.push(&text);
+
     if !was_open && visible == text {
         return Some(data.to_string());
     }
+
     value["choices"][0]["delta"]["content"] = Value::String(visible.clone());
+
     if visible.is_empty() && !carries_more(value) {
         return None;
     }
+
     Some(value.to_string())
 }
 
@@ -1014,6 +983,7 @@ fn carries_more(value: &Value) -> bool {
     let finish = value
         .pointer("/choices/0/finish_reason")
         .is_some_and(|reason| !reason.is_null());
+
     delta || finish
 }
 
@@ -1026,119 +996,9 @@ fn text_length(value: &Value) -> usize {
             .and_then(Value::as_str)
             .map_or(0, str::len)
     };
+
     of("/choices/0/delta/content") + of("/choices/0/delta/reasoning_content")
 }
-
-impl Round {
-    /// Adds the text and tool-call pieces of one streamed chunk.
-    fn absorb(&mut self, chunk: Chunk) {
-        let Some(Choice { delta }) = chunk.choices.into_iter().next() else {
-            return;
-        };
-
-        if let Some(text) = delta.content {
-            self.content.push_str(&text);
-        }
-
-        for piece in delta.tool_calls.unwrap_or_default() {
-            if piece.index >= MAX_CALLS {
-                continue;
-            }
-
-            if self.calls.len() <= piece.index {
-                self.calls.resize_with(piece.index + 1, ToolCall::default);
-            }
-            self.calls[piece.index].extend(piece);
-        }
-    }
-
-    /// The assistant message that asked for this round's tool calls.
-    fn as_message(&self) -> Added<'_> {
-        let tool_calls = self
-            .calls
-            .iter()
-            .map(|call| CallRecord {
-                id: &call.id,
-                kind: "function",
-                function: FunctionRecord {
-                    name: &call.name,
-                    arguments: &call.arguments,
-                },
-            })
-            .collect();
-        Added::Assistant {
-            content: &self.content,
-            tool_calls,
-        }
-    }
-}
-
-impl ToolCall {
-    /// Appends one streamed piece.
-    fn extend(&mut self, piece: CallPiece) {
-        self.id.push_str(&piece.id.unwrap_or_default());
-
-        if let Some(function) = piece.function {
-            self.name.push_str(&function.name.unwrap_or_default());
-            self.arguments
-                .push_str(&function.arguments.unwrap_or_default());
-        }
-    }
-
-    /// The arguments of this call, parsed.
-    fn arguments<T: DeserializeOwned>(&self) -> Option<T> {
-        serde_json::from_str(&self.arguments).ok()
-    }
-
-    /// The searches one call asks for: the `query`, plus every `queries` entry,
-    /// each widened by `kind`, capped at [`MAX_QUERIES_PER_CALL`] and without
-    /// repeats. `None` when no query is given. An unknown `time_range` or `kind`
-    /// is treated as absent.
-    fn search_plan(&self) -> Option<SearchPlan> {
-        let arguments: SearchArguments = self.arguments()?;
-
-        let mut base: Vec<String> = Vec::new();
-        for query in arguments.query.as_deref().into_iter().chain(
-            arguments
-                .queries
-                .as_deref()
-                .unwrap_or_default()
-                .iter()
-                .map(String::as_str),
-        ) {
-            let query = query.trim();
-            if !query.is_empty() && !base.iter().any(|seen| seen == query) {
-                base.push(query.to_string());
-            }
-        }
-        if base.is_empty() {
-            return None;
-        }
-
-        let kind = Kind::of(arguments.kind.as_deref());
-        let mut queries: Vec<String> = Vec::new();
-        for query in base.iter().flat_map(|query| kind.widen(query)) {
-            if queries.len() == MAX_QUERIES_PER_CALL {
-                break;
-            }
-            if !queries.contains(&query) {
-                queries.push(query);
-            }
-        }
-        Some(SearchPlan {
-            queries,
-            range: arguments.time_range.as_deref().and_then(TimeRange::of),
-        })
-    }
-
-    /// The `url` of a fetch, trimmed; `None` when missing or empty.
-    fn url_argument(&self) -> Option<String> {
-        let arguments: FetchArguments = self.arguments()?;
-        let url = arguments.url.trim();
-        (!url.is_empty()).then(|| url.to_string())
-    }
-}
-
 
 #[cfg(test)]
 mod tests;

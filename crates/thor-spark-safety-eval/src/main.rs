@@ -25,6 +25,7 @@ fn main() -> ExitCode {
         }
         Err(error) => {
             eprintln!("spark: {error}");
+
             ExitCode::from(ERROR_STATUS)
         }
     }
