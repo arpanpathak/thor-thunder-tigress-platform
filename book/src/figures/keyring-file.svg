@@ -1,56 +1,67 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" width="960" height="380" role="img" aria-label="The keyring file: a 15-byte magic line, a 16-byte random salt, a 24-byte nonce, then the records sealed as ciphertext with a 16-byte tag. Inside the sealed part is one JSON line per person: name, email, status and key. A wrong passphrase and a changed byte fail the same way.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 436" width="1040" height="436" role="img" aria-label="The keyring file: a 15-byte magic line, a 16-byte random salt, a 24-byte nonce, then the records sealed as ciphertext with a 16-byte tag. Inside the sealed part is JSON: name, email, status, key and time per person.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .label { fill: #1E88A8; font-size: 12px; }
-    .warn { fill: #D9542B; font-size: 12px; }
-    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .box { fill: #F4F7FA; stroke-width: 2; }
-    .built { stroke: #4E8A16; }
-    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
-    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
-    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
-    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
-    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
-  <rect width="960" height="380" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">The keyring file, byte by byte</text>
-  <text x="30" y="62" class="note">Only the last part is a secret.</text>
-
-  <rect x="30" y="96" width="180" height="76" rx="10" class="box built"/>
-  <text x="120" y="124" class="mono name" text-anchor="middle">thor-keyring-1</text>
-  <text x="120" y="146" class="note" text-anchor="middle">magic, 15 bytes</text>
-
-  <rect x="220" y="96" width="150" height="76" rx="10" class="box built"/>
-  <text x="295" y="124" class="name" text-anchor="middle">salt</text>
-  <text x="295" y="146" class="note" text-anchor="middle">16 random bytes</text>
-  <text x="295" y="164" class="note" text-anchor="middle">stored, not secret</text>
-
-  <rect x="380" y="96" width="160" height="76" rx="10" class="box built"/>
-  <text x="460" y="124" class="name" text-anchor="middle">nonce</text>
-  <text x="460" y="146" class="note" text-anchor="middle">24 bytes</text>
-  <text x="460" y="164" class="note" text-anchor="middle">fresh each write</text>
-
-  <rect x="550" y="96" width="380" height="76" rx="10" class="box built"/>
-  <text x="740" y="124" class="name" text-anchor="middle">the records, sealed</text>
-  <text x="740" y="146" class="note" text-anchor="middle">ciphertext, then a 16-byte tag</text>
-
-  <line x1="30" y1="196" x2="930" y2="196" stroke="#D5DCE4" stroke-width="1"/>
-
-  <rect x="30" y="216" width="420" height="110" rx="10" class="outside"/>
-  <text x="240" y="244" class="name" text-anchor="middle">Each part has a job</text>
-  <text x="240" y="266" class="note" text-anchor="middle">magic: refuses another version</text>
-  <text x="240" y="284" class="note" text-anchor="middle">salt: a different key per file</text>
-  <text x="240" y="302" class="note" text-anchor="middle">nonce: never reused</text>
-
-  <rect x="480" y="216" width="450" height="110" rx="10" class="box built"/>
-  <text x="705" y="244" class="name" text-anchor="middle">Inside: one line per person</text>
-  <text x="705" y="270" class="note mono" text-anchor="middle">{"name":"Ada Lovelace",</text>
-  <text x="705" y="290" class="note mono" text-anchor="middle"> "status":"active","key":"5397…"}</text>
-
-  <text x="30" y="356" class="warn">A wrong passphrase and a changed byte fail the same way.</text>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1040" height="436" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">The keyring file, byte by byte</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Only the last part is a secret.</text>
+  <g filter="url(#lift)">
+  <rect x="40" y="110" width="200" height="92" fill="#F1F4F7" stroke="#7F8EA0" stroke-width="1.4"/>
+  <text x="140.0" y="140.0" class="name" text-anchor="middle" xml:space="preserve">thor-keyring-1</text>
+  <text x="140.0" y="160.0" class="sub" text-anchor="middle" xml:space="preserve">magic, 15 bytes</text>
+  <rect x="240" y="110" width="180" height="92" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="330.0" y="140.0" class="name" text-anchor="middle" xml:space="preserve">salt</text>
+  <text x="330.0" y="160.0" class="sub" text-anchor="middle" xml:space="preserve">16 random bytes</text>
+  <text x="330.0" y="177.0" class="sub" text-anchor="middle" xml:space="preserve">stored, not secret</text>
+  <rect x="420" y="110" width="170" height="92" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="505.0" y="140.0" class="name" text-anchor="middle" xml:space="preserve">nonce</text>
+  <text x="505.0" y="160.0" class="sub" text-anchor="middle" xml:space="preserve">24 bytes</text>
+  <text x="505.0" y="177.0" class="sub" text-anchor="middle" xml:space="preserve">fresh each write</text>
+  <rect x="590" y="110" width="410" height="92" fill="#F0EAFB" stroke="#7A4FD0" stroke-width="1.4"/>
+  <text x="795.0" y="140.0" class="name" text-anchor="middle" xml:space="preserve">the records, sealed</text>
+  <text x="795.0" y="160.0" class="sub" text-anchor="middle" xml:space="preserve">ciphertext, then a 16-byte tag</text>
+  </g>
+  <path d="M50,250 H462 L480,268 V372 A10,10 0 0 1 470,382 H50 A10,10 0 0 1 40,372 V260 A10,10 0 0 1 50,250 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M462,250 V268 H480 Z" fill="#FBF1DC" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="56" y="266" width="4" height="14" rx="2" fill="#B7791F"/>
+  <text x="68.0" y="277.5" class="tab" text-anchor="start" style="fill:#B7791F" xml:space="preserve">EACH PART HAS A JOB</text>
+  <text x="56.0" y="306.0" class="mono" text-anchor="start" xml:space="preserve">magic: refuses another version</text>
+  <text x="56.0" y="324.0" class="mono" text-anchor="start" xml:space="preserve">salt: a different key per file</text>
+  <text x="56.0" y="342.0" class="mono" text-anchor="start" xml:space="preserve">nonce: never reused</text>
+  <path d="M570,250 H982 L1000,268 V372 A10,10 0 0 1 990,382 H570 A10,10 0 0 1 560,372 V260 A10,10 0 0 1 570,250 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M982,250 V268 H1000 Z" fill="#F0EAFB" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="576" y="266" width="4" height="14" rx="2" fill="#7A4FD0"/>
+  <text x="588.0" y="277.5" class="tab" text-anchor="start" style="fill:#7A4FD0" xml:space="preserve">INSIDE: ONE LINE PER PERSON</text>
+  <text x="576.0" y="306.0" class="mono" text-anchor="start" xml:space="preserve">{&quot;name&quot;:&quot;Ada Lovelace&quot;,</text>
+  <text x="576.0" y="324.0" class="mono" text-anchor="start" xml:space="preserve"> &quot;status&quot;:&quot;active&quot;,&quot;key&quot;:&quot;5397…&quot;}</text>
+  <path class="wire" d="M795,202 L795,250" marker-end="url(#head)"/>
+  <text x="40.0" y="416.0" class="note" text-anchor="start" xml:space="preserve">A wrong passphrase and a changed byte fail the same way.</text>
 </svg>

@@ -44,6 +44,11 @@ A claim may appear in a report only if its evidence row is met.
 
 Results that did not improve are reported with the same detail as those that did.
 
+<figure>
+<img src="figures/reports-evidence.svg" alt="Three planned reports, each needing something first: Stage 1 and slop flags for the dataset report, Stage 2 and the evaluation for the fine-tuning report, Stage 2 measurements for the Jetson report. Between what exists and each report stands one gate: a claim goes in only if its evidence row is met.">
+<figcaption>What each report needs first, and the gate every claim passes on the way in.</figcaption>
+</figure>
+
 ## 8.3 Provenance, terms and privacy
 
 | Issue | Consequence |

@@ -1,86 +1,82 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 480" width="960" height="480" role="img" aria-label="Three ways into the renamed Thor's Funnel and serve. Anyone on the internet reaches your chat at the root path. Their domain goes through a forwarding page to the friend-app path. Their own devices reach the same app privately on port 8443 with tailscale serve.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1064 510" width="1064" height="510" role="img" aria-label="Three ways into the Thor. Anyone on the internet reaches your chat at the root path. Their domain goes through a forwarding page to the friend-app path. Their own devices reach the same app privately on port 8443 with tailscale serve.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 19px; font-weight: 700; }
-    .sheetlabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .label { fill: #1E88A8; font-size: 12px; font-weight: 600; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .foot { fill: #5B6B7C; font-size: 12px; }
-    .flow { stroke: #1E88A8; stroke-width: 2.2; fill: none; stroke-linejoin: round; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="480" fill="#FFFFFF"/>
-  <text x="34" y="44" class="title">Their app, their domain, one Funnel</text>
-  <rect x="34" y="54" width="56" height="5" rx="2.5" fill="#1E88A8"/>
-  <path d="M342,100 H612 V427 L592,433 L572,427 L552,433 L532,427 L512,433 L492,427 L472,433 L452,427 L432,433 L412,427 L392,433 L372,427 L352,433 L342,427 L342,100 Z" fill="#1D2733" opacity="0.05"/>
-  <path d="M340,96 H610 V423 L590,429 L570,423 L550,429 L530,423 L510,429 L490,423 L470,429 L450,423 L430,429 L410,423 L390,429 L370,423 L350,429 L340,423 L340,96 Z" fill="#FCFAF5" stroke="#E4DDCD" stroke-width="1.2"/>
-  <rect x="356" y="83" width="196" height="26" rx="7" fill="#FFFFFF" stroke="#E4DDCD" stroke-width="1.2"/>
-  <text x="454" y="100" class="sheetlabel mono" text-anchor="middle">thor-tigress.cat-crocodile.ts.net</text>
-  <rect x="32" y="143" width="280" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="34" y="146" width="280" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="30" y="140" width="280" height="72" rx="12" fill="#EDF2FD" stroke="#3B6FD4" stroke-width="1.6"/>
-  <rect x="40" y="154" width="4" height="44" rx="2" fill="#3B6FD4" opacity="0.85"/>
-  <text x="176" y="170" class="name" text-anchor="middle" style="font-size:14px">anyone on the internet</text>
-  <text x="176" y="191" class="note" text-anchor="middle">https://…ts.net/</text>
-  <rect x="32" y="243" width="280" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="34" y="246" width="280" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="30" y="240" width="280" height="72" rx="12" fill="#EDF2FD" stroke="#3B6FD4" stroke-width="1.6"/>
-  <rect x="40" y="254" width="4" height="44" rx="2" fill="#3B6FD4" opacity="0.85"/>
-  <text x="176" y="270" class="name" text-anchor="middle" style="font-size:14px">their domain</text>
-  <text x="176" y="291" class="note" text-anchor="middle">forwarding page · 302</text>
-  <rect x="32" y="343" width="280" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="34" y="346" width="280" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="30" y="340" width="280" height="72" rx="12" fill="#EDF2FD" stroke="#3B6FD4" stroke-width="1.6"/>
-  <rect x="40" y="354" width="4" height="44" rx="2" fill="#3B6FD4" opacity="0.85"/>
-  <text x="176" y="370" class="name" text-anchor="middle" style="font-size:14px">their devices, on the tailnet</text>
-  <text x="176" y="391" class="note" text-anchor="middle">no public hop</text>
-  <rect x="362" y="143" width="230" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="364" y="146" width="230" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="360" y="140" width="230" height="72" rx="12" fill="#F0F7E8" stroke="#4E8A16" stroke-width="1.6"/>
-  <rect x="370" y="154" width="4" height="44" rx="2" fill="#4E8A16" opacity="0.85"/>
-  <text x="481" y="170" class="name" text-anchor="middle" style="font-size:14px">Funnel :443 · /</text>
-  <text x="481" y="191" class="note" text-anchor="middle">your chat</text>
-  <rect x="362" y="243" width="230" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="364" y="246" width="230" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="360" y="240" width="230" height="72" rx="12" fill="#F0F7E8" stroke="#4E8A16" stroke-width="1.6"/>
-  <rect x="370" y="254" width="4" height="44" rx="2" fill="#4E8A16" opacity="0.85"/>
-  <text x="481" y="270" class="name" text-anchor="middle" style="font-size:14px">Funnel :443 · /friend-app</text>
-  <text x="481" y="291" class="note" text-anchor="middle">their app, public</text>
-  <rect x="362" y="343" width="230" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="364" y="346" width="230" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="360" y="340" width="230" height="72" rx="12" fill="#F0F7E8" stroke="#4E8A16" stroke-width="1.6"/>
-  <rect x="370" y="354" width="4" height="44" rx="2" fill="#4E8A16" opacity="0.85"/>
-  <text x="481" y="370" class="name mono" text-anchor="middle" style="font-size:14px">serve :8443</text>
-  <text x="481" y="391" class="note" text-anchor="middle">tailnet only</text>
-  <rect x="652" y="143" width="280" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="654" y="146" width="280" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="650" y="140" width="280" height="72" rx="12" fill="#FDF5E7" stroke="#C9861A" stroke-width="1.6"/>
-  <rect x="660" y="154" width="4" height="44" rx="2" fill="#C9861A" opacity="0.85"/>
-  <text x="796" y="170" class="name mono" text-anchor="middle" style="font-size:14px">thor-tigress-agent</text>
-  <text x="796" y="191" class="note" text-anchor="middle">127.0.0.1:8080</text>
-  <rect x="652" y="243" width="280" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="654" y="246" width="280" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="650" y="240" width="280" height="72" rx="12" fill="#FDF5E7" stroke="#C9861A" stroke-width="1.6"/>
-  <rect x="660" y="254" width="4" height="44" rx="2" fill="#C9861A" opacity="0.85"/>
-  <text x="796" y="270" class="name" text-anchor="middle" style="font-size:14px">their app</text>
-  <text x="796" y="291" class="note" text-anchor="middle">127.0.0.1:9100</text>
-  <rect x="652" y="343" width="280" height="72" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="654" y="346" width="280" height="72" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="650" y="340" width="280" height="72" rx="12" fill="#FDF5E7" stroke="#C9861A" stroke-width="1.6"/>
-  <rect x="660" y="354" width="4" height="44" rx="2" fill="#C9861A" opacity="0.85"/>
-  <text x="796" y="370" class="name" text-anchor="middle" style="font-size:14px">the same app</text>
-  <text x="796" y="391" class="note" text-anchor="middle">stays private</text>
-  <path class="flow" d="M312,176 L356,176" marker-end="url(#arrow)"/>
-  <path class="flow" d="M312,276 L356,276" marker-end="url(#arrow)"/>
-  <path class="flow" d="M312,376 L356,376" marker-end="url(#arrow)"/>
-  <path class="flow" d="M592,176 L646,176" marker-end="url(#arrow)"/>
-  <path class="flow" d="M592,276 L646,276" marker-end="url(#arrow)"/>
-  <path class="flow" d="M592,376 L646,376" marker-end="url(#arrow)"/>
-  <text x="34" y="452" class="foot">One name, one certificate. The path or the port picks which app answers.</text>
+  <rect width="1064" height="510" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Their app, their domain, one Funnel</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Three ways in, each ending at a port on 127.0.0.1.</text>
+  <rect x="380" y="112" width="660" height="352" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="398" y="101" width="287.6" height="22" rx="11" fill="#1B2430"/>
+  <text x="541.8" y="116.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">THOR-TIGRESS.CAT-CROCODILE.TS.NET</text>
+  <rect x="40" y="142" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,142.7 H46 V213.3 H52 A11.3,11.3 0 0 1 40.7,202 V154 A11.3,11.3 0 0 1 52,142.7 Z" fill="#2F6FDB"/>
+  <text x="60.0" y="174.0" class="name" text-anchor="start" xml:space="preserve">anyone on the internet</text>
+  <text x="60.0" y="192.0" class="sub" text-anchor="start" xml:space="preserve">https://…ts.net/</text>
+  <rect x="400" y="142" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M412,142.7 H406 V213.3 H412 A11.3,11.3 0 0 1 400.7,202 V154 A11.3,11.3 0 0 1 412,142.7 Z" fill="#7A4FD0"/>
+  <text x="420.0" y="174.0" class="name" text-anchor="start" xml:space="preserve">Funnel :443 · /</text>
+  <text x="420.0" y="192.0" class="sub" text-anchor="start" xml:space="preserve">your chat</text>
+  <rect x="740" y="142" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M752,142.7 H746 V213.3 H752 A11.3,11.3 0 0 1 740.7,202 V154 A11.3,11.3 0 0 1 752,142.7 Z" fill="#1F8A70"/>
+  <text x="760.0" y="174.0" class="name" text-anchor="start" xml:space="preserve">thor-tigress-agent</text>
+  <text x="760.0" y="192.0" class="sub" text-anchor="start" xml:space="preserve">127.0.0.1:8080</text>
+  <path class="wire" d="M320,178 L400,178" marker-end="url(#head)"/>
+  <path class="wire" d="M680,178 L740,178" marker-end="url(#head)"/>
+  <rect x="40" y="248" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,248.7 H46 V319.3 H52 A11.3,11.3 0 0 1 40.7,308 V260 A11.3,11.3 0 0 1 52,248.7 Z" fill="#2F6FDB"/>
+  <text x="60.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">their domain</text>
+  <text x="60.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">forwarding page · 302</text>
+  <rect x="400" y="248" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M412,248.7 H406 V319.3 H412 A11.3,11.3 0 0 1 400.7,308 V260 A11.3,11.3 0 0 1 412,248.7 Z" fill="#7A4FD0"/>
+  <text x="420.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">Funnel :443 · /friend-app</text>
+  <text x="420.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">their app, public</text>
+  <rect x="740" y="248" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M752,248.7 H746 V319.3 H752 A11.3,11.3 0 0 1 740.7,308 V260 A11.3,11.3 0 0 1 752,248.7 Z" fill="#1F8A70"/>
+  <text x="760.0" y="280.0" class="name" text-anchor="start" xml:space="preserve">their app</text>
+  <text x="760.0" y="298.0" class="sub" text-anchor="start" xml:space="preserve">127.0.0.1:9100</text>
+  <path class="wire" d="M320,284 L400,284" marker-end="url(#head)"/>
+  <path class="wire" d="M680,284 L740,284" marker-end="url(#head)"/>
+  <rect x="40" y="354" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,354.7 H46 V425.3 H52 A11.3,11.3 0 0 1 40.7,414 V366 A11.3,11.3 0 0 1 52,354.7 Z" fill="#2F6FDB"/>
+  <text x="60.0" y="386.0" class="name" text-anchor="start" xml:space="preserve">their devices, on the tailnet</text>
+  <text x="60.0" y="404.0" class="sub" text-anchor="start" xml:space="preserve">no public hop</text>
+  <rect x="400" y="354" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M412,354.7 H406 V425.3 H412 A11.3,11.3 0 0 1 400.7,414 V366 A11.3,11.3 0 0 1 412,354.7 Z" fill="#7F8EA0"/>
+  <text x="420.0" y="386.0" class="name" text-anchor="start" xml:space="preserve">serve :8443</text>
+  <text x="420.0" y="404.0" class="sub" text-anchor="start" xml:space="preserve">tailnet only</text>
+  <rect x="740" y="354" width="280" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M752,354.7 H746 V425.3 H752 A11.3,11.3 0 0 1 740.7,414 V366 A11.3,11.3 0 0 1 752,354.7 Z" fill="#1F8A70"/>
+  <text x="760.0" y="386.0" class="name" text-anchor="start" xml:space="preserve">the same app</text>
+  <text x="760.0" y="404.0" class="sub" text-anchor="start" xml:space="preserve">stays private</text>
+  <path class="wire idle" d="M320,390 L400,390" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M680,390 L740,390" marker-end="url(#head-idle)"/>
+  <text x="40.0" y="490.0" class="note" text-anchor="start" xml:space="preserve">One name, one certificate. The path or the port picks which app answers.</text>
 </svg>

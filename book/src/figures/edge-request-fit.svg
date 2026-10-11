@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 510" width="1000" height="510" role="img" aria-label="Six stages a chat request passes in thor-tigress-agent before a TensorRT Edge-LLM engine sees it: route by model name, name the engine&#x27;s own model, keep only the fields the engine knows, join system messages into one at the top, turn earlier tool-call arguments from JSON text into objects, and relay untouched when the request brings its own tools. Under each stage is what the engine answered without it: 404, 404, 400, 500, repeated steps, and dropped calls. A request for llama-server takes only the first and last stage.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1000" height="510" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">What the agent does to a chat request before an Edge-LLM engine sees it</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Grey is what arrives, black is what leaves. The red line is what the engine answered without the stage.</text>
+  <rect x="40" y="96" width="200" height="132" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M40.7,196 H239.3 V216 A11.3,11.3 0 0 1 228,227.3 H52 A11.3,11.3 0 0 1 40.7,216 Z" fill="#FCEBE6"/>
+  <circle cx="68" cy="124" r="13" fill="#E4F4EF"/>
+  <text x="68.0" y="128.8" class="name" text-anchor="middle" style="fill:#1F8A70" xml:space="preserve">1</text>
+  <text x="90.0" y="129.0" class="name" text-anchor="start" xml:space="preserve">Route</text>
+  <text x="56.0" y="160.0" class="mono dim" text-anchor="start" xml:space="preserve">model: &quot;gpt-4o&quot;</text>
+  <text x="56.0" y="180.0" class="mono" text-anchor="start" xml:space="preserve">→ the first server</text>
+  <text x="56.0" y="216.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">without it: 404</text>
+  <rect x="280" y="96" width="200" height="132" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M280.7,196 H479.3 V216 A11.3,11.3 0 0 1 468,227.3 H292 A11.3,11.3 0 0 1 280.7,216 Z" fill="#FCEBE6"/>
+  <circle cx="308" cy="124" r="13" fill="#E4F4EF"/>
+  <text x="308.0" y="128.8" class="name" text-anchor="middle" style="fill:#1F8A70" xml:space="preserve">2</text>
+  <text x="330.0" y="129.0" class="name" text-anchor="start" xml:space="preserve">Name</text>
+  <text x="296.0" y="160.0" class="mono dim" text-anchor="start" xml:space="preserve">model: &quot;gpt-4o&quot;</text>
+  <text x="296.0" y="180.0" class="mono" text-anchor="start" xml:space="preserve">→ &quot;Qwen3.6-35B-…&quot;</text>
+  <text x="296.0" y="216.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">without it: 404</text>
+  <rect x="520" y="96" width="200" height="132" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M520.7,196 H719.3 V216 A11.3,11.3 0 0 1 708,227.3 H532 A11.3,11.3 0 0 1 520.7,216 Z" fill="#FCEBE6"/>
+  <circle cx="548" cy="124" r="13" fill="#E4F4EF"/>
+  <text x="548.0" y="128.8" class="name" text-anchor="middle" style="fill:#1F8A70" xml:space="preserve">3</text>
+  <text x="570.0" y="129.0" class="name" text-anchor="start" xml:space="preserve">Fields</text>
+  <text x="536.0" y="160.0" class="mono dim" text-anchor="start" xml:space="preserve">user, store, metadata</text>
+  <text x="536.0" y="180.0" class="mono" text-anchor="start" xml:space="preserve">→ dropped</text>
+  <text x="536.0" y="216.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">without it: 400</text>
+  <rect x="760" y="96" width="200" height="132" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M760.7,196 H959.3 V216 A11.3,11.3 0 0 1 948,227.3 H772 A11.3,11.3 0 0 1 760.7,216 Z" fill="#FCEBE6"/>
+  <circle cx="788" cy="124" r="13" fill="#E4F4EF"/>
+  <text x="788.0" y="128.8" class="name" text-anchor="middle" style="fill:#1F8A70" xml:space="preserve">4</text>
+  <text x="810.0" y="129.0" class="name" text-anchor="start" xml:space="preserve">System</text>
+  <text x="776.0" y="160.0" class="mono dim" text-anchor="start" xml:space="preserve">system, user, system</text>
+  <text x="776.0" y="180.0" class="mono" text-anchor="start" xml:space="preserve">→ one system, first</text>
+  <text x="776.0" y="216.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">without it: 500 from Qwen</text>
+  <rect x="40" y="300" width="200" height="132" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M40.7,400 H239.3 V420 A11.3,11.3 0 0 1 228,431.3 H52 A11.3,11.3 0 0 1 40.7,420 Z" fill="#FCEBE6"/>
+  <circle cx="68" cy="328" r="13" fill="#E4F4EF"/>
+  <text x="68.0" y="332.8" class="name" text-anchor="middle" style="fill:#1F8A70" xml:space="preserve">5</text>
+  <text x="90.0" y="333.0" class="name" text-anchor="start" xml:space="preserve">Arguments</text>
+  <text x="56.0" y="364.0" class="mono dim" text-anchor="start" xml:space="preserve">&quot;{\&quot;path\&quot;:\&quot;a.rs\&quot;}&quot;</text>
+  <text x="56.0" y="384.0" class="mono" text-anchor="start" xml:space="preserve">→ {&quot;path&quot;: &quot;a.rs&quot;}</text>
+  <text x="56.0" y="420.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">without it: steps repeat</text>
+  <rect x="280" y="300" width="200" height="132" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M280.7,400 H479.3 V420 A11.3,11.3 0 0 1 468,431.3 H292 A11.3,11.3 0 0 1 280.7,420 Z" fill="#FCEBE6"/>
+  <circle cx="308" cy="328" r="13" fill="#E4F4EF"/>
+  <text x="308.0" y="332.8" class="name" text-anchor="middle" style="fill:#1F8A70" xml:space="preserve">6</text>
+  <text x="330.0" y="333.0" class="name" text-anchor="start" xml:space="preserve">Mode</text>
+  <text x="296.0" y="364.0" class="mono dim" text-anchor="start" xml:space="preserve">brings its own tools</text>
+  <text x="296.0" y="384.0" class="mono" text-anchor="start" xml:space="preserve">→ relayed, untouched</text>
+  <text x="296.0" y="420.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">without it: calls dropped</text>
+  <rect x="520" y="334" width="200" height="64" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M532,334.7 H526 V397.3 H532 A11.3,11.3 0 0 1 520.7,386 V346 A11.3,11.3 0 0 1 532,334.7 Z" fill="#5E9400"/>
+  <rect x="536" y="350.0" width="32" height="32" rx="8" fill="#EEF6DC"/>
+  <g transform="translate(542.0,356.0) scale(0.8333)"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z" fill="#76B900" fill-rule="evenodd"/></g>
+  <text x="578.0" y="362.0" class="name" text-anchor="start" xml:space="preserve">Edge-LLM engine</text>
+  <text x="578.0" y="380.0" class="sub" text-anchor="start" xml:space="preserve">that has the model</text>
+  <rect x="760" y="334" width="200" height="64" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M772,334.7 H766 V397.3 H772 A11.3,11.3 0 0 1 760.7,386 V346 A11.3,11.3 0 0 1 772,334.7 Z" fill="#2F6FDB"/>
+  <rect x="776" y="350.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(782.0,356.0) scale(0.8333)"><path d="M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm3.3 4.3-1.4 1.4L7.2 12l-2.3 2.3 1.4 1.4L10 12zM11 14v2h7v-2z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="818.0" y="353.0" class="name" text-anchor="start" xml:space="preserve">The answer</text>
+  <text x="818.0" y="371.0" class="sub" text-anchor="start" xml:space="preserve">copied back as it</text>
+  <text x="818.0" y="389.0" class="sub" text-anchor="start" xml:space="preserve">comes</text>
+  <path class="wire" d="M240,162 L280,162" marker-end="url(#head)"/>
+  <path class="wire" d="M480,162 L520,162" marker-end="url(#head)"/>
+  <path class="wire" d="M720,162 L760,162" marker-end="url(#head)"/>
+  <path class="wire" d="M860,228 L860,255 Q860,264 851,264 L149,264 Q140,264 140,273 L140,300" marker-end="url(#head)"/>
+  <path class="wire" d="M240,366 L280,366" marker-end="url(#head)"/>
+  <path class="wire" d="M480,366 L520,366" marker-end="url(#head)"/>
+  <path class="wire" d="M720,366 L760,366" marker-end="url(#head)"/>
+  <text x="40.0" y="466.0" class="note" text-anchor="start" xml:space="preserve">Stages 1 and 2: config.rs and body.rs.   Stages 3 to 5: chat/shape.rs.   Stage 6: chat/mod.rs.</text>
+  <text x="40.0" y="486.0" class="note" text-anchor="start" xml:space="preserve">A request for llama-server takes stages 1 and 6 only: it is passed on as it came.</text>
+</svg>

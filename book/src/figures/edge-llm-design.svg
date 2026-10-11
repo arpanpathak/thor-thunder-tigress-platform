@@ -1,69 +1,90 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 460" width="960" height="460" role="img" aria-label="thor-tigress-agent on 8080 routes each request by model id to either the llama.cpp router on 8079, serving Nemotron 3 Nano from a GGUF file, or the TensorRT Edge-LLM server on 8081, serving Qwen3.6-35B-A3B from engines built on the Thor. thor-tigress-serve manages both.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 500" width="1100" height="500" role="img" aria-label="thor-tigress-agent on 8080 routes each request by model id to either the llama.cpp router on 8079, serving Nemotron 3 Nano from a GGUF file, or the TensorRT Edge-LLM server on 8081, serving Qwen3.6-35B-A3B from engines built on the Thor. thor-tigress-serve manages both.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .label { fill: #1E88A8; font-size: 12px; }
-    .warn { fill: #D9542B; font-size: 12px; }
-    .num { fill: #1D2733; font-size: 12px; font-weight: 600; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .box { fill: #F4F7FA; stroke-width: 2; }
-    .built { stroke: #4E8A16; }
-    .planned { fill: #F4F7FA; stroke: #B7791F; stroke-width: 2; stroke-dasharray: 7 5; }
-    .outside { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
-    .zone { fill: none; stroke: #8A99AB; stroke-width: 1.5; stroke-dasharray: 6 5; }
-    .zonelabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .idle { fill: #FFFFFF; stroke: #8A99AB; stroke-width: 2; stroke-dasharray: 6 5; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; stroke-linejoin: round; }
-    .deny { stroke: #D9542B; stroke-width: 2; fill: none; stroke-dasharray: 5 4; stroke-linejoin: round; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
     </marker>
-    <marker id="arrow-deny" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#D9542B"/>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="460" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">Two engines behind one agent</text>
-  <rect x="30" y="170" width="160" height="80" rx="10" class="outside"/>
-  <text x="110.0" y="196" class="name" text-anchor="middle">Web chat, agents</text>
-  <text x="110.0" y="216" class="note" text-anchor="middle">model: id or alias</text>
-  <rect x="240" y="160" width="190" height="100" rx="10" class="box built"/>
-  <text x="335.0" y="186" class="name" text-anchor="middle">thor-tigress-agent</text>
-  <text x="335.0" y="206" class="note" text-anchor="middle">:8080</text>
-  <text x="335.0" y="223" class="note" text-anchor="middle">--engine per other engine</text>
-  <text x="335.0" y="240" class="note" text-anchor="middle">routes by model id</text>
-  <path class="flow" d="M190,210 L238,210" marker-end="url(#arrow)"/>
-  <rect x="500" y="70" width="210" height="110" rx="10" class="box built"/>
-  <text x="605.0" y="96" class="name" text-anchor="middle">llama.cpp router</text>
-  <text x="605.0" y="116" class="note" text-anchor="middle">:8079 · GGUF</text>
-  <text x="605.0" y="133" class="note" text-anchor="middle">Nemotron 3 Nano Q8_0</text>
-  <text x="605.0" y="150" class="note" text-anchor="middle">default model</text>
-  <rect x="500" y="240" width="210" height="110" rx="10" class="box built"/>
-  <text x="605.0" y="266" class="name" text-anchor="middle">Edge-LLM server</text>
-  <text x="605.0" y="286" class="note" text-anchor="middle">:8081 · TensorRT engine</text>
-  <text x="605.0" y="303" class="note" text-anchor="middle">Qwen3.6-35B-A3B NVFP4</text>
-  <text x="605.0" y="320" class="note" text-anchor="middle">service thor-edge-llm</text>
-  <path class="flow" d="M430,195 L455,195 Q465,195 465,185 L465,135 Q465,125 475,125 L498,125" marker-end="url(#arrow)"/>
-  <path class="flow" d="M430,225 L455,225 Q465,225 465,235 L465,285 Q465,295 475,295 L498,295" marker-end="url(#arrow)"/>
-  <rect x="760" y="240" width="170" height="110" rx="10" class="box built"/>
-  <text x="845.0" y="266" class="name" text-anchor="middle">engine files</text>
-  <text x="845.0" y="286" class="note" text-anchor="middle">~/models/edge-llm/cache</text>
-  <text x="845.0" y="303" class="note" text-anchor="middle">built on the Thor</text>
-  <text x="845.0" y="320" class="note" text-anchor="middle">for sm_110 only</text>
-  <path class="flow" d="M760,295 L712,295" marker-end="url(#arrow)"/>
-  <rect x="760" y="70" width="170" height="110" rx="10" class="box built"/>
-  <text x="845.0" y="96" class="name" text-anchor="middle">GGUF files</text>
-  <text x="845.0" y="116" class="note" text-anchor="middle">~/models/gguf/</text>
-  <text x="845.0" y="133" class="note" text-anchor="middle">downloaded as is</text>
-  <path class="flow" d="M760,125 L712,125" marker-end="url(#arrow)"/>
-  <rect x="240" y="330" width="190" height="80" rx="10" class="box built"/>
-  <text x="335.0" y="356" class="name" text-anchor="middle">thor-tigress-serve</text>
-  <text x="335.0" y="376" class="note" text-anchor="middle">EDGE_MODEL; list,</text>
-  <text x="335.0" y="393" class="note" text-anchor="middle">load, unload</text>
-  <path class="flow" d="M430,370 L465,370 Q475,370 475,360 L475,330 Q475,320 485,320 L498,320" marker-end="url(#arrow)"/>
-  <text x="30" y="440" class="note">Both engines share the Thor's 122.8 GB; thor-tigress-serve checks free memory before loading on either.</text>
+  <rect width="1100" height="500" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Two engines behind one agent</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">The request&#x27;s model id decides which engine answers.</text>
+  <rect x="30" y="206" width="210" height="64" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M42,206.7 H36 V269.3 H42 A11.3,11.3 0 0 1 30.7,258 V218 A11.3,11.3 0 0 1 42,206.7 Z" fill="#2F6FDB"/>
+  <rect x="46" y="222.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(52.0,228.0) scale(0.8333)"><path d="M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 5v9h16V9zm1.5-3a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="88.0" y="234.0" class="name" text-anchor="start" xml:space="preserve">Web chat, agents</text>
+  <text x="88.0" y="252.0" class="sub" text-anchor="start" xml:space="preserve">model: id or alias</text>
+  <rect x="300" y="186" width="240" height="104" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M312,186.7 H306 V289.3 H312 A11.3,11.3 0 0 1 300.7,278 V198 A11.3,11.3 0 0 1 312,186.7 Z" fill="#1F8A70"/>
+  <rect x="316" y="222.0" width="32" height="32" rx="8" fill="#E4F4EF"/>
+  <g transform="translate(322.0,228.0) scale(0.8333)"><path d="M7 4 2 9l5 5v-3.5h9V8H7zm10 6v3.5H8V16h9v3.5l5-5z" fill="#1F8A70" fill-rule="evenodd"/></g>
+  <text x="358.0" y="216.0" class="name" text-anchor="start" xml:space="preserve">thor-tigress-agent</text>
+  <text x="358.0" y="234.0" class="sub" text-anchor="start" xml:space="preserve">:8080</text>
+  <text x="358.0" y="252.0" class="sub" text-anchor="start" xml:space="preserve">--engine per other engine</text>
+  <text x="358.0" y="270.0" class="sub" text-anchor="start" xml:space="preserve">routes by model id</text>
+  <rect x="610" y="100" width="230" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M622,100.7 H616 V195.3 H622 A11.3,11.3 0 0 1 610.7,184 V112 A11.3,11.3 0 0 1 622,100.7 Z" fill="#1F8A70"/>
+  <rect x="626" y="132.0" width="32" height="32" rx="8" fill="#E4F4EF"/>
+  <g transform="translate(632.0,138.0) scale(0.8333)"><path d="M12 2 2 7l10 5 10-5zm-7.8 8.6L2 11.7l10 5 10-5-2.2-1.1L12 14.5zm0 4.7L2 16.4l10 5 10-5-2.2-1.1L12 19.2z" fill="#1F8A70" fill-rule="evenodd"/></g>
+  <text x="668.0" y="126.0" class="name" text-anchor="start" xml:space="preserve">llama.cpp router</text>
+  <text x="668.0" y="144.0" class="sub" text-anchor="start" xml:space="preserve">:8079 · GGUF</text>
+  <text x="668.0" y="162.0" class="sub" text-anchor="start" xml:space="preserve">Nemotron 3 Nano Q8_0</text>
+  <text x="668.0" y="180.0" class="sub" text-anchor="start" xml:space="preserve">default model</text>
+  <rect x="610" y="280" width="230" height="112" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M622,280.7 H616 V391.3 H622 A11.3,11.3 0 0 1 610.7,380 V292 A11.3,11.3 0 0 1 622,280.7 Z" fill="#5E9400"/>
+  <rect x="626" y="320.0" width="32" height="32" rx="8" fill="#EEF6DC"/>
+  <g transform="translate(632.0,326.0) scale(0.8333)"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z" fill="#76B900" fill-rule="evenodd"/></g>
+  <text x="668.0" y="314.0" class="name" text-anchor="start" xml:space="preserve">Edge-LLM server</text>
+  <text x="668.0" y="332.0" class="sub" text-anchor="start" xml:space="preserve">:8081 · TensorRT engine</text>
+  <text x="668.0" y="350.0" class="sub" text-anchor="start" xml:space="preserve">Qwen3.6-35B-A3B NVFP4</text>
+  <text x="668.0" y="368.0" class="sub" text-anchor="start" xml:space="preserve">service thor-edge-llm</text>
+  <path d="M896,109 A85.0,9 0 0 1 1066,109 V187 A85.0,9 0 0 1 896,187 Z" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="981.0" cy="109" rx="85.0" ry="9" fill="#FFFFFF" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="981.0" y="142.0" class="name" text-anchor="middle" xml:space="preserve">GGUF files</text>
+  <text x="981.0" y="160.0" class="sub" text-anchor="middle" xml:space="preserve">~/models/gguf/</text>
+  <text x="981.0" y="178.0" class="sub" text-anchor="middle" xml:space="preserve">downloaded as is</text>
+  <path d="M890,283 A90.0,9 0 0 1 1070,283 V389 A90.0,9 0 0 1 890,389 Z" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="980.0" cy="283" rx="90.0" ry="9" fill="#FFFFFF" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="980.0" y="321.0" class="name" text-anchor="middle" xml:space="preserve">engine files</text>
+  <text x="980.0" y="339.0" class="sub" text-anchor="middle" xml:space="preserve">~/models/edge-llm/cache</text>
+  <text x="980.0" y="357.0" class="sub" text-anchor="middle" xml:space="preserve">built on the Thor</text>
+  <text x="980.0" y="375.0" class="sub" text-anchor="middle" xml:space="preserve">for sm_110 only</text>
+  <rect x="300" y="362" width="240" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M312,362.7 H306 V441.3 H312 A11.3,11.3 0 0 1 300.7,430 V374 A11.3,11.3 0 0 1 312,362.7 Z" fill="#7F8EA0"/>
+  <rect x="316" y="386.0" width="32" height="32" rx="8" fill="#F1F4F7"/>
+  <g transform="translate(322.0,392.0) scale(0.8333)"><path d="M21.038,4.9l-7.577-4.498C13.009,0.134,12.505,0,12,0c-0.505,0-1.009,0.134-1.462,0.403L2.961,4.9 C2.057,5.437,1.5,6.429,1.5,7.503v8.995c0,1.073,0.557,2.066,1.462,2.603l7.577,4.497C10.991,23.866,11.495,24,12,24 c0.505,0,1.009-0.134,1.461-0.402l7.577-4.497c0.904-0.537,1.462-1.529,1.462-2.603V7.503C22.5,6.429,21.943,5.437,21.038,4.9z M15.17,18.946l0.013,0.646c0.001,0.078-0.05,0.167-0.111,0.198l-0.383,0.22c-0.061,0.031-0.111-0.007-0.112-0.085L14.57,19.29 c-0.328,0.136-0.66,0.169-0.872,0.084c-0.04-0.016-0.057-0.075-0.041-0.142l0.139-0.584c0.011-0.046,0.036-0.092,0.069-0.121 c0.012-0.011,0.024-0.02,0.036-0.026c0.022-0.011,0.043-0.014,0.062-0.006c0.229,0.077,0.521,0.041,0.802-0.101 c0.357-0.181,0.596-0.545,0.592-0.907c-0.003-0.328-0.181-0.465-0.613-0.468c-0.55,0.001-1.064-0.107-1.072-0.917 c-0.007-0.667,0.34-1.361,0.889-1.8l-0.007-0.652c-0.001-0.08,0.048-0.168,0.111-0.2l0.37-0.236 c0.061-0.031,0.111,0.007,0.112,0.087l0.006,0.653c0.273-0.109,0.511-0.138,0.726-0.088c0.047,0.012,0.067,0.076,0.048,0.151 l-0.144,0.578c-0.011,0.044-0.036,0.088-0.065,0.116c-0.012,0.012-0.025,0.021-0.038,0.028c-0.019,0.01-0.038,0.013-0.057,0.009 c-0.098-0.022-0.332-0.073-0.699,0.113c-0.385,0.195-0.52,0.53-0.517,0.778c0.003,0.297,0.155,0.387,0.681,0.396 c0.7,0.012,1.003,0.318,1.01,1.023C16.105,17.747,15.736,18.491,15.17,18.946z M19.143,17.859c0,0.06-0.008,0.116-0.058,0.145 l-1.916,1.164c-0.05,0.029-0.09,0.004-0.09-0.056v-0.494c0-0.06,0.037-0.093,0.087-0.122l1.887-1.129 c0.05-0.029,0.09-0.004,0.09,0.056V17.859z M20.459,6.797l-7.168,4.427c-0.894,0.523-1.553,1.109-1.553,2.187v8.833 c0,0.645,0.26,1.063,0.66,1.184c-0.131,0.023-0.264,0.039-0.398,0.039c-0.42,0-0.833-0.114-1.197-0.33L3.226,18.64 c-0.741-0.44-1.201-1.261-1.201-2.142V7.503c0-0.881,0.46-1.702,1.201-2.142l7.577-4.498c0.363-0.216,0.777-0.33,1.197-0.33 c0.419,0,0.833,0.114,1.197,0.33l7.577,4.498c0.624,0.371,1.046,1.013,1.164,1.732C21.686,6.557,21.12,6.411,20.459,6.797z" fill="#3E474A" fill-rule="evenodd"/></g>
+  <text x="358.0" y="389.0" class="name" text-anchor="start" xml:space="preserve">thor-tigress-serve</text>
+  <text x="358.0" y="407.0" class="sub" text-anchor="start" xml:space="preserve">EDGE_MODEL; list,</text>
+  <text x="358.0" y="425.0" class="sub" text-anchor="start" xml:space="preserve">load, unload</text>
+  <path class="wire" d="M240,238 L300,238" marker-end="url(#head)"/>
+  <path class="wire" d="M540,226 L566,226 Q575,226 575,217 L575,157 Q575,148 584,148 L610,148" marker-end="url(#head)"/>
+  <path class="wire" d="M540,250 L566,250 Q575,250 575,259 L575,327 Q575,336 584,336 L610,336" marker-end="url(#head)"/>
+  <path class="wire idle" d="M840,148 L896,148" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M840,336 L890,336" marker-end="url(#head-idle)"/>
+  <text x="40.0" y="478.0" class="note" text-anchor="start" xml:space="preserve">Both engines share the Thor&#x27;s 122.8 GB. thor-tigress-serve manages both, and checks free memory before loading on either.</text>
 </svg>

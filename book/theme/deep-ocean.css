@@ -126,16 +126,38 @@ html.navy .hljs-deletion { color: var(--ocean-red); }
     margin-bottom: 0.3em;
 }
 
-/* Figures: the SVGs carry their own dark background. */
-figure { margin: 1.8em 0; text-align: center; }
+/* Figures. Screenshots keep a thin frame; diagrams carry their own paper. */
+figure { margin: 2.4em 0; text-align: center; }
 figure img {
     max-width: 100%;
     border: 1px solid var(--ocean-selection, var(--table-border-color));
     border-radius: 8px;
 }
+
+/* Diagrams are drawn about 1000 px wide and the text column is 750 px, so a
+   diagram runs wider than the text, by the same amount on each side, as far
+   as the window allows. 440 px is the sidebar plus room for the page arrows.
+   On a narrow window the amount is zero and the diagram fits the column. */
+figure:has(> img[src$=".svg"]) {
+    margin-inline: calc(-1 * max(0px, (min(1060px, 100vw - 440px) - 100%) / 2));
+}
+figure > img[src$=".svg"] {
+    width: 100%;
+    border: none;
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(20, 28, 40, 0.08), 0 10px 30px rgba(20, 28, 40, 0.12);
+}
+html.navy figure > img[src$=".svg"],
+html.coal figure > img[src$=".svg"],
+html.ayu figure > img[src$=".svg"] {
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.10), 0 12px 34px rgba(0, 0, 0, 0.45);
+}
+
 figcaption {
-    margin-top: 0.6em;
+    margin: 1em auto 0;
+    max-width: 46em;
     font-size: 0.9em;
+    line-height: 1.5;
     color: var(--ocean-muted, var(--fg));
 }
 figcaption b { color: var(--ocean-accent, inherit); margin-right: 0.4em; }

@@ -18,6 +18,7 @@
 - [Web chat: Thor Tigress Cub](ch09-web-chat.md)
 - [Tool calling](ch19-tool-calling.md)
 - [Bring your own agent](ch16-bring-your-own-agent.md)
+- [Coding tools on TensorRT Edge-LLM](ch28-coding-tools-on-edge-llm.md)
 - [Bring your own domain](ch17-bring-your-own-domain.md)
 - [Security](ch10-security.md)
 - [Operations: recovery and hardening](ch18-operations.md)

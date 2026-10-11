@@ -2,6 +2,10 @@
 
 # Bring your own agent
 
+> **2026-10-11.** A request may name any model the Thor lists, and a name nobody has is
+> answered by the default server instead of being refused. The details are in chapter
+> [Coding tools on TensorRT Edge-LLM](ch28-coding-tools-on-edge-llm.md).
+
 Nemotron on the Thor is an API anyone with a key can call. Point the coding
 agent you already use at it: Claude Code, openbatrangs, OpenCode, or anything
 that speaks the OpenAI or Anthropic API.

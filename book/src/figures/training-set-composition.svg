@@ -1,37 +1,69 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" width="960" height="350" role="img" aria-label="Two stacked bars. Tokens: chat 67 percent, book 24 percent, code 8 percent, curated sets 1.7 percent. Examples: chat 70 percent, book 22 percent, code 4 percent, curated sets 4 percent.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .label { fill: #1D2733; font-size: 13px; }
-    .inside { fill: #1D2733; font-size: 13px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
-  <rect width="900" height="300" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">Training set composition by source</text>
-
-  <!-- Tokens: 800 px for 1,757,394 tokens -->
-  <text x="50" y="74" class="label">Tokens (1.76M)</text>
-  <rect x="50" y="84" width="536.7" height="40" fill="#C9D9F7"/>
-  <rect x="586.7" y="84" width="188.8" height="40" fill="#D3E8BC"/>
-  <rect x="775.5" y="84" width="61.1" height="40" fill="#F6CDBE"/>
-  <rect x="836.6" y="84" width="7.1" height="40" fill="#F3D9A4"/>
-  <rect x="843.7" y="84" width="6.3" height="40" fill="#B6E3E7"/>
-  <text x="62" y="109" class="inside">chat 1,178,903 (67%)</text>
-  <text x="598" y="109" class="inside">book 414,747 (24%)</text>
-  <text x="781" y="109" class="inside">code</text>
-
-  <!-- Examples: 800 px for 3,165 examples -->
-  <text x="50" y="164" class="label">Examples (3,165)</text>
-  <rect x="50" y="174" width="560.6" height="40" fill="#C9D9F7"/>
-  <rect x="610.6" y="174" width="174.4" height="40" fill="#D3E8BC"/>
-  <rect x="785" y="174" width="32.4" height="40" fill="#F6CDBE"/>
-  <rect x="817.4" y="174" width="13.9" height="40" fill="#F3D9A4"/>
-  <rect x="831.3" y="174" width="18.7" height="40" fill="#B6E3E7"/>
-  <text x="62" y="199" class="inside">chat 2,218 (70%)</text>
-  <text x="622" y="199" class="inside">book 690 (22%)</text>
-
-  <path d="M840,218 L840,240 L782,240" stroke="#B7791F" stroke-width="1.5" fill="none"/>
-  <text x="774" y="245" class="label" text-anchor="end" style="fill:#B7791F">curated: readability 55 (yellow), clever_vs_readable 74 (cyan)</text>
-  <text x="774" y="263" class="note" text-anchor="end">29,480 tokens (1.7%); repeated about 5 times per epoch in the training plan</text>
-  <text x="50" y="290" class="note">code: 128 examples, 134,264 tokens (8%). Token counts are estimates at four characters per token.</text>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="960" height="350" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Training set composition by source</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">The same set measured two ways: by tokens, and by examples.</text>
+  <text x="60.0" y="104.0" class="name" text-anchor="start" xml:space="preserve">Tokens (1.76M)</text>
+  <clipPath id="clip-60-114"><rect x="60" y="114" width="840" height="40" rx="6"/></clipPath>
+  <g clip-path="url(#clip-60-114)" filter="url(#lift)">
+  <rect x="60.0" y="114" width="563.5" height="40" fill="#2F6FDB"/>
+  <text x="341.7" y="138.2" class="pill" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">chat 1,178,903 (67%)</text>
+  <rect x="623.5" y="114" width="198.2" height="40" fill="#1F8A70"/>
+  <text x="722.6" y="138.2" class="pill" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">book 414,747 (24%)</text>
+  <rect x="821.7" y="114" width="64.2" height="40" fill="#7A4FD0"/>
+  <text x="853.8" y="138.2" class="pill" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">code</text>
+  <rect x="885.9" y="114" width="14.1" height="40" fill="#B7791F"/>
+  </g>
+  <rect x="60" y="114" width="840" height="40" rx="6" fill="none" stroke="#D5DBE3" stroke-width="1.2"/>
+  <text x="60.0" y="194.0" class="name" text-anchor="start" xml:space="preserve">Examples (3,165)</text>
+  <clipPath id="clip-60-204"><rect x="60" y="204" width="840" height="40" rx="6"/></clipPath>
+  <g clip-path="url(#clip-60-204)" filter="url(#lift)">
+  <rect x="60.0" y="204" width="588.7" height="40" fill="#2F6FDB"/>
+  <text x="354.3" y="228.2" class="pill" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">chat 2,218 (70%)</text>
+  <rect x="648.7" y="204" width="183.1" height="40" fill="#1F8A70"/>
+  <text x="740.2" y="228.2" class="pill" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">book 690 (22%)</text>
+  <rect x="831.8" y="204" width="34.0" height="40" fill="#7A4FD0"/>
+  <rect x="865.8" y="204" width="34.2" height="40" fill="#B7791F"/>
+  </g>
+  <rect x="60" y="204" width="840" height="40" rx="6" fill="none" stroke="#D5DBE3" stroke-width="1.2"/>
+  <rect x="60.0" y="270" width="14" height="14" rx="4" fill="#2F6FDB"/>
+  <text x="81.0" y="281.5" class="note" text-anchor="start" xml:space="preserve">chat</text>
+  <rect x="131.4" y="270" width="14" height="14" rx="4" fill="#1F8A70"/>
+  <text x="152.4" y="281.5" class="note" text-anchor="start" xml:space="preserve">book</text>
+  <rect x="202.8" y="270" width="14" height="14" rx="4" fill="#7A4FD0"/>
+  <text x="223.8" y="281.5" class="note" text-anchor="start" xml:space="preserve">code: 128 examples, 134,264 tokens (8%)</text>
+  <rect x="505.2" y="270" width="14" height="14" rx="4" fill="#B7791F"/>
+  <text x="526.2" y="281.5" class="note" text-anchor="start" xml:space="preserve">curated: readability 55, clever_vs_readable 74</text>
+  <text x="60.0" y="310.0" class="note" text-anchor="start" xml:space="preserve">The curated sets are 29,480 tokens (1.7%); the training plan repeats them about 5 times per epoch.</text>
+  <text x="60.0" y="327.0" class="note" text-anchor="start" xml:space="preserve">Token counts are estimates at four characters per token.</text>
 </svg>

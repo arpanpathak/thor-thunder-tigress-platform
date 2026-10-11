@@ -1,51 +1,65 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" width="960" height="360" role="img" aria-label="A visitor reaches app.example.com, which lands on a Tailscale node of their own running Funnel and a proxy. That node reaches the Thor over the tailnet, where their app listens on 127.0.0.1:9100. The Thor's own name does not change.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1044 336" width="1044" height="336" role="img" aria-label="A visitor reaches app.example.com, which lands on a Tailscale node of their own running Funnel and a proxy. That node reaches the Thor over the tailnet, where their app listens on 127.0.0.1:9100. The Thor&#x27;s own name does not change.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 19px; font-weight: 700; }
-    .sheetlabel { fill: #5B6B7C; font-size: 12px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .label { fill: #1E88A8; font-size: 12px; font-weight: 600; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .foot { fill: #5B6B7C; font-size: 12px; }
-    .flow { stroke: #1E88A8; stroke-width: 2.2; fill: none; stroke-linejoin: round; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="10" markerHeight="10" orient="auto">
-      <path d="M0,0 L10,5 L0,10 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="360" fill="#FFFFFF"/>
-  <text x="34" y="44" class="title">Their name in front, the Thor behind it</text>
-  <rect x="34" y="54" width="56" height="5" rx="2.5" fill="#1E88A8"/>
-  <rect x="32" y="143" width="180" height="84" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="34" y="146" width="180" height="84" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="30" y="140" width="180" height="84" rx="12" fill="#EDF2FD" stroke="#3B6FD4" stroke-width="1.6"/>
-  <rect x="40" y="154" width="4" height="56" rx="2" fill="#3B6FD4" opacity="0.85"/>
-  <text x="126" y="176" class="name" text-anchor="middle" style="font-size:14px">visitor</text>
-  <text x="126" y="197" class="note" text-anchor="middle">app.example.com</text>
-  <path d="M242,109 H472 V274 L452,280 L432,274 L412,280 L392,274 L372,280 L352,274 L332,280 L312,274 L292,280 L272,274 L252,280 L242,274 L242,109 Z" fill="#1D2733" opacity="0.05"/>
-  <path d="M240,105 H470 V270 L450,276 L430,270 L410,276 L390,270 L370,276 L350,270 L330,276 L310,270 L290,276 L270,270 L250,276 L240,270 L240,105 Z" fill="#FCFAF5" stroke="#E4DDCD" stroke-width="1.2"/>
-  <rect x="256" y="92" width="120" height="26" rx="7" fill="#FFFFFF" stroke="#E4DDCD" stroke-width="1.2"/>
-  <text x="316" y="109" class="sheetlabel" text-anchor="middle">their tailnet</text>
-  <rect x="264" y="143" width="186" height="84" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="266" y="146" width="186" height="84" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="262" y="140" width="186" height="84" rx="12" fill="#F0F7E8" stroke="#4E8A16" stroke-width="1.6"/>
-  <rect x="272" y="154" width="4" height="56" rx="2" fill="#4E8A16" opacity="0.85"/>
-  <text x="361" y="176" class="name" text-anchor="middle" style="font-size:14px">their node</text>
-  <text x="361" y="197" class="note" text-anchor="middle">Funnel + proxy</text>
-  <path d="M562,109 H932 V274 L912,280 L892,274 L872,280 L852,274 L832,280 L812,274 L792,280 L772,274 L752,280 L732,274 L712,280 L692,274 L672,280 L652,274 L632,280 L612,274 L592,280 L572,274 L562,280 L562,109 Z" fill="#1D2733" opacity="0.05"/>
-  <path d="M560,105 H930 V270 L910,276 L890,270 L870,276 L850,270 L830,276 L810,270 L790,276 L770,270 L750,276 L730,270 L710,276 L690,270 L670,276 L650,270 L630,276 L610,270 L590,276 L570,270 L560,276 L560,105 Z" fill="#FCFAF5" stroke="#E4DDCD" stroke-width="1.2"/>
-  <rect x="576" y="92" width="185" height="26" rx="7" fill="#FFFFFF" stroke="#E4DDCD" stroke-width="1.2"/>
-  <text x="668" y="109" class="sheetlabel" text-anchor="middle">your tailnet, unchanged</text>
-  <rect x="584" y="143" width="326" height="84" rx="12" fill="#1D2733" opacity="0.06"/>
-  <rect x="586" y="146" width="326" height="84" rx="12" fill="#1D2733" opacity="0.04"/>
-  <rect x="582" y="140" width="326" height="84" rx="12" fill="#FDF5E7" stroke="#C9861A" stroke-width="1.6"/>
-  <rect x="592" y="154" width="4" height="56" rx="2" fill="#C9861A" opacity="0.85"/>
-  <text x="751" y="176" class="name" text-anchor="middle" style="font-size:14px">Jetson AGX Thor</text>
-  <text x="751" y="197" class="note" text-anchor="middle">their app · 127.0.0.1:9100</text>
-  <path class="flow" d="M212,182 L258,182" marker-end="url(#arrow)"/>
-  <path class="flow" d="M452,182 L556,182" marker-end="url(#arrow)"/>
-  <text x="504" y="170" class="label" text-anchor="middle">shared node</text>
-  <text x="34" y="322" class="foot">Their app uses the GPU here. The name on the link is theirs, and your chat's address stays as it is.</text>
+  <rect width="1044" height="336" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Their name in front, the Thor behind it</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">The visitor never sees the Thor&#x27;s address.</text>
+  <rect x="270" y="116" width="250" height="150" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="288" y="105" width="130.3" height="22" rx="11" fill="#1B2430"/>
+  <text x="353.1" y="120.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">THEIR TAILNET</text>
+  <rect x="690" y="116" width="330" height="150" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="708" y="105" width="208.9" height="22" rx="11" fill="#1B2430"/>
+  <text x="812.5" y="120.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">YOUR TAILNET, UNCHANGED</text>
+  <rect x="40" y="154" width="190" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,154.7 H46 V225.3 H52 A11.3,11.3 0 0 1 40.7,214 V166 A11.3,11.3 0 0 1 52,154.7 Z" fill="#2F6FDB"/>
+  <rect x="56" y="174.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(62.0,180.0) scale(0.8333)"><path d="M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 5v9h16V9zm1.5-3a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="98.0" y="186.0" class="name" text-anchor="start" xml:space="preserve">visitor</text>
+  <text x="98.0" y="204.0" class="sub" text-anchor="start" xml:space="preserve">app.example.com</text>
+  <rect x="290" y="154" width="210" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M302,154.7 H296 V225.3 H302 A11.3,11.3 0 0 1 290.7,214 V166 A11.3,11.3 0 0 1 302,154.7 Z" fill="#7A4FD0"/>
+  <rect x="306" y="174.0" width="32" height="32" rx="8" fill="#F0EAFB"/>
+  <g transform="translate(312.0,180.0) scale(0.8333)"><path d="M24 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm-9 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm0-9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6-6a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 24a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm18 .5a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM6 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm9-9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm-3 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM6 3a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM3 5.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" fill="#242424" fill-rule="evenodd"/></g>
+  <text x="348.0" y="186.0" class="name" text-anchor="start" xml:space="preserve">their node</text>
+  <text x="348.0" y="204.0" class="sub" text-anchor="start" xml:space="preserve">Funnel + proxy</text>
+  <rect x="710" y="154" width="290" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M722,154.7 H716 V225.3 H722 A11.3,11.3 0 0 1 710.7,214 V166 A11.3,11.3 0 0 1 722,154.7 Z" fill="#5E9400"/>
+  <rect x="726" y="174.0" width="32" height="32" rx="8" fill="#EEF6DC"/>
+  <g transform="translate(732.0,180.0) scale(0.8333)"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z" fill="#76B900" fill-rule="evenodd"/></g>
+  <text x="768.0" y="186.0" class="name" text-anchor="start" xml:space="preserve">Jetson AGX Thor</text>
+  <text x="768.0" y="204.0" class="sub" text-anchor="start" xml:space="preserve">their app · 127.0.0.1:9100</text>
+  <path class="wire" d="M230,190 L290,190" marker-end="url(#head)"/>
+  <path class="wire" d="M500,190 L710,190" marker-end="url(#head)"/>
+  <rect x="561.7" y="181.0" width="86.6" height="18" rx="9" fill="#FBFAF6" stroke="#3F5873" stroke-width="1"/>
+  <text x="605.0" y="193.8" class="pill" text-anchor="middle" style="fill:#3F5873" xml:space="preserve">shared node</text>
+  <text x="40.0" y="310.0" class="note" text-anchor="start" xml:space="preserve">Their app uses the GPU here. The name on the link is theirs, and your chat&#x27;s address stays as it is.</text>
 </svg>

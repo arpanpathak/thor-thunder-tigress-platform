@@ -1,111 +1,115 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" width="960" height="560">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 556" width="1080" height="556" role="img" aria-label="Three sources feed thor-hammer-trainer, which writes train.jsonl. train.jsonl feeds the review page and the planned chain: QLoRA training, merge and quantize, TensorRT-LLM engine, trtllm-serve. trtllm-serve feeds the planned human evaluation, whose verdicts feed the next data round.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; }
-    .box { fill: #F4F7FA; stroke-width: 2; }
-    .built { stroke: #4E8A16; }
-    .planned { stroke: #B7791F; stroke-dasharray: 7 5; }
-    .source { fill: #F7F9FB; stroke: #3B6FD4; stroke-width: 2; }
-    .flow { stroke: #1E88A8; stroke-width: 2; fill: none; }
-    .future { stroke: #B7791F; stroke-width: 2; fill: none; stroke-dasharray: 7 5; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
     </marker>
-    <marker id="arrow-planned" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#B7791F"/>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-
-  <rect width="960" height="560" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">Components and data flow</text>
-
-  <!-- Sources as cylinders -->
-  <g>
-    <path class="source" d="M40,92 a85,12 0 0 1 170,0 v48 a85,12 0 0 1 -170,0 z"/>
-    <ellipse cx="125" cy="92" rx="85" ry="12" fill="#F4F7FA" stroke="#3B6FD4" stroke-width="2"/>
-    <text x="125" y="125" class="name" text-anchor="middle">Chat export</text>
-    <text x="125" y="143" class="note" text-anchor="middle">384 conversations</text>
-  </g>
-  <g>
-    <path class="source" d="M40,202 a85,12 0 0 1 170,0 v48 a85,12 0 0 1 -170,0 z"/>
-    <ellipse cx="125" cy="202" rx="85" ry="12" fill="#F4F7FA" stroke="#3B6FD4" stroke-width="2"/>
-    <text x="125" y="235" class="name" text-anchor="middle">Curated sets</text>
-    <text x="125" y="253" class="note" text-anchor="middle">55 + 74 pairs, 37 DPO</text>
-  </g>
-  <g>
-    <path class="source" d="M40,312 a85,12 0 0 1 170,0 v48 a85,12 0 0 1 -170,0 z"/>
-    <ellipse cx="125" cy="312" rx="85" ry="12" fill="#F4F7FA" stroke="#3B6FD4" stroke-width="2"/>
-    <text x="125" y="345" class="name" text-anchor="middle">Book repository</text>
-    <text x="125" y="363" class="note" text-anchor="middle">chapters and code files</text>
-  </g>
-
-  <!-- Arrows into the generator -->
-  <path class="flow" d="M212,120 C244,120 238,204 268,204" marker-end="url(#arrow)"/>
-  <path class="flow" d="M212,228 L268,228" marker-end="url(#arrow)"/>
-  <path class="flow" d="M212,340 C244,340 238,252 268,252" marker-end="url(#arrow)"/>
-
-  <!-- Generator -->
-  <rect x="270" y="180" width="200" height="96" rx="10" class="box built"/>
-  <text x="370" y="212" class="name mono" text-anchor="middle">thor-hammer-trainer</text>
-  <text x="370" y="234" class="note" text-anchor="middle">data generator, Rust</text>
-  <text x="370" y="254" class="note" text-anchor="middle">pairs, splits, filters</text>
-
-  <!-- train.jsonl document -->
-  <path class="flow" d="M472,228 L512,228" marker-end="url(#arrow)"/>
-  <path d="M514,186 h108 l22,22 v66 h-130 z" fill="#F7F9FB" stroke="#4E8A16" stroke-width="2"/>
-  <path d="M622,186 v22 h22" fill="none" stroke="#4E8A16" stroke-width="2"/>
-  <text x="579" y="230" class="name mono" text-anchor="middle">train.jsonl</text>
-  <text x="579" y="250" class="note" text-anchor="middle">3,165 examples</text>
-  <text x="579" y="266" class="note" text-anchor="middle">1.76M tokens</text>
-
-  <!-- Review page -->
-  <path class="flow" d="M579,276 L579,328" marker-end="url(#arrow)"/>
-  <rect x="494" y="330" width="170" height="74" rx="10" class="box built"/>
-  <text x="579" y="360" class="name" text-anchor="middle">Review page</text>
-  <text x="579" y="381" class="note" text-anchor="middle">reading, slop flags</text>
-
-  <!-- Planned training and serving column -->
-  <path class="future" d="M646,214 C690,214 690,112 722,112" marker-end="url(#arrow-planned)"/>
-  <rect x="724" y="80" width="210" height="64" rx="10" class="box planned"/>
-  <text x="829" y="107" class="name" text-anchor="middle">QLoRA training</text>
-  <text x="829" y="127" class="note" text-anchor="middle">Unsloth + TRL on the Thor GPU</text>
-
-  <path class="future" d="M829,146 L829,176" marker-end="url(#arrow-planned)"/>
-  <rect x="724" y="178" width="210" height="64" rx="10" class="box planned"/>
-  <text x="829" y="205" class="name" text-anchor="middle">Merge and quantize</text>
-  <text x="829" y="225" class="note" text-anchor="middle">LoRA folded into base weights</text>
-
-  <path class="future" d="M829,244 L829,274" marker-end="url(#arrow-planned)"/>
-  <rect x="724" y="276" width="210" height="64" rx="10" class="box planned"/>
-  <text x="829" y="303" class="name" text-anchor="middle">TensorRT-LLM engine</text>
-  <text x="829" y="323" class="note" text-anchor="middle">built for sm_110</text>
-
-  <path class="future" d="M829,342 L829,372" marker-end="url(#arrow-planned)"/>
-  <rect x="724" y="374" width="210" height="64" rx="10" class="box planned"/>
-  <text x="829" y="401" class="name mono" text-anchor="middle">trtllm-serve</text>
-  <text x="829" y="421" class="note" text-anchor="middle">OpenAI-style HTTP on localhost</text>
-
-  <!-- Human evaluation -->
-  <path class="future" d="M722,420 C640,420 600,470 532,470" marker-end="url(#arrow-planned)"/>
-  <rect x="300" y="436" width="230" height="70" rx="10" class="box planned"/>
-  <text x="415" y="465" class="name" text-anchor="middle">Human evaluation</text>
-  <text x="415" y="486" class="note" text-anchor="middle">base vs fine-tuned, blind A/B</text>
-
-  <!-- Feedback loop -->
-  <path class="future" d="M330,434 C300,380 330,320 352,280" marker-end="url(#arrow-planned)"/>
-  <text x="150" y="414" class="note">verdicts select data</text>
-  <text x="150" y="430" class="note">for the next round</text>
-
-  <!-- Legend -->
-  <rect x="30" y="522" width="26" height="16" rx="3" class="box built"/>
-  <text x="64" y="535" class="note">built and run on real data</text>
-  <rect x="250" y="522" width="26" height="16" rx="3" class="box planned"/>
-  <text x="284" y="535" class="note">designed, not built yet</text>
-  <line x1="470" y1="530" x2="500" y2="530" class="flow" marker-end="url(#arrow)"/>
-  <text x="510" y="535" class="note">data flow</text>
+  <rect width="1080" height="556" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Components and data flow</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Solid cards are built. Dashed cards are designed and not built yet.</text>
+  <rect x="40" y="110" width="226" height="60" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,110.7 H46 V169.3 H52 A11.3,11.3 0 0 1 40.7,158 V122 A11.3,11.3 0 0 1 52,110.7 Z" fill="#B7791F"/>
+  <rect x="56" y="124.0" width="32" height="32" rx="8" fill="#FBF1DC"/>
+  <g transform="translate(62.0,130.0) scale(0.8333)"><path d="M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.5V8h4.5zM8 11v1.6h8V11zm0 3.2v1.6h8v-1.6zm0 3.2V19h5v-1.6z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="98.0" y="136.0" class="name" text-anchor="start" xml:space="preserve">Chat export</text>
+  <text x="98.0" y="154.0" class="sub" text-anchor="start" xml:space="preserve">384 conversations</text>
+  <rect x="40" y="190" width="226" height="60" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,190.7 H46 V249.3 H52 A11.3,11.3 0 0 1 40.7,238 V202 A11.3,11.3 0 0 1 52,190.7 Z" fill="#B7791F"/>
+  <rect x="56" y="204.0" width="32" height="32" rx="8" fill="#FBF1DC"/>
+  <g transform="translate(62.0,210.0) scale(0.8333)"><path d="M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.5V8h4.5zM8 11v1.6h8V11zm0 3.2v1.6h8v-1.6zm0 3.2V19h5v-1.6z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="98.0" y="216.0" class="name" text-anchor="start" xml:space="preserve">Curated sets</text>
+  <text x="98.0" y="234.0" class="sub" text-anchor="start" xml:space="preserve">55 + 74 pairs, 37 DPO</text>
+  <rect x="40" y="270" width="226" height="60" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,270.7 H46 V329.3 H52 A11.3,11.3 0 0 1 40.7,318 V282 A11.3,11.3 0 0 1 52,270.7 Z" fill="#B7791F"/>
+  <rect x="56" y="284.0" width="32" height="32" rx="8" fill="#FBF1DC"/>
+  <g transform="translate(62.0,290.0) scale(0.8333)"><path d="M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.5V8h4.5zM8 11v1.6h8V11zm0 3.2v1.6h8v-1.6zm0 3.2V19h5v-1.6z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="98.0" y="296.0" class="name" text-anchor="start" xml:space="preserve">Book repository</text>
+  <text x="98.0" y="314.0" class="sub" text-anchor="start" xml:space="preserve">chapters and code files</text>
+  <rect x="300" y="184" width="240" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M312,184.7 H306 V255.3 H312 A11.3,11.3 0 0 1 300.7,244 V196 A11.3,11.3 0 0 1 312,184.7 Z" fill="#1F8A70"/>
+  <rect x="316" y="204.0" width="32" height="32" rx="8" fill="#E4F4EF"/>
+  <g transform="translate(322.0,210.0) scale(0.8333)"><path d="M23.8346 11.7033l-1.0073-.6236a13.7268 13.7268 0 00-.0283-.2936l.8656-.8069a.3483.3483 0 00-.1154-.578l-1.1066-.414a8.4958 8.4958 0 00-.087-.2856l.6904-.9587a.3462.3462 0 00-.2257-.5446l-1.1663-.1894a9.3574 9.3574 0 00-.1407-.2622l.49-1.0761a.3437.3437 0 00-.0274-.3361.3486.3486 0 00-.3006-.154l-1.1845.0416a6.7444 6.7444 0 00-.1873-.2268l.2723-1.153a.3472.3472 0 00-.417-.4172l-1.1532.2724a14.0183 14.0183 0 00-.2278-.1873l.0415-1.1845a.3442.3442 0 00-.49-.328l-1.076.491c-.0872-.0476-.1742-.0952-.2623-.1407l-.1903-1.1673A.3483.3483 0 0016.256.955l-.9597.6905a8.4867 8.4867 0 00-.2855-.086l-.414-1.1066a.3483.3483 0 00-.5781-.1154l-.8069.8666a9.2936 9.2936 0 00-.2936-.0284L12.2946.1683a.3462.3462 0 00-.5892 0l-.6236 1.0073a13.7383 13.7383 0 00-.2936.0284L9.9803.3374a.3462.3462 0 00-.578.1154l-.4141 1.1065c-.0962.0274-.1903.0567-.2855.086L7.744.955a.3483.3483 0 00-.5447.2258L7.009 2.348a9.3574 9.3574 0 00-.2622.1407l-1.0762-.491a.3462.3462 0 00-.49.328l.0416 1.1845a7.9826 7.9826 0 00-.2278.1873L3.8413 3.425a.3472.3472 0 00-.4171.4171l.2713 1.1531c-.0628.075-.1255.1509-.1863.2268l-1.1845-.0415a.3462.3462 0 00-.328.49l.491 1.0761a9.167 9.167 0 00-.1407.2622l-1.1662.1894a.3483.3483 0 00-.2258.5446l.6904.9587a13.303 13.303 0 00-.087.2855l-1.1065.414a.3483.3483 0 00-.1155.5781l.8656.807a9.2936 9.2936 0 00-.0283.2935l-1.0073.6236a.3442.3442 0 000 .5892l1.0073.6236c.008.0982.0182.1964.0283.2936l-.8656.8079a.3462.3462 0 00.1155.578l1.1065.4141c.0273.0962.0567.1914.087.2855l-.6904.9587a.3452.3452 0 00.2268.5447l1.1662.1893c.0456.088.0922.1751.1408.2622l-.491 1.0762a.3462.3462 0 00.328.49l1.1834-.0415c.0618.0769.1235.1528.1873.2277l-.2713 1.1541a.3462.3462 0 00.4171.4161l1.153-.2713c.075.0638.151.1255.2279.1863l-.0415 1.1845a.3442.3442 0 00.49.327l1.0761-.49c.087.0486.1741.0951.2622.1407l.1903 1.1662a.3483.3483 0 00.5447.2268l.9587-.6904a9.299 9.299 0 00.2855.087l.414 1.1066a.3452.3452 0 00.5781.1154l.8079-.8656c.0972.0111.1954.0203.2936.0294l.6236 1.0073a.3472.3472 0 00.5892 0l.6236-1.0073c.0982-.0091.1964-.0183.2936-.0294l.8069.8656a.3483.3483 0 00.578-.1154l.4141-1.1066a8.4626 8.4626 0 00.2855-.087l.9587.6904a.3452.3452 0 00.5447-.2268l.1903-1.1662c.088-.0456.1751-.0931.2622-.1407l1.0762.49a.3472.3472 0 00.49-.327l-.0415-1.1845a6.7267 6.7267 0 00.2267-.1863l1.1531.2713a.3472.3472 0 00.4171-.416l-.2713-1.1542c.0628-.0749.1255-.1508.1863-.2278l1.1845.0415a.3442.3442 0 00.328-.49l-.49-1.076c.0475-.0872.0951-.1742.1407-.2623l1.1662-.1893a.3483.3483 0 00.2258-.5447l-.6904-.9587.087-.2855 1.1066-.414a.3462.3462 0 00.1154-.5781l-.8656-.8079c.0101-.0972.0202-.1954.0283-.2936l1.0073-.6236a.3442.3442 0 000-.5892zm-6.7413 8.3551a.7138.7138 0 01.2986-1.396.714.714 0 11-.2997 1.396zm-.3422-2.3142a.649.649 0 00-.7715.5l-.3573 1.6685c-1.1035.501-2.3285.7795-3.6193.7795a8.7368 8.7368 0 01-3.6951-.814l-.3574-1.6684a.648.648 0 00-.7714-.499l-1.473.3158a8.7216 8.7216 0 01-.7613-.898h7.1676c.081 0 .1356-.0141.1356-.088v-2.536c0-.074-.0536-.0881-.1356-.0881h-2.0966v-1.6077h2.2677c.2065 0 1.1065.0587 1.394 1.2088.0901.3533.2875 1.5044.4232 1.8729.1346.413.6833 1.2381 1.2685 1.2381h3.5716a.7492.7492 0 00.1296-.0131 8.7874 8.7874 0 01-.8119.9526zM6.8369 20.024a.714.714 0 11-.2997-1.396.714.714 0 01.2997 1.396zM4.1177 8.9972a.7137.7137 0 11-1.304.5791.7137.7137 0 011.304-.579zm-.8352 1.9813l1.5347-.6824a.65.65 0 00.33-.8585l-.3158-.7147h1.2432v5.6025H3.5669a8.7753 8.7753 0 01-.2834-3.348zm6.7343-.5437V8.7836h2.9601c.153 0 1.0792.1772 1.0792.8697 0 .575-.7107.7815-1.2948.7815zm10.7574 1.4862c0 .2187-.008.4363-.0243.651h-.9c-.09 0-.1265.0586-.1265.1477v.413c0 .973-.5487 1.1846-1.0296 1.2382-.4576.0517-.9648-.1913-1.0275-.4717-.2704-1.5186-.7198-1.8436-1.4305-2.4034.8817-.5599 1.799-1.386 1.799-2.4915 0-1.1936-.819-1.9458-1.3769-2.3153-.7825-.5163-1.6491-.6195-1.883-.6195H5.4682a8.7651 8.7651 0 014.907-2.7699l1.0974 1.151a.648.648 0 00.9182.0213l1.227-1.1743a8.7753 8.7753 0 016.0044 4.2762l-.8403 1.8982a.652.652 0 00.33.8585l1.6178.7188c.0283.2875.0425.577.0425.8717zm-9.3006-9.5993a.7128.7128 0 11.984 1.0316.7137.7137 0 01-.984-1.0316zm8.3389 6.71a.7107.7107 0 01.9395-.3625.7137.7137 0 11-.9405.3635z" fill="#A8431A" fill-rule="evenodd"/></g>
+  <text x="358.0" y="207.0" class="name" text-anchor="start" xml:space="preserve">thor-hammer-trainer</text>
+  <text x="358.0" y="225.0" class="sub" text-anchor="start" xml:space="preserve">data generator, Rust</text>
+  <text x="358.0" y="243.0" class="sub" text-anchor="start" xml:space="preserve">pairs, splits, filters</text>
+  <path d="M600,187 A85.0,9 0 0 1 770,187 V253 A85.0,9 0 0 1 600,253 Z" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="685.0" cy="187" rx="85.0" ry="9" fill="#FFFFFF" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="685.0" y="214.0" class="name" text-anchor="middle" xml:space="preserve">train.jsonl</text>
+  <text x="685.0" y="232.0" class="sub" text-anchor="middle" xml:space="preserve">3,165 examples</text>
+  <text x="685.0" y="250.0" class="sub" text-anchor="middle" xml:space="preserve">1.76M tokens</text>
+  <rect x="830" y="190" width="200" height="60" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M842,190.7 H836 V249.3 H842 A11.3,11.3 0 0 1 830.7,238 V202 A11.3,11.3 0 0 1 842,190.7 Z" fill="#2F6FDB"/>
+  <rect x="846" y="204.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(852.0,210.0) scale(0.8333)"><path d="M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1 5v9h16V9zm1.5-3a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm3 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="888.0" y="216.0" class="name" text-anchor="start" xml:space="preserve">Review page</text>
+  <text x="888.0" y="234.0" class="sub" text-anchor="start" xml:space="preserve">reading, slop flags</text>
+  <path class="wire" d="M266,140 L274.5,140.0 Q283,140 283,149 L283,199 Q283,208 291.5,208.0 L300,208" marker-end="url(#head)"/>
+  <path class="wire" d="M266,220 L300,220" marker-end="url(#head)"/>
+  <path class="wire" d="M266,300 L274.5,300.0 Q283,300 283,291 L283,241 Q283,232 291.5,232.0 L300,232" marker-end="url(#head)"/>
+  <path class="wire" d="M540,220 L600,220" marker-end="url(#head)"/>
+  <path class="wire" d="M770,220 L830,220" marker-end="url(#head)"/>
+  <rect x="40" y="420" width="180" height="76" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M52,420.7 H46 V495.3 H52 A11.3,11.3 0 0 1 40.7,484 V432 A11.3,11.3 0 0 1 52,420.7 Z" fill="#B7791F"/>
+  <text x="60.0" y="445.0" class="name" text-anchor="start" xml:space="preserve">QLoRA training</text>
+  <text x="60.0" y="463.0" class="sub" text-anchor="start" xml:space="preserve">Unsloth + TRL</text>
+  <text x="60.0" y="481.0" class="sub" text-anchor="start" xml:space="preserve">on the Thor GPU</text>
+  <rect x="240" y="420" width="186" height="76" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M252,420.7 H246 V495.3 H252 A11.3,11.3 0 0 1 240.7,484 V432 A11.3,11.3 0 0 1 252,420.7 Z" fill="#B7791F"/>
+  <text x="260.0" y="445.0" class="name" text-anchor="start" xml:space="preserve">Merge and quantize</text>
+  <text x="260.0" y="463.0" class="sub" text-anchor="start" xml:space="preserve">LoRA folded into</text>
+  <text x="260.0" y="481.0" class="sub" text-anchor="start" xml:space="preserve">base weights</text>
+  <rect x="446" y="420" width="200" height="76" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M458,420.7 H452 V495.3 H458 A11.3,11.3 0 0 1 446.7,484 V432 A11.3,11.3 0 0 1 458,420.7 Z" fill="#B7791F"/>
+  <text x="466.0" y="454.0" class="name" text-anchor="start" xml:space="preserve">TensorRT-LLM engine</text>
+  <text x="466.0" y="472.0" class="sub" text-anchor="start" xml:space="preserve">built for sm_110</text>
+  <rect x="666" y="420" width="170" height="76" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M678,420.7 H672 V495.3 H678 A11.3,11.3 0 0 1 666.7,484 V432 A11.3,11.3 0 0 1 678,420.7 Z" fill="#B7791F"/>
+  <text x="686.0" y="445.0" class="name" text-anchor="start" xml:space="preserve">trtllm-serve</text>
+  <text x="686.0" y="463.0" class="sub" text-anchor="start" xml:space="preserve">OpenAI-style HTTP</text>
+  <text x="686.0" y="481.0" class="sub" text-anchor="start" xml:space="preserve">on localhost</text>
+  <rect x="856" y="420" width="184" height="76" rx="12" fill="#FBF1DC" stroke="#B7791F" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M868,420.7 H862 V495.3 H868 A11.3,11.3 0 0 1 856.7,484 V432 A11.3,11.3 0 0 1 868,420.7 Z" fill="#B7791F"/>
+  <text x="876.0" y="445.0" class="name" text-anchor="start" xml:space="preserve">Human evaluation</text>
+  <text x="876.0" y="463.0" class="sub" text-anchor="start" xml:space="preserve">base vs fine-tuned,</text>
+  <text x="876.0" y="481.0" class="sub" text-anchor="start" xml:space="preserve">blind A/B</text>
+  <path class="wire idle" d="M685,262 L685,363 Q685,372 676,372 L139,372 Q130,372 130,381 L130,420" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M220,458 L240,458" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M426,458 L446,458" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M646,458 L666,458" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M836,458 L856,458" marker-end="url(#head-idle)"/>
+  <path class="wire idle" d="M948,420 L948,349 Q948,340 957,340 L1041,340 Q1050,340 1050,331 L1050,93 Q1050,84 1041,84 L429,84 Q420,84 420,93 L420,184" marker-end="url(#head-idle)"/>
+  <rect x="586.1" y="75.0" width="297.8" height="18" rx="9" fill="#FBFAF6" stroke="#7F8EA0" stroke-width="1"/>
+  <text x="735.0" y="87.8" class="pill" text-anchor="middle" style="fill:#7F8EA0" xml:space="preserve">verdicts choose the data for the next round</text>
+  <rect x="40" y="522" width="14" height="14" rx="4" fill="#E4F4EF" stroke="#1F8A70" stroke-width="1.3"/>
+  <text x="61.0" y="533.5" class="note" text-anchor="start" xml:space="preserve">built and run on real data</text>
+  <rect x="254.60000000000002" y="522" width="14" height="14" rx="4" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.3"/>
+  <text x="275.6" y="533.5" class="note" text-anchor="start" xml:space="preserve">a file or a set of files</text>
+  <rect x="470" y="522" width="14" height="14" rx="4" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.3" stroke-dasharray="3 2"/>
+  <text x="491.0" y="533.5" class="note" text-anchor="start" xml:space="preserve">designed, not built yet</text>
 </svg>

@@ -15,6 +15,7 @@ site-url = "/thor-thunder-tigress-platform/"
 default-theme = "light"
 preferred-dark-theme = "navy"
 additional-css = ["theme/deep-ocean.css"]
+additional-js = ["theme/figures.js"]
 smart-punctuation = true
 mathjax-support = true
 

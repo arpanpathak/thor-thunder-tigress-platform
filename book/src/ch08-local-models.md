@@ -2,6 +2,10 @@
 
 # Local models
 
+> **2026-10-11.** `openbatrangs --thor` now uses the Thor's Tailscale address instead of
+> `127.0.0.1:8079`, so it works without the SSH tunnel. The details are in chapter
+> [Coding tools on TensorRT Edge-LLM](ch28-coding-tools-on-edge-llm.md).
+
 ## edgechat (local-copilot-codebuddy)
 
 Terminal chat that runs the model inside the program with llama.cpp. On the

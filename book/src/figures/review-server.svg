@@ -1,67 +1,74 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 400" width="960" height="400">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 444" width="1000" height="444" role="img" aria-label="On 127.0.0.1, the browser requests / and /train.jsonl from the review server. The server reads data/train.jsonl on each request. Another machine cannot connect.">
   <style>
-    text { font-family: Inter, "Segoe UI", Helvetica, Arial, sans-serif; }
-    .title { fill: #1D2733; font-size: 17px; font-weight: 600; }
-    .name { fill: #1D2733; font-size: 14px; font-weight: 600; }
-    .note { fill: #5B6B7C; font-size: 12px; }
-    .mono { font-family: "JetBrains Mono", Menlo, monospace; font-size: 12px; }
-    .box { fill: #F4F7FA; stroke: #3B6FD4; stroke-width: 2; }
-    .machine { fill: none; stroke: #B0BEC5; stroke-width: 1.5; stroke-dasharray: 8 6; }
-    .file { fill: #F7F9FB; stroke: #4E8A16; stroke-width: 2; }
-    .request { stroke: #1E88A8; stroke-width: 1.8; fill: none; }
-    .response { stroke: #4E8A16; stroke-width: 1.8; fill: none; }
-    .blocked { stroke: #C62828; stroke-width: 2; fill: none; }
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
   </style>
   <defs>
-    <marker id="arrow" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#1E88A8"/>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
     </marker>
-    <marker id="arrow-green" viewBox="0 0 12 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="9" orient="auto">
-      <path d="M0,0.8 L11,5 L0,9.2 L2.6,5 Z" fill="#4E8A16"/>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
     </marker>
   </defs>
-  <rect width="960" height="400" fill="#FFFFFF"/>
-  <text x="30" y="36" class="title">Review server: routes and loopback boundary</text>
-
-  <rect x="20" y="56" width="720" height="320" rx="14" class="machine"/>
-  <text x="36" y="78" class="note">this Thor, 127.0.0.1</text>
-
-  <!-- Browser -->
-  <rect x="50" y="100" width="250" height="250" rx="10" class="box"/>
-  <text x="175" y="128" class="name" text-anchor="middle">Browser: review.html</text>
-  <text x="70" y="160" class="note">parse 3,165 JSON lines</text>
-  <text x="70" y="184" class="note">search and source filter</text>
-  <text x="70" y="208" class="note">20 examples per page</text>
-  <text x="70" y="232" class="note">highlight emails, phone</text>
-  <text x="70" y="248" class="note">numbers, keys, passwords</text>
-  <text x="70" y="272" class="note">flag as AI slop, with a note</text>
-  <text x="70" y="296" class="note" style="fill:#4E8A16">all text set with textContent:</text>
-  <text x="70" y="314" class="note" style="fill:#4E8A16">HTML in the data is not executed</text>
-
-  <!-- Server -->
-  <rect x="440" y="100" width="260" height="130" rx="10" class="box"/>
-  <text x="570" y="128" class="name" text-anchor="middle">review (Rust, std only)</text>
-  <text x="460" y="158" class="mono" style="fill:#1D2733">GET  / /train.jsonl /slop.jsonl</text>
-  <text x="460" y="180" class="mono" style="fill:#1D2733">GET  /flags   POST /flags</text>
-  <text x="460" y="202" class="mono" style="fill:#1D2733">anything else → 404</text>
-
-  <path class="request" d="M302,150 L436,150" marker-end="url(#arrow)"/>
-  <text x="320" y="142" class="note">request</text>
-  <path class="response" d="M436,200 L302,200" marker-end="url(#arrow-green)"/>
-  <text x="320" y="222" class="note">response</text>
-
-  <!-- File -->
-  <path d="M500,270 h120 l20,20 v60 h-140 z" class="file"/>
-  <text x="570" y="314" class="mono" text-anchor="middle" style="fill:#1D2733">data/ and labels/</text>
-  <text x="570" y="334" class="note" text-anchor="middle">read per request</text>
-  <path class="request" d="M570,232 L570,266" marker-end="url(#arrow)"/>
-
-  <!-- Other machines -->
-  <rect x="790" y="140" width="150" height="80" rx="10" fill="#F4F7FA" stroke="#C62828" stroke-width="2"/>
-  <text x="865" y="172" class="name" text-anchor="middle">Other machine</text>
-  <text x="865" y="194" class="note" text-anchor="middle">on the network</text>
-  <path class="blocked" d="M788,180 L746,180"/>
-  <path class="blocked" d="M760,166 L774,194 M774,166 L760,194"/>
-  <text x="790" y="248" class="note">cannot connect: the</text>
-  <text x="790" y="264" class="note">socket binds 127.0.0.1</text>
+  <rect width="1000" height="444" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Review server: routes and the loopback boundary</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Everything inside the tinted area is one machine talking to itself.</text>
+  <rect x="230" y="104" width="746" height="316" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="248" y="93" width="193.2" height="22" rx="11" fill="#1B2430"/>
+  <text x="344.6" y="108.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">THIS THOR · 127.0.0.1</text>
+  <rect x="24" y="150" width="160" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M36,150.7 H30 V229.3 H36 A11.3,11.3 0 0 1 24.7,218 V162 A11.3,11.3 0 0 1 36,150.7 Z" fill="#7A4FD0"/>
+  <text x="44.0" y="186.0" class="name" text-anchor="start" xml:space="preserve">Other machine</text>
+  <text x="44.0" y="204.0" class="sub" text-anchor="start" xml:space="preserve">on the network</text>
+  <path class="wire danger" d="M184,190 L226,190" marker-end="url(#head-danger)"/>
+  <text x="24.0" y="254.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">Cannot connect: the</text>
+  <text x="24.0" y="271.0" class="note" text-anchor="start" style="fill:#CF4526" xml:space="preserve">socket binds 127.0.0.1.</text>
+  <path d="M264,130 H556 L574,148 V366 A10,10 0 0 1 564,376 H264 A10,10 0 0 1 254,366 V140 A10,10 0 0 1 264,130 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M556,130 V148 H574 Z" fill="#EAF1FD" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="270" y="146" width="4" height="14" rx="2" fill="#2F6FDB"/>
+  <text x="282.0" y="157.5" class="tab" text-anchor="start" style="fill:#2F6FDB" xml:space="preserve">BROWSER · REVIEW.HTML</text>
+  <text x="270.0" y="186.0" class="mono" text-anchor="start" xml:space="preserve">parse 3,165 JSON lines</text>
+  <text x="270.0" y="204.0" class="mono" text-anchor="start" xml:space="preserve">search and source filter</text>
+  <text x="270.0" y="222.0" class="mono" text-anchor="start" xml:space="preserve">20 examples per page</text>
+  <text x="270.0" y="240.0" class="mono" text-anchor="start" xml:space="preserve">highlight emails, phone numbers,</text>
+  <text x="270.0" y="258.0" class="mono" text-anchor="start" xml:space="preserve">keys, passwords</text>
+  <text x="270.0" y="276.0" class="mono" text-anchor="start" xml:space="preserve">flag as AI slop, with a note</text>
+  <text x="270.0" y="343.0" class="note" text-anchor="start" style="fill:#2F6FDB" xml:space="preserve">All text is set with textContent:</text>
+  <text x="270.0" y="360.0" class="note" text-anchor="start" style="fill:#2F6FDB" xml:space="preserve">HTML in the data is not executed.</text>
+  <path d="M654,130 H934 L952,148 V252 A10,10 0 0 1 942,262 H654 A10,10 0 0 1 644,252 V140 A10,10 0 0 1 654,130 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M934,130 V148 H952 Z" fill="#E4F4EF" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="660" y="146" width="4" height="14" rx="2" fill="#1F8A70"/>
+  <text x="672.0" y="157.5" class="tab" text-anchor="start" style="fill:#1F8A70" xml:space="preserve">REVIEW · RUST, STD ONLY</text>
+  <text x="660.0" y="186.0" class="mono" text-anchor="start" xml:space="preserve">GET  / /train.jsonl /slop.jsonl</text>
+  <text x="660.0" y="204.0" class="mono" text-anchor="start" xml:space="preserve">GET  /flags   POST /flags</text>
+  <text x="660.0" y="222.0" class="mono dim" text-anchor="start" xml:space="preserve">anything else → 404</text>
+  <path d="M698,321 A100.0,9 0 0 1 898,321 V387 A100.0,9 0 0 1 698,387 Z" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="798.0" cy="321" rx="100.0" ry="9" fill="#FFFFFF" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="798.0" y="357.0" class="name" text-anchor="middle" xml:space="preserve">data/ and labels/</text>
+  <text x="798.0" y="375.0" class="sub" text-anchor="middle" xml:space="preserve">read on every request</text>
+  <path class="wire" d="M574,170 L644,170" marker-end="url(#head)"/>
+  <path class="wire" d="M644,214 L574,214" marker-end="url(#head)"/>
+  <text x="609.0" y="160.0" class="note" text-anchor="middle" xml:space="preserve">request</text>
+  <text x="609.0" y="234.0" class="note" text-anchor="middle" xml:space="preserve">response</text>
+  <path class="wire" d="M798,262 L798,312" marker-end="url(#head)"/>
 </svg>
