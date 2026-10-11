@@ -14,40 +14,86 @@
   <a href="LICENSE"><img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/license.svg" alt="License" height="28"></a>
 </p>
 
-Thor Thunder Tigress fine-tunes a local language model on an NVIDIA Jetson so it
-stops writing AI slop: in prose (filler, fake importance, hedging) and in Rust
-(`unwrap`, comments inside function bodies, index loops, errors that are strings).
+Local language models write slop. In prose it is filler, hedging and
+sentences that announce their own importance. In Rust it is `unwrap`, comments
+inside function bodies, index loops and errors passed around as strings.
 
-The tigress is the project. `crates/` builds the training set and scores answers
-against the slop phrases and the five rules; `jetson-thor/` is the service that
-runs the models on the device; `book/` documents both.
+This project teaches a model that runs on an NVIDIA Jetson to stop. It builds
+a training set from text and code that do not have those habits, and it has a
+checker that counts each habit in a model's answers, so a fine-tune can be
+judged by numbers. It also runs the models on the device and puts them behind
+a chat page and an API.
 
-The cub is the part people talk to: the chat page and the API that put the models
-in front of anyone with an invite, from a browser or from a coding agent.
+The data, the checker and the serving are built and in use. The fine-tune
+itself has not started; see [Status](#status).
 
-**Book:** https://arpanpathak.github.io/thor-thunder-tigress-platform/ (or `mdbook serve book` locally).
+**The book** explains every part, with the measurements:
+https://arpanpathak.github.io/thor-thunder-tigress-platform/
+(or `mdbook serve book` to read it locally).
 
-Measured by CI on every push to `main`: each crate's tests run under
-`cargo llvm-cov`, and `spark` checks the whole repository against the five
-rules. The numbers are kept over time in
-[`history.csv`](https://github.com/arpanpathak/thor-thunder-tigress-platform/blob/badges/history.csv) on the `badges` branch.
+## What is in this repository
 
-## The projects
+| Folder | What it holds |
+|---|---|
+| `crates/` | The Rust tools: the training-set builder, the checker, the review page, the question generator, and the chat server with its keyring |
+| `jetson-thor/` | What runs on the Jetson Thor: the chat page, and `thor-tigress-serve`, which manages the models |
+| `book/` | The book, as an mdBook |
+| `train/` | Hand-written teaching conversations, and the script that fetches the open books and docs |
+| `projects/`, `tools/` | Related repositories, as git submodules |
 
-| Repository | What it is | Here |
-|---|---|---|
-| **thor-thunder-tigress-platform** (this one) | Data pipeline, slop and rule checker, review page, teacher-question generator | `crates/` |
-| [openbatrangs](https://github.com/arpanpathak/openbatrangs) | Agentic coding CLI for Ollama or any OpenAI-compatible server, such as Nemotron on the Thor | `projects/openbatrangs` |
-| [local-copilot-codebuddy](https://github.com/arpanpathak/local-copilot-codebuddy) | Terminal coding copilot on TensorRT-LLM or llama.cpp, no server | `projects/local-copilot-codebuddy` |
-| [thor-sync](https://github.com/arpanpathak/thor-sync) | Keeps project folders copied to the Jetson over SSH or Tailscale | `tools/thor-sync` |
+The project has two characters. The tigress is the platform: the data, the
+checker and the training. The cub is the part people talk to: the chat page
+and the API.
 
-The other repositories are git submodules: a pointer to one commit, not a copy.
-Clone with them, or fetch them later:
+## The Thor Tigress Cub
+
+A chat page and an API on the Jetson Thor, for anyone with an invite.
+
+- **Chat.** A model picker, a thinking panel, and a **Web** switch that lets
+  the model search with SearXNG and read the pages it cites.
+- **API.** OpenAI's `/v1/chat/completions` and Anthropic's `/v1/messages`, so
+  coding tools such as [openbatrangs](https://github.com/arpanpathak/openbatrangs),
+  OpenCode and Claude Code can use the Thor's models.
+- **Keys.** Each person gets their own key, kept in an encrypted keyring.
+- **Models.** Qwen3.6 35B and Nemotron 3.5 Lightning run on TensorRT Edge-LLM.
+  GGUF models run on llama.cpp. `thor-tigress-serve` lists, downloads, loads
+  and unloads them, and checks the memory first.
+
+Where to read more in the book: "Web chat", "Tool calling", "Bring your own
+agent", "Model serving" and "Coding tools on TensorRT Edge-LLM".
+
+## Status
+
+| Stage | State |
+|---|---|
+| 0. Slop and rule checker (`spark`) | Done. It has scored the two baseline models in `runs/` |
+| 1. Training data | Done: 13,114 examples, about 6.5M tokens, from 35 sources |
+| 2. QLoRA on the Thor: train, merge, quantize, serve, score before and after | Not started |
+| 3. Distillation: keep the teacher's answers that pass the checker and compile | The question generator is written and tested against a stand-in server |
+| 4. A small trainer in Rust with Candle | Only if it earns its place |
+
+One limit to know about: `spark` reads code, it does not compile it or run
+its tests. A block can pass all five rules and still not build.
+
+## Quick start
 
 ```bash
-git clone --recurse-submodules https://github.com/arpanpathak/thor-thunder-tigress-platform
-git submodule update --init          # in an existing clone
+cargo build --release
+bash train/fetch_corpus.sh                         # clone the open books and docs (~2 GB)
+target/release/thor-hammer-trainer data            # build data/train.jsonl and data/stats.md
+target/release/reinforcer data/train.jsonl 8787    # review it at http://127.0.0.1:8787
+target/release/spark rs crates                     # check Rust code against the five rules
+target/release/spark score RUN.jsonl --field text  # score a model's answers
+target/release/lasso conversations --dry-run       # plan conversations; needs no model
+target/release/thor-tigress-keyring init           # the encrypted registry of invited people
 ```
+
+`fetch_corpus.sh` reads the licence file of every source, and the trainer
+refuses anything that is not MIT, Apache-2.0, BSD, CC BY or CC0.
+
+The pipeline also reads personal inputs: a chat export and hand-written
+pairs. Their paths are set in `crates/thor-hammer-trainer/src/build.rs`. They
+are not in this repository, and `data/` and `corpus/` are git-ignored.
 
 ## Crates
 
@@ -57,10 +103,12 @@ git submodule update --init          # in an existing clone
 | `thor-hammer-trainer` | `thor-hammer-trainer` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-hammer-trainer-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-hammer-trainer-tests.svg" alt="tests" height="24"> | Builds `data/train.jsonl` from books, docs, a chat export and hand-written pairs, with licence checks, clean-up, deduplication and a per-source token cap |
 | `thor-tigress-reinforcer-frontend` | `reinforcer` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-reinforcer-frontend-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-reinforcer-frontend-tests.svg" alt="tests" height="24"> | Review page for the training set: syntax-highlighted code, rule-breaking lines tagged, slop phrases suggested, a phrase marked once found everywhere |
 | `thor-lasso-distiller` | `lasso` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-lasso-distiller-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-lasso-distiller-tests.svg" alt="tests" height="24"> | Asks a teacher model, served by `trtllm-serve`, for the question each book section answers, and builds conversations whose answers are the book text |
-| `thor-tigress-agent` | `thor-tigress-agent` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-agent-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-agent-tests.svg" alt="tests" height="24"> | The Thor Tigress Cub's server: the chat page, the personal keys in the keyring, the registration form, web search with recency, page reading, and the API, in front of llama-server |
+| `thor-tigress-agent` | `thor-tigress-agent` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-agent-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-agent-tests.svg" alt="tests" height="24"> | The Thor Tigress Cub's server: the chat page, the personal keys in the keyring, the registration form, web search with recency, page reading, and the API, in front of the model servers |
 | `thor-tigress-keyring` | `thor-tigress-keyring` | <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-keyring-coverage.svg" alt="coverage" height="24"> <img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/thor-tigress-keyring-tests.svg" alt="tests" height="24"> | The encrypted registry of who may use the chat and the key each was given: a name, an email, a status and a key per person, sealed with a passphrase (Argon2id, then XChaCha20-Poly1305) and queried over SSH |
 
-The five Rust rules, checked by `spark` and kept by every crate here:
+### The five Rust rules
+
+`spark` checks them, and every crate here keeps them:
 
 1. No `unwrap()` or `expect()`, not even in tests.
 2. Errors are a hand-written enum implementing `Display` and `std::error::Error`.
@@ -69,86 +117,42 @@ The five Rust rules, checked by `spark` and kept by every crate here:
 5. No index loops like `for i in 0..n`.
 
 `cargo test` runs `spark` on this repository's own source, so a crate that
-breaks a rule fails the build.
+breaks a rule fails its tests.
 
-## Web search, and reading what it finds
+CI runs on every push to `main`. Each crate's tests run under
+`cargo llvm-cov`, and `spark` checks the whole repository. The results are the
+badges above, and their history is in
+[`history.csv`](https://github.com/arpanpathak/thor-thunder-tigress-platform/blob/badges/history.csv)
+on the `badges` branch.
 
-With the chat's **Web** switch on, `thor-tigress-agent` runs a tool loop for the
-chosen model:
+## Related repositories
 
-- **`web_search`** asks SearXNG for titles, addresses, dates and snippets, with
-  an optional `time_range` (`day`, `week`, `month`, `year`) for jobs and other
-  recent postings. One call can fan out over several sub-questions (`queries`),
-  and `kind: "jobs"` widens a search towards postings while `kind: "people"`
-  looks for the recruiter and the hiring manager behind one. Every source gets
-  one number to cite, and an answer is budgeted at 16 searches and 12 pages. An
-  engine that was suspended or showed a CAPTCHA is named in the result, so a thin
-  answer can say why.
-- **`fetch_page_content_recursive`** opens one address a search returned, or one
-  the user wrote, follows that page's own links up to two hops, and returns the
-  text: six pages at most, 12,000 characters a page, 24,000 in all.
+| Repository | What it is | Here |
+|---|---|---|
+| [openbatrangs](https://github.com/arpanpathak/openbatrangs) | A coding agent for the terminal. It works with Ollama or any OpenAI-compatible server, the Thor included | `projects/openbatrangs` |
+| [local-copilot-codebuddy](https://github.com/arpanpathak/local-copilot-codebuddy) | A terminal coding copilot on TensorRT-LLM or llama.cpp, with no server | `projects/local-copilot-codebuddy` |
+| [thor-sync](https://github.com/arpanpathak/thor-sync) | Keeps project folders copied to the Jetson over SSH or Tailscale | `tools/thor-sync` |
 
-The first round of a Web-on answer carries `tool_choice: "required"`, so both
-Nemotron and Qwen look before they answer; later rounds are the model's choice.
-Eight tool rounds run at most, a repeat of a call already made is not run again,
-and up to three rounds without tools at the end make the model write the answer.
-The search hint is taken back out of the system line before those rounds, and a
-call the model writes there is still run: the text is streamed as it arrives, so
-stopping at the first sentence of a summary would end the answer on a half
-sentence with no links. A call the model writes as text
-(`<tool_call><function=web_search>…`) is filtered out of the stream and run
-like a structured one. When no round writes any text at all, the answer names the
-sources the search found rather than ending on an excuse.
-
-The fetch runs behind the rules of the book's
-["Tool calling"](book/src/ch19-tool-calling.md) chapter: `https` and public
-addresses only, one lookup and one connection, at most three redirects, no
-cookies, `Authorization` or referrer, and page text labelled as untrusted.
-
-## Quick start
+They are git submodules: a pointer to one commit, not a copy. Clone with
+them, or fetch them later:
 
 ```bash
-cargo build --release
-bash train/fetch_corpus.sh                       # clone the open books and docs (~2 GB)
-target/release/thor-hammer-trainer data          # build data/train.jsonl and data/stats.md
-target/release/reinforcer data/train.jsonl 8787  # review at http://127.0.0.1:8787
-target/release/spark rs crates                   # check Rust code against the five rules
-target/release/spark score RUN.jsonl --field text  # score a model's answers
-target/release/lasso conversations --dry-run     # plan conversations, no model needed
-target/release/thor-tigress-keyring init         # the encrypted registry of invited people
+git clone --recurse-submodules https://github.com/arpanpathak/thor-thunder-tigress-platform
+git submodule update --init          # in an existing clone
 ```
-
-`fetch_corpus.sh` reads every licence file of every source; the trainer
-refuses anything that is not MIT, Apache-2.0, BSD, CC BY or CC0.
-
-The data pipeline reads personal inputs (a chat export, hand-written pairs)
-from paths set in `crates/thor-hammer-trainer/src/build.rs`. They are not part
-of this repository; `data/` and `corpus/` are git-ignored.
-
-## Status
-
-| Stage | State |
-|---|---|
-| 0. Slop and rule checker (`spark`) | Done. Scores the two baseline models in `runs/` |
-| 1. Training data | Done: 13,114 examples, about 6.5M tokens, 35 sources |
-| 2. QLoRA on the Thor, merge, quantize, serve, score before and after | Not started |
-| 3. Distillation: teacher answers that pass the checker and compile | Question generator written and tested against a fake server; waits for `trtllm-serve` on the Thor |
-| 4. Small Rust/Candle trainer | Only if it earns its place |
-
-What `spark` does not do yet: compile code or run tests. A block can pass all
-five rules and still not build.
 
 ## Hardware
 
-Built on a Jetson Orin NX 16 GB; training targets a Jetson AGX Thor 128 GB
-(Blackwell, sm_110, JetPack 7). Device setup, SSH and syncing are in
-[`jetson-thor/README.md`](jetson-thor/README.md); syncing uses
-[thor-sync](https://github.com/arpanpathak/thor-sync).
+The code is written on a Jetson Orin NX 16 GB. The models run, and the
+training will run, on a Jetson AGX Thor 128 GB (Blackwell GPU, sm_110,
+JetPack 7).
 
-Models on the Thor are served by llama.cpp's llama-server in router mode
-and managed with
-[`thor-tigress-serve`](jetson-thor/model-serving/thor-tigress-serve):
-`list`, `list-latest` (the newest models on Hugging Face), `load`, `unload`
-and `download`, each taking a key from a list or a model name. Nemotron 3 Nano is loaded; Nemotron 3.5 Lightning is on disk. The
-book's chapter "Model serving" has the memory checks and models worth
-trying.
+Setting up the Thor, SSH and syncing are covered in
+[`jetson-thor/README.md`](jetson-thor/README.md). Models are managed with
+[`thor-tigress-serve`](jetson-thor/model-serving/thor-tigress-serve): `list`,
+`list-latest` (the newest models on Hugging Face), `download`, `load` and
+`unload`, each taking a key from the list or a model's name.
+
+## Licence
+
+Apache-2.0. See [`LICENSE`](LICENSE).
