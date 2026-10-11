@@ -2,7 +2,7 @@
 //! on, run as a loop in which the model may call a tool before it answers.
 //!
 //! ```text
-//!   client ── request ──► server ── stream ──► the engine
+//!   client ── request ──► server ── stream ──► llama-server or an engine
 //!      ▲                    │  tool call: web_search("…", time_range)
 //!      │                    │             fetch_page_content_recursive(url)
 //!      │                    ▼
@@ -17,8 +17,9 @@
 //! [`crate::tooltext`] takes it out of the answer and hands it to the loop.
 //!
 //! A request that brings its own tools comes from a coding tool running its
-//! own loop, so the engine's answer is copied back untouched, streamed or not.
-//! Every request is first given the shape the engine takes; see [`shape`].
+//! own loop, so the answer is copied back untouched, streamed or not. A
+//! request for an Edge-LLM engine is first given the shape that engine takes;
+//! see [`shape`].
 
 mod shape;
 
@@ -30,7 +31,7 @@ use serde_json::{Value, json};
 use crate::{
     address::Url,
     body::{self, Fields},
-    config::Upstreams,
+    config::{Engine, Upstreams},
     error::{AgentError, Outcome},
     fetch::{self, Allowed},
     http::Web,
@@ -369,11 +370,10 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
         .unwrap_or(false);
 
     let engine = upstreams.serving(body::model(&fields));
-    body::name(&mut fields, &engine.model);
-    shape::fit(&mut fields);
+    fit(&mut fields, engine);
 
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
-    let model = &engine.endpoint;
+    let model = engine.endpoint();
 
     match Mode::of(web_search, streamed, brings_tools(&fields)) {
         Mode::Relay => model
@@ -389,6 +389,19 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
                 search_loop(client, fields.clone(), upstreams, model)
             })
         }
+    }
+}
+
+/// Shapes a request for the server that will answer it. An Edge-LLM server
+/// needs its own model name and the shape in [`shape`]; llama-server takes
+/// what an OpenAI client sends, and its own fields besides.
+fn fit(fields: &mut Fields, engine: &Engine) {
+    match engine {
+        Engine::Edge { model, .. } => {
+            body::name(fields, model);
+            shape::fit(fields);
+        }
+        Engine::Llama { .. } => {}
     }
 }
 

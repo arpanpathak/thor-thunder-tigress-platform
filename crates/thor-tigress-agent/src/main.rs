@@ -1,8 +1,9 @@
 //! `thor-tigress-agent`: the front server of the Thor Tigress Cub.
 //!
 //! It serves the chat page, checks the access key, passes model calls to the
-//! TensorRT Edge-LLM engine serving the model they name, and, when the page
-//! turns web search on, lets the model call `web_search` backed by SearXNG.
+//! server that has the model they name (llama-server, or a TensorRT Edge-LLM
+//! engine), and, when the page turns web search on, lets the model call
+//! `web_search` backed by SearXNG.
 //! `/v1/chat/completions` is what OpenAI-compatible coding tools call and
 //! `/v1/messages` what Claude Code calls. One thread per connection.
 //!
@@ -16,8 +17,8 @@
 //! | [`address`], [`fetch`], [`html`], [`http`] | reading a cited page and its links |
 //! | [`tooltext`] | tool calls the model writes as text |
 //! | [`body`] | a JSON request body and the model it names |
-//! | [`models`] | the models the engines offer |
-//! | [`upstream`] | calling an engine and SearXNG |
+//! | [`models`] | the models that can answer now |
+//! | [`upstream`] | calling llama-server, an engine and SearXNG |
 
 #![forbid(unsafe_code)]
 
@@ -51,7 +52,10 @@ use std::{
     thread,
 };
 
-use crate::{config::Config, error::Outcome};
+use crate::{
+    config::{Config, Engine},
+    error::Outcome,
+};
 
 /// Runs until the arguments, the key file or the listening address fail;
 /// serving itself never ends.
@@ -65,16 +69,12 @@ fn main() -> ExitCode {
 fn serve(config: Config) -> Outcome<Infallible> {
     let listener = TcpListener::bind(&config.listen)?;
     let access = if config.key.is_some() { "required" } else { "off" };
-    let engines: Vec<&str> = config
-        .upstreams
-        .engines()
-        .map(|engine| engine.model.as_str())
-        .collect();
+    let models: Vec<&str> = config.upstreams.engines().map(Engine::label).collect();
 
     eprintln!(
-        "listening on {}, engines {}, search {}, access key {}, keyring {}",
+        "listening on {}, models from {}, search {}, access key {}, keyring {}",
         config.listen,
-        engines.join(", "),
+        models.join(", "),
         config.upstreams.search.address(),
         access,
         if config.people.is_some() { "on" } else { "off" }

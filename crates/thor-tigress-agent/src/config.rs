@@ -1,18 +1,22 @@
 //! The server's settings, from the command line, the key file and the keyring.
 //!
 //! ```text
-//! thor-tigress-agent --engine MODEL=HOST:PORT [--engine MODEL=HOST:PORT]...
-//!                    [--listen 127.0.0.1:8080] [--search 127.0.0.1:8888]
+//! thor-tigress-agent [--listen 127.0.0.1:8080] [--model 127.0.0.1:8079]
+//!                    [--engine MODEL=HOST:PORT]... [--search 127.0.0.1:8888]
 //!                    [--web DIR] [--key-file FILE]
 //!                    [--keyring FILE] [--keyring-passphrase-file FILE]
 //! ```
 //!
-//! Each `--engine` names a model and the TensorRT Edge-LLM server holding it.
-//! A request naming one of them goes there; a request naming anything else,
-//! or nothing, goes to the first.
+//! `--model` is llama-server, which answers for the models it has loaded.
+//! Each `--engine` names one model and the TensorRT Edge-LLM server holding
+//! it. A request goes to the server that has the model it names. A request
+//! naming a model nobody has, or none, goes to whichever of them comes first
+//! on the command line; with neither option that is llama-server on its
+//! usual port.
 //!
-//! `--key-file` holds the operator's key. When `--keyring` names an encrypted
-//! registry, the personal keys in it are what visitors may use. The
+//! `--key-file` is the one key this server sends to llama-server, and it lets
+//! the operator in. When `--keyring` names an encrypted registry, the
+//! personal keys in it are what visitors may use. The
 //! keyring's passphrase comes from `--keyring-passphrase-file` or the
 //! `THOR_KEYRING_PASSPHRASE` environment variable.
 
@@ -29,11 +33,15 @@ use zeroize::Zeroizing;
 use crate::{
     error::{AgentError, Outcome},
     http::{HttpWeb, Web},
+    models,
     upstream::Endpoint,
 };
 
 /// Where the server listens unless `--listen` says otherwise.
 const DEFAULT_LISTEN: &str = "127.0.0.1:8080";
+
+/// Where llama-server listens.
+const DEFAULT_MODEL: &str = "127.0.0.1:8079";
 
 /// Where SearXNG listens.
 const DEFAULT_SEARCH: &str = "127.0.0.1:8888";
@@ -47,11 +55,11 @@ const KEYRING_ENV: &str = "THOR_KEYRING_PASSPHRASE";
 /// How a key is sent in an `Authorization` header.
 pub const BEARER: &str = "Bearer ";
 
-/// The engines and the search engine.
+/// The model servers and the search engine.
 pub struct Upstreams {
-    /// The engine that answers a request naming no engine's model.
+    /// The server that answers a request naming a model nobody has.
     pub default: Engine,
-    /// The other engines, each answering requests that name its model.
+    /// The other servers, each answering requests for the models it has.
     pub others: Vec<Engine>,
     /// SearXNG, called without a key.
     pub search: Endpoint,
@@ -59,39 +67,87 @@ pub struct Upstreams {
     pub web: Box<dyn Web>,
 }
 
-/// One model, and the TensorRT Edge-LLM server holding it.
+/// A server that answers for models. The two kinds read a request
+/// differently, so every caller that shapes one matches on the kind.
 #[derive(Debug, Clone)]
-pub struct Engine {
-    /// The model id requests name.
-    pub model: String,
-    /// Where it is served, called without a key: it listens on localhost only.
-    pub endpoint: Endpoint,
+pub enum Engine {
+    /// One model on a TensorRT Edge-LLM server, called without a key: it
+    /// listens on localhost only.
+    Edge {
+        /// The model id requests name.
+        model: String,
+        /// Where it is served.
+        endpoint: Endpoint,
+    },
+    /// llama-server in router mode, called with the access key when there is
+    /// one. It answers for whichever models it has loaded.
+    Llama {
+        /// Where it is served.
+        endpoint: Endpoint,
+    },
 }
 
 impl Engine {
-    /// The engine serving `model` at `address` (`host:port`).
+    /// The Edge-LLM server holding `model` at `address` (`host:port`).
     #[must_use]
-    pub fn new(model: String, address: String) -> Self {
-        Engine {
+    pub fn edge(model: String, address: String) -> Self {
+        Engine::Edge {
             model,
             endpoint: Endpoint::new(address, None),
+        }
+    }
+
+    /// llama-server at `address`, sent `authorization` when there is one.
+    #[must_use]
+    pub fn llama(address: String, authorization: Option<String>) -> Self {
+        Engine::Llama {
+            endpoint: Endpoint::new(address, authorization),
+        }
+    }
+
+    /// Where the server is called.
+    #[must_use]
+    pub fn endpoint(&self) -> &Endpoint {
+        match self {
+            Engine::Edge { endpoint, .. } | Engine::Llama { endpoint } => endpoint,
+        }
+    }
+
+    /// What the server is called in the startup line.
+    #[must_use]
+    pub fn label(&self) -> &str {
+        match self {
+            Engine::Edge { model, .. } => model,
+            Engine::Llama { .. } => "llama-server",
+        }
+    }
+
+    /// Whether the server has `model` ready: an Edge-LLM server by its one
+    /// name, llama-server by asking which models it has loaded.
+    fn serves(&self, model: Option<&str>) -> bool {
+        match (self, model) {
+            (_, None) => false,
+            (Engine::Edge { model: served, .. }, Some(wanted)) => served == wanted,
+            (Engine::Llama { endpoint }, Some(wanted)) => models::loaded_names(endpoint)
+                .iter()
+                .any(|name| name == wanted),
         }
     }
 }
 
 impl Upstreams {
-    /// Every engine, the default first.
+    /// Every server, the default first.
     pub fn engines(&self) -> impl Iterator<Item = &Engine> {
         std::iter::once(&self.default).chain(&self.others)
     }
 
-    /// The engine for a request naming `model`: the one serving it, else the
+    /// The server for a request naming `model`: the one that has it, else the
     /// default. A coding tool sends the name it was built around, such as a
     /// hosted model's, and still has to be answered.
     #[must_use]
     pub fn serving(&self, model: Option<&str>) -> &Engine {
         self.engines()
-            .find(|engine| Some(engine.model.as_str()) == model)
+            .find(|engine| engine.serves(model))
             .unwrap_or(&self.default)
     }
 }
@@ -196,19 +252,19 @@ impl Config {
     ///
     /// # Errors
     ///
-    /// `AgentError::Config` for an unknown option, one without a value, or no
-    /// `--engine` at all, and `AgentError::Keyring` when the keyring cannot be
-    /// opened.
+    /// `AgentError::Config` for an unknown option or one without a value, and
+    /// `AgentError::Keyring` when the keyring cannot be opened.
     pub fn from_args(arguments: impl IntoIterator<Item = String>) -> Outcome<Self> {
         let options = Options::parse(arguments)?;
         let key = read_key(&options.key_file);
-        let mut engines = options.engines.iter().cloned();
-
-        let Some(default) = engines.next() else {
-            return Err(AgentError::Config(
-                "at least one --engine MODEL=HOST:PORT is needed".to_string(),
-            ));
-        };
+        let authorization = key.as_ref().map(|key| format!("{BEARER}{key}"));
+        let mut engines = options
+            .servers
+            .iter()
+            .map(|wanted| wanted.engine(authorization.clone()));
+        let default = engines
+            .next()
+            .unwrap_or_else(|| Engine::llama(DEFAULT_MODEL.to_string(), authorization.clone()));
 
         let people = match &options.keyring {
             Some(path) => {
@@ -269,10 +325,27 @@ impl Config {
     }
 }
 
+/// A model server as the command line names it, before the key file is read.
+enum Wanted {
+    /// `--model HOST:PORT`.
+    Llama(String),
+    /// `--engine MODEL=HOST:PORT`.
+    Edge(String, String),
+}
+
+impl Wanted {
+    fn engine(&self, authorization: Option<String>) -> Engine {
+        match self {
+            Wanted::Llama(address) => Engine::llama(address.clone(), authorization),
+            Wanted::Edge(model, address) => Engine::edge(model.clone(), address.clone()),
+        }
+    }
+}
+
 /// The options as given, before the key file is read.
 struct Options {
     listen: String,
-    engines: Vec<Engine>,
+    servers: Vec<Wanted>,
     search: String,
     web: PathBuf,
     key_file: PathBuf,
@@ -287,7 +360,7 @@ impl Default for Options {
             .unwrap_or_default();
         Options {
             listen: DEFAULT_LISTEN.to_string(),
-            engines: Vec::new(),
+            servers: Vec::new(),
             search: DEFAULT_SEARCH.to_string(),
             web: PathBuf::from("."),
             key_file: home.join(KEY_FILE),
@@ -315,7 +388,8 @@ impl Options {
     fn set(&mut self, flag: &str, value: String) -> Outcome {
         match flag {
             "--listen" => self.listen = value,
-            "--engine" => self.engines.push(engine(&value)?),
+            "--model" => self.servers.push(Wanted::Llama(value)),
+            "--engine" => self.servers.push(engine(&value)?),
             "--search" => self.search = value,
             "--web" => self.web = PathBuf::from(value),
             "--key-file" => self.key_file = PathBuf::from(value),
@@ -331,10 +405,10 @@ impl Options {
 }
 
 /// Reads `MODEL=HOST:PORT`.
-fn engine(value: &str) -> Outcome<Engine> {
+fn engine(value: &str) -> Outcome<Wanted> {
     match value.split_once('=') {
         Some((model, address)) if !model.is_empty() && !address.is_empty() => {
-            Ok(Engine::new(model.to_string(), address.to_string()))
+            Ok(Wanted::Edge(model.to_string(), address.to_string()))
         }
         _ => Err(AgentError::Config(format!(
             "--engine {value}: expected MODEL=HOST:PORT"
@@ -392,6 +466,7 @@ fn same_secret(given: &str, expected: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::{FakeServer, json_response};
 
     const PASS: &str = "keyring passphrase";
 
@@ -433,6 +508,15 @@ mod tests {
             .collect()
     }
 
+    /// `servers`, with a key file that isn't there.
+    fn without_a_key(servers: &[&str]) -> Vec<String> {
+        servers
+            .iter()
+            .chain(&["--key-file", "/none"])
+            .map(ToString::to_string)
+            .collect()
+    }
+
     fn with_key(key: Option<&str>) -> Outcome<Config> {
         let mut config = Config::from_args(args(&["--key-file", "/nonexistent"]))?;
         config.key = key.map(ToString::to_string);
@@ -461,7 +545,7 @@ mod tests {
     fn defaults_point_at_localhost() -> Outcome {
         let config = Config::from_args(args(&["--key-file", "/nonexistent"]))?;
         assert_eq!(config.listen, "127.0.0.1:8080");
-        assert_eq!(config.upstreams.default.endpoint.address(), "127.0.0.1:1");
+        assert_eq!(config.upstreams.default.endpoint().address(), "127.0.0.1:1");
         assert_eq!(config.upstreams.search.address(), "127.0.0.1:8888");
         assert_eq!(config.key, None);
         assert!(config.people.is_none());
@@ -491,7 +575,7 @@ mod tests {
     fn a_named_model_goes_to_its_engine_and_any_other_name_to_the_first() -> Outcome {
         let config = Config::from_args(args(&["--engine", "qwen=e:1", "--key-file", "/none"]))?;
         let upstreams = &config.upstreams;
-        let served = |model| upstreams.serving(model).endpoint.address();
+        let served = |model| upstreams.serving(model).endpoint().address();
 
         assert_eq!(served(Some("qwen")), "e:1");
         assert_eq!(served(Some("nemotron")), "127.0.0.1:1");
@@ -500,18 +584,51 @@ mod tests {
         assert!(
             upstreams
                 .engines()
-                .all(|engine| engine.endpoint.authorization().is_none())
+                .all(|engine| engine.endpoint().authorization().is_none())
         );
         Ok(())
     }
 
     #[test]
-    fn a_server_without_an_engine_is_refused() {
-        let refused = Config::from_args(["--key-file".to_string(), "/none".to_string()]);
+    fn with_no_server_named_llama_server_on_its_usual_port_answers() -> Outcome {
+        let config = Config::from_args(["--key-file".to_string(), "/none".to_string()])?;
+        let default = &config.upstreams.default;
 
-        assert!(refused.is_err_and(|error| {
-            error.to_string() == "config: at least one --engine MODEL=HOST:PORT is needed"
-        }));
+        assert!(matches!(default, Engine::Llama { .. }));
+        assert_eq!(default.endpoint().address(), "127.0.0.1:8079");
+        assert_eq!(default.label(), "llama-server");
+        assert!(config.upstreams.others.is_empty());
+        Ok(())
+    }
+
+    /// llama-server answers for what it has loaded, under an id or an alias;
+    /// a model it only has on disk is nobody's, so the first server gets it.
+    #[test]
+    fn llama_server_gets_the_models_it_has_loaded() -> Outcome {
+        let preset = r#"{"data":[
+            {"id":"nano","aliases":["nemotron"],"status":{"value":"loaded"}},
+            {"id":"on-disk","status":{"value":"unloaded"}}]}"#;
+        let llama = FakeServer::start(vec![json_response(preset); 3])?;
+        let address = llama.address();
+        let servers = ["--engine", "qwen=e:1", "--model", &address];
+        let config = Config::from_args(without_a_key(&servers))?;
+
+        let served = ["nemotron", "nano", "on-disk", "qwen"]
+            .map(|model| config.upstreams.serving(Some(model)).label());
+
+        assert_eq!(served, ["llama-server", "llama-server", "qwen", "qwen"]);
+        assert_eq!(config.upstreams.serving(None).label(), "qwen");
+        Ok(())
+    }
+
+    #[test]
+    fn the_first_server_named_is_the_default() -> Outcome {
+        let servers = ["--model", "l:1", "--engine", "qwen=e:1"];
+        let config = Config::from_args(without_a_key(&servers))?;
+
+        assert_eq!(config.upstreams.default.label(), "llama-server");
+        assert_eq!(config.upstreams.others[0].label(), "qwen");
+        Ok(())
     }
 
     #[test]
@@ -539,11 +656,17 @@ mod tests {
     fn reads_the_key_file_trimmed() -> Outcome {
         let path = std::env::temp_dir().join(format!("thor-key-{}", std::process::id()));
         fs::write(&path, "  secret\n")?;
-        let config = Config::from_args(args(&["--key-file", &path.to_string_lossy()]));
+        let key_file = path.to_string_lossy();
+        let config = Config::from_args(args(&["--model", "l:1", "--key-file", &key_file]));
         fs::remove_file(&path)?;
         let config = config?;
-        assert_eq!(config.key.as_deref(), Some("secret"));
+        let sent = |engine: &Engine| engine.endpoint().authorization().map(str::to_string);
         assert_eq!(config.upstreams.search.authorization(), None);
+        assert_eq!(sent(&config.upstreams.default), None);
+        let to_llama = sent(&config.upstreams.others[0]);
+
+        assert_eq!(config.key.as_deref(), Some("secret"));
+        assert_eq!(to_llama.as_deref(), Some("Bearer secret"));
         Ok(())
     }
 

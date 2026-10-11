@@ -1,7 +1,7 @@
 //! Anthropic's `/v1/messages` and `/v1/messages/count_tokens` (used by Claude
-//! Code), passed to an engine with the three rewrites it needs: the model
-//! named as the engine knows it, system messages moved to the top, and
-//! thinking off unless the request asks for it.
+//! Code), passed to the server that has the model. Either kind gets thinking
+//! off unless the request asks for it. An Edge-LLM engine also needs the
+//! model named as it knows it, and system messages moved to the top.
 
 use std::io::Write;
 
@@ -9,11 +9,11 @@ use serde_json::{Value, json};
 
 use crate::{
     body::{self, Fields},
-    config::Upstreams,
+    config::{Engine, Upstreams},
     error::Outcome,
 };
 
-/// The field an engine reads to switch the model's chat template.
+/// The field both kinds of server read to switch the model's chat template.
 const TEMPLATE_SETTINGS: &str = "chat_template_kwargs";
 
 /// The request's conversation.
@@ -52,7 +52,7 @@ impl Thinking {
     }
 }
 
-/// Sends an Anthropic request to `path` on the engine serving its model and
+/// Sends an Anthropic request to `path` on the server that has its model and
 /// relays the answer.
 ///
 /// # Errors
@@ -63,18 +63,29 @@ pub fn forward(client: &mut dyn Write, path: &str, body: &[u8], upstreams: &Upst
     let mut fields = body::fields(body)?;
     let engine = upstreams.serving(body::model(&fields));
 
-    body::name(&mut fields, &engine.model);
-    lift_system_messages(&mut fields);
+    fit(&mut fields, engine);
     choose_thinking(&mut fields);
 
     engine
-        .endpoint
+        .endpoint()
         .post(path, &serde_json::to_vec(&fields)?)?
         .relay(client)
 }
 
-/// An engine ignores Anthropic's `thinking` field, so the choice is made
-/// through the chat template instead. A request that sets the template
+/// What only an Edge-LLM engine needs: its own model name, and no system
+/// message inside the conversation. llama-server reads both where they are.
+fn fit(fields: &mut Fields, engine: &Engine) {
+    match engine {
+        Engine::Edge { model, .. } => {
+            body::name(fields, model);
+            lift_system_messages(fields);
+        }
+        Engine::Llama { .. } => {}
+    }
+}
+
+/// Neither kind of server reads Anthropic's `thinking` field, so the choice
+/// is made through the chat template instead. A request that sets the template
 /// settings itself is left as it is.
 fn choose_thinking(fields: &mut Fields) {
     match (
@@ -145,7 +156,7 @@ mod tests {
 
     fn upstreams(engine: &FakeServer) -> Upstreams {
         Upstreams {
-            default: Engine::new("qwen".to_string(), engine.address()),
+            default: Engine::edge("qwen".to_string(), engine.address()),
             others: Vec::new(),
             search: Endpoint::new(engine.address(), None),
             web: Box::new(FakeWeb::default()),
@@ -256,6 +267,36 @@ mod tests {
         assert_eq!(lifted.get(SYSTEM), None);
         assert_eq!(lifted[MESSAGES], json!([{"role": "user", "content": "hi"}]));
         assert_eq!(sent(&json!({"messages": "text"}))?[MESSAGES], "text");
+        Ok(())
+    }
+
+    /// llama-server reads system messages where they are and answers to its
+    /// own names; only the thinking choice is made for it.
+    #[test]
+    fn llama_server_gets_the_conversation_as_it_came() -> Outcome {
+        let loaded = json_response(r#"{"data":[{"id":"nemotron"}]}"#);
+        let llama = FakeServer::start(vec![loaded, json_response(r#"{"type":"message"}"#)])?;
+        let mut upstreams = upstreams(&llama);
+        upstreams.default = Engine::llama(llama.address(), None);
+        let request = json!({
+            "model": "nemotron",
+            "messages": [{"role": "user", "content": "a"}, {"role": "system", "content": "b"}]
+        });
+
+        forward(
+            &mut Vec::new(),
+            paths::MESSAGES,
+            &serde_json::to_vec(&request)?,
+            &upstreams,
+        )?;
+
+        let seen = llama.requests()?;
+        let body = seen[1].split("\r\n\r\n").nth(1).unwrap_or_default();
+        let sent: Value = serde_json::from_str(body)?;
+
+        assert_eq!(sent["model"], "nemotron");
+        assert_eq!(sent[MESSAGES], request[MESSAGES]);
+        assert_eq!(sent[TEMPLATE_SETTINGS]["enable_thinking"], false);
         Ok(())
     }
 

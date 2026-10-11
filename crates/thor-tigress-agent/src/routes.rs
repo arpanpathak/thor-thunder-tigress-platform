@@ -329,7 +329,7 @@ mod tests {
         let reply = json_response(r#"{"ok":true}"#);
         let engine = FakeServer::start(vec![reply.clone(), reply.clone(), reply])?;
         let mut setup = setup(Vec::new(), None)?;
-        let qwen = Engine::new("qwen".to_string(), engine.address());
+        let qwen = Engine::edge("qwen".to_string(), engine.address());
         setup.config.upstreams.others.push(qwen);
         let answers = [
             paths::CHAT_COMPLETIONS,

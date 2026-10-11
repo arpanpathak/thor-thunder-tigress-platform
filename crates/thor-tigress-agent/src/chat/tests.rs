@@ -8,7 +8,7 @@ fn upstreams(model: &FakeServer, search: &FakeServer) -> Upstreams {
 
 fn upstreams_with(model: &FakeServer, search: &FakeServer, web: FakeWeb) -> Upstreams {
     Upstreams {
-        default: Engine::new("nemotron".to_string(), model.address()),
+        default: Engine::edge("nemotron".to_string(), model.address()),
         others: Vec::new(),
         search: Endpoint::new(search.address(), None),
         web: Box::new(web),
@@ -1218,11 +1218,34 @@ fn a_named_model_is_answered_by_its_own_engine() -> Outcome {
     let mut upstreams = upstreams(&idle()?, &idle()?);
     upstreams
         .others
-        .push(Engine::new("qwen".to_string(), qwen.address()));
+        .push(Engine::edge("qwen".to_string(), qwen.address()));
     let request = br#"{"model":"qwen","messages":[]}"#;
 
     answer(&mut Vec::new(), request, &upstreams)?;
 
     assert_eq!(qwen.requests()?.len(), 1);
+    Ok(())
+}
+
+/// llama-server understands fields an engine refuses, and answers to the
+/// names it gave its models, so a request for it is passed on as it came.
+#[test]
+fn llama_server_gets_a_request_as_it_came() -> Outcome {
+    let loaded = json_response(r#"{"data":[{"id":"nemotron"}]}"#);
+    let llama = FakeServer::start(vec![loaded, json_response(r#"{"choices":[]}"#)])?;
+    let mut upstreams = upstreams(&idle()?, &idle()?);
+    upstreams.default = Engine::llama(llama.address(), None);
+    let request = br#"{"model":"nemotron","n_predict":5,"grammar":"x","messages":[
+        {"role":"user","content":"a"},{"role":"system","content":"b"}]}"#;
+
+    answer(&mut Vec::new(), request, &upstreams)?;
+
+    let seen = llama.requests()?;
+    let sent: Value = serde_json::from_str(seen[1].split("\r\n\r\n").nth(1).unwrap_or_default())?;
+    let expected: Value = serde_json::from_slice(request)?;
+
+    assert!(seen[0].starts_with("GET /v1/models"), "{}", seen[0]);
+
+    assert_eq!(sent, expected);
     Ok(())
 }
