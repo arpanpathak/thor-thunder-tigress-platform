@@ -279,6 +279,7 @@ mod tests {
     #[test]
     fn a_link_with_accented_letters_does_not_stop_the_scan() {
         let found = hrefs("<a href='/página/ááá'>1</a><a HREF=\"/next\">2</a>");
+
         assert_eq!(found, ["/página/ááá", "/next"]);
     }
 

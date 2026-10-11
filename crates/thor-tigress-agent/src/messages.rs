@@ -44,6 +44,7 @@ impl Thinking {
             .get("thinking")
             .and_then(|thinking| thinking.get("type"))
             .and_then(Value::as_str);
+
         match kind {
             Some("enabled" | "adaptive") => Thinking::On,
             _ => Thinking::Off,
@@ -61,9 +62,11 @@ impl Thinking {
 pub fn forward(client: &mut dyn Write, path: &str, body: &[u8], upstreams: &Upstreams) -> Outcome {
     let mut fields = body::fields(body)?;
     let engine = upstreams.serving(body::model(&fields));
+
     body::name(&mut fields, &engine.model);
     lift_system_messages(&mut fields);
     choose_thinking(&mut fields);
+
     engine
         .endpoint
         .post(path, &serde_json::to_vec(&fields)?)?
@@ -98,10 +101,12 @@ fn lift_system_messages(fields: &mut Fields) {
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return;
     };
+
     let (system, kept): (Vec<Value>, Vec<Value>) = std::mem::take(messages)
         .into_iter()
         .partition(|message| message.get(ROLE).and_then(Value::as_str) == Some(SYSTEM));
     *messages = kept;
+
     let lifted: Vec<Value> = system
         .iter()
         .flat_map(|message| blocks(message.get(CONTENT)))
@@ -110,6 +115,7 @@ fn lift_system_messages(fields: &mut Fields) {
     if lifted.is_empty() {
         return;
     }
+
     let merged = blocks(fields.get(SYSTEM))
         .into_iter()
         .chain(lifted)
@@ -150,7 +156,9 @@ mod tests {
     fn sent(request: &Value) -> Outcome<Value> {
         let engine = FakeServer::start(vec![json_response(r#"{"type":"message"}"#)])?;
         let body = serde_json::to_vec(request)?;
+
         forward(&mut Vec::new(), paths::MESSAGES, &body, &upstreams(&engine))?;
+
         let seen = engine.requests()?;
         let json = seen[0].split("\r\n\r\n").nth(1).unwrap_or_default();
         Ok(serde_json::from_str(json)?)
@@ -190,6 +198,7 @@ mod tests {
         let engine = FakeServer::start(Vec::new())?;
         let upstreams = upstreams(&engine);
         let answered = |body: &[u8]| forward(&mut Vec::new(), paths::MESSAGES, body, &upstreams);
+
         assert!(matches!(answered(b"[1,2]"), Err(AgentError::BadRequest(_))));
         assert!(matches!(answered(b"{"), Err(AgentError::Json(_))));
         Ok(())
@@ -208,6 +217,7 @@ mod tests {
                 {"role": "assistant", "content": "answer"}
             ]
         }))?;
+
         assert_eq!(lifted["model"], "qwen");
         assert_eq!(
             lifted[MESSAGES],
@@ -229,6 +239,7 @@ mod tests {
             "system": "header",
             "messages": [{"role": "system", "content": "rules"}, {"role": "user", "content": "hi"}]
         }))?;
+
         assert_eq!(
             lifted[SYSTEM],
             json!([{"type": "text", "text": "header"}, {"type": "text", "text": "rules"}])
@@ -241,6 +252,7 @@ mod tests {
     fn a_request_without_a_system_message_gains_no_system_prompt() -> Outcome {
         let request = json!({"messages": [{"role": "user", "content": "hi"}, {"role": "system"}]});
         let lifted = sent(&request)?;
+
         assert_eq!(lifted.get(SYSTEM), None);
         assert_eq!(lifted[MESSAGES], json!([{"role": "user", "content": "hi"}]));
         assert_eq!(sent(&json!({"messages": "text"}))?[MESSAGES], "text");
@@ -251,7 +263,9 @@ mod tests {
     fn relays_the_answer_from_the_path_asked_for() -> Outcome {
         let engine = FakeServer::start(vec![json_response(r#"{"input_tokens":3}"#)])?;
         let mut client = Vec::new();
+
         forward(&mut client, paths::COUNT_TOKENS, b"{}", &upstreams(&engine))?;
+
         let seen = engine.requests()?;
         assert!(seen[0].starts_with("POST /v1/messages/count_tokens HTTP/1.1"));
         assert!(String::from_utf8_lossy(&client).ends_with(r#"{"input_tokens":3}"#));

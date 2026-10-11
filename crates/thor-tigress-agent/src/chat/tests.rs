@@ -521,11 +521,13 @@ fn a_chunk_that_is_only_a_tag_is_forwarded_for_what_else_it_carries() -> Outcome
     let model = FakeServer::start(vec![event_stream(&[thinking, bare])])?;
     let search = idle()?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[],"stream":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let sent = events(&client);
     assert_eq!(sent.len(), 2, "{sent:?}");
     assert!(sent[0].contains(r#""reasoning_content":"hm""#), "{sent:?}");
@@ -1185,12 +1187,13 @@ fn a_coding_tools_request_is_fitted_and_relayed() -> Outcome {
         ]
     });
     let mut client = Vec::new();
-
     let body = serde_json::to_vec(&request)?;
+
     answer(&mut client, &body, &upstreams(&engine, &idle()?))?;
 
     let seen = engine.requests()?;
     let sent: Value = serde_json::from_str(seen[0].split("\r\n\r\n").nth(1).unwrap_or_default())?;
+
     assert_eq!(sent["model"], "nemotron");
     assert_eq!(sent["top_k"], 40);
     assert_eq!(sent["tools"], request["tools"]);
@@ -1203,6 +1206,7 @@ fn a_coding_tools_request_is_fitted_and_relayed() -> Outcome {
             { "role": "user", "content": "ask" }
         ])
     );
+
     let body = stream.split("\r\n\r\n").nth(1).unwrap_or_default();
     assert!(String::from_utf8_lossy(&client).ends_with(body));
     Ok(())
@@ -1215,8 +1219,8 @@ fn a_named_model_is_answered_by_its_own_engine() -> Outcome {
     upstreams
         .others
         .push(Engine::new("qwen".to_string(), qwen.address()));
-
     let request = br#"{"model":"qwen","messages":[]}"#;
+
     answer(&mut Vec::new(), request, &upstreams)?;
 
     assert_eq!(qwen.requests()?.len(), 1);

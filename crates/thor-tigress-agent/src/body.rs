@@ -53,7 +53,9 @@ mod tests {
     #[test]
     fn names_the_model_over_whatever_was_there() -> Outcome {
         let mut request = fields(br#"{"model":"claude-sonnet-5-5"}"#)?;
+
         name(&mut request, "qwen");
+
         assert_eq!(model(&request), Some("qwen"));
         Ok(())
     }

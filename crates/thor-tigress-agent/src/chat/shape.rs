@@ -73,6 +73,7 @@ fn unpack_call_arguments(fields: &mut Fields) {
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return;
     };
+
     messages
         .iter_mut()
         .filter_map(|message| message.get_mut("tool_calls")?.as_array_mut())
@@ -101,8 +102,10 @@ fn gather_system(fields: &mut Fields) {
     let Some(messages) = fields.get_mut(MESSAGES).and_then(Value::as_array_mut) else {
         return;
     };
+
     let (system, mut kept): (Vec<Value>, Vec<Value>) =
         std::mem::take(messages).into_iter().partition(is_system);
+
     let text = system
         .iter()
         .map(text_of)
@@ -113,6 +116,7 @@ fn gather_system(fields: &mut Fields) {
     if !system.is_empty() {
         kept.insert(0, json!({ "role": "system", "content": text }));
     }
+
     *messages = kept;
 }
 
@@ -153,15 +157,19 @@ mod tests {
     #[test]
     fn keeps_every_field_the_engine_knows_and_no_other() -> Outcome {
         let mut request = Fields::new();
+
         for field in ENGINE_FIELDS {
             request.insert(field.to_string(), json!(1));
         }
+
         for field in ["user", "store", "metadata", "n_predict", "grammar"] {
             request.insert(field.to_string(), json!(1));
         }
+
         let kept = fitted(&Value::Object(request))?;
         let mut names: Vec<&str> = kept.keys().map(String::as_str).collect();
         names.sort_unstable();
+
         assert_eq!(names, ENGINE_FIELDS);
         Ok(())
     }
@@ -179,6 +187,7 @@ mod tests {
             { "role": "system" },
             { "role": "assistant", "content": "answer" }
         ] }))?;
+
         assert_eq!(
             kept[MESSAGES],
             json!([
@@ -192,7 +201,8 @@ mod tests {
 
     #[test]
     fn earlier_tool_calls_carry_their_arguments_as_objects() -> Outcome {
-        let call = |arguments: Value| json!({ "id": "c", "function": { "name": "f", "arguments": arguments } });
+        let call = |arguments: Value| json!({ "id": "c", "function": { "arguments": arguments } });
+
         let kept = fitted(&json!({ "messages": [
             { "role": "user", "content": "ask" },
             { "role": "assistant", "tool_calls": [
@@ -204,12 +214,14 @@ mod tests {
             ] },
             { "role": "tool", "tool_call_id": "c", "content": "done" }
         ] }))?;
+
         let arguments: Vec<&Value> = kept[MESSAGES][1]["tool_calls"]
             .as_array()
             .into_iter()
             .flatten()
             .filter_map(|call| call.pointer("/function/arguments"))
             .collect();
+
         assert_eq!(
             arguments,
             [
@@ -225,6 +237,7 @@ mod tests {
     #[test]
     fn a_conversation_without_a_system_message_is_left_as_it_is() -> Outcome {
         let request = json!({ "messages": [{ "role": "user", "content": "ask" }] });
+
         assert_eq!(fitted(&request)?[MESSAGES], request[MESSAGES]);
         assert_eq!(fitted(&json!({ "messages": "text" }))?[MESSAGES], "text");
         Ok(())

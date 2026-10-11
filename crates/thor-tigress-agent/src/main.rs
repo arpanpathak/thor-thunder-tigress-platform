@@ -70,6 +70,7 @@ fn serve(config: Config) -> Outcome<Infallible> {
         .engines()
         .map(|engine| engine.model.as_str())
         .collect();
+
     eprintln!(
         "listening on {}, engines {}, search {}, access key {}, keyring {}",
         config.listen,
@@ -122,6 +123,7 @@ mod tests {
     fn arguments(more: &[&str]) -> Vec<String> {
         let engine = ["--engine", "nemotron=127.0.0.1:1"];
         let key = ["--key-file", "/nonexistent"];
+
         engine
             .iter()
             .chain(&key)

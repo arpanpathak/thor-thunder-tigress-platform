@@ -203,11 +203,13 @@ impl Config {
         let options = Options::parse(arguments)?;
         let key = read_key(&options.key_file);
         let mut engines = options.engines.iter().cloned();
+
         let Some(default) = engines.next() else {
             return Err(AgentError::Config(
                 "at least one --engine MODEL=HOST:PORT is needed".to_string(),
             ));
         };
+
         let people = match &options.keyring {
             Some(path) => {
                 let passphrase = keyring_passphrase(&options, std::env::var(KEYRING_ENV).ok())?;
@@ -490,6 +492,7 @@ mod tests {
         let config = Config::from_args(args(&["--engine", "qwen=e:1", "--key-file", "/none"]))?;
         let upstreams = &config.upstreams;
         let served = |model| upstreams.serving(model).endpoint.address();
+
         assert_eq!(served(Some("qwen")), "e:1");
         assert_eq!(served(Some("nemotron")), "127.0.0.1:1");
         assert_eq!(served(Some("claude-sonnet-5-5")), "127.0.0.1:1");
@@ -505,6 +508,7 @@ mod tests {
     #[test]
     fn a_server_without_an_engine_is_refused() {
         let refused = Config::from_args(["--key-file".to_string(), "/none".to_string()]);
+
         assert!(refused.is_err_and(|error| {
             error.to_string() == "config: at least one --engine MODEL=HOST:PORT is needed"
         }));

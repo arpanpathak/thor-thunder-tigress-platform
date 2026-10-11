@@ -260,11 +260,13 @@ def load(values, wanted):
     row = find(values, wanted)
     if row["state"] == "loaded":
         return print("already loaded")
+
     minimum, unit_name = int(values["MIN_FREE_GB"]), row["unit"]
     needed, room = row["size"] / 1e9 + WORKING_GB, max(0.0, free_gb() - minimum)
     if needed > room:
         return print(f"not loaded: needs about {needed:.0f} GB, only {room:.0f} GB can be used"
                      f" while keeping {minimum} GB free")
+
     before, started = free_gb(), time.time()
     subprocess.run(["systemctl", "--user", "start", unit_name], check=True)
     while not edge_answering(row["port"]):
@@ -274,6 +276,7 @@ def load(values, wanted):
         if subprocess.run(["systemctl", "--user", "is-failed", "-q", unit_name]).returncode == 0:
             return print(f"failed to start; see: journalctl --user -u {unit_name} -n 50")
         time.sleep(2)
+
     return print(f"loaded in {time.time() - started:.0f} s: {before - free_gb():.1f} GB used, {free_gb():.1f} GB free")
 
 
@@ -282,6 +285,7 @@ def unload(values, wanted):
     row = find(values, wanted)
     if row["state"] == "on disk":
         return print("not loaded")
+
     before = free_gb()
     subprocess.run(["systemctl", "--user", "stop", row["unit"]], check=True)
     time.sleep(3)
@@ -337,26 +341,32 @@ def install(values):
     entries = edge_models(values)
     if not entries:
         sys.exit("no model to serve: set EDGE_MODEL in ~/.config/thor-chat/env")
+
     UNITS.mkdir(parents=True, exist_ok=True)
     engines = [edge_unit(entry) for entry in entries]
+
     for entry, name in zip(entries, engines):
         unit(name, f"{entry['name']} (TensorRT Edge-LLM) on 127.0.0.1:{entry['port']}",
              "edge" if entry["primary"] else f"edge {entry['name']}", "", EDGE_LIMITS)
     unit("thor-tigress-agent", f"Chat page and web search on 127.0.0.1:{values['PORT']}", "agent",
          " ".join(f"{name}.service" for name in engines))
     services = [*engines, "thor-tigress-agent"]
+
     source = Path(__file__).resolve()
     command = HOME / ".local" / "bin" / "thor-tigress-serve"
     command.parent.mkdir(parents=True, exist_ok=True)
     if source != command:
         command.unlink(missing_ok=True)
         command.symlink_to(source)
+
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     for name in drop_units(stale_units(services)):
         print(f"removed {name}: this install does not run it")
+
     subprocess.run(["systemctl", "--user", "enable", *services], check=True, capture_output=True)
     subprocess.run(["systemctl", "--user", "restart", *services], check=True)
     subprocess.run(["loginctl", "enable-linger", os.environ.get("USER", "")], check=False)
+
     print(f"running: http://127.0.0.1:{values['PORT']}")
     for entry in entries:
         print(f"  {entry['name']} (TensorRT Edge-LLM) on 127.0.0.1:{entry['port']}"
@@ -379,10 +389,12 @@ def drop_units(names):
     """Stops and deletes units, with the drop-ins they carry."""
     if not names:
         return names
+
     subprocess.run(["systemctl", "--user", "disable", "--now", *names], check=False)
     for name in names:
         (UNITS / f"{name}.service").unlink(missing_ok=True)
         shutil.rmtree(UNITS / f"{name}.service.d", ignore_errors=True)
+
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     return names
 

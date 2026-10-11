@@ -367,9 +367,11 @@ pub fn answer(client: &mut dyn Write, body: &[u8], upstreams: &Upstreams) -> Out
         .remove(WEB_SEARCH_SWITCH)
         .and_then(|value| value.as_bool())
         .unwrap_or(false);
+
     let engine = upstreams.serving(body::model(&fields));
     body::name(&mut fields, &engine.model);
     shape::fit(&mut fields);
+
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
     let model = &engine.endpoint;
 

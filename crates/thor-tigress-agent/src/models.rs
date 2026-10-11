@@ -26,6 +26,7 @@ pub fn list(client: &mut dyn Write, upstreams: &Upstreams) -> Outcome {
         .flatten()
         .collect();
     let list = json!({ "object": "list", "data": data });
+
     response::respond(
         client,
         Status::Ok,
@@ -52,6 +53,7 @@ mod tests {
 
     fn upstreams(first: String, others: &[String]) -> Upstreams {
         let engine = |address: &String| Engine::new("m".to_string(), address.clone());
+
         Upstreams {
             default: engine(&first),
             others: others.iter().map(engine).collect(),
@@ -71,6 +73,7 @@ mod tests {
         let text = String::from_utf8_lossy(client);
         let body = text.split("\r\n\r\n").nth(1).unwrap_or_default();
         let list: Value = serde_json::from_str(body)?;
+
         Ok(list["data"]
             .as_array()
             .into_iter()
@@ -93,7 +96,9 @@ mod tests {
             empty.address(),
         ];
         let mut client = Vec::new();
+
         list(&mut client, &upstreams(qwen.address(), &others))?;
+
         assert_eq!(listed_ids(&client)?, ["qwen", "lightning"]);
         Ok(())
     }
@@ -101,7 +106,9 @@ mod tests {
     #[test]
     fn no_engine_answering_is_an_empty_list() -> Outcome {
         let mut client = Vec::new();
+
         list(&mut client, &upstreams(closed()?, &[closed()?]))?;
+
         let text = String::from_utf8_lossy(&client);
         assert!(text.starts_with("HTTP/1.1 200 OK"), "{text}");
         assert!(listed_ids(&client)?.is_empty());
