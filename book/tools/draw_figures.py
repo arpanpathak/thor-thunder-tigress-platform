@@ -1155,6 +1155,81 @@ def coffee_shop_ssh():
 
 
 @figure
+def ssh_alias():
+    meanings = [("client", "Where to go", "HostName and User: the address, the login", "search"),
+                ("store", "Who you are", "IdentityFile: the key that proves it", "key"),
+                ("service", "Stay connected", "ControlMaster: later commands reuse it", "swap")]
+    parts = [
+        card(24, 176, 220, 72, "client", "ssh thor", "what you type", glyph="terminal"),
+        sheet(290, 108, 330, 210, "store", "~/.SSH/CONFIG, READ BY SSH", [
+            ("strong", "Host thor"), ("", "    HostName <thor-ip>"), ("", "    User <user>"),
+            ("", "    IdentityFile ~/.ssh/id_ed25519"), ("", "    ControlMaster auto"), ("", "    ControlPersist 10m")]),
+        *[card(680, 108 + 74 * row, 360, 62, kind, name, sub, glyph=glyph) for row, (kind, name, sub, glyph) in enumerate(meanings)],
+        wire([(244, 212), (290, 212)]),
+        *[wire([(620, 139 + 74 * row), (680, 139 + 74 * row)]) for row in range(3)],
+        lines(24, 352, ["ssh looks the name up in the file and fills in the rest. scp, rsync and thor-sync read the same file."]),
+    ]
+    save(OUT / "ssh-alias.svg", 1064, 378,
+         "You type ssh thor. ssh looks up Host thor in the file ~/.ssh/config and finds five settings. HostName and "
+         "User say where to go and which login to use. IdentityFile names the key that proves who you are. "
+         "ControlMaster and ControlPersist keep one connection open so later commands reuse it.",
+         "What the alias stands for", "One short name in place of an address, a login and a key.", parts)
+
+
+@figure
+def mac_setup():
+    steps = [
+        ("client", "1 · Join the tailnet", "tailscale",
+         ["Install the Tailscale app and sign in with the account", "the Thor is on. The Thor then shows up as arpanpathak."]),
+        ("store", "2 · Have a key on the Thor", "key",
+         ["ls ~/.ssh/*.pub. None? Run ssh-keygen, then ssh-copy-id,", "at home, where the Thor still takes your password."]),
+        ("service", "3 · Write one alias", "terminal",
+         ["Host thor in ~/.ssh/config, with HostName", "arpanpathak.taildb9a39.ts.net"]),
+        ("good", "4 · Try it on a phone hotspot", "laptop",
+         ["Wi-Fi off, hotspot on, ssh thor.", "If that gives a prompt, the coffee shop will too."]),
+    ]
+    parts = [card(24 + 520 * (index % 2), 108 + 124 * (index // 2), 496, 96, kind, name, sub, glyph=glyph)
+             for index, (kind, name, glyph, sub) in enumerate(steps)]
+    parts += [
+        wire([(520, 156), (544, 156)]),
+        wire([(792, 204), (792, 218), (272, 218), (272, 232)]),
+        wire([(520, 280), (544, 280)]),
+        lines(24, 362, ["All four are done on the Mac, at home. Nothing is changed on the Thor except one line in authorized_keys."]),
+    ]
+    save(OUT / "mac-setup.svg", 1064, 388,
+         "Four steps on the Mac, done at home. One: install the Tailscale app and sign in with the account the Thor "
+         "is on. Two: make sure the Mac has an ssh key on the Thor, creating one with ssh-keygen and installing it "
+         "with ssh-copy-id if not. Three: write one alias, Host thor, pointing at the Thor's tailnet name. Four: "
+         "turn Wi-Fi off, use a phone hotspot, and run ssh thor to prove it works away from home.",
+         "Setting up a Mac, once", "Four steps at home, then the same command works anywhere.", parts)
+
+
+@figure
+def coffee_shop_safety():
+    hops = [("client", "Your Mac", "encrypts every packet", "laptop"), ("idle", "Café Wi-Fi", "sees scrambled packets", "cup"),
+            ("outside", "Tailscale relay", "passes them, can't read", "tailscale"), ("model", "The Thor", "no port open at home", "nvidia")]
+    risks = [
+        ("Your Tailscale account", "key", ["Whoever signs in to it can add a device.", "Turn on two-factor sign-in."]),
+        ("The Mac itself", "laptop", ["Signed in means trusted. Lock the screen, use FileVault,", "and remove a lost Mac on the admin page."]),
+        ("A key on a pendrive", "lock", ["Give the key a passphrase. Without one, whoever", "finds the pendrive holds the key."]),
+        ("The person behind you", "eye", ["No tunnel hides your screen.", "Sit with your back to a wall."]),
+    ]
+    parts = [card(24 + 262 * index, 112, 230, 80, kind, name, sub, glyph=glyph) for index, (kind, name, sub, glyph) in enumerate(hops)]
+    parts += [wire([(254 + 262 * gap, 152), (286 + 262 * gap, 152)]) for gap in range(3)]
+    parts.append(zone(24, 246, 1016, 220, "Where the risk really is"))
+    parts += [card(40 + 500 * (index % 2), 276 + 92 * (index // 2), 484, 76, "danger", name, sub, glyph=glyph, dashed=True, tile="#FFFFFF")
+              for index, (name, glyph, sub) in enumerate(risks)]
+    parts.append(lines(24, 500, ["The network in between is the part you do not have to trust. The account, the laptop and the key are."]))
+    save(OUT / "coffee-shop-safety.svg", 1064, 526,
+         "Along the top, the path of a packet: your Mac encrypts it, the café Wi-Fi sees only scrambled packets, a "
+         "Tailscale relay passes them on without being able to read them, and the Thor at home has no port open. "
+         "Below, the four real risks: your Tailscale account, which needs two-factor sign-in; the Mac itself, which "
+         "needs a locked screen and disk encryption; a key on a pendrive, which needs a passphrase; and the person "
+         "behind you, who can read your screen.",
+         "Is it safe from a coffee shop?", "Yes for the network. The risks are the things you carry.", parts)
+
+
+@figure
 def tunnel_uses():
     parts = [
         sheet(24, 108, 328, 190, "service", "1 · A SHELL", [

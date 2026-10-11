@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1064 378" width="1064" height="378" role="img" aria-label="You type ssh thor. ssh looks up Host thor in the file ~/.ssh/config and finds five settings. HostName and User say where to go and which login to use. IdentityFile names the key that proves who you are. ControlMaster and ControlPersist keep one connection open so later commands reuse it.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1064" height="378" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">What the alias stands for</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">One short name in place of an address, a login and a key.</text>
+  <rect x="24" y="176" width="220" height="72" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M36,176.7 H30 V247.3 H36 A11.3,11.3 0 0 1 24.7,236 V188 A11.3,11.3 0 0 1 36,176.7 Z" fill="#2F6FDB"/>
+  <rect x="40" y="196.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(46.0,202.0) scale(0.8333)"><path d="M3 4h18a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm3.3 4.3-1.4 1.4L7.2 12l-2.3 2.3 1.4 1.4L10 12zM11 14v2h7v-2z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="82.0" y="208.0" class="name" text-anchor="start" xml:space="preserve">ssh thor</text>
+  <text x="82.0" y="226.0" class="sub" text-anchor="start" xml:space="preserve">what you type</text>
+  <path d="M300,108 H602 L620,126 V308 A10,10 0 0 1 610,318 H300 A10,10 0 0 1 290,308 V118 A10,10 0 0 1 300,108 Z" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M602,108 V126 H620 Z" fill="#FBF1DC" stroke="#D5DBE3" stroke-width="1.3" stroke-linejoin="round"/>
+  <rect x="306" y="124" width="4" height="14" rx="2" fill="#B7791F"/>
+  <text x="318.0" y="135.5" class="tab" text-anchor="start" style="fill:#B7791F" xml:space="preserve">~/.SSH/CONFIG, READ BY SSH</text>
+  <text x="306.0" y="164.0" class="mono strong" text-anchor="start" xml:space="preserve">Host thor</text>
+  <text x="306.0" y="182.0" class="mono" text-anchor="start" xml:space="preserve">    HostName &lt;thor-ip&gt;</text>
+  <text x="306.0" y="200.0" class="mono" text-anchor="start" xml:space="preserve">    User &lt;user&gt;</text>
+  <text x="306.0" y="218.0" class="mono" text-anchor="start" xml:space="preserve">    IdentityFile ~/.ssh/id_ed25519</text>
+  <text x="306.0" y="236.0" class="mono" text-anchor="start" xml:space="preserve">    ControlMaster auto</text>
+  <text x="306.0" y="254.0" class="mono" text-anchor="start" xml:space="preserve">    ControlPersist 10m</text>
+  <rect x="680" y="108" width="360" height="62" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M692,108.7 H686 V169.3 H692 A11.3,11.3 0 0 1 680.7,158 V120 A11.3,11.3 0 0 1 692,108.7 Z" fill="#2F6FDB"/>
+  <rect x="696" y="123.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(702.0,129.0) scale(0.8333)"><path d="M10.5 3a7.5 7.5 0 0 1 5.9 12.1l4.7 4.8-1.8 1.8-4.8-4.7A7.5 7.5 0 1 1 10.5 3zm0 2.5a5 5 0 1 0 0 10 5 5 0 0 0 0-10z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="738.0" y="135.0" class="name" text-anchor="start" xml:space="preserve">Where to go</text>
+  <text x="738.0" y="153.0" class="sub" text-anchor="start" xml:space="preserve">HostName and User: the address, the login</text>
+  <rect x="680" y="182" width="360" height="62" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M692,182.7 H686 V243.3 H692 A11.3,11.3 0 0 1 680.7,232 V194 A11.3,11.3 0 0 1 692,182.7 Z" fill="#B7791F"/>
+  <rect x="696" y="197.0" width="32" height="32" rx="8" fill="#FBF1DC"/>
+  <g transform="translate(702.0,203.0) scale(0.8333)"><path d="M14.5 2a7.5 7.5 0 0 0-7.2 9.6L2 16.9V22h5.1v-2.5h2.5V17h2.4l1-1a7.5 7.5 0 1 0 1.5-14zm2.2 4.3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" fill="#B7791F" fill-rule="evenodd"/></g>
+  <text x="738.0" y="209.0" class="name" text-anchor="start" xml:space="preserve">Who you are</text>
+  <text x="738.0" y="227.0" class="sub" text-anchor="start" xml:space="preserve">IdentityFile: the key that proves it</text>
+  <rect x="680" y="256" width="360" height="62" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M692,256.7 H686 V317.3 H692 A11.3,11.3 0 0 1 680.7,306 V268 A11.3,11.3 0 0 1 692,256.7 Z" fill="#1F8A70"/>
+  <rect x="696" y="271.0" width="32" height="32" rx="8" fill="#E4F4EF"/>
+  <g transform="translate(702.0,277.0) scale(0.8333)"><path d="M7 4 2 9l5 5v-3.5h9V8H7zm10 6v3.5H8V16h9v3.5l5-5z" fill="#1F8A70" fill-rule="evenodd"/></g>
+  <text x="738.0" y="283.0" class="name" text-anchor="start" xml:space="preserve">Stay connected</text>
+  <text x="738.0" y="301.0" class="sub" text-anchor="start" xml:space="preserve">ControlMaster: later commands reuse it</text>
+  <path class="wire" d="M244,212 L290,212" marker-end="url(#head)"/>
+  <path class="wire" d="M620,139 L680,139" marker-end="url(#head)"/>
+  <path class="wire" d="M620,213 L680,213" marker-end="url(#head)"/>
+  <path class="wire" d="M620,287 L680,287" marker-end="url(#head)"/>
+  <text x="24.0" y="352.0" class="note" text-anchor="start" xml:space="preserve">ssh looks the name up in the file and fills in the rest. scp, rsync and thor-sync read the same file.</text>
+</svg>

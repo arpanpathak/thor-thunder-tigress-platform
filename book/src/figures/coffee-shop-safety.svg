@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1064 526" width="1064" height="526" role="img" aria-label="Along the top, the path of a packet: your Mac encrypts it, the café Wi-Fi sees only scrambled packets, a Tailscale relay passes them on without being able to read them, and the Thor at home has no port open. Below, the four real risks: your Tailscale account, which needs two-factor sign-in; the Mac itself, which needs a locked screen and disk encryption; a key on a pendrive, which needs a passphrase; and the person behind you, who can read your screen.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1064" height="526" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Is it safe from a coffee shop?</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Yes for the network. The risks are the things you carry.</text>
+  <rect x="24" y="112" width="230" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M36,112.7 H30 V191.3 H36 A11.3,11.3 0 0 1 24.7,180 V124 A11.3,11.3 0 0 1 36,112.7 Z" fill="#2F6FDB"/>
+  <rect x="40" y="136.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(46.0,142.0) scale(0.8333)"><path d="M5 4h14a1 1 0 0 1 1 1v10H4V5a1 1 0 0 1 1-1zm1 2v7h12V6zM2 16.5h20V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="82.0" y="148.0" class="name" text-anchor="start" xml:space="preserve">Your Mac</text>
+  <text x="82.0" y="166.0" class="sub" text-anchor="start" xml:space="preserve">encrypts every packet</text>
+  <rect x="286" y="112" width="230" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M298,112.7 H292 V191.3 H298 A11.3,11.3 0 0 1 286.7,180 V124 A11.3,11.3 0 0 1 298,112.7 Z" fill="#7F8EA0"/>
+  <rect x="302" y="136.0" width="32" height="32" rx="8" fill="#F1F4F7"/>
+  <g transform="translate(308.0,142.0) scale(0.8333)"><path d="M4 8h13v2h1.5a3.5 3.5 0 0 1 0 7H17a5 5 0 0 1-5 4H9a5 5 0 0 1-5-5zm13 4v3h1.5a1.5 1.5 0 0 0 0-3zM7 2h1.6v4H7zm3.2 0h1.6v4h-1.6zm3.2 0H15v4h-1.6z" fill="#7F8EA0" fill-rule="evenodd"/></g>
+  <text x="344.0" y="148.0" class="name" text-anchor="start" xml:space="preserve">Café Wi-Fi</text>
+  <text x="344.0" y="166.0" class="sub" text-anchor="start" xml:space="preserve">sees scrambled packets</text>
+  <rect x="548" y="112" width="230" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M560,112.7 H554 V191.3 H560 A11.3,11.3 0 0 1 548.7,180 V124 A11.3,11.3 0 0 1 560,112.7 Z" fill="#7A4FD0"/>
+  <rect x="564" y="136.0" width="32" height="32" rx="8" fill="#F0EAFB"/>
+  <g transform="translate(570.0,142.0) scale(0.8333)"><path d="M24 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm-9 9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm0-9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6-6a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM3 24a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm18 .5a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm0-.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM6 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm9-9a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm-3 2.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zM6 3a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM3 5.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z" fill="#242424" fill-rule="evenodd"/></g>
+  <text x="606.0" y="148.0" class="name" text-anchor="start" xml:space="preserve">Tailscale relay</text>
+  <text x="606.0" y="166.0" class="sub" text-anchor="start" xml:space="preserve">passes them, can&#x27;t read</text>
+  <rect x="810" y="112" width="230" height="80" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M822,112.7 H816 V191.3 H822 A11.3,11.3 0 0 1 810.7,180 V124 A11.3,11.3 0 0 1 822,112.7 Z" fill="#5E9400"/>
+  <rect x="826" y="136.0" width="32" height="32" rx="8" fill="#EEF6DC"/>
+  <g transform="translate(832.0,142.0) scale(0.8333)"><path d="M8.948 8.798v-1.43a6.7 6.7 0 0 1 .424-.018c3.922-.124 6.493 3.374 6.493 3.374s-2.774 3.851-5.75 3.851c-.398 0-.787-.062-1.158-.185v-4.346c1.528.185 1.837.857 2.747 2.385l2.04-1.714s-1.492-1.952-4-1.952a6.016 6.016 0 0 0-.796.035m0-4.735v2.138l.424-.027c5.45-.185 9.01 4.47 9.01 4.47s-4.08 4.964-8.33 4.964c-.37 0-.733-.035-1.095-.097v1.325c.3.035.61.062.91.062 3.957 0 6.82-2.023 9.593-4.408.459.371 2.34 1.263 2.73 1.652-2.633 2.208-8.772 3.984-12.253 3.984-.335 0-.653-.018-.971-.053v1.864H24V4.063zm0 10.326v1.131c-3.657-.654-4.673-4.46-4.673-4.46s1.758-1.944 4.673-2.262v1.237H8.94c-1.528-.186-2.73 1.245-2.73 1.245s.68 2.412 2.739 3.11M2.456 10.9s2.164-3.197 6.5-3.533V6.201C4.153 6.59 0 10.653 0 10.653s2.35 6.802 8.948 7.42v-1.237c-4.84-.6-6.492-5.936-6.492-5.936z" fill="#76B900" fill-rule="evenodd"/></g>
+  <text x="868.0" y="148.0" class="name" text-anchor="start" xml:space="preserve">The Thor</text>
+  <text x="868.0" y="166.0" class="sub" text-anchor="start" xml:space="preserve">no port open at home</text>
+  <path class="wire" d="M254,152 L286,152" marker-end="url(#head)"/>
+  <path class="wire" d="M516,152 L548,152" marker-end="url(#head)"/>
+  <path class="wire" d="M778,152 L810,152" marker-end="url(#head)"/>
+  <rect x="24" y="246" width="1016" height="220" rx="16" fill="#F3F1EA" stroke="#E4E0D4" stroke-width="1.2"/>
+  <rect x="42" y="235" width="216.8" height="22" rx="11" fill="#1B2430"/>
+  <text x="150.4" y="250.2" class="tab" text-anchor="middle" style="fill:#FFFFFF" xml:space="preserve">WHERE THE RISK REALLY IS</text>
+  <rect x="40" y="276" width="484" height="76" rx="12" fill="#FCEBE6" stroke="#CF4526" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M52,276.7 H46 V351.3 H52 A11.3,11.3 0 0 1 40.7,340 V288 A11.3,11.3 0 0 1 52,276.7 Z" fill="#CF4526"/>
+  <rect x="56" y="298.0" width="32" height="32" rx="8" fill="#FFFFFF"/>
+  <g transform="translate(62.0,304.0) scale(0.8333)"><path d="M14.5 2a7.5 7.5 0 0 0-7.2 9.6L2 16.9V22h5.1v-2.5h2.5V17h2.4l1-1a7.5 7.5 0 1 0 1.5-14zm2.2 4.3a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" fill="#CF4526" fill-rule="evenodd"/></g>
+  <text x="98.0" y="301.0" class="name" text-anchor="start" xml:space="preserve">Your Tailscale account</text>
+  <text x="98.0" y="319.0" class="sub" text-anchor="start" xml:space="preserve">Whoever signs in to it can add a device.</text>
+  <text x="98.0" y="337.0" class="sub" text-anchor="start" xml:space="preserve">Turn on two-factor sign-in.</text>
+  <rect x="540" y="276" width="484" height="76" rx="12" fill="#FCEBE6" stroke="#CF4526" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M552,276.7 H546 V351.3 H552 A11.3,11.3 0 0 1 540.7,340 V288 A11.3,11.3 0 0 1 552,276.7 Z" fill="#CF4526"/>
+  <rect x="556" y="298.0" width="32" height="32" rx="8" fill="#FFFFFF"/>
+  <g transform="translate(562.0,304.0) scale(0.8333)"><path d="M5 4h14a1 1 0 0 1 1 1v10H4V5a1 1 0 0 1 1-1zm1 2v7h12V6zM2 16.5h20V18a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z" fill="#CF4526" fill-rule="evenodd"/></g>
+  <text x="598.0" y="301.0" class="name" text-anchor="start" xml:space="preserve">The Mac itself</text>
+  <text x="598.0" y="319.0" class="sub" text-anchor="start" xml:space="preserve">Signed in means trusted. Lock the screen, use FileVault,</text>
+  <text x="598.0" y="337.0" class="sub" text-anchor="start" xml:space="preserve">and remove a lost Mac on the admin page.</text>
+  <rect x="40" y="368" width="484" height="76" rx="12" fill="#FCEBE6" stroke="#CF4526" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M52,368.7 H46 V443.3 H52 A11.3,11.3 0 0 1 40.7,432 V380 A11.3,11.3 0 0 1 52,368.7 Z" fill="#CF4526"/>
+  <rect x="56" y="390.0" width="32" height="32" rx="8" fill="#FFFFFF"/>
+  <g transform="translate(62.0,396.0) scale(0.8333)"><path d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1zm2.2 0h5.6V7a2.8 2.8 0 0 0-5.6 0zM12 13.5a1.6 1.6 0 0 0-.8 3v2h1.6v-2a1.6 1.6 0 0 0-.8-3z" fill="#CF4526" fill-rule="evenodd"/></g>
+  <text x="98.0" y="393.0" class="name" text-anchor="start" xml:space="preserve">A key on a pendrive</text>
+  <text x="98.0" y="411.0" class="sub" text-anchor="start" xml:space="preserve">Give the key a passphrase. Without one, whoever</text>
+  <text x="98.0" y="429.0" class="sub" text-anchor="start" xml:space="preserve">finds the pendrive holds the key.</text>
+  <rect x="540" y="368" width="484" height="76" rx="12" fill="#FCEBE6" stroke="#CF4526" stroke-dasharray="6 5" stroke-width="1.3"/>
+  <path d="M552,368.7 H546 V443.3 H552 A11.3,11.3 0 0 1 540.7,432 V380 A11.3,11.3 0 0 1 552,368.7 Z" fill="#CF4526"/>
+  <rect x="556" y="390.0" width="32" height="32" rx="8" fill="#FFFFFF"/>
+  <g transform="translate(562.0,396.0) scale(0.8333)"><path d="M12 5c5 0 8.5 3.5 10 7-1.5 3.5-5 7-10 7S3.5 15.5 2 12c1.5-3.5 5-7 10-7zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2.2a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6z" fill="#CF4526" fill-rule="evenodd"/></g>
+  <text x="598.0" y="393.0" class="name" text-anchor="start" xml:space="preserve">The person behind you</text>
+  <text x="598.0" y="411.0" class="sub" text-anchor="start" xml:space="preserve">No tunnel hides your screen.</text>
+  <text x="598.0" y="429.0" class="sub" text-anchor="start" xml:space="preserve">Sit with your back to a wall.</text>
+  <text x="24.0" y="500.0" class="note" text-anchor="start" xml:space="preserve">The network in between is the part you do not have to trust. The account, the laptop and the key are.</text>
+</svg>
