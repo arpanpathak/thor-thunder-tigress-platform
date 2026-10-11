@@ -7,9 +7,11 @@ use regex::Regex;
 use serde::Serialize;
 
 use crate::{
-    claims::{self, FalseClaim},
-    rules::{self, CodeReport, Rule, Verdict},
-    slop::{self, SlopReport},
+    prose::{
+        claims::{self, FalseClaim},
+        slop::{self, SlopReport},
+    },
+    code::rules::{self, CodeReport, Rule, Verdict},
 };
 
 /// A Rust code block found in an answer.
@@ -77,6 +79,7 @@ pub fn rust_blocks(text: &str) -> Vec<CodeBlock> {
             let is_rust = matches!(language, "rust" | "rs")
                 || (language.is_empty() && hint.is_match(code.as_str()));
             let line = text[..code.start()].matches('\n').count() + 1;
+
             is_rust.then(|| CodeBlock {
                 line,
                 code: code.as_str().to_string(),
@@ -95,6 +98,7 @@ pub fn score(text: &str) -> AnswerScore {
             report: rules::check(&block.code),
         })
         .collect();
+
     combine(text, blocks)
 }
 
@@ -110,6 +114,7 @@ pub fn score_parts(prose: &str, code: &str) -> AnswerScore {
             report: rules::check(code),
         }]
     };
+
     combine(prose, blocks)
 }
 
@@ -121,6 +126,7 @@ fn combine(prose: &str, blocks: Vec<Block>) -> AnswerScore {
                 .iter()
                 .filter_map(|block| block.report.verdicts.get(rule).copied())
                 .collect();
+
             let verdict = match (
                 verdicts.contains(&Verdict::Fail),
                 verdicts.contains(&Verdict::Pass),
@@ -129,12 +135,14 @@ fn combine(prose: &str, blocks: Vec<Block>) -> AnswerScore {
                 (false, true) => Verdict::Pass,
                 (false, false) => Verdict::NotApplicable,
             };
+
             (*rule, verdict)
         })
         .collect();
     let all_rules =
         (!blocks.is_empty()).then(|| blocks.iter().all(|block| block.report.all_pass()));
     let false_claims = claims::false_claims(&slop::prose_only(prose), &rules);
+
     AnswerScore {
         slop: slop::check(prose),
         blocks,
@@ -155,12 +163,14 @@ mod tests {
             .into_iter()
             .map(|block| block.line)
             .collect();
+
         assert_eq!(lines, vec![3, 6]);
     }
 
     #[test]
     fn an_answer_without_code_has_no_rule_verdict() {
         let scored = score("Use an iterator here.");
+
         assert_eq!(scored.all_rules, None);
         assert!(
             scored
@@ -174,6 +184,7 @@ mod tests {
     fn one_failing_block_fails_the_answer() {
         let text = "```rust\n/// Ok.\npub fn a() {}\n```\n```rust\nfn b() { c().unwrap(); }\n```";
         let scored = score(text);
+
         assert_eq!(scored.all_rules, Some(false));
         assert_eq!(scored.rules.get(&Rule::NoUnwrap), Some(&Verdict::Fail));
         assert_eq!(scored.rules.get(&Rule::PubDocs), Some(&Verdict::Pass));
@@ -182,12 +193,14 @@ mod tests {
     #[test]
     fn a_compliance_claim_over_broken_code_is_false() {
         let text = "No comments inside function bodies.\n```rust\nfn a() {\n    // note\n}\n```";
+
         assert_eq!(score(text).false_claims.len(), 1);
     }
 
     #[test]
     fn code_given_apart_from_the_prose_is_one_block() {
         let scored = score_parts("Plain prose.", "fn a() { b().unwrap(); }");
+
         assert_eq!(scored.blocks.len(), 1);
         assert_eq!(scored.rules.get(&Rule::NoUnwrap), Some(&Verdict::Fail));
         assert_eq!(score_parts("Prose.", "  ").all_rules, None);

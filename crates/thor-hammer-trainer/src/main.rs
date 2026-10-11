@@ -29,10 +29,12 @@ fn main() -> ExitCode {
                 .iter()
                 .for_each(|warning| eprintln!("{warning}"));
             print!("{}", built.report);
+
             ExitCode::SUCCESS
         }
         Err(error) => {
             eprintln!("thor-hammer-trainer: {error}");
+
             ExitCode::FAILURE
         }
     }

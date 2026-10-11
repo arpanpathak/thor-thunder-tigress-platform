@@ -23,6 +23,7 @@ impl TempDir {
         let path =
             std::env::temp_dir().join(format!("reinforcer-test-{}-{number}", std::process::id()));
         fs::create_dir_all(&path).map_err(ReviewError::io(&path))?;
+
         Ok(TempDir { path })
     }
 
@@ -35,6 +36,7 @@ impl TempDir {
     pub fn file(&self, name: &str, text: &str) -> Outcome<PathBuf> {
         let path = self.path.join(name);
         fs::write(&path, text).map_err(ReviewError::io(&path))?;
+
         Ok(path)
     }
 }

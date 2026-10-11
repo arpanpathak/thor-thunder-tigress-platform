@@ -13,7 +13,7 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::workspace::DatasetSpec;
+use crate::datasets::workspace::DatasetSpec;
 
 /// The training file the scan reads when no argument is given.
 const DEFAULT_TRAINING: &str = "data/train.jsonl";
@@ -83,6 +83,7 @@ impl Command {
     #[must_use]
     pub fn from_args(arguments: impl IntoIterator<Item = String>) -> Command {
         let arguments: Vec<String> = arguments.into_iter().collect();
+
         let Some((first, rest)) = arguments.split_first() else {
             return serve(&[]);
         };
@@ -155,6 +156,7 @@ fn serve(options: &[String]) -> Command {
             })
             .collect();
     }
+
     Command::Serve { port, datasets }
 }
 
@@ -170,6 +172,7 @@ fn dataset(value: &str) -> Option<DatasetSpec> {
     let removed = files
         .next()
         .map_or_else(|| format!("data/{name}_removed.jsonl"), str::to_string);
+
     (!name.is_empty()).then(|| {
         DatasetSpec::new(
             name,
@@ -226,8 +229,11 @@ mod tests {
             "--dataset",
             "other=b.jsonl",
         ]);
+
         assert!(matches!(&served, Command::Serve { port, .. } if port == DEFAULT_PORT));
+
         let datasets = specs(served);
+
         assert_eq!(
             datasets[0],
             DatasetSpec::new(
@@ -247,8 +253,11 @@ mod tests {
     #[test]
     fn serves_one_file_the_old_way() {
         let served = command(&["data/conversations.jsonl", "8788", "labels/c.jsonl"]);
+
         assert!(matches!(&served, Command::Serve { port, .. } if port == "8788"));
+
         let datasets = specs(served);
+
         assert_eq!(
             datasets,
             [DatasetSpec::new(
@@ -263,6 +272,7 @@ mod tests {
     #[test]
     fn refuses_what_it_cannot_read() {
         let usage = |words: &[&str]| matches!(command(words), Command::Usage(_));
+
         assert!(usage(&["serve", "--port"]));
         assert!(usage(&["serve", "--colour", "dark"]));
         assert!(usage(&["serve", "--dataset", "no-equals"]));

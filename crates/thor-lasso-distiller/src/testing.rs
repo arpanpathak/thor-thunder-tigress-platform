@@ -1,16 +1,13 @@
 //! A model server for tests that answers each request with the next reply of a script.
 
 use std::{
-    io::{Read, Write},
-    net::TcpListener,
+    io::{BufRead, BufReader, Read, Write},
+    net::{TcpListener, TcpStream},
     sync::{Arc, Mutex, PoisonError},
     thread,
 };
 
 use crate::{client::Client, error::DistillError};
-
-/// The size of the buffer a request is read into; requests in tests are smaller.
-const REQUEST_BUFFER: usize = 64 * 1024;
 
 /// A server on a free local port that replies to the n-th request with the
 /// n-th reply, as an OpenAI-style chat completion, and keeps every request body.
@@ -38,16 +35,18 @@ impl FakeModel {
             .iter()
             .map(|reply| serde_json::json!({ "choices": [{ "message": { "role": "assistant", "content": reply } }] }).to_string())
             .collect();
+
         thread::spawn(move || {
             for (body, mut stream) in bodies
                 .into_iter()
                 .zip(listener.incoming().filter_map(Result::ok))
             {
-                let mut buffer = vec![0_u8; REQUEST_BUFFER];
-                let read = stream.read(&mut buffer).unwrap_or_default();
+                let request = read_request(&stream).unwrap_or_default();
+
                 seen.lock()
                     .unwrap_or_else(PoisonError::into_inner)
-                    .push(String::from_utf8_lossy(&buffer[..read]).into_owned());
+                    .push(request);
+
                 let reply = format!(
                     "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
                     body.len()
@@ -55,11 +54,13 @@ impl FakeModel {
                 let _ = stream.write_all(reply.as_bytes());
             }
         });
+
         let client = Client {
             address,
             model: "teacher".to_string(),
             key: None,
         };
+
         Ok(Self { client, requests })
     }
 
@@ -71,4 +72,41 @@ impl FakeModel {
             .unwrap_or_else(PoisonError::into_inner)
             .len()
     }
+}
+
+/// Reads one whole request as text: the headers, then as many body bytes as
+/// `Content-Length` says. Answering before the body has arrived would reset
+/// the connection under a client that sends the two separately.
+///
+/// # Errors
+///
+/// `DistillError::Io` when the connection ends before the whole request arrived.
+pub fn read_request(stream: &TcpStream) -> Result<String, DistillError> {
+    let mut reader = BufReader::new(stream);
+    let mut raw = String::new();
+    let mut length = 0;
+
+    loop {
+        let mut line = String::new();
+        reader
+            .read_line(&mut line)
+            .map_err(DistillError::io("request"))?;
+        raw.push_str(&line);
+
+        if line.trim().is_empty() {
+            break;
+        }
+
+        if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+            length = value.trim().parse().unwrap_or(0);
+        }
+    }
+
+    let mut body = vec![0; length];
+    reader
+        .read_exact(&mut body)
+        .map_err(DistillError::io("request"))?;
+    raw.push_str(&String::from_utf8_lossy(&body));
+
+    Ok(raw)
 }

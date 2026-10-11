@@ -156,6 +156,7 @@ pub fn run(options: &Options, out: &mut impl Write) -> Result<(), DistillError> 
     let counts = conversations::plan_counts(&planned);
     let turns: usize = planned.iter().map(Vec::len).sum();
     let console = DistillError::io("standard output");
+
     writeln!(
         out,
         "{} conversations, {turns} turns, from {} books and doc sets",
@@ -171,12 +172,14 @@ pub fn run(options: &Options, out: &mut impl Write) -> Result<(), DistillError> 
         )
         .map_err(DistillError::io("standard output"))?;
     }
+
     let finished = finished_keys(&options.out)?;
     let remaining: Vec<&Vec<Passage>> = planned
         .iter()
         .filter(|sections| !finished.contains(&conversations::conversation_key(sections)))
         .collect();
     let done = planned.len() - remaining.len();
+
     writeln!(
         out,
         "{done} already in {}, {} left",
@@ -184,6 +187,7 @@ pub fn run(options: &Options, out: &mut impl Write) -> Result<(), DistillError> 
         remaining.len()
     )
     .map_err(DistillError::io("standard output"))?;
+
     let chosen: Vec<&Vec<Passage>> = remaining
         .into_iter()
         .take(options.limit.unwrap_or(usize::MAX))
@@ -211,10 +215,12 @@ fn write_prompts(
                 .iter()
                 .map(|message| json!({ "role": message.role, "content": message.content }))
                 .collect();
+
             json!({ "origin": passage.origin, "messages": messages }).to_string()
         })
         .collect();
     fs::write(&path, lines.join("\n") + "\n").map_err(DistillError::io(&path))?;
+
     writeln!(
         out,
         "dry run: wrote {} first-turn prompts to {}",
@@ -231,6 +237,7 @@ fn finished_keys(path: &Path) -> Result<HashSet<String>, DistillError> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(HashSet::new()),
         Err(error) => return Err(DistillError::io(path)(error)),
     };
+
     Ok(text
         .lines()
         .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
@@ -265,6 +272,7 @@ fn generate(
             let line = conversation.to_json(&options.client.model);
             writeln!(file, "{line}").map_err(DistillError::io(&options.out))?;
         }
+
         let count = done + 1;
 
         if count % PROGRESS_EVERY == 0 || count == chosen.len() {
@@ -276,6 +284,7 @@ fn generate(
             writeln!(out, "{line}").map_err(DistillError::io("standard output"))?;
         }
     }
+
     writeln!(out, "wrote {}", options.out.display()).map_err(DistillError::io("standard output"))
 }
 
@@ -297,6 +306,7 @@ mod tests {
             let path =
                 std::env::temp_dir().join(format!("thor-lasso-cli-{name}-{}", std::process::id()));
             fs::create_dir_all(&path).map_err(DistillError::io(&path))?;
+
             let train = path.join("train.jsonl");
             let lines = [
                 r##"{"instruction":"","response":"# Vectors\n\nUse push to grow a vector.","origin":"trpl/src/ch08.md"}"##,
@@ -305,6 +315,7 @@ mod tests {
                 r##"{"instruction":"Q","response":"A","origin":"chat"}"##,
             ];
             fs::write(&train, lines.join("\n")).map_err(DistillError::io(&train))?;
+
             Ok(Self { path })
         }
 
@@ -313,6 +324,7 @@ mod tests {
             let out = self.path.join("conversations.jsonl").display().to_string();
             let mut arguments = words(&["conversations", "--train", &train, "--out", &out]);
             arguments.extend(words(extra));
+
             arguments
         }
     }
@@ -343,6 +355,7 @@ mod tests {
             "--dry-run",
         ]);
         let options = options(&arguments, Some("key".to_string()))?;
+
         assert_eq!(options.books, ["trpl", "rbe"]);
         assert_eq!(
             (options.turns, options.limit, options.dry_run),
@@ -357,6 +370,7 @@ mod tests {
             }
         );
         assert_eq!(super::options(&[], Some(String::new()))?.client.key, None);
+
         Ok(())
     }
 
@@ -367,6 +381,7 @@ mod tests {
                 .err()
                 .map(|error| error.to_string())
         };
+
         assert_eq!(
             refused(&["--turns"]).as_deref(),
             Some("--turns needs a value")
@@ -379,7 +394,9 @@ mod tests {
             refused(&["--colour"])
                 .is_some_and(|message| message.starts_with("unknown option --colour"))
         );
+
         let mut out = Vec::new();
+
         assert!(matches!(
             main_with(&words(&["help"]), None, &mut out),
             Err(DistillError::Usage(_))
@@ -391,12 +408,17 @@ mod tests {
         let folder = Folder::new("dry")?;
         let mut out = Vec::new();
         main_with(&folder.arguments(&["--dry-run"]), None, &mut out)?;
+
         let printed = String::from_utf8_lossy(&out).into_owned();
+
         assert!(printed.starts_with("2 conversations, 3 turns, from 2 books and doc sets"));
         assert!(printed.contains("dry run: wrote 2 first-turn prompts"));
+
         let prompts = fs::read_to_string(folder.path.join("conversations.prompts.jsonl"))
             .map_err(DistillError::io(&folder.path))?;
+
         assert_eq!(prompts.lines().count(), 2);
+
         Ok(())
     }
 
@@ -415,19 +437,26 @@ mod tests {
         let server = model.client.address.clone();
         let mut out = Vec::new();
         main_with(&folder.arguments(&["--server", &server]), None, &mut out)?;
+
         let written = fs::read_to_string(folder.path.join("conversations.jsonl"))
             .map_err(DistillError::io(&folder.path))?;
+
         assert_eq!(written.lines().count(), 1);
+
         let printed = String::from_utf8_lossy(&out).into_owned();
+
         assert!(
             printed.contains("2/2 conversations, 2 questions kept, 3 rejected"),
             "{printed}"
         );
         assert!(!printed.contains("1/2 conversations"));
+
         let mut again = Vec::new();
         let arguments = folder.arguments(&["--books", "trpl", "--dry-run"]);
         main_with(&arguments, None, &mut again)?;
+
         assert!(String::from_utf8_lossy(&again).contains("1 already in"));
+
         Ok(())
     }
 
@@ -439,11 +468,14 @@ mod tests {
         if let Some(out) = arguments.get_mut(4) {
             *out = folder.path.display().to_string();
         }
+
         let mut out = Vec::new();
+
         assert!(matches!(
             main_with(&arguments, None, &mut out),
             Err(DistillError::Io { .. })
         ));
+
         Ok(())
     }
 }

@@ -13,6 +13,7 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("lasso: {error}");
+
             ExitCode::FAILURE
         }
     }

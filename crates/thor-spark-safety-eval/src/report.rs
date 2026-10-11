@@ -6,8 +6,8 @@ use serde::Serialize;
 
 use crate::{
     answer::AnswerScore,
-    rules::{Rule, Verdict},
-    slop::{Category, EM_DASH_HABIT},
+    code::rules::{Rule, Verdict},
+    prose::slop::{Category, EM_DASH_HABIT},
 };
 
 /// How one rule fared over the answers it applied to.
@@ -69,6 +69,7 @@ impl Summary {
             count.passed += usize::from(*verdict == Verdict::Pass);
             count.applied += usize::from(*verdict != Verdict::NotApplicable);
         }
+
         self.clean_prose += usize::from(score.slop.clean());
         self.slop_hits += score.slop.hits.len();
         self.em_dash_habit += usize::from(score.slop.em_dashes >= EM_DASH_HABIT);
@@ -97,6 +98,7 @@ impl Summary {
         ]
         .concat();
         let divider = vec!["---"; columns.len()];
+
         format!("| {} |\n|{}|", columns.join(" | "), divider.join("|"))
     }
 
@@ -106,6 +108,7 @@ impl Summary {
     pub fn row(&self, label: &str) -> String {
         let rules = Rule::ALL.iter().map(|rule| {
             let count = self.rules.get(rule).copied().unwrap_or_default();
+
             format!(
                 "{} of {}",
                 percent(count.passed, count.applied),
@@ -132,6 +135,7 @@ impl Summary {
             },
         ])
         .collect();
+
         format!("| {} |", cells.join(" | "))
     }
 }
@@ -151,6 +155,7 @@ fn per_thousand(count: usize, words: usize) -> String {
         0 => NO_VALUE.to_string(),
         words => {
             let tenths = rounded(count * 10_000, words);
+
             format!("{}.{}", tenths / 10, tenths % 10)
         }
     }
@@ -178,6 +183,7 @@ mod tests {
         let mut summary = Summary::default();
         summary.add(&score("Plain words."));
         summary.add(&score("```rust\nfn a() { b().unwrap(); }\n```"));
+
         assert_eq!(summary.with_code, 1);
         assert_eq!(
             summary.rules.get(&Rule::NoUnwrap),
@@ -203,6 +209,7 @@ mod tests {
             .next()
             .map_or(0, |line| line.matches('|').count());
         let row_cells = Summary::default().row("empty").matches('|').count();
+
         assert_eq!(header_cells, row_cells);
     }
 
@@ -218,6 +225,7 @@ mod tests {
             .iter()
             .map(|&(part, whole)| percent(part, whole))
             .collect();
+
         assert_eq!(integer, ["12%", "38%", "62%", "0%", "67%", "33%"]);
         assert_eq!(
             [
@@ -233,10 +241,13 @@ mod tests {
     #[test]
     fn a_row_reports_rates_slop_and_words() {
         let mut summary = Summary::default();
+
         summary.add(&score(
             "Great question! Use iter().\n```rust\n/// Adds.\npub fn a() {}\n```",
         ));
+
         let row = summary.row("run");
+
         assert!(row.starts_with("| run | 1 | 1 | 100% | 100% |"), "{row}");
         assert!(row.contains("100% of 1"));
     }

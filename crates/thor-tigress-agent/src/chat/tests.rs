@@ -1,5 +1,8 @@
-use super::*;
-use crate::config::Engine;
+use super::{
+    wire::{CallPiece, Chunk, SearchPlan},
+    *,
+};
+use crate::web::{research::MAX_QUERIES_PER_CALL, search::TimeRange};
 use crate::testing::{FakeServer, FakeWeb, event_stream, json_response};
 
 fn upstreams(model: &FakeServer, search: &FakeServer) -> Upstreams {
@@ -8,7 +11,7 @@ fn upstreams(model: &FakeServer, search: &FakeServer) -> Upstreams {
 
 fn upstreams_with(model: &FakeServer, search: &FakeServer, web: FakeWeb) -> Upstreams {
     Upstreams {
-        default: Engine::new("nemotron".to_string(), model.address()),
+        default: Engine::edge("nemotron".to_string(), model.address()),
         others: Vec::new(),
         search: Endpoint::new(search.address(), None),
         web: Box::new(web),
@@ -38,25 +41,30 @@ fn conversation_helpers_leave_a_request_without_messages_alone() {
     append_user(&mut fields, "ask");
     retract_system(&mut fields, "hint");
     set_system(&mut fields, "hello".to_string());
+
     assert_eq!(fields[MESSAGES], json!("not a list"));
 
     let mut plain = Fields::new();
+
     plain.insert(
         MESSAGES.to_string(),
         json!([{ "role": "user", "content": "hi" }]),
     );
     retract_system(&mut plain, "hint");
+
     assert_eq!(plain[MESSAGES][0]["content"], "hi");
 }
 
 #[test]
 fn a_call_piece_without_a_function_keeps_what_it_has() {
     let mut call = ToolCall::default();
+
     call.extend(CallPiece {
         index: 0,
         id: Some("call-1".to_string()),
         function: None,
     });
+
     assert_eq!(call.id, "call-1");
     assert!(call.name.is_empty() && call.arguments.is_empty());
 }
@@ -69,6 +77,7 @@ fn more_queries_than_the_cap_are_dropped() {
         arguments: r#"{"query":"rust","queries":["tokio","async","jobs","threads"]}"#.to_string(),
     };
     let planned = call.search_plan().map(|plan| plan.queries.len());
+
     assert_eq!(planned, Some(MAX_QUERIES_PER_CALL));
 }
 
@@ -118,11 +127,13 @@ fn tools_are_found_by_name() {
 #[test]
 fn a_search_request_gains_a_system_hint() {
     let mut fields = Fields::new();
+
     fields.insert(
         MESSAGES.to_string(),
         json!([{ "role": "user", "content": "news?" }]),
     );
     nudge_to_search(&mut fields);
+
     assert_eq!(
         fields[MESSAGES],
         json!([{ "role": "system", "content": SEARCH_HINT }, { "role": "user", "content": "news?" }])
@@ -132,8 +143,13 @@ fn a_search_request_gains_a_system_hint() {
 #[test]
 fn the_hint_merges_into_an_existing_system_message() {
     let mut fields = Fields::new();
-    fields.insert(MESSAGES.to_string(), json!([{ "role": "system", "content": "Be brief." }, { "role": "user", "content": "hi" }]));
+
+    fields.insert(
+        MESSAGES.to_string(),
+        json!([{ "role": "system", "content": "Be brief." }, { "role": "user", "content": "hi" }]),
+    );
     nudge_to_search(&mut fields);
+
     assert_eq!(
         fields[MESSAGES][0]["content"],
         json!(format!("Be brief.\n\n{SEARCH_HINT}"))
@@ -146,6 +162,7 @@ fn the_hint_is_skipped_without_a_message_list() {
     let mut fields = Fields::new();
     fields.insert(STREAM.to_string(), Value::Bool(true));
     nudge_to_search(&mut fields);
+
     assert!(!fields.contains_key(MESSAGES));
 }
 
@@ -154,11 +171,13 @@ fn taking_the_hint_back_leaves_the_rest_of_the_system_line() {
     let content = format!("Be brief.\n\n{SEARCH_HINT}\n\nBe honest.");
     let system = |fields: &Fields| fields[MESSAGES][0]["content"].clone();
     let mut fields = Fields::new();
+
     fields.insert(
         MESSAGES.to_string(),
         json!([{ "role": "system", "content": content }, { "role": "user", "content": "hi" }]),
     );
     retract_system(&mut fields, SEARCH_HINT);
+
     assert_eq!(system(&fields), json!("Be brief.\n\nBe honest."));
     assert_eq!(fields[MESSAGES].as_array().map(Vec::len), Some(2));
 }
@@ -166,11 +185,13 @@ fn taking_the_hint_back_leaves_the_rest_of_the_system_line() {
 #[test]
 fn taking_back_a_hint_that_is_the_whole_system_line_leaves_it_empty() {
     let mut fields = Fields::new();
+
     fields.insert(
         MESSAGES.to_string(),
         json!([{ "role": "system", "content": SEARCH_HINT }]),
     );
     retract_system(&mut fields, SEARCH_HINT);
+
     assert_eq!(fields[MESSAGES][0]["content"], json!(""));
 }
 
@@ -180,6 +201,7 @@ fn taking_back_a_hint_that_was_never_added_changes_nothing() {
     let mut fields = Fields::new();
     fields.insert(MESSAGES.to_string(), messages.clone());
     retract_system(&mut fields, SEARCH_HINT);
+
     assert_eq!(fields[MESSAGES], messages);
 }
 
@@ -189,6 +211,7 @@ fn a_system_message_that_is_not_text_is_left_alone() {
     let mut fields = Fields::new();
     fields.insert(MESSAGES.to_string(), messages.clone());
     nudge_to_search(&mut fields);
+
     assert_eq!(fields[MESSAGES], messages);
 }
 
@@ -201,6 +224,7 @@ fn assembles_a_tool_call_streamed_in_pieces() -> Outcome {
         r#"{"choices":[{"delta":{"content":"ok","tool_calls":null}}]}"#,
     )?);
     round.absorb(chunk(r#"{"choices":[],"timings":{}}"#)?);
+
     assert_eq!(round.content, "ok");
     assert_eq!(round.calls.len(), 1);
     assert_eq!(
@@ -210,16 +234,20 @@ fn assembles_a_tool_call_streamed_in_pieces() -> Outcome {
             range: None
         })
     );
+
     Ok(())
 }
 
 #[test]
 fn ignores_tool_calls_past_the_limit() -> Outcome {
     let mut round = Round::default();
+
     round.absorb(chunk(
         r#"{"choices":[{"delta":{"tool_calls":[{"index":1000000,"id":"x"}]}}]}"#,
     )?);
+
     assert_eq!(round.calls, []);
+
     Ok(())
 }
 
@@ -299,6 +327,7 @@ fn a_tool_call_must_carry_its_argument() {
         arguments: arguments.to_string(),
         ..ToolCall::default()
     };
+
     assert_eq!(
         call(r#"{"url":" https://example.com/ "}"#)
             .url_argument()
@@ -326,6 +355,7 @@ fn a_search_call_with_several_queries_fans_out() -> Outcome {
         ),
     ])?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[{"role":"user","content":"jobs"}],"thor_web_search":true}"#,
@@ -333,23 +363,27 @@ fn a_search_call_with_several_queries_fans_out() -> Outcome {
     )?;
 
     let asked = search.requests()?;
+
     assert_eq!(asked.len(), 2);
     assert!(asked[0].contains("q=rust+jobs"));
     assert!(asked[1].contains("q=tokio+jobs"));
 
     let seen = model.requests()?;
+
     assert!(seen[1].contains("[1] A"), "{}", seen[1]);
     assert!(seen[1].contains("[2] B"), "{}", seen[1]);
     assert!(seen[1].contains("[3] C"), "{}", seen[1]);
     assert!(seen[1].contains("Searches used 2 of 16"), "{}", seen[1]);
 
     let sent = events(&client);
+
     assert_eq!(
         sent.iter()
             .filter(|event| event.contains(r#""search""#))
             .count(),
         2
     );
+
     Ok(())
 }
 
@@ -365,6 +399,7 @@ fn a_people_search_is_widened_towards_recruiters() -> Outcome {
         json_response(r#"{"results":[]}"#);
         MAX_QUERIES_PER_CALL
     ])?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"who hires"}],"thor_web_search":true}"#,
@@ -372,6 +407,7 @@ fn a_people_search_is_widened_towards_recruiters() -> Outcome {
     )?;
 
     let asked = search.requests()?;
+
     assert_eq!(asked.len(), MAX_QUERIES_PER_CALL);
     assert!(asked[0].contains("q=synthires+rust&"), "{}", asked[0]);
     assert!(
@@ -381,6 +417,7 @@ fn a_people_search_is_widened_towards_recruiters() -> Outcome {
     );
     assert!(asked[2].contains("hiring+manager"), "{}", asked[2]);
     assert!(asked[3].contains("we+are+hiring"), "{}", asked[3]);
+
     Ok(())
 }
 
@@ -397,6 +434,7 @@ fn the_search_budget_stops_the_seventeenth_query() -> Outcome {
     let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
     let model = FakeServer::start(vec![stream, event_stream(&[reply])])?;
     let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#); MAX_SEARCHES])?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"hunt"}],"thor_web_search":true}"#,
@@ -404,10 +442,13 @@ fn the_search_budget_stops_the_seventeenth_query() -> Outcome {
     )?;
 
     assert_eq!(search.requests()?.len(), MAX_SEARCHES);
+
     let seen = model.requests()?;
+
     assert_eq!(seen.len(), 2);
     assert!(seen[1].contains("budget is spent"), "{}", seen[1]);
     assert!(seen[1].contains("Searches used 16 of 16"), "{}", seen[1]);
+
     Ok(())
 }
 
@@ -420,9 +461,11 @@ fn the_answer_round_is_given_the_source_numbers() -> Outcome {
         .iter()
         .map(|call| event_stream(&[call.as_str()]))
         .collect();
+
     responses.push(event_stream(&[
         r#"{"choices":[{"delta":{"content":"done"}}]}"#,
     ]));
+
     let model = FakeServer::start(responses)?;
     let search = FakeServer::start(vec![
         json_response(
@@ -430,6 +473,7 @@ fn the_answer_round_is_given_the_source_numbers() -> Outcome {
         );
         MAX_ROUNDS
     ])?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
@@ -437,6 +481,7 @@ fn the_answer_round_is_given_the_source_numbers() -> Outcome {
     )?;
 
     let seen = model.requests()?;
+
     assert_eq!(seen.len(), MAX_ROUNDS + 1);
     assert!(
         seen[MAX_ROUNDS].contains("Sources found, with the numbers to cite"),
@@ -452,6 +497,7 @@ fn the_answer_round_is_given_the_source_numbers() -> Outcome {
         !seen[MAX_ROUNDS].contains(SEARCH_HINT),
         "the search hint must be gone by the answer rounds"
     );
+
     Ok(())
 }
 
@@ -466,6 +512,7 @@ fn added_messages_have_openais_shape() -> Outcome {
         }],
         cut: false,
     };
+
     assert_eq!(
         serde_json::to_value(round.as_message())?,
         json!({"role":"assistant","content":"thinking","tool_calls":[{"id":"c1","type":"function","function":{"name":"web_search","arguments":"{}"}}]})
@@ -477,6 +524,7 @@ fn added_messages_have_openais_shape() -> Outcome {
         })?,
         json!({"role":"tool","tool_call_id":"c1","content":"[1] x"})
     );
+
     Ok(())
 }
 
@@ -487,13 +535,16 @@ fn relays_a_request_that_does_not_stream() -> Outcome {
         idle()?,
     );
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[]}"#,
         &upstreams(&model, &search),
     )?;
+
     assert!(String::from_utf8_lossy(&client).ends_with(r#"{"choices":[]}"#));
     assert!(model.requests()?[0].ends_with(r#"{"messages":[],"model":"nemotron"}"#));
+
     Ok(())
 }
 
@@ -502,13 +553,16 @@ fn streams_tokens_and_ends_with_done() -> Outcome {
     let token = r#"{"choices":[{"delta":{"content":"hi"}}]}"#;
     let (model, search) = (FakeServer::start(vec![event_stream(&[token])])?, idle()?);
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[],"stream":true}"#,
         &upstreams(&model, &search),
     )?;
+
     assert_eq!(events(&client), [token, DONE]);
     assert!(!model.requests()?[0].contains(SEARCH_HINT));
+
     Ok(())
 }
 
@@ -529,9 +583,11 @@ fn a_chunk_that_is_only_a_tag_is_forwarded_for_what_else_it_carries() -> Outcome
     )?;
 
     let sent = events(&client);
+
     assert_eq!(sent.len(), 2, "{sent:?}");
     assert!(sent[0].contains(r#""reasoning_content":"hm""#), "{sent:?}");
     assert!(sent[0].contains(r#""content":"""#), "{sent:?}");
+
     Ok(())
 }
 
@@ -543,8 +599,11 @@ fn a_web_search_request_tells_the_model_to_search() -> Outcome {
     let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
     let request = br#"{"messages":[{"role":"user","content":"news?"}],"thor_web_search":true}"#;
     answer(&mut Vec::new(), request, &upstreams(&model, &search))?;
+
     let seen = model.requests()?;
+
     assert!(seen[0].contains(SEARCH_HINT) && seen[0].contains(r#""role":"system""#));
+
     Ok(())
 }
 
@@ -559,13 +618,18 @@ fn searches_then_answers() -> Outcome {
     let mut client = Vec::new();
     let request = br#"{"messages":[{"role":"user","content":"news?"}],"thor_web_search":true}"#;
     answer(&mut client, request, &upstreams(&model, &search))?;
+
     let seen = model.requests()?;
+
     assert!(seen[0].contains(r#""tools""#) && seen[0].contains(r#""stream":true"#));
     assert!(seen[1].contains(r#""role":"tool""#) && seen[1].contains("[1] Rust"));
+
     let sent = events(&client);
+
     assert_eq!(sent.first(), Some(&call));
     assert!(sent.contains(&r#"{"thor":{"search":{"query":"rust","results":[{"domain":"r","title":"Rust","url":"https://r"}]}}}"#.to_string()), "{sent:?}");
     assert_eq!(sent.last().map(String::as_str), Some(DONE));
+
     Ok(())
 }
 
@@ -575,13 +639,17 @@ fn every_tool_round_has_tools_and_one_last_round_does_not() -> Outcome {
     let reply = r#"{"choices":[{"delta":{"content":"final answer"}}]}"#;
     let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
     responses.push(event_stream(&[reply]));
+
     let model = FakeServer::start(responses)?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[],"thor_web_search":true}"#,
         &upstreams(&model, &idle()?),
     )?;
+
     let seen = model.requests()?;
+
     assert_eq!(seen.len(), MAX_ROUNDS + 1);
     assert!(
         seen[..MAX_ROUNDS]
@@ -593,6 +661,7 @@ fn every_tool_round_has_tools_and_one_last_round_does_not() -> Outcome {
     assert!(seen[MAX_ROUNDS].contains(ANSWER_ASK));
     assert!(seen[1].contains("Unknown tool other."));
     assert!(seen[2].contains("already ran"), "{}", seen[2]);
+
     Ok(())
 }
 
@@ -606,15 +675,20 @@ fn a_call_written_as_text_runs_and_is_not_shown() -> Outcome {
         r#"{"results":[{"title":"A job","url":"https://jobs.example/1","content":"hiring"}]}"#,
     )])?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[{"role":"user","content":"jobs?"}],"thor_web_search":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let seen = model.requests()?;
+
     assert!(seen[1].contains("[1] A job"), "{}", seen[1]);
     assert!(search.requests()?[0].contains("q=rust+jobs"));
+
     let sent = events(&client);
+
     assert!(
         !sent.iter().any(|event| event.contains("<tool_call")),
         "{sent:?}"
@@ -628,28 +702,32 @@ fn a_call_written_as_text_runs_and_is_not_shown() -> Outcome {
             .any(|event| event.contains("Here is the answer")),
         "{sent:?}"
     );
+
     Ok(())
 }
 
 #[test]
 fn a_tag_the_model_leaves_open_is_flushed_at_the_end_of_the_round() -> Outcome {
     let call = call_event("web_search", r#"{"query":"rust"}"#);
-    let partial =
-        json!({ "choices": [{ "delta": { "content": "almost <tool" } }] }).to_string();
+    let partial = json!({ "choices": [{ "delta": { "content": "almost <tool" } }] }).to_string();
     let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[&partial])])?;
     let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let sent = events(&client);
+
     assert!(
         sent.iter().any(|event| event.contains("almost ")),
         "{sent:?}"
     );
     assert!(sent.iter().any(|event| event.contains("<tool")), "{sent:?}");
+
     Ok(())
 }
 
@@ -661,16 +739,20 @@ fn a_query_that_fails_is_reported_and_the_others_still_run() -> Outcome {
     let search = FakeServer::start(vec![json_response(
         r#"{"results":[{"title":"Good","url":"https://good"}]}"#,
     )])?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let seen = model.requests()?;
+
     assert!(seen[1].contains("bad"), "{}", seen[1]);
     assert!(seen[1].contains("failed"), "{}", seen[1]);
     assert!(seen[1].contains("[1] Good"), "{}", seen[1]);
     assert!(seen[1].contains("Searches used 2 of 16"), "{}", seen[1]);
+
     Ok(())
 }
 
@@ -682,17 +764,21 @@ fn engines_that_did_not_answer_reach_the_model() -> Outcome {
     let search = FakeServer::start(vec![json_response(
         r#"{"results":[],"unresponsive_engines":[["duckduckgo","CAPTCHA"],["brave",null]]}"#,
     )])?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"news"}],"thor_web_search":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let seen = model.requests()?;
+
     assert!(
         seen[1].contains("Engines that did not answer: duckduckgo (CAPTCHA), brave."),
         "{}",
         seen[1]
     );
+
     Ok(())
 }
 
@@ -722,15 +808,20 @@ fn the_page_budget_stops_after_twelve_pages() -> Outcome {
         event_stream(&[&fetch_call("https://docs.example/c")]),
     ];
     responses.push(event_stream(&[reply]));
+
     let model = FakeServer::start(responses)?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"read https://docs.example/a https://docs.example/b https://docs.example/c"}],"thor_web_search":true}"#,
         &upstreams_with(&model, &idle()?, web),
     )?;
+
     let seen = model.requests()?;
+
     assert!(seen[3].contains("page budget is spent"), "{}", seen[3]);
     assert!(seen[3].contains("(12 pages)"), "{}", seen[3]);
+
     Ok(())
 }
 
@@ -742,15 +833,19 @@ fn a_call_on_the_answer_round_is_run() -> Outcome {
     let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
     responses.push(event_stream(&[&leaked]));
     responses.push(event_stream(&[reply]));
+
     let model = FakeServer::start(responses)?;
     let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[],"thor_web_search":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let seen = model.requests()?;
+
     assert_eq!(seen.len(), MAX_ROUNDS + 2);
     assert!(
         seen[MAX_ROUNDS + 1].contains("No results."),
@@ -758,7 +853,9 @@ fn a_call_on_the_answer_round_is_run() -> Outcome {
         seen[MAX_ROUNDS + 1]
     );
     assert!(search.requests()?[0].contains("q=x"));
+
     let sent = events(&client);
+
     assert!(
         !sent.iter().any(|event| event.contains("<tool_call")),
         "{sent:?}"
@@ -767,6 +864,7 @@ fn a_call_on_the_answer_round_is_run() -> Outcome {
         sent.iter().any(|event| event.contains("the answer")),
         "{sent:?}"
     );
+
     Ok(())
 }
 
@@ -774,23 +872,28 @@ fn a_call_on_the_answer_round_is_run() -> Outcome {
 fn text_beside_a_call_on_the_answer_round_does_not_end_the_answer() -> Outcome {
     let call = call_event("other", "{}");
     let mixed = json!({ "choices": [{ "delta": { "content": "Here are the jobs. <tool_call><function=web_search><parameter=query>x</parameter></function></tool_call>" } }] }).to_string();
-    let reply =
-        r#"{"choices":[{"delta":{"content":"and the links: https://jobs.example/1"}}]}"#;
+    let reply = r#"{"choices":[{"delta":{"content":"and the links: https://jobs.example/1"}}]}"#;
     let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
     responses.push(event_stream(&[&mixed]));
     responses.push(event_stream(&[reply]));
+
     let model = FakeServer::start(responses)?;
     let search = FakeServer::start(vec![json_response(r#"{"results":[]}"#)])?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[],"thor_web_search":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let seen = model.requests()?;
+
     assert_eq!(seen.len(), MAX_ROUNDS + 2);
     assert!(search.requests()?[0].contains("q=x"));
+
     let sent = events(&client);
+
     assert!(
         sent.iter()
             .any(|event| event.contains("Here are the jobs.")),
@@ -801,6 +904,7 @@ fn text_beside_a_call_on_the_answer_round_does_not_end_the_answer() -> Outcome {
             .any(|event| event.contains("and the links: https://jobs.example/1")),
         "{sent:?}"
     );
+
     Ok(())
 }
 
@@ -810,19 +914,24 @@ fn the_fallback_is_sent_when_no_round_writes_an_answer() -> Outcome {
     let empty = r#"{"choices":[{"delta":{}}]}"#;
     let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
     responses.extend((0..ANSWER_ROUNDS).map(|_| event_stream(&[empty])));
+
     let model = FakeServer::start(responses)?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[],"thor_web_search":true}"#,
         &upstreams(&model, &idle()?),
     )?;
+
     let sent = events(&client);
+
     assert!(
         sent.iter()
             .any(|event| event.contains("no round wrote an answer")),
         "{sent:?}"
     );
+
     Ok(())
 }
 
@@ -832,22 +941,27 @@ fn the_fallback_names_the_sources_when_no_round_writes_one() -> Outcome {
     let empty = r#"{"choices":[{"delta":{}}]}"#;
     let mut responses = vec![event_stream(&[&call]); MAX_ROUNDS];
     responses.extend((0..ANSWER_ROUNDS).map(|_| event_stream(&[empty])));
+
     let model = FakeServer::start(responses)?;
     let search = FakeServer::start(vec![json_response(
         r#"{"results":[{"title":"A job","url":"https://jobs.example/1"}]}"#,
     )])?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[],"thor_web_search":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let sent = events(&client);
+
     assert!(
         sent.iter()
             .any(|event| event.contains("[1] A job — https://jobs.example/1")),
         "{sent:?}"
     );
+
     Ok(())
 }
 
@@ -858,12 +972,15 @@ fn a_model_error_becomes_an_error_event() -> Outcome {
         idle()?,
     );
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[],"stream":true}"#,
         &upstreams(&model, &search),
     )?;
+
     let sent = events(&client);
+
     assert_eq!(
         sent,
         [
@@ -871,6 +988,7 @@ fn a_model_error_becomes_an_error_event() -> Outcome {
             DONE
         ]
     );
+
     Ok(())
 }
 
@@ -878,11 +996,12 @@ fn a_model_error_becomes_an_error_event() -> Outcome {
 fn rejects_a_body_that_is_not_an_object() -> Outcome {
     let (model, search) = (idle()?, idle()?);
     let outcome = answer(&mut Vec::new(), b"[]", &upstreams(&model, &search));
+
     assert!(
-        outcome.is_err_and(
-            |error| error.to_string() == "bad request: the body must be a JSON object"
-        )
+        outcome
+            .is_err_and(|error| error.to_string() == "bad request: the body must be a JSON object")
     );
+
     Ok(())
 }
 
@@ -900,15 +1019,18 @@ fn the_phases_offer_the_tools_and_only_the_first_forces_a_call() {
 
     let mut fields = Fields::new();
     prepare(&mut fields, Phase::Opening);
+
     assert!(tools(&fields));
     assert!(forced(&fields));
     assert_eq!(fields[TOOL_CHOICE], json!("required"));
 
     prepare(&mut fields, Phase::Searching);
+
     assert!(tools(&fields));
     assert!(!forced(&fields));
 
     prepare(&mut fields, Phase::Answering);
+
     assert!(!tools(&fields));
     assert!(!forced(&fields));
 }
@@ -924,12 +1046,13 @@ fn the_user_text_is_only_the_users_messages() {
         ]
     });
     let fields = messages.as_object().cloned().unwrap_or_default();
+
     assert_eq!(user_text(&fields), "read https://user.example/doc");
     assert_eq!(user_text(&Fields::new()), "");
 }
 
-fn fetched(content_type: &str, body: &str) -> crate::http::Fetched {
-    crate::http::Fetched {
+fn fetched(content_type: &str, body: &str) -> crate::web::http::Fetched {
+    crate::web::http::Fetched {
         status: 200,
         content_type: content_type.to_string(),
         location: None,
@@ -948,7 +1071,9 @@ fn searches_then_answers_with_a_forced_first_round_and_recency() -> Outcome {
     let mut client = Vec::new();
     let request = br#"{"messages":[{"role":"user","content":"news?"}],"thor_web_search":true}"#;
     answer(&mut client, request, &upstreams(&model, &search))?;
+
     let seen = model.requests()?;
+
     assert!(seen[0].contains(r#""tools""#) && seen[0].contains(r#""stream":true"#));
     assert!(
         seen[0].contains(r#""tool_choice":"required""#),
@@ -959,10 +1084,13 @@ fn searches_then_answers_with_a_forced_first_round_and_recency() -> Outcome {
     assert!(seen[1].contains(r#""role":"tool""#) && seen[1].contains("[1] Rust"));
     assert!(seen[1].contains("published: 2026-10-06"), "{}", seen[1]);
     assert!(search.requests()?[0].contains("time_range=day"));
+
     let sent = events(&client);
+
     assert_eq!(sent.first(), Some(&call));
     assert!(sent.contains(&r#"{"thor":{"search":{"query":"rust","results":[{"domain":"r","published":"2026-10-06","title":"Rust","url":"https://r"}]}}}"#.to_string()), "{sent:?}");
     assert_eq!(sent.last().map(String::as_str), Some(DONE));
+
     Ok(())
 }
 
@@ -989,9 +1117,13 @@ fn reads_a_cited_page_with_the_fetch_tool() -> Outcome {
     let mut client = Vec::new();
     let request = br#"{"messages":[{"role":"user","content":"how?"}],"thor_web_search":true}"#;
     answer(&mut client, request, &upstreams_with(&model, &search, web))?;
+
     let seen = model.requests()?;
+
     assert!(seen[2].contains("the answer"), "{}", seen[2]);
+
     let sent = events(&client);
+
     assert!(
         sent.contains(
             &json!({ "thor": { "read": { "url": "https://docs.example/guide", "title": "Guide", "domain": "docs.example" } } })
@@ -999,6 +1131,7 @@ fn reads_a_cited_page_with_the_fetch_tool() -> Outcome {
         ),
         "{sent:?}"
     );
+
     Ok(())
 }
 
@@ -1014,12 +1147,15 @@ fn an_address_the_user_wrote_may_be_read() -> Outcome {
         "https://user.example/doc",
         fetched("text/plain", "hello from the page"),
     )]);
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"read https://user.example/doc"}],"thor_web_search":true}"#,
         &upstreams_with(&model, &idle()?, web),
     )?;
+
     assert!(model.requests()?[1].contains("hello from the page"));
+
     Ok(())
 }
 
@@ -1035,18 +1171,22 @@ fn an_address_that_was_not_seen_is_refused() -> Outcome {
         "https://evil.example/",
         fetched("text/html", "secret"),
     )]);
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"hi"}],"thor_web_search":true}"#,
         &upstreams_with(&model, &idle()?, web),
     )?;
+
     let seen = model.requests()?;
+
     assert!(
         seen[1].contains("not in this answer's search results"),
         "{}",
         seen[1]
     );
     assert!(!seen[1].contains("secret"));
+
     Ok(())
 }
 
@@ -1058,13 +1198,17 @@ fn a_page_that_cannot_be_read_is_reported() -> Outcome {
     );
     let reply = r#"{"choices":[{"delta":{"content":"ok"}}]}"#;
     let model = FakeServer::start(vec![event_stream(&[&fetch_call]), event_stream(&[reply])])?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"read https://gone.example/"}],"thor_web_search":true}"#,
         &upstreams(&model, &idle()?),
     )?;
+
     let seen = model.requests()?;
+
     assert!(seen[1].contains("Could not read the page"), "{}", seen[1]);
+
     Ok(())
 }
 
@@ -1078,12 +1222,15 @@ fn a_fetch_without_an_address_or_with_a_bad_one_says_so() -> Outcome {
         )]),
         event_stream(&[r#"{"choices":[{"delta":{"content":"ok"}}]}"#]),
     ])?;
+
     answer(
         &mut Vec::new(),
         br#"{"messages":[{"role":"user","content":"hi"}],"thor_web_search":true}"#,
         &upstreams(&model, &idle()?),
     )?;
+
     let seen = model.requests()?;
+
     assert!(
         seen[2].contains("The fetch needs an address."),
         "{}",
@@ -1094,6 +1241,7 @@ fn a_fetch_without_an_address_or_with_a_bad_one_says_so() -> Outcome {
         "{}",
         seen[2]
     );
+
     Ok(())
 }
 
@@ -1104,22 +1252,26 @@ fn a_search_without_messages_is_reported() -> Outcome {
         idle()?,
     );
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"thor_web_search":true}"#,
         &upstreams(&model, &search),
     )?;
+
     assert!(
         events(&client)
             .iter()
             .any(|event| event.contains("messages must be a list"))
     );
+
     Ok(())
 }
 
 #[test]
 fn a_chunks_text_is_its_content_and_its_thinking() {
     let both = json!({ "choices": [{ "delta": { "content": "abc", "reasoning_content": "de" } }] });
+
     assert_eq!(text_length(&both), 5);
     assert_eq!(text_length(&json!({ "choices": [{ "delta": {} }] })), 0);
 }
@@ -1130,6 +1282,7 @@ fn a_round_that_runs_away_is_cut_and_the_stream_ends() -> Outcome {
     let chunk = json!({ "choices": [{ "delta": { "content": huge } }] }).to_string();
     let model = FakeServer::start(vec![event_stream(&[&chunk])])?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[{"role":"user","content":"hi"}],"stream":true}"#,
@@ -1137,12 +1290,14 @@ fn a_round_that_runs_away_is_cut_and_the_stream_ends() -> Outcome {
     )?;
 
     let sent = events(&client);
+
     assert!(
         sent.iter()
             .any(|event| event.contains(r#""finish_reason":"length""#)),
         "{sent:?}"
     );
     assert_eq!(sent.last().map(String::as_str), Some(DONE));
+
     Ok(())
 }
 
@@ -1151,6 +1306,7 @@ fn a_round_under_the_cap_is_streamed_whole() -> Outcome {
     let reply = r#"{"choices":[{"delta":{"content":"done"}}]}"#;
     let model = FakeServer::start(vec![event_stream(&[reply])])?;
     let mut client = Vec::new();
+
     answer(
         &mut client,
         br#"{"messages":[],"stream":true}"#,
@@ -1158,11 +1314,13 @@ fn a_round_under_the_cap_is_streamed_whole() -> Outcome {
     )?;
 
     let sent = events(&client);
+
     assert!(sent.iter().any(|event| event.contains("done")), "{sent:?}");
     assert!(
         !sent.iter().any(|event| event.contains("finish_reason")),
         "{sent:?}"
     );
+
     Ok(())
 }
 
@@ -1208,7 +1366,9 @@ fn a_coding_tools_request_is_fitted_and_relayed() -> Outcome {
     );
 
     let body = stream.split("\r\n\r\n").nth(1).unwrap_or_default();
+
     assert!(String::from_utf8_lossy(&client).ends_with(body));
+
     Ok(())
 }
 
@@ -1216,13 +1376,51 @@ fn a_coding_tools_request_is_fitted_and_relayed() -> Outcome {
 fn a_named_model_is_answered_by_its_own_engine() -> Outcome {
     let qwen = FakeServer::start(vec![json_response(r#"{"choices":[]}"#)])?;
     let mut upstreams = upstreams(&idle()?, &idle()?);
+
     upstreams
         .others
-        .push(Engine::new("qwen".to_string(), qwen.address()));
+        .push(Engine::edge("qwen".to_string(), qwen.address()));
+
     let request = br#"{"model":"qwen","messages":[]}"#;
 
     answer(&mut Vec::new(), request, &upstreams)?;
 
     assert_eq!(qwen.requests()?.len(), 1);
+
     Ok(())
+}
+
+/// llama-server understands fields an engine refuses, and answers to the
+/// names it gave its models, so a request for it is passed on as it came.
+#[test]
+fn llama_server_gets_a_request_as_it_came() -> Outcome {
+    let loaded = json_response(r#"{"data":[{"id":"nemotron"}]}"#);
+    let llama = FakeServer::start(vec![loaded, json_response(r#"{"choices":[]}"#)])?;
+    let mut upstreams = upstreams(&idle()?, &idle()?);
+    upstreams.default = Engine::llama(llama.address(), None);
+
+    let request = br#"{"model":"nemotron","n_predict":5,"grammar":"x","messages":[
+        {"role":"user","content":"a"},{"role":"system","content":"b"}]}"#;
+
+    answer(&mut Vec::new(), request, &upstreams)?;
+
+    let seen = llama.requests()?;
+    let sent: Value = serde_json::from_str(seen[1].split("\r\n\r\n").nth(1).unwrap_or_default())?;
+    let expected: Value = serde_json::from_slice(request)?;
+
+    assert!(seen[0].starts_with("GET /v1/models"), "{}", seen[0]);
+    assert_eq!(sent, expected);
+
+    Ok(())
+}
+
+#[test]
+fn a_chunk_with_a_finish_reason_or_more_than_text_carries_more() {
+    let text = json!({ "choices": [{ "delta": { "content": "hi" }, "finish_reason": null }] });
+    let finished = json!({ "choices": [{ "delta": { "content": "" }, "finish_reason": "stop" }] });
+    let reasoning = json!({ "choices": [{ "delta": { "reasoning_content": "hm" } }] });
+
+    assert!(!carries_more(&text));
+    assert!(carries_more(&finished));
+    assert!(carries_more(&reasoning));
 }

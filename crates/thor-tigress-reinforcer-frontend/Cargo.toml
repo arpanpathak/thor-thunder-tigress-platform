@@ -5,9 +5,17 @@ edition = "2024"
 description = "Shows the training set to a person and records slop flags and preferences."
 
 [dependencies]
+anyhow = "1"
+axum = "0.8"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thor-spark-safety-eval = { path = "../thor-spark-safety-eval" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["io-util"] }
+tower = { version = "0.5", features = ["util"] }
 
 [[bin]]
 name = "reinforcer"

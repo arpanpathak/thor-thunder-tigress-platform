@@ -5,3 +5,4 @@ doc-valid-idents = ["SearXNG", "OpenAI", "..", "DuckDuckGo", "GitHub", "TensorRT
 # than one job, and a reader cannot hold it in their head.
 cognitive-complexity-threshold = 15
 too-many-lines-threshold = 55
+excessive-nesting-threshold = 4

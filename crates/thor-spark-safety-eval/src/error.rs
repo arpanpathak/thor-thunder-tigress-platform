@@ -1,14 +1,17 @@
 //! The one error type of the crate.
 
-use std::{fmt, io, path::PathBuf};
+use std::{io, path::PathBuf};
+
+use thiserror::Error;
 
 /// The result of anything in this crate that can fail.
 pub type Outcome<T = ()> = Result<T, EvalError>;
 
 /// Everything that can go wrong while scoring.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum EvalError {
     /// A file could not be read or written.
+    #[error("{}: {source}", path.display())]
     Io {
         /// The file involved.
         path: PathBuf,
@@ -16,6 +19,7 @@ pub enum EvalError {
         source: io::Error,
     },
     /// A line of a JSONL file is not valid JSON.
+    #[error("{}:{line}: {source}", path.display())]
     Json {
         /// The file involved.
         path: PathBuf,
@@ -25,6 +29,7 @@ pub enum EvalError {
         source: serde_json::Error,
     },
     /// A JSONL record has no string in the field the answer is read from.
+    #[error("{}:{line}: no string field \"{field}\"", path.display())]
     MissingField {
         /// The file involved.
         path: PathBuf,
@@ -34,6 +39,7 @@ pub enum EvalError {
         field: String,
     },
     /// The command line was not understood.
+    #[error("{0}")]
     Usage(String),
 }
 
@@ -41,6 +47,7 @@ impl EvalError {
     /// A closure that wraps an I/O error with the path it happened on.
     pub fn io(path: impl Into<PathBuf>) -> impl FnOnce(io::Error) -> EvalError {
         let path = path.into();
+
         move |source| EvalError::Io { path, source }
     }
 
@@ -50,43 +57,15 @@ impl EvalError {
         line: usize,
     ) -> impl FnOnce(serde_json::Error) -> EvalError {
         let path = path.into();
+
         move |source| EvalError::Json { path, line, source }
-    }
-}
-
-impl fmt::Display for EvalError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EvalError::Io { path, source } => write!(formatter, "{}: {source}", path.display()),
-            EvalError::Json { path, line, source } => {
-                write!(formatter, "{}:{line}: {source}", path.display())
-            }
-            EvalError::MissingField { path, line, field } => {
-                write!(
-                    formatter,
-                    "{}:{line}: no string field \"{field}\"",
-                    path.display()
-                )
-            }
-            EvalError::Usage(message) => formatter.write_str(message),
-        }
-    }
-}
-
-impl std::error::Error for EvalError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            EvalError::Io { source, .. } => Some(source),
-            EvalError::Json { source, .. } => Some(source),
-            EvalError::MissingField { .. } | EvalError::Usage(_) => None,
-        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error;
+    use std::error::Error as _;
 
     #[test]
     fn every_error_names_the_file_and_line() {
@@ -106,6 +85,7 @@ mod tests {
             EvalError::Usage("usage: spark".to_string()),
         ];
         let shown: Vec<String> = errors.iter().map(ToString::to_string).collect();
+
         assert_eq!(
             shown,
             [

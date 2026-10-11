@@ -6,6 +6,7 @@ description = "Builds the instruction/response training set."
 default-run = "thor-hammer-trainer"
 
 [dependencies]
+thiserror = "2"
 serde = { version = "1.0.229", features = ["derive"] }
 regex = "1"
 serde_json = "1.0.151"

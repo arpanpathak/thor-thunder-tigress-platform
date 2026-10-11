@@ -1,14 +1,11 @@
-//! Just enough HTTP to call an OpenAI-compatible `/v1/chat/completions`
-//! endpoint on localhost, which is what `trtllm-serve` exposes. Talking HTTP
-//! keeps the engine swappable without touching this crate.
+//! Calls an OpenAI-compatible `/v1/chat/completions` endpoint on localhost,
+//! which is what `trtllm-serve` exposes. Talking HTTP keeps the engine
+//! swappable without touching this crate.
 
-use std::{
-    io::{BufRead, BufReader, Read, Write},
-    net::TcpStream,
-    time::Duration,
-};
+use std::time::Duration;
 
 use serde_json::{Value, json};
+use ureq::{Agent, http::StatusCode};
 
 use crate::error::DistillError;
 
@@ -60,6 +57,7 @@ impl Client {
         let response = self.post("/v1/chat/completions", &body)?;
         let parsed: Value = serde_json::from_str(&response)
             .map_err(|error| DistillError::Server(format!("reply is not JSON: {error}")))?;
+
         parsed
             .pointer("/choices/0/message/content")
             .and_then(Value::as_str)
@@ -69,76 +67,37 @@ impl Client {
 
     fn post(&self, path: &str, body: &str) -> Result<String, DistillError> {
         let server =
-            |error: std::io::Error| DistillError::Server(format!("{}: {error}", self.address));
-        let mut stream = TcpStream::connect(&self.address).map_err(server)?;
-        stream.set_read_timeout(Some(TIMEOUT)).map_err(server)?;
-        let request = format!(
-            "POST {path} HTTP/1.1\r\nHost: {}\r\n{}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
-            self.address,
-            self.key.as_ref().map_or(String::new(), |key| format!(
-                "Authorization: Bearer {key}\r\n"
-            )),
-            body.len()
-        );
-        stream.write_all(request.as_bytes()).map_err(server)?;
-        let mut reader = BufReader::new(stream);
-        let mut status = String::new();
-        reader.read_line(&mut status).map_err(server)?;
-        let mut chunked = false;
+            |error: ureq::Error| DistillError::Server(format!("{}: {error}", self.address));
+        let agent: Agent = Agent::config_builder()
+            .timeout_global(Some(TIMEOUT))
+            .http_status_as_error(false)
+            .build()
+            .into();
+        let request = agent
+            .post(format!("http://{}{path}", self.address))
+            .header("Content-Type", "application/json");
 
-        loop {
-            let mut header = String::new();
-            reader.read_line(&mut header).map_err(server)?;
-
-            if header.trim().is_empty() {
-                break;
-            }
-
-            let lowered = header.to_ascii_lowercase();
-            chunked |= lowered.starts_with("transfer-encoding:") && lowered.contains("chunked");
-        }
-        let mut raw = Vec::new();
-        reader.read_to_end(&mut raw).map_err(server)?;
-        let text = String::from_utf8_lossy(&raw).into_owned();
-        let body = match chunked {
-            true => dechunk(&text),
-            false => text,
+        let request = match &self.key {
+            Some(key) => request.header("Authorization", format!("Bearer {key}")),
+            None => request,
         };
 
-        match status.split_whitespace().nth(1) {
-            Some("200") => Ok(body),
-            _ => Err(DistillError::Server(format!(
-                "{} {}",
-                status.trim(),
-                body.trim()
-            ))),
+        let mut response = request.send(body).map_err(server)?;
+        let text = response.body_mut().read_to_string().map_err(server)?;
+
+        match response.status() {
+            StatusCode::OK => Ok(text),
+            status => Err(DistillError::Server(format!("{status} {}", text.trim()))),
         }
     }
-}
-
-/// The body of a `Transfer-Encoding: chunked` response.
-fn dechunk(text: &str) -> String {
-    let mut body = String::new();
-    let mut rest = text;
-
-    while let Some((size_line, after)) = rest.split_once("\r\n") {
-        let size = usize::from_str_radix(size_line.trim(), 16).unwrap_or(0);
-
-        if size == 0 {
-            break;
-        }
-
-        body.push_str(after.get(..size).unwrap_or(after));
-        rest = after.get(size..).unwrap_or("").trim_start_matches("\r\n");
-    }
-    body
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{net::TcpListener, thread};
+    use std::{io::Write, net::TcpListener, thread};
 
     use super::*;
+    use crate::testing::read_request;
 
     fn serve_once(reply: String) -> Result<String, DistillError> {
         let listener = TcpListener::bind("127.0.0.1:0").map_err(DistillError::io("listener"))?;
@@ -146,13 +105,14 @@ mod tests {
             .local_addr()
             .map_err(DistillError::io("listener"))?
             .to_string();
+
         thread::spawn(move || {
             if let Ok((mut stream, _)) = listener.accept() {
-                let mut buffer = [0u8; 4096];
-                let _ = stream.read(&mut buffer);
+                let _ = read_request(&stream);
                 let _ = stream.write_all(reply.as_bytes());
             }
         });
+
         Ok(address)
     }
 
@@ -172,10 +132,12 @@ mod tests {
             role: "user",
             content: "hi".to_string(),
         };
+
         assert_eq!(
             client.complete(&[message], 32, 0.7)?,
             "How do I share a Vec between threads?"
         );
+
         Ok(())
     }
 
@@ -188,9 +150,11 @@ mod tests {
             key: None,
         };
         let outcome = client.complete(&[], 32, 0.7);
+
         assert!(
             matches!(outcome, Err(DistillError::Server(message)) if message.contains("engine not loaded"))
         );
+
         Ok(())
     }
 
@@ -206,7 +170,9 @@ mod tests {
             model: "teacher".to_string(),
             key: Some("k".to_string()),
         };
+
         assert_eq!(client.complete(&[], 8, 0.0)?, "chunked");
+
         Ok(())
     }
 
@@ -220,33 +186,32 @@ mod tests {
         };
         let reply = "HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nnope".to_string();
         let not_json = client(serve_once(reply)?);
+
         assert!(
             matches!(not_json.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply is not JSON"))
         );
+
         let reply = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}".to_string();
         let empty = client(serve_once(reply)?);
+
         assert!(
             matches!(empty.complete(&[], 8, 0.0), Err(DistillError::Server(message)) if message.starts_with("reply has no message"))
         );
+
         let closed =
             std::net::TcpListener::bind("127.0.0.1:0").map_err(DistillError::io("listener"))?;
         let address = closed
             .local_addr()
             .map_err(DistillError::io("listener"))?
             .to_string();
+
         drop(closed);
+
         assert!(matches!(
             client(address).complete(&[], 8, 0.0),
             Err(DistillError::Server(_))
         ));
-        Ok(())
-    }
 
-    #[test]
-    fn joins_chunked_bodies() {
-        assert_eq!(
-            dechunk("5\r\nhello\r\n6\r\n world\r\n0\r\n\r\n"),
-            "hello world"
-        );
+        Ok(())
     }
 }
