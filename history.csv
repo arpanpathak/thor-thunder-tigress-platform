@@ -40,3 +40,4 @@ measured_at,commit,coverage,tests,crates
 2026-10-08T13:48:24Z,82c6a9d,99.80,466,thor-hammer-trainer=100.00,thor-lasso-distiller=100.00,thor-spark-safety-eval=100.00,thor-tigress-agent=99.44,thor-tigress-keyring=99.64,thor-tigress-reinforcer-frontend=100.00
 2026-10-08T13:53:51Z,425546c,99.80,466,thor-hammer-trainer=100.00,thor-lasso-distiller=100.00,thor-spark-safety-eval=100.00,thor-tigress-agent=99.44,thor-tigress-keyring=99.64,thor-tigress-reinforcer-frontend=100.00
 2026-10-11T04:27:10Z,30404c0,99.80,466,thor-hammer-trainer=100.00,thor-lasso-distiller=100.00,thor-spark-safety-eval=100.00,thor-tigress-agent=99.44,thor-tigress-keyring=99.64,thor-tigress-reinforcer-frontend=100.00
+2026-10-11T07:07:59Z,6a9b087,99.80,466,thor-hammer-trainer=100.00,thor-lasso-distiller=100.00,thor-spark-safety-eval=100.00,thor-tigress-agent=99.44,thor-tigress-keyring=99.64,thor-tigress-reinforcer-frontend=100.00
