@@ -401,3 +401,56 @@ fn the_total_text_is_cut_at_a_line_end() -> Outcome {
 
     Ok(())
 }
+
+/// A site whose every page takes a moment to arrive, counting how many are on
+/// their way at once.
+#[derive(Debug, Default)]
+struct Slow {
+    site: Fake,
+    on_the_way: std::sync::atomic::AtomicUsize,
+    most_at_once: std::sync::atomic::AtomicUsize,
+}
+
+impl Web for Slow {
+    fn get(&self, url: &Url) -> Outcome<Fetched> {
+        use std::sync::atomic::Ordering;
+
+        let now = self.on_the_way.fetch_add(1, Ordering::SeqCst) + 1;
+        self.most_at_once.fetch_max(now, Ordering::SeqCst);
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        self.on_the_way.fetch_sub(1, Ordering::SeqCst);
+
+        self.site.get(url)
+    }
+}
+
+#[test]
+fn the_links_of_a_page_are_read_at_the_same_time_and_kept_in_order() -> Outcome {
+    let start = url("https://example.com/")?;
+    let links = "<title>Start</title><a href=\"/a\">A</a><a href=\"/b\">B</a><a href=\"/c\">C</a>";
+    let slow = Slow {
+        site: Fake::with(&[
+            ("https://example.com/", html(links)),
+            ("https://example.com/a", html("<title>A</title>")),
+            ("https://example.com/b", html("<title>B</title>")),
+            ("https://example.com/c", html("<title>C</title>")),
+        ]),
+        ..Slow::default()
+    };
+
+    let report = read_recursive(&slow, &start, &allowed(&["example.com"]), MAX_PAGES)?;
+
+    let titles: Vec<&str> = report
+        .pages
+        .iter()
+        .map(|page| page.title.as_str())
+        .collect();
+
+    assert_eq!(titles, ["Start", "A", "B", "C"]);
+    assert_eq!(
+        slow.most_at_once.load(std::sync::atomic::Ordering::SeqCst),
+        3
+    );
+
+    Ok(())
+}
