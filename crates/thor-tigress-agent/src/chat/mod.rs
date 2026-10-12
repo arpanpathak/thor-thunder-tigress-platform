@@ -36,7 +36,7 @@ use crate::{
         fetch::{self, Allowed},
         http::Web,
         research::{Kind, Ledger, MAX_READS, MAX_SEARCHES},
-        search::{self, SearchResult, TimeRange},
+        search::{self, SearchResult},
     },
     engines::{
         body::{self, Fields},
@@ -692,7 +692,7 @@ impl Research {
     }
 
     /// A research round: one search per sub-question the model asked for, widened
-    /// by `kind` when it asked for one. Its sources also become the addresses
+    /// by `kind` when it asked for one, all sent to the search engine together. Its sources also become the addresses
     /// this answer may read a page from, and every source keeps one number to
     /// cite.
     fn search(
@@ -705,17 +705,20 @@ impl Research {
             return Ok("The search needs a non-empty query.".to_string());
         };
 
-        let mut blocks: Vec<String> = Vec::new();
+        let left = self.ledger.searches_left(MAX_SEARCHES);
+        let (asked, dropped) = plan.queries.split_at(plan.queries.len().min(left));
+        let found = search::search_all(searxng, asked, plan.range);
 
-        for query in &plan.queries {
-            if self.ledger.searches_left(MAX_SEARCHES) == 0 {
-                blocks.push(format!(
-                    "The search budget is spent ({MAX_SEARCHES} searches). Answer with what you have."
-                ));
-                break;
-            }
+        let mut blocks = asked
+            .iter()
+            .zip(found)
+            .map(|(query, hits)| self.record(client, query, hits))
+            .collect::<Outcome<Vec<String>>>()?;
 
-            blocks.push(self.search_one(client, query, plan.range, searxng)?);
+        if !dropped.is_empty() {
+            blocks.push(format!(
+                "The search budget is spent ({MAX_SEARCHES} searches). Answer with what you have."
+            ));
         }
 
         blocks.push(format!(
@@ -728,18 +731,17 @@ impl Research {
         Ok(blocks.join("\n\n"))
     }
 
-    /// Runs one search, tells the page what it found, and returns the results
-    /// as the model reads them, or that the search failed.
-    fn search_one(
+    /// Counts one finished search, tells the page what it found, and returns the
+    /// results as the model reads them, or that the search failed.
+    fn record(
         &mut self,
         client: &mut dyn Write,
         query: &str,
-        range: Option<TimeRange>,
-        searxng: &Endpoint,
+        hits: Outcome<search::Hits>,
     ) -> Outcome<String> {
         self.ledger.count_search();
 
-        let hits = match search::search(searxng, query, range) {
+        let hits = match hits {
             Ok(hits) => hits,
             Err(error) => return Ok(format!("The search \"{query}\" failed: {error}")),
         };

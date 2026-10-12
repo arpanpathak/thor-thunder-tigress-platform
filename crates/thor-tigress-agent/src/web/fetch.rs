@@ -11,7 +11,7 @@
 //! one a search returned or the user's own message wrote. Links found inside a
 //! page are followed only when they stay on that page's site.
 
-use std::collections::VecDeque;
+use std::{collections::VecDeque, thread};
 
 use crate::{
     web::{
@@ -192,30 +192,56 @@ impl Crawl {
     }
 
     /// Reads until the queue is empty or `limit` pages have been read, breadth
-    /// first, so a page's own links are read before their links are.
+    /// first, so a page's own links are read before their links are. The
+    /// addresses waiting in the queue are downloaded together, as many as the
+    /// limit still has room for, and taken in the order they were queued.
     fn run(&mut self, web: &dyn Web, limit: usize) -> Outcome<()> {
-        while let Some((url, depth)) = self.queue.pop_front() {
-            if self.pages.len() >= limit {
-                break;
+        loop {
+            let batch = self.next_batch(limit.saturating_sub(self.pages.len()));
+
+            if batch.is_empty() {
+                return Ok(());
             }
+
+            let fetched = fetch_all(web, &batch);
+
+            for ((url, depth), fetched) in batch.iter().zip(fetched) {
+                self.take(url, *depth, fetched)?;
+            }
+        }
+    }
+
+    /// Takes up to `room` addresses off the front of the queue, leaving out any
+    /// that were already asked for.
+    fn next_batch(&mut self, room: usize) -> Vec<(Url, usize)> {
+        let mut batch = Vec::new();
+
+        while batch.len() < room {
+            let Some((url, depth)) = self.queue.pop_front() else {
+                break;
+            };
 
             if self.visited.contains(&url.as_string()) {
                 continue;
             }
 
             self.visited.push(url.as_string());
-
-            self.read(web, &url, depth)?;
+            batch.push((url, depth));
         }
 
-        Ok(())
+        batch
     }
 
-    /// Reads one page and queues its same-site links. The address the model named
-    /// has to work, so its failure ends the crawl; a page found inside it may
-    /// fail, and that becomes a note in the text instead.
-    fn read(&mut self, web: &dyn Web, url: &Url, depth: usize) -> Outcome<()> {
-        let (page_url, body, kind) = match fetch_one(web, url) {
+    /// Keeps one downloaded page and queues its same-site links. The address the
+    /// model named has to work, so its failure ends the crawl; a page found
+    /// inside it may fail, and that becomes a note in the text instead.
+    fn take(
+        &mut self,
+        url: &Url,
+        depth: usize,
+        fetched: Outcome<(Url, String, Kind)>,
+    ) -> Outcome<()> {
+        let (page_url, body, kind) = match fetched {
             Ok(fetched) => fetched,
             Err(error) if self.pages.is_empty() => return Err(error),
             Err(error) => {
@@ -330,6 +356,26 @@ struct Page {
 enum Kind {
     Html,
     Text,
+}
+
+/// Downloads every address in `batch` at the same time, one thread each, and
+/// returns the outcomes in the batch's order. A batch is [`MAX_PAGES`] at most,
+/// and the wait is the slowest page's instead of the sum.
+fn fetch_all(web: &dyn Web, batch: &[(Url, usize)]) -> Vec<Outcome<(Url, String, Kind)>> {
+    thread::scope(|scope| {
+        let reads: Vec<_> = batch
+            .iter()
+            .map(|(url, _)| scope.spawn(move || fetch_one(web, url)))
+            .collect();
+
+        reads
+            .into_iter()
+            .map(|read| {
+                read.join()
+                    .unwrap_or_else(|_| Err(AgentError::Fetch("a page read panicked".to_string())))
+            })
+            .collect()
+    })
 }
 
 /// Downloads `url`, following up to [`MAX_REDIRECTS`] `Location`s by hand.

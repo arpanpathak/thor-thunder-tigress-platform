@@ -42,6 +42,26 @@ pub struct UpstreamResponse {
     pub body: Box<dyn BufRead + Send>,
 }
 
+/// A request already written to an upstream server whose response has not been
+/// read yet. Several can be open at once: the server works on all of them while
+/// the caller reads them one after another.
+#[derive(Debug)]
+pub struct Sent {
+    stream: TcpStream,
+    address: String,
+}
+
+impl Sent {
+    /// Waits for the response's status line and headers.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Endpoint::get`].
+    pub fn response(self) -> Outcome<UpstreamResponse> {
+        read_response(Box::new(BufReader::new(self.stream)), &self.address)
+    }
+}
+
 impl Endpoint {
     /// An endpoint at `address` (`host:port`), sending `authorization` when given.
     #[must_use]
@@ -75,6 +95,17 @@ impl Endpoint {
         self.send("GET", path, &[])
     }
 
+    /// Writes `GET path` and returns before the server answers, so the next
+    /// request can be written while this one is being worked on.
+    ///
+    /// # Errors
+    ///
+    /// `AgentError::Upstream` when the server can't be reached; `AgentError::Io`
+    /// when the request can't be written.
+    pub fn start_get(&self, path: &str) -> Outcome<Sent> {
+        self.start("GET", path, &[])
+    }
+
     /// `POST path` with a JSON `body`.
     ///
     /// # Errors
@@ -85,6 +116,10 @@ impl Endpoint {
     }
 
     fn send(&self, method: &str, path: &str, body: &[u8]) -> Outcome<UpstreamResponse> {
+        self.start(method, path, body)?.response()
+    }
+
+    fn start(&self, method: &str, path: &str, body: &[u8]) -> Outcome<Sent> {
         let mut stream = TcpStream::connect(&self.address)
             .map_err(|error| AgentError::Upstream(format!("{}: {error}", self.address)))?;
         stream.set_read_timeout(Some(TIMEOUT))?;
@@ -101,7 +136,10 @@ impl Endpoint {
         stream.write_all(head.as_bytes())?;
         stream.write_all(body)?;
 
-        read_response(Box::new(BufReader::new(stream)), &self.address)
+        Ok(Sent {
+            stream,
+            address: self.address.clone(),
+        })
     }
 }
 
