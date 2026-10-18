@@ -121,9 +121,12 @@ ssh thor 'bash -lc "cd ~/Projects/edgechat && cargo install --path ."'
 
 ## Thor Tigress Cub: chat in the browser
 
-`web/` holds the chat page (`index.html` with the cub art inline, `chat.css` for
-the theme, and `chat.js` for the markdown, links and tables; no outside scripts)
-and the art (`cub.svg`). `model-serving/thor-tigress-serve`
+`web/` holds the chat page and cub art, with no outside scripts or build step.
+`chat.js` coordinates the UI and streaming; `appearance.js` manages the sidebar
+and theme picker; `history.js` owns local conversation
+storage; `markdown.js` renders responses using safe DOM nodes from `dom.js`.
+Styles are split into `themes.css`, `chat.css` (layout and controls), and
+`messages.css` (response content). `model-serving/thor-tigress-serve`
 serves the models and the page. `thor-tigress-serve install`
 creates two user services that start at boot: `thor-chat` (llama.cpp's
 `llama-server` with Nemotron on `127.0.0.1:8079`) and `thor-tigress-agent`
@@ -144,8 +147,43 @@ Change settings in `~/.config/thor-chat/env` (e.g. `USERS=8`), then
 `thor-tigress-serve install`. For the context on its own,
 `thor-tigress-serve context TOKENS [USERS]` is quicker: it reloads the models
 through the router and never restarts a service. The page has Web and Think switches, a stop key (Esc),
-highlighted code with copy, twelve themes and an optional system prompt in
-Settings (none by default).
+highlighted code with copy, a header theme picker and an optional system prompt in
+Settings. A small default formatting instruction asks for blank lines between
+logical groups; an optional custom system prompt is appended to it.
+
+Enter adds a new line; Shift+Enter or the Send button sends. The sidebar keeps
+multiple conversations and drafts in this browser, migrates the old single
+conversation, and offers deletion and Markdown export. On phones it opens as
+a drawer; on desktop either sidebar icon folds or restores it, and the choice
+is remembered. The header palette button previews 20 dark themes, three light
+themes, and a device-following option. New browsers start with Graphite; existing
+theme choices are preserved. Clearing browser data removes history; there is no server history
+store. Messages still go to Thor for inference, and Web mode can send queries
+to external services. Storage failures are shown rather than silently ignored.
+
+Frontend checks:
+
+```bash
+node jetson-thor/web/tests/history.test.mjs
+node jetson-thor/web/tests/stream.test.mjs
+python3 -m http.server 8765 --bind 127.0.0.1 --directory jetson-thor/web
+# In another terminal, with Playwright available:
+node jetson-thor/web/tests/browser.mjs
+```
+
+The browser checks use fixture API responses. `PLAYWRIGHT_MODULE`, `CHROME_PATH`,
+and `CHAT_PREVIEW` can select an existing Playwright installation, Chromium
+binary, and preview URL. Changes to the served module list in
+`crates/thor-tigress-agent/src/server/routes.rs` require rebuilding the gateway
+and restarting only `thor-tigress-agent`; static file edits are read per request.
+
+`stream.js` reads streamed events across network chunk boundaries and cancels
+the reader on Stop, Esc, or `[DONE]`. Silent streams time out after 90 seconds;
+the full request has a ten-minute limit. Blank answers and incomplete streams
+show an explanation while retaining partial replies. The gateway stops chat
+rounds that repeat the same text, generate excessive blank output, or exceed
+the 48 KiB output limit. Coding clients supplying their own tools retain the
+existing relay behavior.
 
 ```bash
 thor-tigress-serve list               # the models on the Thor, each with a key and what it costs

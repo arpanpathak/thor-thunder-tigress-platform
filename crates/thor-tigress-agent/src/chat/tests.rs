@@ -1276,6 +1276,33 @@ fn a_round_under_the_cap_is_streamed_whole() -> Outcome {
     Ok(())
 }
 
+#[test]
+fn repeated_or_blank_generation_closes_with_an_explanation() -> Outcome {
+    for text in [
+        ".or_else(|| DeviceBuffer::new(len))\n".repeat(12),
+        " ".repeat(2048),
+    ] {
+        let chunk = json!({"choices":[{"delta":{"content":text}}]}).to_string();
+        let after = r#"{"choices":[{"delta":{"content":"must not appear"}}]}"#;
+        let model = FakeServer::start(vec![event_stream(&[&chunk, after])])?;
+        let mut client = Vec::new();
+
+        answer(
+            &mut client,
+            br#"{"messages":[],"stream":true}"#,
+            &upstreams(&model, &idle()?),
+        )?;
+
+        let sent = events(&client);
+
+        assert!(sent.iter().any(|event| event.contains("Stopped because")));
+        assert!(!sent.iter().any(|event| event.contains("must not appear")));
+        assert_eq!(sent.last().map(String::as_str), Some(DONE));
+    }
+
+    Ok(())
+}
+
 /// What a coding tool sends: a hosted model's name, fields the engine does
 /// not know, two system messages, and its own tools.
 fn coding_tool_request() -> Value {

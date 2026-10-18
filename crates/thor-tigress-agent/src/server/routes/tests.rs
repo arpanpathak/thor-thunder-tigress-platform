@@ -126,6 +126,12 @@ fn serves_only_the_listed_files() {
         ("/thor-tigress-cub/chat.js", "chat.js"),
         ("/thor-tigress-cub/cub.svg", "cub.svg"),
         ("/cub.png", "cub.png"),
+        ("/dom.js", "dom.js"),
+        ("/appearance.js", "appearance.js"),
+        ("/thor-tigress-cub/markdown.js", "markdown.js"),
+        ("/history.js", "history.js"),
+        ("/themes.css", "themes.css"),
+        ("/thor-tigress-cub/messages.css", "messages.css"),
     ];
     let unlisted = [
         "/serve.sh",

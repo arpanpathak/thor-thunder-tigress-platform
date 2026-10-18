@@ -157,18 +157,26 @@ header opens it.
 
 | Setting | Effect |
 |---|---|
-| Theme | **Cub** (default; light or dark following your device), Paper, Night, Material Deep Ocean, GitHub Light, Solarized Light and Dark, Nord, Dracula, One Dark, Gruvbox Dark, Monokai |
+| Theme (palette button in the header) | 20 dark palettes, three light palettes, and Follow device; visual previews apply immediately. Graphite is the default for new browsers. |
 | Access key | sent as `Authorization: Bearer <key>` with every request |
-| System prompt | sent first in every conversation; empty sends none |
+| System prompt | optional custom instructions, appended to the default paragraph-spacing instruction |
 | Temperature | empty uses the model's default |
 
-Conversations, settings and the key live in your browser's local storage,
-nowhere else. Another browser or device starts empty.
+Conversation history, drafts, settings, and your copy of the access key live
+in this browser's local storage. Another browser or device starts empty.
+The sidebar lets you switch conversations, delete them, or export a Markdown
+copy. Both sidebar icons fold or restore it on desktop, with the state saved
+locally; phones use a drawer. Existing single-chat history is migrated automatically.
+
+The server does not save conversation history. It processes messages to generate
+replies, and Web mode sends queries to external services. Access registration
+still stores your name and email on the server. Clearing browser data deletes
+the local chats; export anything you want to keep.
 
 | Key | Does |
 |---|---|
-| Enter | send |
-| Shift+Enter | new line |
+| Enter | new line |
+| Shift+Enter | send |
 | Esc | stop the reply |
 
 ## How it fits together

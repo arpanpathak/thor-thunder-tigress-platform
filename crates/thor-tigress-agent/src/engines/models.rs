@@ -22,7 +22,11 @@ const LOADED: &str = "loaded";
 ///
 /// `AgentError::Io` when the client is gone.
 pub fn list(client: &mut dyn Client, upstreams: &Upstreams) -> Outcome {
-    let data: Vec<Value> = upstreams.engines().flat_map(offered).collect();
+    let data: Vec<Value> = upstreams
+        .engines()
+        .flat_map(offered)
+        .map(with_context)
+        .collect();
     let list = json!({ "object": "list", "data": data });
 
     response::respond(client, StatusCode::OK, JSON, &serde_json::to_vec(&list)?)
@@ -37,6 +41,32 @@ fn offered(engine: &Engine) -> Vec<Value> {
         Engine::Edge { .. } => listed,
         Engine::Llama { .. } => listed.into_iter().filter(ready).collect(),
     }
+}
+
+/// Publishes llama.cpp's configured context in the field coding clients read.
+/// The training context can be larger than the memory reserved by the server.
+fn with_context(mut model: Value) -> Value {
+    let context = model.pointer("/meta/n_ctx").and_then(Value::as_u64);
+    let parallel = model
+        .pointer("/status/args")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .windows(2)
+        .find(|pair| pair[0].as_str() == Some("--parallel"))
+        .and_then(|pair| pair[1].as_str())
+        .and_then(|count| count.parse::<u64>().ok())
+        .filter(|count| *count > 0)
+        .unwrap_or(1);
+
+    if model.get("max_model_len").is_none()
+        && let Some(context) = context.filter(|context| *context >= parallel)
+    {
+        model["max_model_len"] = json!(context / parallel);
+    }
+
+    model
 }
 
 /// The names llama-server answers to right now: the id and the aliases of
@@ -89,6 +119,39 @@ fn listed(server: &Endpoint) -> Option<Vec<Value>> {
 mod tests {
     use super::*;
     use crate::testing::{FakeServer, FakeWeb, json_response};
+
+    #[test]
+    fn reports_allocated_context_instead_of_training_context() {
+        let model = with_context(json!({
+            "meta": { "n_ctx": 65_536, "n_ctx_train": 262_144 },
+            "context_length": 262_144,
+            "status": { "args": ["--parallel", "1"] }
+        }));
+
+        assert_eq!(model["max_model_len"], 65_536);
+    }
+
+    #[test]
+    fn divides_reserved_context_among_parallel_slots() {
+        let model = with_context(json!({
+            "meta": { "n_ctx": 131_072 },
+            "status": { "args": ["--parallel", "4"] }
+        }));
+
+        assert_eq!(model["max_model_len"], 32_768);
+    }
+
+    #[test]
+    fn preserves_upstream_context_and_leaves_unknown_context_unset() {
+        let model = with_context(json!({ "max_model_len": 32_768, "meta": { "n_ctx": 65_536 } }));
+
+        assert_eq!(model["max_model_len"], 32_768);
+        assert!(
+            with_context(json!({ "id": "unknown" }))
+                .get("max_model_len")
+                .is_none()
+        );
+    }
 
     fn upstreams(first: String, others: &[String]) -> Upstreams {
         let engine = |address: &String| Engine::edge("m".to_string(), address.clone());

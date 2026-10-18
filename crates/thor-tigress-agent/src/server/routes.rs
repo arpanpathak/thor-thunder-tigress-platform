@@ -57,7 +57,7 @@ const PAGE: StaticFile = StaticFile {
 };
 
 /// The other files in the web folder that may be served; nothing else is.
-const FILES: [StaticFile; 5] = [
+const FILES: [StaticFile; 12] = [
     StaticFile {
         name: "about.html",
         content_type: "text/html; charset=utf-8",
@@ -69,6 +69,34 @@ const FILES: [StaticFile; 5] = [
     StaticFile {
         name: "chat.js",
         content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "appearance.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "dom.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "markdown.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "history.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "stream.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "themes.css",
+        content_type: "text/css; charset=utf-8",
+    },
+    StaticFile {
+        name: "messages.css",
+        content_type: "text/css; charset=utf-8",
     },
     StaticFile {
         name: "cub.svg",
