@@ -36,11 +36,14 @@ let themeFilter = "dark";
 
 function syncSidebar() {
   const open = mobile.matches ? drawerOpen : !collapsed;
+
   document.body.classList.toggle("sidebar-collapsed", !mobile.matches && collapsed);
   document.body.classList.toggle("history-open", mobile.matches && drawerOpen);
+
   $("sidebar").inert = !open;
   $("history-backdrop").hidden = !mobile.matches || !drawerOpen;
   document.querySelector(".chat-panel").inert = mobile.matches && drawerOpen;
+
   $("open-history").setAttribute("aria-expanded", String(open));
   $("open-history").setAttribute("aria-label", open ? "Hide sidebar" : "Show sidebar");
   $("open-history").title = open ? "Hide sidebar" : "Show sidebar";
@@ -52,7 +55,9 @@ function setSidebar(open) {
     collapsed = !open;
     preferences.set("sidebar-collapsed", collapsed);
   }
+
   syncSidebar();
+
   if (open && mobile.matches) $("close-history").focus();
   else $("open-history").focus();
 }
@@ -63,20 +68,24 @@ export function closeHistoryOnMobile() {
 
 function applyTheme(id, persist = false) {
   const theme = THEMES.find((item) => item.id === id) || THEMES[0];
+
   if (theme.id === "system") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = theme.id;
 
   $("theme-label").textContent = theme.name;
   $("open-themes").setAttribute("aria-label", `Choose theme, current: ${theme.name}`);
   $("theme-status").textContent = `${theme.name} · Saved on this device`;
+
   $("theme-grid").querySelectorAll("button").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.themeChoice === theme.id));
   });
+
   if (persist) preferences.set("theme", theme.id);
 }
 
 function renderThemes() {
   $("theme-grid").replaceChildren();
+
   THEMES.filter((theme) => themeFilter === "all" || theme.kind === themeFilter).forEach((theme) => {
     const button = element("button", "theme-choice");
     button.type = "button";
@@ -84,13 +93,16 @@ function renderThemes() {
     button.setAttribute("aria-label", theme.name);
     button.style.setProperty("--preview-bg", theme.bg);
     button.style.setProperty("--preview-accent", theme.accent);
+
     const preview = element("span", "theme-preview");
     preview.setAttribute("aria-hidden", "true");
     preview.append(element("i"), element("i"), element("i"));
+
     button.append(preview, element("span", "theme-name", theme.name), element("span", "theme-check", "✓"));
     button.addEventListener("click", () => applyTheme(theme.id, true));
     $("theme-grid").append(button);
   });
+
   applyTheme(preferences.get("theme", "graphite"));
 }
 
@@ -98,15 +110,18 @@ function trapDrawerFocus(event) {
   if (!mobile.matches || !drawerOpen) return;
   if (event.key === "Escape") { setSidebar(false); return; }
   if (event.key !== "Tab" || document.querySelector("dialog[open]")) return;
+
   const nodes = [...$("sidebar").querySelectorAll("a, button:not(:disabled)")];
   const first = nodes[0];
   const last = nodes.at(-1);
+
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
 }
 
 export function initAppearance() {
   syncSidebar();
+
   $("open-history").addEventListener("click", () => setSidebar(mobile.matches ? !drawerOpen : collapsed));
   $("close-history").addEventListener("click", () => setSidebar(false));
   $("history-backdrop").addEventListener("click", () => setSidebar(false));
@@ -118,10 +133,12 @@ export function initAppearance() {
   document.querySelectorAll("[data-filter]").forEach((button) => {
     button.addEventListener("click", () => {
       themeFilter = button.dataset.filter;
+
       document.querySelectorAll("[data-filter]").forEach((item) => item.setAttribute("aria-pressed", String(item === button)));
       renderThemes();
     });
   });
+
   $("themes").addEventListener("click", (event) => {
     const bounds = $("themes").getBoundingClientRect();
     if (event.target === $("themes") && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) $("themes").close();

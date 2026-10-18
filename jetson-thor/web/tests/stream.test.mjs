@@ -15,6 +15,7 @@ test('DONE completes and cancels a body whose server keeps the connection open',
     start(controller) { controller.enqueue(encode('data: {"choices":[]}\n\ndata: [DONE]\n\n')); },
     cancel() { cancelled = true; },
   });
+
   assert.deepEqual(await collect(body), [{ choices: [] }]);
   assert.equal(cancelled, true);
   assert.equal(body.locked, false);
@@ -28,6 +29,7 @@ test('UTF-8, multiline events and CRLF survive arbitrary byte boundaries', async
       controller.close();
     },
   });
+
   assert.deepEqual(await collect(body), [{ text: '雪🐯' }]);
 });
 
@@ -36,7 +38,9 @@ test('Stop interrupts a pending read and releases the stream', async () => {
   let cancelled = false;
   const body = new ReadableStream({ cancel() { cancelled = true; } });
   const result = collect(body, controller.signal);
+
   controller.abort();
+
   await assert.rejects(result, { name: 'AbortError' });
   assert.equal(cancelled, true);
   assert.equal(body.locked, false);
@@ -45,6 +49,7 @@ test('Stop interrupts a pending read and releases the stream', async () => {
 test('silent connections time out and get cancelled', async () => {
   let cancelled = false;
   const body = new ReadableStream({ cancel() { cancelled = true; } });
+
   await assert.rejects(collect(body, undefined, 10), /stopped sending data/);
   assert.equal(cancelled, true);
 });
@@ -54,6 +59,7 @@ test('truncated and malformed streams report an error', async () => {
     controller.enqueue(encode(text));
     controller.close();
   } });
+
   await assert.rejects(collect(body('data: {"choices":[]}\n\n')), /before completion/);
   await assert.rejects(collect(body('data: invalid\n\n')), SyntaxError);
 });

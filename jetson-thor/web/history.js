@@ -7,6 +7,7 @@ export const preferences = {
   get(key, fallback) {
     try {
       const value = localStorage.getItem(key);
+
       return value === null ? fallback : JSON.parse(value);
     } catch {
       return fallback;
@@ -33,12 +34,14 @@ export function newConversation() {
 
 export function conversationTitle(conversation) {
   const first = conversation.messages.find((message) => message.role === "user");
+
   return (first?.content || conversation.draft || "New chat").replace(/\s+/g, " ").trim().slice(0, 70);
 }
 
 export class LocalHistory {
   constructor(storage) {
     this.error = "";
+
     try {
       this.storage = storage ?? globalThis.localStorage;
     } catch {
@@ -49,6 +52,7 @@ export class LocalHistory {
   read(id) {
     try {
       const value = JSON.parse(this.storage.getItem(PREFIX + id));
+
       if (value?.id !== id || !validMessages(value.messages)) return null;
 
       return {
@@ -83,9 +87,11 @@ export class LocalHistory {
       if (previous) return previous;
 
       const legacy = JSON.parse(this.storage.getItem("messages"));
+
       if (validMessages(legacy) && legacy.length) {
         const migrated = { ...newConversation(), messages: legacy };
         if (this.save(migrated)) this.storage.removeItem("messages");
+
         return migrated;
       }
     } catch {
@@ -105,6 +111,7 @@ export class LocalHistory {
       this.storage.setItem(PREFIX + conversation.id, JSON.stringify({ ...conversation, messages }));
       this.storage.setItem(ACTIVE, conversation.id);
       this.error = "";
+
       return true;
     } catch {
       this.error = "This chat could not be saved locally. Browser storage may be full or blocked. Export it before closing.";
@@ -116,9 +123,11 @@ export class LocalHistory {
     try {
       this.storage.removeItem(PREFIX + id);
       this.error = "";
+
       return true;
     } catch {
       this.error = "This chat could not be deleted from browser storage.";
+
       return false;
     }
   }
