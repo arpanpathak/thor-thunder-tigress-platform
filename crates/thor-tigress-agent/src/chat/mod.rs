@@ -21,6 +21,7 @@
 //! request for an Edge-LLM engine is first given the shape that engine takes;
 //! see [`shape`].
 
+mod guard;
 mod shape;
 pub mod tooltext;
 mod wire;
@@ -859,7 +860,7 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
     let response = accepted(model.post(paths::CHAT_COMPLETIONS, &request)?)?;
     let mut round = Round::default();
     let mut sieve = Sieve::new();
-    let mut streamed = 0_usize;
+    let mut guard = guard::Guard::default();
 
     for line in response.body.lines() {
         let line = line?;
@@ -872,16 +873,19 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
             break;
         }
 
-        streamed += relay_chunk(client, data, &mut sieve, &mut round)?;
+        let value: Value = serde_json::from_str(data)?;
 
-        if streamed > MAX_ROUND_CHARS {
+        if let Some(reason) = guard.observe(&value) {
             round.cut = true;
+            send_thor(client, &ThorEvent::Error(reason.to_string()))?;
 
             let event =
                 json!({ "choices": [{ "delta": {}, "finish_reason": "length" }] }).to_string();
             response::send_event(client, &event)?;
             break;
         }
+
+        relay_chunk(client, data, value, &mut sieve, &mut round)?;
     }
 
     finish_round(client, sieve, &mut round)?;
@@ -905,15 +909,14 @@ fn accepted(response: UpstreamResponse) -> Outcome<UpstreamResponse> {
 }
 
 /// Sends one chunk of the model's reply on to the client and adds it to
-/// `round`. Returns how many characters of text the chunk carried.
+/// `round`.
 fn relay_chunk(
     client: &mut dyn Write,
     data: &str,
+    mut value: Value,
     sieve: &mut Sieve,
     round: &mut Round,
-) -> Outcome<usize> {
-    let mut value: Value = serde_json::from_str(data)?;
-    let length = text_length(&value);
+) -> Outcome {
 
     if let Some(event) = forward(&mut value, data, sieve) {
         response::send_event(client, &event)?;
@@ -921,7 +924,7 @@ fn relay_chunk(
 
     round.absorb(serde_json::from_value(value)?);
 
-    Ok(length)
+    Ok(())
 }
 
 /// Ends a round: sends the text the sieve was still holding, and adds the
@@ -999,7 +1002,9 @@ fn text_length(value: &Value) -> usize {
             .map_or(0, str::len)
     };
 
-    of("/choices/0/delta/content") + of("/choices/0/delta/reasoning_content")
+    of("/choices/0/delta/content")
+        + of("/choices/0/delta/reasoning_content")
+        + of("/choices/0/delta/reasoning")
 }
 
 #[cfg(test)]

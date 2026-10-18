@@ -1,0 +1,85 @@
+  .msg { margin: 0 0 32px; }
+  .msg.assistant { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 18px; padding-bottom: 26px; border-bottom: 1px solid var(--border); }
+  .avatar { width: 42px; height: 42px; border-radius: 2px 10px 2px 2px; background: var(--panel); border: 1px solid var(--border);
+            overflow: hidden; display: grid; place-items: center; }
+  .avatar svg { width: 34px; height: 34px; margin-top: 4px; }
+  .dots { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); font-size: 14px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: hop 1.2s infinite ease-in-out; }
+  .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+  .dots span { margin-left: 6px; }
+  @keyframes hop { 0%, 80%, 100% { opacity: .3; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+  .msg.user { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 18px; }
+  .msg.user::before { content: "YOU /"; color: var(--accent); font: 10px/2 ui-monospace, monospace; padding-top: 12px; }
+  .msg.user .body { background: var(--user); border-left: 2px solid var(--accent); border-radius: 0; padding: 12px 18px; max-width: 100%;
+                    white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.assistant .body { overflow-wrap: anywhere; }
+  .body p { margin: 0 0 20px; line-height: 1.8; white-space: pre-line; }
+  .body p:last-child { margin-bottom: 0; }
+  .body h1, .body h2, .body h3, .body h4 { font-size: 17px; margin: 30px 0 12px; line-height: 1.4; }
+  .body ul, .body ol { margin: 0 0 12px; padding-left: 24px; }
+  .body li { margin: 8px 0; line-height: 1.75; }
+  .body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  .body a:hover { color: var(--text); }
+  .body blockquote { margin: 0 0 12px; padding-left: 12px; border-left: 3px solid var(--border); color: var(--muted); }
+
+  /* Tables: a framed, scrollable card, matching the theme through its variables. */
+  .table-wrap { margin: 14px 0; border: 1px solid var(--border); border-radius: 12px; overflow-x: auto;
+                background: var(--panel); -webkit-overflow-scrolling: touch; }
+  .body table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .body th, .body td { padding: 8px 13px; text-align: left; vertical-align: top;
+                       border-bottom: 1px solid var(--border); overflow-wrap: break-word; }
+  .body th + th, .body td + td { border-left: 1px solid var(--border); }
+  .body td a { overflow-wrap: anywhere; }
+  .body thead th { background: var(--bar); color: var(--text); font-weight: 600; white-space: nowrap; }
+  .body tbody tr:last-child td { border-bottom: 0; }
+  .body tbody tr:nth-child(even) { background: color-mix(in srgb, var(--bar) 40%, transparent); }
+  .body tbody tr:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+  code { font: 13.5px/1.55 ui-monospace, "JetBrains Mono", "SF Mono", Menlo, monospace; }
+  :not(pre) > code { background: var(--code-bg); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px;
+                     font-size: 13.5px; }
+
+  .code { margin: 12px 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--code-bg); }
+  .code .bar { display: flex; align-items: center; padding: 3px 6px 3px 12px; background: var(--bar);
+               border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+  .code .bar span { flex: 1; font-family: ui-monospace, monospace; }
+  .code .bar button { font-size: 12px; padding: 1px 9px; }
+  .code pre { margin: 0; padding: 12px 14px; overflow-x: auto; tab-size: 4; }
+  .tok-comment { color: var(--tok-comment); font-style: italic; } .tok-string { color: var(--tok-string); }
+  .tok-keyword { color: var(--tok-keyword); font-weight: 600; } .tok-type { color: var(--tok-type); }
+  .tok-number { color: var(--tok-number); } .tok-macro { color: var(--tok-macro); font-weight: 600; }
+  .tok-attr { color: var(--tok-attr); } .tok-lifetime { color: var(--tok-lifetime); } .tok-call { color: var(--tok-call); }
+
+  /* Sources: each result is a small card with its title, domain and date. */
+  details.sources { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+  details.sources summary { cursor: pointer; user-select: none; }
+  details.sources summary:hover { color: var(--text); }
+  .sources-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+  .source { display: grid; gap: 2px; padding: 8px 12px; border: 1px solid var(--border);
+            border-radius: 10px; background: var(--panel); }
+  .source:hover { border-color: var(--muted); }
+  .body .source-title { color: var(--text); font-weight: 500; text-decoration: none; overflow-wrap: anywhere; }
+  .body .source-title:hover { color: var(--accent); text-decoration: underline; }
+  .body .source-title:not([href]) { color: var(--muted); }
+  .body .source-meta { color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+  details.thinking { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+  details.thinking summary { cursor: pointer; user-select: none; }
+  details.thinking .text { white-space: pre-wrap; border-left: 2px solid var(--border); padding: 4px 0 4px 12px;
+                           margin-top: 6px; max-height: 320px; overflow-y: auto; }
+  .stats { margin-top: 8px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .error { color: var(--danger); font-size: 14px; }
+  .blank { color: var(--muted); font-size: 14px; }
+  .cursor::after { content: "▍"; color: var(--muted); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+
+.body [data-part="content"] > :first-child { margin-top: 0; }
+.body blockquote { white-space: pre-line; }
+@media (max-width: 560px) {
+  .msg.assistant { grid-template-columns: 24px minmax(0, 1fr); gap: 9px; }
+  .avatar { width: 24px; height: 24px; }
+  .msg.user { grid-template-columns: 24px minmax(0, 1fr); gap: 9px; }
+  .msg.user::before { font-size: 8px; }
+  .msg.user .body { max-width: 100%; padding: 12px; }
+  .body { font-size: 14px; }
+}

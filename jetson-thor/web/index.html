@@ -6,13 +6,22 @@
 <title>Thor Tigress Cub</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
 <!-- The theme is set before the stylesheet loads, so the first paint is the
-     right one; everything else lives in chat.js. -->
-<script>try { const t = JSON.parse(localStorage.getItem("theme")); if (t && t !== "system") document.documentElement.dataset.theme = t; } catch {}</script>
+     right one; chat.js loads the interaction, history, and rendering modules. -->
+<script>try { const t = JSON.parse(localStorage.getItem("theme")); document.documentElement.dataset.theme = t || "graphite"; if (t === "system") delete document.documentElement.dataset.theme; } catch {}</script>
+<link rel="stylesheet" href="themes.css">
 <link rel="stylesheet" href="chat.css">
+<link rel="stylesheet" href="messages.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
+    <symbol id="icon-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></symbol>
+    <symbol id="icon-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="icon-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.4 1.4 0 0 1 1.1-2.3H18A3 3 0 0 0 21 12a9 9 0 0 0-9-9Z"/><circle cx="7.5" cy="10" r=".8"/><circle cx="11" cy="7" r=".8"/><circle cx="15.5" cy="8.5" r=".8"/></symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="icon-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v5c0 5-8 10-8 10S4 16 4 11V6Z"/><path d="m8.5 11.5 2.5 2.5 4.5-5"/></symbol>
     <linearGradient id="cape" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#4A6396"/>
       <stop offset="1" stop-color="#2E4170"/>
@@ -123,52 +132,97 @@
 </g>
   </defs>
 </svg>
+<div class="workspace">
+<aside id="sidebar" aria-label="Chat history">
+  <div class="sidebar-top">
+    <a class="brand" href="/" aria-label="Thor Tigress Cub home"><svg viewBox="70 40 300 300" aria-hidden="true"><use href="#cub-art"/></svg><span class="brand-wordmark">TIGRESS<span>THOR / LOCAL AI</span></span></a>
+    <button id="close-history" class="icon-btn" aria-label="Hide sidebar" title="Hide sidebar"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar"/></svg></button>
+  </div>
+  <button id="new" class="new-chat"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"/></svg><span>Start a conversation</span></button>
+  <div class="section-label">CONVERSATIONS <span>ON DEVICE</span></div>
+  <nav id="history-list" aria-label="Saved conversations"></nav>
+  <div class="sidebar-bottom">
+    <div class="privacy-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-shield"/></svg></div>
+    <strong>Your chats stay here.</strong>
+    <p>History is stored in this browser, not saved on the server.</p>
+    <a href="/about.html">About the cub <span aria-hidden="true">↗</span></a>
+  </div>
+</aside>
+<button id="history-backdrop" aria-label="Close chat history" tabindex="-1" hidden></button>
+<div class="chat-panel">
 <header>
-  <span class="brand"><svg viewBox="70 40 300 300" aria-hidden="true"><use href="#cub-art"/></svg><span class="name">Thor Tigress Cub</span></span>
+  <button id="open-history" class="icon-btn" title="Toggle sidebar" aria-label="Toggle sidebar" aria-expanded="true" aria-controls="sidebar"><svg class="ui-icon" aria-hidden="true"><use href="#icon-sidebar"/></svg></button>
+  <div class="heading"><strong id="chat-title">Thor Tigress Cub</strong><span class="eyebrow">THOR / CONVERSATION</span></div>
   <span class="model-chip"><span id="status" class="dot" title="server status"></span><select id="model" title="Model" aria-label="Model" disabled><option>connecting…</option></select></span>
   <span class="spacer"></span>
-  <a id="about" class="about" href="/about.html">About</a>
-  <label class="pill" title="Let the model search the web before answering"><input id="web" type="checkbox">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Web</label>
-  <label class="pill" title="Let the model reason before answering (slower, often better)"><input id="think" type="checkbox">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Think</label>
-  <button id="new" class="icon-btn" title="New conversation" aria-label="New conversation">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button id="open-themes" class="theme-trigger" aria-haspopup="dialog" title="Choose a theme"><svg class="ui-icon" aria-hidden="true"><use href="#icon-palette"/></svg><span id="theme-label">Graphite</span></button>
+  <button id="export-chat" class="icon-btn" title="Export this chat" aria-label="Export this chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg></button>
   <button id="open-settings" class="icon-btn" title="Settings" aria-label="Settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
 </header>
 
-<main id="scroller"><div id="thread"></div></main>
+<main id="scroller" aria-label="Conversation"><div id="thread"></div></main>
 
 <footer>
+  <div id="storage-status" role="status" hidden></div>
   <form class="composer" id="composer">
-    <textarea id="input" rows="1" placeholder="Message the cub" autocomplete="off"></textarea>
-    <button id="send" type="submit">Send</button>
+    <div class="composer-heading"><label for="input">YOUR TURN</label><span>THINK IT. TYPE IT.</span></div>
+    <textarea id="input" rows="2" placeholder="Give the cub something to work on…" aria-label="Message the cub" aria-describedby="keyboard-hint" autocomplete="off" enterkeyhint="enter"></textarea>
+    <div class="composer-toolbar">
+      <div class="tools">
+        <label class="pill" title="Let the model search the web before answering"><input id="web" type="checkbox">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Web</label>
+  <label class="pill" title="Let the model reason before answering (slower, often better)"><input id="think" type="checkbox">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Think</label>
+      </div>
+      <span id="keyboard-hint">Enter for a new line · Shift+Enter to send</span>
+      <button id="send" type="submit" aria-label="Send message" title="Send · Shift+Enter"><span>Send</span><svg class="ui-icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+    </div>
   </form>
-  <div class="hint">Nemotron 3 Nano on a Jetson AGX Thor · Enter sends · Shift+Enter new line · Esc stops</div>
+  <div class="hint">Chat history stays in this browser · <button id="open-privacy" type="button">How it works</button></div>
 </footer>
+</div>
+</div>
 
-<dialog id="settings">
+<dialog id="privacy" aria-labelledby="privacy-title">
   <form method="dialog">
-    <h2>Settings</h2>
-    <label for="theme">Theme</label>
-    <select id="theme">
-      <option value="system">Cub (follows your device)</option>
-      <option value="paper">Paper</option>
-      <option value="night">Night</option>
-      <option value="deep-ocean">Material Deep Ocean</option>
-      <option value="github-light">GitHub Light</option>
-      <option value="solarized-light">Solarized Light</option>
-      <option value="solarized-dark">Solarized Dark</option>
-      <option value="nord">Nord</option>
-      <option value="dracula">Dracula</option>
-      <option value="one-dark">One Dark</option>
-      <option value="gruvbox-dark">Gruvbox Dark</option>
-      <option value="monokai">Monokai</option>
-    </select>
+    <h2 id="privacy-title">Your chat history is local.</h2>
+    <p>Conversations are saved in this browser on this device. The server does not save your chat history. Clearing browser data removes it; export chats you want to keep.</p>
+    <p>Your messages and the current conversation are sent to Thor to generate each reply. With Web enabled, search queries and page requests also go to external services.</p>
+    <p>Access requests store your name and email on the server so you can be invited.</p>
+    <div class="row"><button class="primary">Got it</button></div>
+  </form>
+</dialog>
+
+<dialog id="delete-chat" aria-labelledby="delete-title">
+  <form method="dialog">
+    <h2 id="delete-title">Delete this chat?</h2>
+    <p>This removes the conversation from this browser. Export a copy first if you want to keep it.</p>
+    <div class="row"><button value="cancel">Keep chat</button><button value="delete" class="danger">Delete chat</button></div>
+  </form>
+</dialog>
+
+<dialog id="themes" class="theme-dialog" aria-labelledby="themes-title">
+  <div class="dialog-heading">
+    <div><span class="eyebrow">MAKE IT YOURS</span><h2 id="themes-title">Choose your atmosphere.</h2></div>
+    <form method="dialog"><button class="icon-btn" aria-label="Close themes"><svg class="ui-icon" aria-hidden="true"><use href="#icon-close"/></svg></button></form>
+  </div>
+  <p>20 dark palettes, a few lighter ones. Changes save automatically.</p>
+  <div class="theme-filters" role="group" aria-label="Filter themes">
+    <button type="button" data-filter="dark" aria-pressed="true">Dark <span>20</span></button>
+    <button type="button" data-filter="light" aria-pressed="false">Light</button>
+    <button type="button" data-filter="all" aria-pressed="false">All</button>
+  </div>
+  <div id="theme-grid" class="theme-grid" role="group" aria-label="Theme choices"></div>
+  <div id="theme-status" class="theme-status" role="status"></div>
+</dialog>
+
+<dialog id="settings" aria-labelledby="settings-title">
+  <form method="dialog">
+    <h2 id="settings-title">Make yourself at home.</h2>
     <label for="key">Access key</label>
     <input id="key" type="password" autocomplete="off">
-    <label for="system">System prompt (empty: none)</label>
+    <label for="system">System prompt (optional)</label>
     <textarea id="system"></textarea>
     <label for="temperature">Temperature (empty: the model's default)</label>
     <input id="temperature" type="number" step="0.1" min="0" max="2">
