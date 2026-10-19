@@ -1,11 +1,11 @@
 {
-  "commit": "29e8974",
-  "measured_at": "2026-10-19T05:15:50Z",
+  "commit": "6c56837",
+  "measured_at": "2026-10-19T14:47:04Z",
   "all_passed": true,
-  "coverage": 99.85,
-  "tests": 486,
+  "coverage": 98.86,
+  "tests": 492,
   "rules": {
-    "files": 120,
+    "files": 121,
     "problems": 0
   },
   "crates": [
@@ -30,11 +30,11 @@
     {
       "crate": "thor-spark-safety-eval",
       "passed": true,
-      "tests": 59,
+      "tests": 65,
       "failed": 0,
-      "lines": 1488,
-      "covered": 1488,
-      "coverage": 100.0
+      "lines": 1706,
+      "covered": 1595,
+      "coverage": 93.49355216881594
     },
     {
       "crate": "thor-tigress-agent",
@@ -42,8 +42,8 @@
       "tests": 208,
       "failed": 0,
       "lines": 3875,
-      "covered": 3862,
-      "coverage": 99.66451612903226
+      "covered": 3861,
+      "coverage": 99.63870967741936
     },
     {
       "crate": "thor-tigress-keyring",
