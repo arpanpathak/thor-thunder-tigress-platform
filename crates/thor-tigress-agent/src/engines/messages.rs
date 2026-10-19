@@ -6,7 +6,10 @@
 use serde_json::{Value, json};
 
 use crate::{
-    engines::body::{self, Fields},
+    engines::{
+        body::{self, Fields},
+        server_search,
+    },
     config::{Engine, Upstreams},
     error::Outcome,
     server::response::Client,
@@ -60,6 +63,14 @@ impl Thinking {
 /// object; upstream and I/O errors as in [`crate::engines::upstream::Endpoint::post`].
 pub fn forward(client: &mut dyn Client, path: &str, body: &[u8], upstreams: &Upstreams) -> Outcome {
     let mut fields = body::fields(body)?;
+
+    if server_search::requested(&fields) {
+        if path == crate::paths::MESSAGES {
+            return server_search::answer(client, &fields, &upstreams.search);
+        }
+        server_search::strip(&mut fields);
+    }
+
     let engine = upstreams.serving(body::model(&fields));
 
     fit(&mut fields, engine);
