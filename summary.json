@@ -1,8 +1,8 @@
 {
-  "commit": "6c56837",
-  "measured_at": "2026-10-19T14:47:04Z",
+  "commit": "9ac4185",
+  "measured_at": "2026-10-19T19:25:13Z",
   "all_passed": true,
-  "coverage": 98.86,
+  "coverage": 98.64,
   "tests": 492,
   "rules": {
     "files": 121,
@@ -41,9 +41,9 @@
       "passed": true,
       "tests": 208,
       "failed": 0,
-      "lines": 3875,
-      "covered": 3861,
-      "coverage": 99.63870967741936
+      "lines": 3902,
+      "covered": 3863,
+      "coverage": 99.00051255766273
     },
     {
       "crate": "thor-tigress-keyring",
