@@ -63,7 +63,7 @@ is overwritten.
 ```bash
 ssh thor
 cd ~/Projects/some-project
-openbatrangs --thor                           # interactive TUI on Nemotron
+openbatrangs --thor                           # interactive TUI on the default model
 openbatrangs --thor "fix the failing test"    # one task (thinking on; --no-think to turn off)
 openbatrangs -m qwen3.6:27b --max-ctx 32768 "fix the failing test"   # Ollama instead
 openbatrangs --read-only "explain this repo"  # no file writes or commands
@@ -82,7 +82,12 @@ From any other machine, including macOS: `--openai-url
 https://arpanpathak.taildb9a39.ts.net/v1 --api-key-file
 ~/.config/thor-chat/api-key` (book, chapter "Bring your own agent").
 
-## Claude Code with Nemotron
+## Claude Code on the Thor
+
+Since 2026-10-18 the default model is Qwen3.8 Flash Next on vLLM, with a
+262,144-token context; `claude-thor` and `openbatrangs --thor` need no flags.
+Setup and measurements: [model-serving/qwen3.8.md](model-serving/qwen3.8.md).
+The Nemotron measurements below are from before the switch.
 
 `claude-thor` (thinking off) and `claude-thor-think` (thinking on) are shell
 aliases that run Claude Code against Nemotron, through the SSH tunnel to

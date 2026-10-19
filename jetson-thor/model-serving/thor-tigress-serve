@@ -29,7 +29,8 @@ Services:
 
 The services run "thor-tigress-serve run" (llama-server in router mode on
 :8079), "thor-tigress-serve agent" (thor-tigress-agent: the page and API on
-:8080) and one "thor-tigress-serve edge [NAME]" per TensorRT Edge-LLM model.
+:8080), one "thor-tigress-serve edge [NAME]" per TensorRT Edge-LLM model, and
+"thor-tigress-serve vllm" (a vLLM container) when VLLM_MODEL is set.
 Settings go in ~/.config/thor-chat/env as KEY=value lines:
 
   MODEL         the default model's GGUF   Nemotron 3 Nano 30B-A3B Q8_0
@@ -45,6 +46,13 @@ Settings go in ~/.config/thor-chat/env as KEY=value lines:
   EDGE_MODELS   more of them, FOLDER=PORT[:TOKENS]  none
   AGENT_DEFAULT "edge": a request for a model nobody has goes to the first
                 Edge-LLM model instead of llama-server                 none
+  VLLM_MODEL    a Hugging Face repo served by vLLM in Docker; it then answers
+                a request for a model nobody has                       none
+  VLLM_REVISION the repo's commit                                      main
+  VLLM_NAME     the name requests and the picker use                   the repo's name
+  VLLM_IMAGE    the vLLM image                                         none
+  VLLM_PORT     its server's port                                      8000
+  VLLM_ARGS     the model's own vllm serve options                     none
   PORT, MODEL_PORT, SEARCH_PORT            8080, 8079, 8888
 
 Every Edge-LLM model is offered in the chat page's picker: the agent is given
@@ -62,9 +70,11 @@ EDGE_MODEL's, under ~/models/edge-llm.
 """
 
 import concurrent.futures
+import grp
 import json
 import os
 import re
+import shlex
 import shutil
 import struct
 import subprocess
@@ -104,6 +114,12 @@ DEFAULTS = {
     "MODEL_PORT": "8079",
     "SEARCH_PORT": "8888",
     "AGENT_DEFAULT": "",
+    "VLLM_MODEL": "",
+    "VLLM_REVISION": "main",
+    "VLLM_NAME": "",
+    "VLLM_IMAGE": "",
+    "VLLM_PORT": "8000",
+    "VLLM_ARGS": "",
     "SERVER": str(LLAMA / "build" / "bin" / "llama-server"),
     "AGENT": str(HOME / ".cargo" / "bin" / "thor-tigress-agent"),
     "KEYRING_BIN": str(HOME / ".cargo" / "bin" / "thor-tigress-keyring"),
@@ -822,17 +838,58 @@ def edge(values, wanted=None):
                                      "--max-batch-size", "1"])
 
 
-def agent(values):
-    """The page and API. llama-server is passed as --model and each Edge-LLM model as
-    --engine, so the agent shapes a request for the kind of server that will answer it.
+VLLM_CONTAINER = "thor-vllm"
 
-    The first one named answers a request for a model nobody has: llama-server, or with
-    AGENT_DEFAULT=edge the first Edge-LLM model."""
+
+def vllm(values):
+    """vLLM's OpenAI- and Anthropic-compatible server for VLLM_MODEL, in NVIDIA's container,
+    on localhost only. A container left behind by a crash still holds the name, so it is
+    removed first. Weights and compiled kernels are cached under ~/.cache across restarts."""
+    if not values["VLLM_MODEL"] or not values["VLLM_IMAGE"]:
+        sys.exit("VLLM_MODEL and VLLM_IMAGE must both be set in ~/.config/thor-chat/env")
+    subprocess.run(docker(["rm", "-f", VLLM_CONTAINER]), check=False, capture_output=True)
+    cache = HOME / ".cache"
+    (cache / "vllm").mkdir(parents=True, exist_ok=True)
+    command = docker(["run", "--rm", "--name", VLLM_CONTAINER,
+                      "--runtime=nvidia", "--gpus", "all", "--network", "host", "--ipc=host",
+                      "-v", f"{cache / 'huggingface'}:/root/.cache/huggingface",
+                      "-v", f"{cache / 'vllm'}:/root/.cache/vllm",
+                      values["VLLM_IMAGE"], values["VLLM_MODEL"],
+                      "--revision", values["VLLM_REVISION"],
+                      "--host", "127.0.0.1", "--port", values["VLLM_PORT"],
+                      "--served-model-name", vllm_name(values),
+                      *shlex.split(values["VLLM_ARGS"])])
+    os.execvp(command[0], command)
+
+
+def docker(arguments):
+    """A docker command line. The user's systemd keeps the groups it started with, so a
+    docker group added since then is only reached through sg until the next boot."""
+    command = ["docker", *arguments]
+    if grp.getgrnam("docker").gr_gid in os.getgroups():
+        return command
+    return ["sg", "docker", "-c", shlex.join(command)]
+
+
+def vllm_name(values):
+    """What the vLLM model is called: VLLM_NAME, else the repo's last part."""
+    return values["VLLM_NAME"] or values["VLLM_MODEL"].rsplit("/", 1)[-1]
+
+
+def agent(values):
+    """The page and API. llama-server and vLLM are passed as --model and each Edge-LLM model
+    as --engine, so the agent shapes a request for the kind of server that will answer it.
+    vLLM takes requests as an OpenAI or Anthropic client sends them, as llama-server does.
+
+    The first one named answers a request for a model nobody has: vLLM when VLLM_MODEL is
+    set, else llama-server, or with AGENT_DEFAULT=edge the first Edge-LLM model."""
     llama = ["--model", f"127.0.0.1:{values['MODEL_PORT']}"]
     engines = [item for entry in edge_models(values)
                for item in ("--engine", f"{entry['name']}=127.0.0.1:{entry['port']}")]
     edge_first = values["AGENT_DEFAULT"].strip().lower() == "edge"
     servers = [*engines, *llama] if edge_first else [*llama, *engines]
+    if values["VLLM_MODEL"]:
+        servers = ["--model", f"127.0.0.1:{values['VLLM_PORT']}", *servers]
     os.execv(values["AGENT"], [values["AGENT"], "--listen", f"127.0.0.1:{values['PORT']}",
                                *servers,
                                "--search", f"127.0.0.1:{values['SEARCH_PORT']}",
@@ -873,6 +930,10 @@ def install(values):
     unit("thor-chat", f"Models (llama-server) on 127.0.0.1:{values['MODEL_PORT']}", "run", "")
     unit("thor-tigress-agent", f"Chat page and web search on 127.0.0.1:{values['PORT']}", "agent", "thor-chat.service")
     services = ["thor-chat", "thor-tigress-agent"]
+    if values["VLLM_MODEL"]:
+        unit("thor-vllm", f"{vllm_name(values)} (vLLM) on 127.0.0.1:{values['VLLM_PORT']}", "vllm",
+             "docker.service", "TimeoutStopSec=60\n")
+        services.append("thor-vllm")
     for entry in edge_models(values):
         name = edge_unit(entry)
         unit(name, f"{entry['name']} (TensorRT Edge-LLM) on 127.0.0.1:{entry['port']}",
@@ -892,6 +953,9 @@ def install(values):
     subprocess.run(["systemctl", "--user", "restart", *services], check=True)
     subprocess.run(["loginctl", "enable-linger", os.environ.get("USER", "")], check=False)
     print(f"running: {', '.join(services)}; all start at boot. {command} is on your PATH.")
+    if values["VLLM_MODEL"]:
+        print(f"  the page offers {vllm_name(values)} from vLLM on :{values['VLLM_PORT']}"
+              " (service thor-vllm), and sends it requests for models nobody has")
     for entry in edge_models(values):
         print(f"  the page offers {entry['name']} from TensorRT Edge-LLM on :{entry['port']}"
               f" (service {edge_unit(entry)})")
@@ -921,9 +985,9 @@ def uninstall(values):
     """Stops and removes the services. Edge-LLM units are found by name, so ones
     left over from an earlier EDGE_MODELS are removed too."""
     edge_units = edge_unit_names()
-    subprocess.run(["systemctl", "--user", "disable", "--now", "thor-tigress-agent", "thor-chat", *edge_units],
-                   check=False)
-    for name in ("thor-chat", "thor-tigress-agent", *edge_units):
+    subprocess.run(["systemctl", "--user", "disable", "--now", "thor-tigress-agent", "thor-chat", "thor-vllm",
+                    *edge_units], check=False)
+    for name in ("thor-chat", "thor-tigress-agent", "thor-vllm", *edge_units):
         (UNITS / f"{name}.service").unlink(missing_ok=True)
         shutil.rmtree(UNITS / f"{name}.service.d", ignore_errors=True)
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
@@ -968,6 +1032,8 @@ def keyring(values, rest):
 def logs(values):
     """Follows the services: the models, the page, and each Edge-LLM engine."""
     units = ["thor-chat", "thor-tigress-agent", *(edge_unit(entry) for entry in edge_models(values))]
+    if values["VLLM_MODEL"]:
+        units.append("thor-vllm")
     arguments = [item for name in units for item in ("-u", name)]
     os.execvp("journalctl", ["journalctl", "--user", *arguments, "-f"])
 
@@ -975,7 +1041,7 @@ def logs(values):
 COMMANDS = {
     "list": list_here, "list-latest": list_latest,
     "install": install, "uninstall": uninstall, "key": key, "keyring-init": keyring_init,
-    "logs": logs, "run": run, "agent": agent,
+    "logs": logs, "run": run, "agent": agent, "vllm": vllm,
 }
 COMMANDS_WITH_NAME = {"load": load_command, "unload": unload_command, "download": download_command}
 
