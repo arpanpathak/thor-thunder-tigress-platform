@@ -65,13 +65,13 @@ pub fn forward(client: &mut dyn Client, path: &str, body: &[u8], upstreams: &Ups
     let mut fields = body::fields(body)?;
 
     if server_search::requested(&fields) {
-        if path == crate::paths::MESSAGES {
+        if path == crate::paths::MESSAGES && server_search::only_search(&fields) {
             return server_search::answer(client, &fields, &upstreams.search);
         }
         server_search::strip(&mut fields);
     }
 
-    let engine = upstreams.serving(body::model(&fields));
+    let engine = upstreams.route(&mut fields);
 
     fit(&mut fields, engine);
     choose_thinking(&mut fields);

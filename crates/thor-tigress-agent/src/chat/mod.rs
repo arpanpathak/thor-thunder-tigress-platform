@@ -251,7 +251,7 @@ pub fn answer(client: &mut dyn Client, body: &[u8], upstreams: &Upstreams) -> Ou
         .and_then(|value| value.as_bool())
         .unwrap_or(false);
 
-    let engine = upstreams.serving(body::model(&fields));
+    let engine = upstreams.route(&mut fields);
     fit(&mut fields, engine);
 
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);

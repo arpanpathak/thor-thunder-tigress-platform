@@ -32,6 +32,17 @@ pub fn requested(fields: &Fields) -> bool {
         .is_some_and(|tools| tools.iter().any(is_search_tool))
 }
 
+/// Whether the search tool is the request's only tool, as in Claude Code's
+/// WebSearch call: then the request is the search itself. With other tools
+/// beside it, the model is asked, without the search tool.
+#[must_use]
+pub fn only_search(fields: &Fields) -> bool {
+    fields
+        .get("tools")
+        .and_then(Value::as_array)
+        .is_some_and(|tools| !tools.is_empty() && tools.iter().all(is_search_tool))
+}
+
 /// Removes every server-side web search tool, for a request that is still
 /// passed on, such as a token count.
 pub fn strip(fields: &mut Fields) {
@@ -263,6 +274,19 @@ mod tests {
 
         assert!(requested(&request));
         assert_eq!(query(&request).as_deref(), Some("cuda-oxide docs"));
+    }
+
+    #[test]
+    fn search_beside_other_tools_is_not_the_search_itself() {
+        let alone =
+            fields(json!({ "tools": [{ "type": "web_search_20250305", "name": "web_search" }] }));
+        let mixed = fields(json!({
+            "tools": [{ "type": "web_search_20250305", "name": "web_search" }, { "name": "Bash", "input_schema": {} }],
+        }));
+
+        assert!(only_search(&alone));
+        assert!(!only_search(&mixed));
+        assert!(requested(&mixed));
     }
 
     #[test]

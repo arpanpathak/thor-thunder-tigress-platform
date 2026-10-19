@@ -33,7 +33,11 @@ use zeroize::Zeroizing;
 use crate::{
     error::{AgentError, Outcome},
     web::http::{HttpWeb, Web},
-    engines::{models, upstream::Endpoint},
+    engines::{
+        body::{self, Fields},
+        models,
+        upstream::Endpoint,
+    },
 };
 
 /// Where the server listens unless `--listen` says otherwise.
@@ -142,12 +146,40 @@ impl Upstreams {
 
     /// The server for a request naming `model`: the one that has it, else the
     /// default. A coding tool sends the name it was built around, such as a
-    /// hosted model's, and still has to be answered.
+    /// hosted model's, and still has to be answered. Requests go through
+    /// [`Upstreams::route`]; this is the choice alone, for the tests.
+    #[cfg(test)]
     #[must_use]
     pub fn serving(&self, model: Option<&str>) -> &Engine {
-        self.engines()
-            .find(|engine| engine.serves(model))
-            .unwrap_or(&self.default)
+        self.having(model).unwrap_or(&self.default)
+    }
+
+    /// The server that has `model`, when one has it.
+    fn having(&self, model: Option<&str>) -> Option<&Engine> {
+        self.engines().find(|engine| engine.serves(model))
+    }
+
+    /// The server for the request in `fields`, as [`Upstreams::serving`]
+    /// picks it. When no server has the model and the default does not list
+    /// that name at all, the request is renamed to the default's first loaded
+    /// model: vLLM answers 404 to a name it does not serve. A name it lists
+    /// but has not loaded is kept, so llama-server's router can load it.
+    pub fn route(&self, fields: &mut Fields) -> &Engine {
+        let wanted = body::model(fields).map(str::to_string);
+
+        if let Some(engine) = self.having(wanted.as_deref()) {
+            return engine;
+        }
+
+        let Engine::Llama { endpoint } = &self.default else {
+            return &self.default;
+        };
+        let unknown = wanted.is_some_and(|name| !models::listed_names(endpoint).contains(&name));
+        if unknown && let Some(loaded) = models::loaded_names(endpoint).into_iter().next() {
+            body::name(fields, &loaded);
+        }
+
+        &self.default
     }
 }
 

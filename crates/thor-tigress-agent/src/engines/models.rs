@@ -80,6 +80,16 @@ pub fn loaded_names(llama: &Endpoint) -> Vec<String> {
         .collect()
 }
 
+/// Every name llama-server or vLLM lists, loaded or not: a name it lists can
+/// be asked for, and llama-server's router loads it on that request.
+pub fn listed_names(server: &Endpoint) -> Vec<String> {
+    listed(server)
+        .unwrap_or_default()
+        .iter()
+        .flat_map(names)
+        .collect()
+}
+
 /// A model's id and its aliases.
 fn names(model: &Value) -> Vec<String> {
     let aliases = model.get("aliases").and_then(Value::as_array);
