@@ -16,6 +16,9 @@ pub const MODELS: &str = "/v1/models";
 /// OpenAI: chat.
 pub const CHAT_COMPLETIONS: &str = "/v1/chat/completions";
 
+/// Web search for remote coding tools, answered in SearXNG's JSON format.
+pub const SEARCH: &str = "/v1/search";
+
 /// Anthropic: messages, used by Claude Code.
 pub const MESSAGES: &str = "/v1/messages";
 

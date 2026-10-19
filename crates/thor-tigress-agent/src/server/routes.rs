@@ -9,7 +9,7 @@ use std::{path::Path, sync::Arc};
 use axum::{
     Router,
     body::Bytes,
-    extract::{DefaultBodyLimit, Request, State},
+    extract::{DefaultBodyLimit, Query, Request, State},
     http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -27,6 +27,7 @@ use crate::{
     error::Outcome,
     engines::{messages, models},
     paths,
+    web::search,
 };
 
 /// What `/health` answers.
@@ -120,6 +121,7 @@ pub fn router(config: Arc<Config>) -> Router {
         .route(paths::CHAT_COMPLETIONS, post(chat_completions))
         .route(paths::MESSAGES, post(messages))
         .route(paths::COUNT_TOKENS, post(count_tokens))
+        .route(paths::SEARCH, get(web_search))
         .route(paths::REQUEST, post(request_access))
         .fallback(file)
         .method_not_allowed_fallback(not_found)
@@ -223,6 +225,41 @@ async fn count_tokens(State(config): Shared, body: Bytes) -> Response {
     };
 
     bridge::answered(forward).await
+}
+
+/// The query of a `/v1/search` request.
+#[derive(Deserialize)]
+struct SearchQuery {
+    q: String,
+}
+
+/// Searches the local SearXNG for a remote coding tool and answers in
+/// SearXNG's own JSON shape, so a client written for SearXNG reads it as is.
+async fn web_search(State(config): Shared, Query(query): Query<SearchQuery>) -> Response {
+    let answer = move |client: &mut dyn Client| {
+        let hits = search::search_all(&config.upstreams.search, &[query.q], None)
+            .into_iter()
+            .next()
+            .unwrap_or_else(|| Ok(search::Hits::default()))?;
+
+        let results: Vec<_> = hits
+            .results
+            .iter()
+            .map(|hit| {
+                serde_json::json!({
+                    "title": hit.title,
+                    "url": hit.url,
+                    "content": hit.snippet,
+                    "publishedDate": hit.published,
+                })
+            })
+            .collect();
+        let body = serde_json::json!({ "results": results, "unresponsive_engines": hits.down });
+
+        response::respond(client, StatusCode::OK, JSON, body.to_string().as_bytes())
+    };
+
+    bridge::answered(answer).await
 }
 
 /// Records a registration form's name and email in the keyring. It is open,
