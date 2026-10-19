@@ -177,3 +177,37 @@ fn a_line_without_the_field_is_named() -> Outcome {
 
     Ok(())
 }
+
+#[test]
+fn reads_generate_and_fills_its_defaults() -> Outcome {
+    let words = [
+        "generate",
+        "--url",
+        "http://127.0.0.1:8000",
+        "--model",
+        "qwen",
+        "--rules",
+        "rules.md",
+        "--out",
+        "run.jsonl",
+        "--think",
+    ];
+
+    let Command::Generate(options) = Command::from_args(&args(&words))? else {
+        return Err(EvalError::Usage("not generate".to_string()));
+    };
+
+    assert_eq!(options.model, "qwen");
+    assert_eq!(options.backend, "vllm");
+    assert_eq!(options.key_file, None);
+    assert!(options.think);
+
+    Ok(())
+}
+
+#[test]
+fn generate_names_what_is_missing() {
+    let outcome = Command::from_args(&args(&["generate", "--url", "http://x"]));
+
+    assert!(outcome.is_err_and(|error| error.to_string().starts_with("generate needs --model")));
+}

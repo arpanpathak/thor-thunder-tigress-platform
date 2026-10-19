@@ -4,6 +4,8 @@
 //! spark rs    PATH...    check .rs files (directories are walked) against the five rules
 //! spark text  PATH...    find slop in text or markdown files
 //! spark score RUN.jsonl [--field F] [--code-field F] [--label L] [--out OUT.jsonl]
+//! spark generate --url URL --model M --rules RULES.md --out RUN.jsonl
+//!                [--key-file F] [--backend NAME] [--think]
 //! ```
 //!
 //! `score` reads one answer per JSONL line from `--field` (default `text`). With
@@ -14,6 +16,7 @@
 //! they find anything, so they can gate a build.
 
 use std::{
+    collections::BTreeMap,
     fs,
     io::{BufWriter, Write},
     path::{Path, PathBuf},
@@ -26,6 +29,7 @@ use crate::{
     error::{EvalError, Outcome},
     report::Summary,
     code::rules,
+    generate::{self, GenerateOptions},
     prose::slop,
 };
 
@@ -44,6 +48,8 @@ pub enum Command {
     Text(Vec<PathBuf>),
     /// Score every answer of an eval run.
     Score(ScoreOptions),
+    /// Collect a run from a model server.
+    Generate(GenerateOptions),
 }
 
 /// The options of `spark score`.
@@ -94,6 +100,7 @@ impl Command {
             "rs" => Ok(Command::Rust(paths(rest)?)),
             "text" => Ok(Command::Text(paths(rest)?)),
             "score" => Ok(Command::Score(ScoreOptions::parse(rest)?)),
+            "generate" => Ok(Command::Generate(generate_options(rest)?)),
             _ => Err(EvalError::Usage(usage())),
         }
     }
@@ -109,6 +116,10 @@ impl Command {
             Command::Rust(paths) => check_rust(paths),
             Command::Text(paths) => check_text(paths),
             Command::Score(options) => score_run(options),
+            Command::Generate(options) => Ok(Report {
+                lines: generate::generate(options)?,
+                exit: Exit::Clean,
+            }),
         }
     }
 }
@@ -117,7 +128,9 @@ impl Command {
 #[must_use]
 pub fn usage() -> String {
     "usage: spark rs PATH... | spark text PATH... | \
-     spark score RUN.jsonl [--field F] [--code-field F] [--label L] [--out OUT.jsonl]"
+     spark score RUN.jsonl [--field F] [--code-field F] [--label L] [--out OUT.jsonl] | \
+     spark generate --url URL --model M --rules RULES.md --out RUN.jsonl \
+     [--key-file F] [--backend NAME] [--think]"
         .to_string()
 }
 
@@ -193,6 +206,57 @@ impl Given {
             code_field: self.code_field,
         })
     }
+}
+
+/// The `generate` options: `--url`, `--model`, `--rules` and `--out` are
+/// required; `--backend` defaults to `vllm`.
+fn generate_options(arguments: &[String]) -> Outcome<GenerateOptions> {
+    let (mut values, think) = generate_values(arguments)?;
+
+    let mut required = |name: &str| {
+        values
+            .remove(name)
+            .ok_or_else(|| EvalError::Usage(format!("generate needs {name}\n{}", usage())))
+    };
+
+    Ok(GenerateOptions {
+        url: required("--url")?,
+        model: required("--model")?,
+        rules: PathBuf::from(required("--rules")?),
+        output: PathBuf::from(required("--out")?),
+        key_file: values.remove("--key-file").map(PathBuf::from),
+        backend: values
+            .remove("--backend")
+            .unwrap_or_else(|| "vllm".to_string()),
+        think,
+    })
+}
+
+/// The `generate` options that take a value, by name, and whether `--think`
+/// was given.
+fn generate_values(arguments: &[String]) -> Outcome<(BTreeMap<&str, String>, bool)> {
+    let mut values = BTreeMap::new();
+    let mut think = false;
+    let mut rest = arguments.iter();
+
+    while let Some(argument) = rest.next() {
+        match argument.as_str() {
+            "--think" => think = true,
+            "--url" | "--model" | "--rules" | "--out" | "--key-file" | "--backend" => {
+                let value = rest
+                    .next()
+                    .ok_or_else(|| EvalError::Usage(format!("{argument} needs a value")))?;
+                values.insert(argument.as_str(), value.clone());
+            }
+            other => {
+                let message = format!("unknown argument {other}\n{}", usage());
+
+                return Err(EvalError::Usage(message));
+            }
+        }
+    }
+
+    Ok((values, think))
 }
 
 fn stem(path: &Path) -> String {

@@ -41,6 +41,9 @@ pub enum EvalError {
     /// The command line was not understood.
     #[error("{0}")]
     Usage(String),
+    /// A model server failed or answered with something unexpected.
+    #[error("server: {0}")]
+    Server(String),
 }
 
 impl EvalError {

@@ -8,11 +8,13 @@
 //! [`report`] adds answers up into the rates a run is compared on.
 //!
 //! It does not compile code or run tests; a block can pass every rule and
-//! still not build. [`cli`] holds the `spark` commands.
+//! still not build. [`generate`] collects a run from a model server, and
+//! [`cli`] holds the `spark` commands.
 
 pub mod answer;
 pub mod cli;
 pub mod code;
 pub mod error;
+pub mod generate;
 pub mod prose;
 pub mod report;

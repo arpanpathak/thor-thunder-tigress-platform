@@ -424,9 +424,17 @@ $("model").addEventListener("change", () => {
 // body field it does not know with "Extra inputs are not permitted", so they are
 // sent to llama-server only. Turning Think on for a model an engine serves still
 // works, through chat_template_kwargs; it just has no cap on its thinking.
+//
+// vLLM has no budget either. Qwen3.8's template thinks at effort xhigh by
+// default and spends all of max_tokens on a mid-sized coding question, so the
+// page asks vLLM for medium effort instead.
 function servedByLlamaCpp() {
   const engine = modelEngines[chosenModel()];
   return !engine || engine === "llamacpp";
+}
+
+function servedByVllm() {
+  return modelEngines[chosenModel()] === "vllm";
 }
 
 function chatRequest(history, thinking) {
@@ -448,6 +456,8 @@ function chatRequest(history, thinking) {
     body.reasoning_budget_tokens = budget;
     body.reasoning_budget_message = "";
   }
+
+  if (servedByVllm() && thinking) body.chat_template_kwargs.reasoning_effort = "medium";
 
   return body;
 }
