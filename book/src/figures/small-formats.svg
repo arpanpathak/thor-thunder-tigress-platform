@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 600" width="1040" height="600" role="img" aria-label="Four ways to store weights. Q8_0 keeps blocks of 32 weights of 8 bits and one 16-bit scale, 8.5 bits per weight. Q4_K keeps 4-bit weights with 6-bit scales per 32 and one more per 256, about 4.5 bits. NVFP4 keeps blocks of 16 four-bit floating-point weights with one FP8 scale, 4.5 bits, and Blackwell GPUs multiply it in hardware. IQ2_XXS stores each group of 8 weights as one 8-bit index into a 256-entry grid, with scales per 32 and per 256 weights, 2.06 bits per weight.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <linearGradient id="thor-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C6CCD5"/><stop offset="1" stop-color="#979EA9"/>
+    </linearGradient>
+    <linearGradient id="switch-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B4656"/><stop offset="1" stop-color="#232B37"/>
+    </linearGradient>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1040" height="600" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Four ways to store a weight</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Each format packs a block of weights with a shared scale; the bits per weight set the bytes per token.</text>
+  <text x="40.0" y="148.0" class="name" text-anchor="start" xml:space="preserve">Q8_0</text>
+  <text x="40.0" y="168.0" class="note" text-anchor="start" xml:space="preserve">8.5 bits per weight</text>
+  <rect x="200" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="211" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="222" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="233" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="244" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="255" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="266" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="277" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="288" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="299" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="310" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="321" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="332" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="343" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="354" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="365" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="376" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="387" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="398" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="409" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="420" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="431" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="442" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="453" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="464" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="475" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="486" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="497" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="508" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="519" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="530" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="541" y="134" width="8" height="40" rx="3" fill="#5E9400" opacity="0.85"/>
+  <rect x="560" y="134" width="22" height="40" rx="3" fill="#B7791F"/>
+  <text x="592.0" y="158.0" class="note" text-anchor="start" xml:space="preserve">32 weights of 8 bits, one 16-bit scale per block</text>
+  <text x="40.0" y="240.0" class="name" text-anchor="start" xml:space="preserve">Q4_K</text>
+  <text x="40.0" y="260.0" class="note" text-anchor="start" xml:space="preserve">4.5 bits per weight</text>
+  <rect x="200" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="211" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="222" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="233" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="244" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="255" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="266" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="277" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="288" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="299" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="310" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="321" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="332" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="343" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="354" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="365" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="376" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="387" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="398" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="409" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="420" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="431" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="442" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="453" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="464" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="475" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="486" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="497" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="508" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="519" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="530" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="541" y="226" width="8" height="24" rx="3" fill="#2F6FDB" opacity="0.85"/>
+  <rect x="560" y="226" width="22" height="40" rx="3" fill="#B7791F"/>
+  <text x="592.0" y="250.0" class="note" text-anchor="start" xml:space="preserve">4-bit weights; scales of 6 bits per 32, one per 256</text>
+  <text x="40.0" y="332.0" class="name" text-anchor="start" xml:space="preserve">NVFP4</text>
+  <text x="40.0" y="352.0" class="note" text-anchor="start" xml:space="preserve">4.5 bits per weight</text>
+  <rect x="200" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="218" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="236" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="254" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="272" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="290" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="308" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="326" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="344" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="362" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="380" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="398" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="416" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="434" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="452" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="470" y="318" width="15" height="24" rx="3" fill="#7A4FD0" opacity="0.85"/>
+  <rect x="496" y="318" width="22" height="40" rx="3" fill="#B7791F"/>
+  <text x="528.0" y="342.0" class="note" text-anchor="start" xml:space="preserve">16 FP4 weights, one FP8 scale; Blackwell multiplies it</text>
+  <text x="40.0" y="424.0" class="name" text-anchor="start" xml:space="preserve">IQ2_XXS</text>
+  <text x="40.0" y="444.0" class="note" text-anchor="start" xml:space="preserve">2.06 bits per weight</text>
+  <rect x="200" y="410" width="15" height="16" rx="3" fill="#CF4526" opacity="0.85"/>
+  <rect x="218" y="410" width="15" height="16" rx="3" fill="#CF4526" opacity="0.85"/>
+  <rect x="236" y="410" width="15" height="16" rx="3" fill="#CF4526" opacity="0.85"/>
+  <rect x="254" y="410" width="15" height="16" rx="3" fill="#CF4526" opacity="0.85"/>
+  <rect x="272" y="410" width="15" height="16" rx="3" fill="#CF4526" opacity="0.85"/>
+  <rect x="290" y="410" width="15" height="16" rx="3" fill="#CF4526" opacity="0.85"/>
+  <rect x="308" y="410" width="15" height="16" rx="3" fill="#CF4526" opacity="0.85"/>
+  <rect x="326" y="410" width="15" height="16" rx="3" fill="#CF4526" opacity="0.85"/>
+  <rect x="352" y="410" width="22" height="40" rx="3" fill="#B7791F"/>
+  <text x="384.0" y="434.0" class="note" text-anchor="start" xml:space="preserve">8 weights stored as one 8-bit index into a 256-entry grid</text>
+  <rect x="40.0" y="510" width="14" height="14" rx="4" fill="#7F8EA0"/>
+  <text x="61.0" y="521.5" class="note" text-anchor="start" xml:space="preserve">bar height: bits per weight</text>
+  <rect x="263.2" y="510" width="14" height="14" rx="4" fill="#B7791F"/>
+  <text x="284.2" y="521.5" class="note" text-anchor="start" xml:space="preserve">the block&#x27;s shared scale</text>
+  <text x="40.0" y="556.0" class="note" text-anchor="start" style="fill:#7F8EA0" xml:space="preserve">A block&#x27;s weights share one scale, so a 4-bit or 2-bit number still covers a wide range. IQ2_XXS keeps its scales</text>
+  <text x="40.0" y="573.0" class="note" text-anchor="start" style="fill:#7F8EA0" xml:space="preserve">per 32 and per 256 weights. Fewer bits mean fewer bytes per token, but each weight must be decoded before it is used.</text>
+</svg>

@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 420" width="1040" height="420" role="img" aria-label="A timeline. The model&#x27;s training data ends first, and that is its sense of now. The document under review has a last date of August 2026. Today is 20 October 2026. Without the date line Qwen3.8 called the August 2026 date a future-dated typo and made fixing it its first, critical point. With the line it worked out that the entry ended about two months ago. Nemotron 3 Nano with the date line was right three times of three with thinking on and once of three with it off.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <linearGradient id="thor-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C6CCD5"/><stop offset="1" stop-color="#979EA9"/>
+    </linearGradient>
+    <linearGradient id="switch-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B4656"/><stop offset="1" stop-color="#232B37"/>
+    </linearGradient>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1040" height="420" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">What a model believes today is</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Without a date, a model takes the end of its training data as now.</text>
+  <path d="M60,170 H980" stroke="#5D6B7A" stroke-width="2"/>
+  <circle cx="150" cy="170" r="9" fill="#B7791F"/>
+  <text x="150.0" y="142.0" class="name" text-anchor="middle" xml:space="preserve">training data ends</text>
+  <text x="150.0" y="210.0" class="sub" text-anchor="middle" xml:space="preserve">the model&#x27;s sense of now</text>
+  <circle cx="560" cy="170" r="9" fill="#2F6FDB"/>
+  <text x="560.0" y="142.0" class="name" text-anchor="middle" xml:space="preserve">Aug 2026</text>
+  <text x="560.0" y="210.0" class="sub" text-anchor="middle" xml:space="preserve">the document&#x27;s last date</text>
+  <circle cx="900" cy="170" r="9" fill="#2E8B3D"/>
+  <text x="900.0" y="142.0" class="name" text-anchor="middle" xml:space="preserve">20 Oct 2026</text>
+  <text x="900.0" y="210.0" class="sub" text-anchor="middle" xml:space="preserve">today, the date line says</text>
+  <rect x="60" y="250" width="440" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M72,250.7 H66 V345.3 H72 A11.3,11.3 0 0 1 60.7,334 V262 A11.3,11.3 0 0 1 72,250.7 Z" fill="#CF4526"/>
+  <rect x="76" y="282.0" width="32" height="32" rx="8" fill="#FCEBE6"/>
+  <g transform="translate(82.0,288.0) scale(0.8333)"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zM11 7h2v4.6l3.3 2-1 1.7-4.3-2.6z" fill="#CF4526" fill-rule="evenodd"/></g>
+  <text x="118.0" y="276.0" class="name" text-anchor="start" xml:space="preserve">Without the date line</text>
+  <text x="118.0" y="294.0" class="sub" text-anchor="start" xml:space="preserve">&quot;Aug 2026 is in the future: a typo</text>
+  <text x="118.0" y="312.0" class="sub" text-anchor="start" xml:space="preserve">or a placeholder.&quot; Qwen3.8 made it</text>
+  <text x="118.0" y="330.0" class="sub" text-anchor="start" xml:space="preserve">its first fix, ranked critical.</text>
+  <rect x="540" y="250" width="440" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M552,250.7 H546 V345.3 H552 A11.3,11.3 0 0 1 540.7,334 V262 A11.3,11.3 0 0 1 552,250.7 Z" fill="#2E8B3D"/>
+  <rect x="556" y="282.0" width="32" height="32" rx="8" fill="#E7F5E9"/>
+  <g transform="translate(562.0,288.0) scale(0.8333)"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zM11 7h2v4.6l3.3 2-1 1.7-4.3-2.6z" fill="#2E8B3D" fill-rule="evenodd"/></g>
+  <text x="598.0" y="276.0" class="name" text-anchor="start" xml:space="preserve">With the date line</text>
+  <text x="598.0" y="294.0" class="sub" text-anchor="start" xml:space="preserve">&quot;Today is Oct 19, 2026, so this</text>
+  <text x="598.0" y="312.0" class="sub" text-anchor="start" xml:space="preserve">ended about 2 months ago.&quot;</text>
+  <text x="598.0" y="330.0" class="sub" text-anchor="start" xml:space="preserve">The complaint was gone.</text>
+  <text x="60.0" y="382.0" class="note" text-anchor="start" style="fill:#7F8EA0" xml:space="preserve">Nemotron 3 Nano with the date line: right 3 times of 3 with thinking on, 1 of 3 with it off.</text>
+</svg>
