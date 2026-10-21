@@ -349,3 +349,48 @@ fn registration_is_closed_without_a_keyring() -> Outcome {
 
     Ok(())
 }
+
+fn vllm_upstreams(server: &FakeServer) -> Upstreams {
+    Upstreams {
+        default: Engine::llama(server.address(), None),
+        others: Vec::new(),
+        search: Endpoint::new(server.address(), None),
+        web: Box::new(crate::testing::FakeWeb::default()),
+    }
+}
+
+const QWEN_LIST: &str = r#"{"data":[{"id":"Qwen3.8-Flash-Next","owned_by":"vllm"}]}"#;
+
+#[test]
+fn a_name_no_server_has_is_renamed_to_the_served_model() -> Outcome {
+    let server = FakeServer::start(vec![json_response(QWEN_LIST); 3])?;
+    let mut fields = body::fields(br#"{"model":"NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0"}"#)?;
+
+    vllm_upstreams(&server).route(&mut fields);
+
+    assert_eq!(body::model(&fields), Some("Qwen3.8-Flash-Next"));
+    Ok(())
+}
+
+#[test]
+fn a_served_name_is_kept() -> Outcome {
+    let server = FakeServer::start(vec![json_response(QWEN_LIST); 3])?;
+    let mut fields = body::fields(br#"{"model":"Qwen3.8-Flash-Next"}"#)?;
+
+    vllm_upstreams(&server).route(&mut fields);
+
+    assert_eq!(body::model(&fields), Some("Qwen3.8-Flash-Next"));
+    Ok(())
+}
+
+#[test]
+fn a_listed_but_unloaded_name_is_kept_so_the_router_can_load_it() -> Outcome {
+    let list = r#"{"data":[{"id":"loaded","status":{"value":"loaded"}},{"id":"nano","status":{"value":"unloaded"}}]}"#;
+    let server = FakeServer::start(vec![json_response(list); 3])?;
+    let mut fields = body::fields(br#"{"model":"nano"}"#)?;
+
+    vllm_upstreams(&server).route(&mut fields);
+
+    assert_eq!(body::model(&fields), Some("nano"));
+    Ok(())
+}

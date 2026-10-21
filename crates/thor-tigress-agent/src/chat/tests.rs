@@ -973,9 +973,22 @@ fn rejects_a_body_that_is_not_an_object() -> Outcome {
 
 #[test]
 fn only_the_first_tool_round_forces_a_call() {
-    assert_eq!(Phase::of_tool_round(1), Phase::Opening);
-    assert_eq!(Phase::of_tool_round(2), Phase::Searching);
-    assert_eq!(Phase::of_tool_round(MAX_ROUNDS), Phase::Searching);
+    let llama = Engine::llama("127.0.0.1:8079".to_string(), None);
+
+    assert_eq!(Phase::of_tool_round(1, &llama), Phase::Opening);
+    assert_eq!(Phase::of_tool_round(2, &llama), Phase::Searching);
+    assert_eq!(Phase::of_tool_round(MAX_ROUNDS, &llama), Phase::Searching);
+}
+
+#[test]
+fn an_edge_engine_is_never_forced_to_call() {
+    let edge = Engine::edge(
+        "Qwen3.6-35B-A3B-NVFP4".to_string(),
+        "127.0.0.1:8081".to_string(),
+    );
+
+    assert_eq!(Phase::of_tool_round(1, &edge), Phase::Searching);
+    assert_eq!(Phase::of_tool_round(2, &edge), Phase::Searching);
 }
 
 #[test]
@@ -1036,7 +1049,9 @@ fn searches_then_answers_with_a_forced_first_round_and_recency() -> Outcome {
     )])?;
     let mut client = Vec::new();
     let request = br#"{"messages":[{"role":"user","content":"news?"}],"thor_web_search":true}"#;
-    answer(&mut client, request, &upstreams(&model, &search))?;
+    let mut servers = upstreams(&model, &search);
+    servers.default = Engine::llama(model.address(), None);
+    answer(&mut client, request, &servers)?;
 
     let seen = model.requests()?;
 
@@ -1056,6 +1071,27 @@ fn searches_then_answers_with_a_forced_first_round_and_recency() -> Outcome {
     assert_eq!(sent.first(), Some(&call));
     assert!(sent.contains(&r#"{"thor":{"search":{"query":"rust","results":[{"domain":"r","published":"2026-10-06","title":"Rust","url":"https://r"}]}}}"#.to_string()), "{sent:?}");
     assert_eq!(sent.last().map(String::as_str), Some(DONE));
+
+    Ok(())
+}
+
+#[test]
+fn an_edge_engine_chooses_its_first_search_itself() -> Outcome {
+    let call = call_event("web_search", r#"{"query":"rust"}"#);
+    let reply = r#"{"choices":[{"delta":{"content":"Rust 1.99"}}]}"#;
+    let model = FakeServer::start(vec![event_stream(&[&call]), event_stream(&[reply])])?;
+    let search = FakeServer::start(vec![json_response(
+        r#"{"results":[{"title":"Rust","url":"https://r","content":"new"}]}"#,
+    )])?;
+    let mut client = Vec::new();
+    let request = br#"{"messages":[{"role":"user","content":"news?"}],"thor_web_search":true}"#;
+
+    answer(&mut client, request, &upstreams(&model, &search))?;
+
+    let seen = model.requests()?;
+
+    assert!(seen[0].contains(r#""tools""#));
+    assert!(!seen[0].contains(r#""tool_choice""#), "{}", seen[0]);
 
     Ok(())
 }

@@ -3,4 +3,5 @@
 pub mod body;
 pub mod messages;
 pub mod models;
+pub mod server_search;
 pub mod upstream;

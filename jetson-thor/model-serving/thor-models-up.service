@@ -1,0 +1,11 @@
+[Unit]
+Description=Load Nemotron 3.5 Bolt once the Edge-LLM engine answers (thor-model up)
+After=thor-chat.service thor-edge-llm.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving/thor-model up
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=default.target

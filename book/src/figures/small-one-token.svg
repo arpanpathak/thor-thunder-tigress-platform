@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 480" width="1040" height="480" role="img" aria-label="To write one token the GPU reads every active weight from memory once: the experts the router picked, attention, embeddings and the output head, about 2.5 to 3.5 GB for these models. Memory delivers 273 GB per second, so tokens per second can be at most 273 divided by the gigabytes read per token: 91 for 3 GB. Real engines reach 50 to 70 percent of that. Three things lower the bytes: fewer active parameters, fewer bits per weight, and more tokens per read.">
+  <style>
+    text { font-family: Inter, "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif; fill: #1B2430; }
+    .title { font-size: 18px; font-weight: 650; }
+    .lede { font-size: 12.5px; fill: #5D6B7A; }
+    .name { font-size: 14px; font-weight: 650; }
+    .sub { font-size: 12px; fill: #5D6B7A; }
+    .note { font-size: 12px; fill: #5D6B7A; }
+    .tab { font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; fill: #5D6B7A; }
+    .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+    .dim { fill: #8794A3; }
+    .strong { font-weight: 700; }
+    .trap { fill: #CF4526; font-weight: 700; }
+    .pill { font-size: 11px; font-weight: 600; }
+    .wire { fill: none; stroke: #3F5873; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .wire.danger { stroke: #CF4526; stroke-dasharray: 6 5; }
+    .wire.idle { stroke: #7F8EA0; stroke-dasharray: 2 5; }
+  </style>
+  <defs>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="135%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#1B2430" flood-opacity="0.13"/>
+    </filter>
+    <linearGradient id="thor-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C6CCD5"/><stop offset="1" stop-color="#979EA9"/>
+    </linearGradient>
+    <linearGradient id="switch-body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3B4656"/><stop offset="1" stop-color="#232B37"/>
+    </linearGradient>
+    <marker id="head" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#3F5873"/>
+    </marker>
+    <marker id="head-danger" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#CF4526"/>
+    </marker>
+    <marker id="head-idle" viewBox="0 0 10 10" refX="8.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto">
+      <path d="M0.5,1 L9,5 L0.5,9 Z" fill="#7F8EA0"/>
+    </marker>
+  </defs>
+  <rect width="1040" height="480" rx="14" fill="#FBFAF6"/>
+  <text x="32.0" y="42.0" class="title" text-anchor="start" xml:space="preserve">Why decoding speed is a memory question</text>
+  <text x="32.0" y="63.0" class="lede" text-anchor="start" xml:space="preserve">Every token reads the active weights once, and memory delivers 273 GB a second.</text>
+  <path d="M40,149 A120.0,9 0 0 1 280,149 V281 A120.0,9 0 0 1 40,281 Z" fill="#FBF1DC" stroke="#B7791F" stroke-width="1.4" filter="url(#lift)"/>
+  <ellipse cx="160.0" cy="149" rx="120.0" ry="9" fill="#FFFFFF" stroke="#B7791F" stroke-width="1.4"/>
+  <text x="160.0" y="200.0" class="name" text-anchor="middle" xml:space="preserve">Active weights</text>
+  <text x="160.0" y="218.0" class="sub" text-anchor="middle" xml:space="preserve">the experts the router picked,</text>
+  <text x="160.0" y="236.0" class="sub" text-anchor="middle" xml:space="preserve">attention, embeddings, head:</text>
+  <text x="160.0" y="254.0" class="sub" text-anchor="middle" xml:space="preserve">about 2.5 to 3.5 GB</text>
+  <rect x="400" y="160" width="250" height="110" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M412,160.7 H406 V269.3 H412 A11.3,11.3 0 0 1 400.7,258 V172 A11.3,11.3 0 0 1 412,160.7 Z" fill="#5E9400"/>
+  <rect x="416" y="199.0" width="32" height="32" rx="8" fill="#EEF6DC"/>
+  <g transform="translate(422.0,205.0) scale(0.8333)"><path d="M8 2h2v3h4V2h2v3h2a1 1 0 0 1 1 1v2h3v2h-3v4h3v2h-3v2a1 1 0 0 1-1 1h-2v3h-2v-3h-4v3H8v-3H6a1 1 0 0 1-1-1v-2H2v-2h3v-4H2V8h3V6a1 1 0 0 1 1-1h2zM7 7v10h10V7zm2.5 2.5h5v5h-5z" fill="#5E9400" fill-rule="evenodd"/></g>
+  <text x="458.0" y="193.0" class="name" text-anchor="start" xml:space="preserve">The GPU</text>
+  <text x="458.0" y="211.0" class="sub" text-anchor="start" xml:space="preserve">multiplies each weight once</text>
+  <text x="458.0" y="229.0" class="sub" text-anchor="start" xml:space="preserve">for this token, then</text>
+  <text x="458.0" y="247.0" class="sub" text-anchor="start" xml:space="preserve">needs all of them again</text>
+  <path class="wire" d="M280,215 L400,215" marker-end="url(#head)"/>
+  <rect x="306.6" y="206.0" width="66.8" height="18" rx="9" fill="#FBFAF6" stroke="#3F5873" stroke-width="1"/>
+  <text x="340.0" y="218.8" class="pill" text-anchor="middle" style="fill:#3F5873" xml:space="preserve">273 GB/s</text>
+  <rect x="770" y="160" width="230" height="110" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M782,160.7 H776 V269.3 H782 A11.3,11.3 0 0 1 770.7,258 V172 A11.3,11.3 0 0 1 782,160.7 Z" fill="#2F6FDB"/>
+  <rect x="786" y="199.0" width="32" height="32" rx="8" fill="#EAF1FD"/>
+  <g transform="translate(792.0,205.0) scale(0.8333)"><path d="M6 2h8l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.5V8h4.5zM8 11v1.6h8V11zm0 3.2v1.6h8v-1.6zm0 3.2V19h5v-1.6z" fill="#2F6FDB" fill-rule="evenodd"/></g>
+  <text x="828.0" y="202.0" class="name" text-anchor="start" xml:space="preserve">One token</text>
+  <text x="828.0" y="220.0" class="sub" text-anchor="start" xml:space="preserve">the next word piece,</text>
+  <text x="828.0" y="238.0" class="sub" text-anchor="start" xml:space="preserve">then the loop repeats</text>
+  <path class="wire" d="M650,215 L770,215" marker-end="url(#head)"/>
+  <rect x="40" y="350" width="470" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M52,350.7 H46 V445.3 H52 A11.3,11.3 0 0 1 40.7,434 V362 A11.3,11.3 0 0 1 52,350.7 Z" fill="#2E8B3D"/>
+  <rect x="56" y="382.0" width="32" height="32" rx="8" fill="#E7F5E9"/>
+  <g transform="translate(62.0,388.0) scale(0.8333)"><path d="M12 2a10 10 0 1 1 0 20 10 10 0 0 1 0-20zm0 2.4a7.6 7.6 0 1 0 0 15.2 7.6 7.6 0 0 0 0-15.2zM11 7h2v4.6l3.3 2-1 1.7-4.3-2.6z" fill="#2E8B3D" fill-rule="evenodd"/></g>
+  <text x="98.0" y="376.0" class="name" text-anchor="start" xml:space="preserve">The ceiling</text>
+  <text x="98.0" y="394.0" class="sub" text-anchor="start" xml:space="preserve">tokens per second  ≤  273 GB/s ÷ bytes read</text>
+  <text x="98.0" y="412.0" class="sub" text-anchor="start" xml:space="preserve">per token. 3 GB per token: at most 91.</text>
+  <text x="98.0" y="430.0" class="sub" text-anchor="start" xml:space="preserve">Real engines reach 50 to 70% of it.</text>
+  <rect x="530" y="350" width="470" height="96" rx="12" fill="#FFFFFF" stroke="#D5DBE3" stroke-width="1.3" filter="url(#lift)"/>
+  <path d="M542,350.7 H536 V445.3 H542 A11.3,11.3 0 0 1 530.7,434 V362 A11.3,11.3 0 0 1 542,350.7 Z" fill="#7A4FD0"/>
+  <rect x="546" y="382.0" width="32" height="32" rx="8" fill="#F0EAFB"/>
+  <g transform="translate(552.0,388.0) scale(0.8333)"><path d="M12 2 2 7l10 5 10-5zm-7.8 8.6L2 11.7l10 5 10-5-2.2-1.1L12 14.5zm0 4.7L2 16.4l10 5 10-5-2.2-1.1L12 19.2z" fill="#7A4FD0" fill-rule="evenodd"/></g>
+  <text x="588.0" y="376.0" class="name" text-anchor="start" xml:space="preserve">What lowers the bytes</text>
+  <text x="588.0" y="394.0" class="sub" text-anchor="start" xml:space="preserve">fewer active parameters (mixture of experts),</text>
+  <text x="588.0" y="412.0" class="sub" text-anchor="start" xml:space="preserve">fewer bits per weight (quantization),</text>
+  <text x="588.0" y="430.0" class="sub" text-anchor="start" xml:space="preserve">more tokens per read (speculative decoding)</text>
+</svg>

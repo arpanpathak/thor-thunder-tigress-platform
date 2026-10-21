@@ -251,7 +251,7 @@ pub fn answer(client: &mut dyn Client, body: &[u8], upstreams: &Upstreams) -> Ou
         .and_then(|value| value.as_bool())
         .unwrap_or(false);
 
-    let engine = upstreams.serving(body::model(&fields));
+    let engine = upstreams.route(&mut fields);
     fit(&mut fields, engine);
 
     let streamed = fields.get(STREAM).and_then(Value::as_bool).unwrap_or(false);
@@ -271,7 +271,7 @@ pub fn answer(client: &mut dyn Client, body: &[u8], upstreams: &Upstreams) -> Ou
             nudge_to_search(&mut fields);
 
             as_events(client, &mut |client| {
-                search_loop(client, fields.clone(), upstreams, model)
+                search_loop(client, fields.clone(), upstreams, engine)
             })
         }
     }
@@ -326,11 +326,12 @@ fn search_loop(
     client: &mut dyn Write,
     mut fields: Fields,
     upstreams: &Upstreams,
-    model: &Endpoint,
+    engine: &Engine,
 ) -> Outcome {
+    let model = engine.endpoint();
     let mut research = Research::new(&user_text(&fields));
 
-    match tool_rounds(client, &mut fields, upstreams, model, &mut research)? {
+    match tool_rounds(client, &mut fields, upstreams, engine, &mut research)? {
         Ending::Replied => return Ok(()),
         Ending::Exhausted => (),
     }
@@ -358,13 +359,13 @@ fn tool_rounds(
     client: &mut dyn Write,
     fields: &mut Fields,
     upstreams: &Upstreams,
-    model: &Endpoint,
+    engine: &Engine,
     research: &mut Research,
 ) -> Outcome<Ending> {
     for round in 1..=MAX_ROUNDS {
-        prepare(fields, Phase::of_tool_round(round));
+        prepare(fields, Phase::of_tool_round(round, engine));
 
-        let reply = stream_round(client, fields, model)?;
+        let reply = stream_round(client, fields, engine.endpoint())?;
 
         if reply.cut || reply.calls.is_empty() {
             return Ok(Ending::Replied);
@@ -569,11 +570,15 @@ enum Phase {
 
 impl Phase {
     /// The phase for tool round `round`, counting from one. The first round is
-    /// the one that requires a call, so that both models look something up
-    /// before they answer.
-    fn of_tool_round(round: usize) -> Phase {
-        match round {
-            1 => Phase::Opening,
+    /// the one that requires a call, so that the model looks something up
+    /// before it answers.
+    ///
+    /// An Edge-LLM engine is never sent `required`: Qwen3.6 on TensorRT
+    /// Edge-LLM 0.11.0 answers in plain text when a call is required and
+    /// thinking is off, and calls the tool with `auto` (measured 2026-10-20).
+    fn of_tool_round(round: usize, engine: &Engine) -> Phase {
+        match (round, engine) {
+            (1, Engine::Llama { .. }) => Phase::Opening,
             _ => Phase::Searching,
         }
     }
@@ -917,7 +922,6 @@ fn relay_chunk(
     sieve: &mut Sieve,
     round: &mut Round,
 ) -> Outcome {
-
     if let Some(event) = forward(&mut value, data, sieve) {
         response::send_event(client, &event)?;
     }

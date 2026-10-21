@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+#
+# thor-model — which models the Thor serves. Two sets do not fit in memory together:
+#
+#   small    Nemotron 3 Nano Q8_0 and Nemotron 3.5 Bolt on llama.cpp, and NVIDIA's
+#            Qwen3.6-35B-A3B NVFP4 on TensorRT Edge-LLM; about 3 minutes of downtime
+#   qwen38   Qwen3.8 Flash Next on vLLM; about 20 minutes of downtime
+#
+# Switching stops one set before starting the other, then restarts the agent so the set's
+# first model answers requests that name no model (or a stale one). Run it on the Thor or
+# the dev box; off the Thor it runs itself there over ssh.
+#
+#   thor-model            what is served now, and free memory
+#   thor-model small      the three small models
+#   thor-model qwen38     Qwen3.8 alone
+#   thor-model up         load Bolt once the Edge-LLM engine answers (thor-models-up runs it at boot)
+#
+# Order matters in the small set. The Edge-LLM engine stalls while loading when Bolt is
+# already in memory (measured 2026-10-20: ten minutes at 100% CPU with 17 GB free), and
+# loads in under a minute before it. So Bolt is not loaded by llama-server at startup;
+# "up" loads it after the engine answers.
+#
+# Settings stay in ~/.config/thor-chat/env: VLLM_MODEL is commented out while the small
+# set serves, because thor-tigress-serve puts vLLM first for the agent whenever it is set.
+
+set -euo pipefail
+
+if [ "$(hostname)" != "arpanpathak" ]; then
+    exec ssh thor "~/Projects/thor-thunder-tigress-platform/jetson-thor/model-serving/thor-model" "$@"
+fi
+
+env_file="$HOME/.config/thor-chat/env"
+key="$(cat "$HOME/.config/thor-chat/api-key")"
+nano="NVIDIA-Nemotron-3-Nano-30B-A3B-Q8_0"
+bolt="NVIDIA-Nemotron-3.5-Bolt-74B-A9B-24GB"
+
+free_gb() {
+    awk '/MemAvailable/ { printf "%.1f", $2 / 1048576 }' /proc/meminfo
+}
+
+answering() {
+    curl -sf -m 5 -H "Authorization: Bearer $key" "http://127.0.0.1:$1/v1/models" >/dev/null
+}
+
+wait_for() {
+    local port="$1" what="$2" minutes="$3" waited=0
+    printf 'waiting for %s on :%s' "$what" "$port" >&2
+    until answering "$port"; do
+        if [ "$waited" -ge $((minutes * 60)) ]; then
+            printf '\n%s did not answer within %s minutes\n' "$what" "$minutes" >&2
+            exit 1
+        fi
+        sleep 10
+        waited=$((waited + 10))
+        printf '.' >&2
+    done
+    printf ' up after %s s\n' "$waited" >&2
+}
+
+warm() {
+    local model="$1"
+    printf 'loading %s' "$model" >&2
+    curl -sf -m 30 -H "Authorization: Bearer $key" -H 'Content-Type: application/json' \
+        -d "{\"model\":\"$model\"}" http://127.0.0.1:8079/models/load >/dev/null || true
+    until curl -sf -m 600 -H "Authorization: Bearer $key" -H 'Content-Type: application/json' \
+            -d "{\"model\":\"$model\",\"max_tokens\":1,\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}" \
+            http://127.0.0.1:8079/v1/chat/completions >/dev/null; do
+        sleep 5
+        printf '.' >&2
+    done
+    printf ' ready\n' >&2
+}
+
+restart_agent() {
+    systemctl --user restart thor-tigress-agent
+    wait_for 8080 "the agent" 1
+}
+
+status() {
+    local unit
+    for unit in thor-chat thor-edge-llm thor-vllm thor-tigress-agent; do
+        printf '  %-20s %s\n' "$unit" "$(systemctl --user is-active "$unit" || true)"
+    done
+    printf '  served: '
+    curl -sf -m 10 -H "Authorization: Bearer $key" http://127.0.0.1:8080/v1/models |
+        grep -o '"id":"[^"]*","max_model_len":[0-9]*\|"id":"[^"]*","object":"model"' | cut -d'"' -f4 | paste -sd ' ' || echo "nothing answers"
+    printf '  free memory: %s GiB\n' "$(free_gb)"
+}
+
+up() {
+    if ! systemctl --user is-enabled -q thor-edge-llm; then
+        echo "the small set is not the one enabled; nothing to load" >&2
+        return
+    fi
+    wait_for 8079 "llama-server" 2
+    warm "$nano"
+    wait_for 8081 "the Edge-LLM engine" 15
+    warm "$bolt"
+}
+
+small() {
+    systemctl --user disable --now thor-vllm
+    sed -i -e 's/^VLLM_MODEL=/#VLLM_MODEL=/' -e 's/^MODEL_ON_STARTUP=.*/MODEL_ON_STARTUP=true/' "$env_file"
+
+    systemctl --user enable --now thor-chat thor-edge-llm
+    up
+    restart_agent
+}
+
+qwen38() {
+    systemctl --user disable --now thor-chat thor-edge-llm
+    sed -i -e 's/^#VLLM_MODEL=/VLLM_MODEL=/' -e 's/^MODEL_ON_STARTUP=.*/MODEL_ON_STARTUP=false/' "$env_file"
+
+    printf 'free memory before vLLM: %s GiB; the weights load for about 16 minutes\n' "$(free_gb)" >&2
+    systemctl --user enable --now thor-vllm
+    wait_for 8000 "vLLM" 30
+
+    systemctl --user enable --now thor-chat
+    restart_agent
+}
+
+case "${1:-status}" in
+    status) status ;;
+    up)     up ;;
+    small)  small; status ;;
+    qwen38) qwen38; status ;;
+    *)      sed -n '3,16p' "$0" >&2; exit 2 ;;
+esac

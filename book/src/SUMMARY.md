@@ -42,5 +42,6 @@
 - [Keys, and the cryptography under them](ch25-keyring-crypto.md)
 - [What the context window is](ch26-context-window.md)
 - [Qwen3.8 Flash Next on the Thor](ch31-qwen38-flash-next.md)
+- [Three models on one Thor](ch32-three-small-models.md)
 
 [Appendix: commands and files](appendix-commands.md)
