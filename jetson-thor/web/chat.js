@@ -479,13 +479,17 @@ async function send(text) {
   const history = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content)).map(({ role, content }) => ({ role, content }));
   const formatting = "Write readable Markdown. Separate logical ideas with blank lines. Use short paragraphs and spaced lists when helpful; keep related points together. Preserve code indentation and blank lines between logical code sections.";
 
+  // The models' training ends before today, so without the date they take
+  // recent dates (a job ending last month) for typos or the future.
+  const today = `Today's date is ${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}.`;
+
   // Web search is its own mode: the server writes the system line for the hunt,
   // and adding the formatting line above it makes the model keep hunting until
   // the rounds run out. Keep the old shape there; keep formatting in plain chat.
   if ($("web").checked) {
-    if (settings.system.trim()) history.unshift({ role: "system", content: settings.system.trim() });
+    history.unshift({ role: "system", content: [today, settings.system.trim()].filter(Boolean).join("\n\n") });
   } else {
-    history.unshift({ role: "system", content: [formatting, settings.system.trim()].filter(Boolean).join("\n\n") });
+    history.unshift({ role: "system", content: [today, formatting, settings.system.trim()].filter(Boolean).join("\n\n") });
   }
 
   const body = chatRequest(history, $("think").checked);
