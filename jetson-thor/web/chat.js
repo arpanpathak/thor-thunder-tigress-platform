@@ -603,6 +603,8 @@ function setBusy(busy) {
 const input = $("input");
 
 function autosize() { input.style.height = "auto"; input.style.height = `${input.scrollHeight}px`; }
+// The height limit depends on the window (and the on-screen keyboard), so re-fit on resize.
+window.addEventListener("resize", autosize);
 
 let draftTimer;
 
