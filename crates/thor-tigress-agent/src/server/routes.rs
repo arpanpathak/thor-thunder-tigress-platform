@@ -58,7 +58,7 @@ const PAGE: StaticFile = StaticFile {
 };
 
 /// The other files in the web folder that may be served; nothing else is.
-const FILES: [StaticFile; 12] = [
+const FILES: [StaticFile; 14] = [
     StaticFile {
         name: "about.html",
         content_type: "text/html; charset=utf-8",
@@ -92,6 +92,14 @@ const FILES: [StaticFile; 12] = [
         content_type: "text/javascript; charset=utf-8",
     },
     StaticFile {
+        name: "rich.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "attachments.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
         name: "themes.css",
         content_type: "text/css; charset=utf-8",
     },
@@ -108,6 +116,36 @@ const FILES: [StaticFile; 12] = [
         content_type: "image/png",
     },
 ];
+
+/// Libraries the page loads the first time a reply or a file needs one: KaTeX
+/// for formulas, Mermaid for diagrams, PDF.js for attached PDFs. Each name
+/// carries its version, so a browser may keep it for good: a new version is a
+/// new name.
+const LIBRARIES: [StaticFile; 5] = [
+    StaticFile {
+        name: "katex-0.19.0.min.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "katex-0.19.0.css",
+        content_type: "text/css; charset=utf-8",
+    },
+    StaticFile {
+        name: "mermaid-12.1.0.min.js",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "pdf-6.4.299.min.mjs",
+        content_type: "text/javascript; charset=utf-8",
+    },
+    StaticFile {
+        name: "pdf.worker-6.4.299.min.mjs",
+        content_type: "text/javascript; charset=utf-8",
+    },
+];
+
+/// How long a browser keeps a library: a year, without asking again.
+const KEPT: &str = "public, max-age=31536000, immutable";
 
 /// The settings, shared by every request.
 type Shared = State<Arc<Config>>;
@@ -132,7 +170,8 @@ pub fn router(config: Arc<Config>) -> Router {
 
 /// Answers a CORS preflight itself, refuses a request that touches the model
 /// (`/v1/…`) without the key, and passes every other request on. Every
-/// answer may be read by pages on other sites and is kept by no cache.
+/// answer may be read by pages on other sites, and none is kept by a cache
+/// unless its handler says otherwise (the versioned libraries).
 ///
 /// Letting other sites call is safe because access is by a key in a header,
 /// not by cookies: a site can't use a visitor's key without having it.
@@ -154,7 +193,9 @@ async fn guard(State(config): Shared, request: Request, next: Next) -> Response 
         header::ACCESS_CONTROL_ALLOW_ORIGIN,
         HeaderValue::from_static("*"),
     );
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    headers
+        .entry(header::CACHE_CONTROL)
+        .or_insert(HeaderValue::from_static("no-store"));
 
     response
 }
@@ -303,7 +344,10 @@ fn listed_file(path: &str) -> Option<StaticFile> {
 
     let name = within_site(path).strip_prefix('/')?;
 
-    FILES.into_iter().find(|file| file.name == name)
+    FILES
+        .into_iter()
+        .chain(LIBRARIES)
+        .find(|file| file.name == name)
 }
 
 /// Answers a `GET` for anything that is no route: a listed file, or not found.
@@ -321,7 +365,15 @@ async fn file(State(config): Shared, method: Method, uri: Uri) -> Outcome<Respon
 async fn send_file(folder: &Path, file: StaticFile) -> Outcome<Response> {
     let body = tokio::fs::read(folder.join(file.name)).await?;
 
-    Ok(([(header::CONTENT_TYPE, file.content_type)], body).into_response())
+    let mut response = ([(header::CONTENT_TYPE, file.content_type)], body).into_response();
+
+    if LIBRARIES.contains(&file) {
+        response
+            .headers_mut()
+            .insert(header::CACHE_CONTROL, HeaderValue::from_static(KEPT));
+    }
+
+    Ok(response)
 }
 
 #[cfg(test)]

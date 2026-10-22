@@ -83,12 +83,16 @@ function highlight(code, lang) {
   return fragment;
 }
 
-// ---- inline markdown: code, emphasis and links, all built from DOM nodes ----
-// The pattern matches, in order, a code span, bold, italic, a markdown link,
+// ---- inline markdown: code, math, emphasis and links, all built from DOM nodes ----
+// The pattern matches, in order, a code span, a formula, bold, italic, a markdown link,
 // an <autolink>, a bare address, and a <br> the model writes to break a line
 // inside a table cell. A bare address matters most in job answers, where the
 // model writes the posting's URL as plain text.
-const INLINE = /`(?<code>[^`\n]+)`|\*\*(?<bold>[^*\n]+)\*\*|\*(?<italic>[^*\n]+)\*|(?<!\w)_(?<under>[^_\n]+)_(?!\w)|\[(?<text>[^\]\n]+)\]\((?<href>https?:\/\/[^)\s]+)\)|<(?<auto>https?:\/\/[^>\s]+)>|(?<bare>(?:https?:\/\/|www\.)[^\s<>"'`]+)|(?<br><\/?[bB][rR]\s*\/?>)/g;
+//
+// A formula is $$…$$, \[…\], \(…\) or $…$. A single $ follows Pandoc's rule so prices
+// stay text: the opening $ has no space after it, the closing $ has no space
+// before it and no digit after it, so "$5 and $10" is not math.
+const INLINE = /`(?<code>[^`\n]+)`|\$\$(?<display>[^$\n]+?)\$\$|\\\[(?<bracket>[^\n]+?)\\\]|\\\((?<paren>[^\n]+?)\\\)|(?<![\\$\w])\$(?<math>[^\s$](?:[^$\n]*?[^\s$\\])?)\$(?![\d$])|\*\*(?<bold>[^*\n]+)\*\*|\*(?<italic>[^*\n]+)\*|(?<!\w)_(?<under>[^_\n]+)_(?!\w)|\[(?<text>[^\]\n]+)\]\((?<href>https?:\/\/[^)\s]+)\)|<(?<auto>https?:\/\/[^>\s]+)>|(?<bare>(?:https?:\/\/|www\.)[^\s<>"'`]+)|(?<br><\/?[bB][rR]\s*\/?>)/g;
 
 // Whether a run of text has more closing than opening parentheses, so a URL
 // that ends inside `(see …)` loses the sentence's bracket and not its own.
@@ -145,6 +149,10 @@ function inline(parent, text, insideLink = false) {
     parent.append(document.createTextNode(text.slice(position, match.index)));
     const groups = match.groups;
     if (groups.code !== undefined) parent.append(element("code", "", groups.code));
+    else if (groups.display !== undefined) parent.append(formula(groups.display, true, "span"));
+    else if (groups.bracket !== undefined) parent.append(formula(groups.bracket, true, "span"));
+    else if (groups.paren !== undefined) parent.append(formula(groups.paren, false, "span"));
+    else if (groups.math !== undefined) parent.append(formula(groups.math, false, "span"));
     else if (groups.bold !== undefined) parent.append(emphasis("strong", groups.bold, insideLink));
     else if (groups.italic !== undefined) parent.append(emphasis("em", groups.italic, insideLink));
     else if (groups.under !== undefined) parent.append(emphasis("em", groups.under, insideLink));
@@ -165,9 +173,15 @@ function inline(parent, text, insideLink = false) {
   parent.append(document.createTextNode(text.slice(position)));
 }
 
-function codeBlock(code, lang) {
-  const block = element("div", "code");
-  const bar = element("div", "bar");
+// A formula's TeX, marked for rich.js to typeset; until then it reads as TeX.
+function formula(tex, display, tag) {
+  const node = element(tag, display ? "math display" : "math", tex);
+  node.dataset.tex = tex.trim();
+
+  return node;
+}
+
+function copyButton(code) {
   const copy = element("button", "", "copy");
   copy.type = "button";
 
@@ -178,7 +192,14 @@ function codeBlock(code, lang) {
     setTimeout(() => { copy.textContent = "copy"; }, 1400);
   });
 
-  bar.append(element("span", "", lang || "text"), copy);
+  return copy;
+}
+
+function codeBlock(code, lang) {
+  const block = element("div", "code");
+  const bar = element("div", "bar");
+
+  bar.append(element("span", "", lang || "text"), copyButton(code));
 
   const pre = element("pre");
   const node = element("code");
@@ -188,6 +209,64 @@ function codeBlock(code, lang) {
   block.append(bar, pre);
 
   return block;
+}
+
+// Switches a figure between its drawing and its code.
+function toggleButton(block, kind) {
+  const toggle = element("button", "", "code");
+  toggle.type = "button";
+
+  toggle.addEventListener("click", () => {
+    const showing = block.classList.toggle("show-code");
+
+    toggle.textContent = showing ? (kind === "svg" ? "drawing" : "diagram") : "code";
+  });
+
+  return toggle;
+}
+
+// Saves the drawing as an .svg file: what rich.js drew, or the code itself.
+function downloadButton(block, code, kind) {
+  const save = element("button", "", "download");
+  save.type = "button";
+
+  save.addEventListener("click", () => {
+    const svg = block.dataset.svg || code;
+    const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+
+    const link = element("a");
+    link.href = url;
+    link.download = kind === "svg" ? "drawing.svg" : "diagram.svg";
+    link.click();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  return save;
+}
+
+// A ```mermaid diagram or ```svg drawing. rich.js draws it into `.view`; the
+// code stays one click away, and the drawing can be saved as an .svg file.
+function figureBlock(code, kind, lang) {
+  const block = element("div", "code figure");
+  block.dataset.kind = kind;
+
+  const bar = element("div", "bar");
+  bar.append(element("span", "", lang), toggleButton(block, kind), downloadButton(block, code, kind), copyButton(code));
+
+  const pre = element("pre");
+  pre.append(element("code", "", code));
+
+  block.append(bar, element("div", "view"), pre);
+
+  return block;
+}
+
+function figureKind(lang, code) {
+  if (lang === "mermaid") return "mermaid";
+  if (lang === "svg" || (["xml", "html"].includes(lang) && /^\s*(<\?xml[^>]*>\s*)?<svg\b/i.test(code))) return "svg";
+
+  return "";
 }
 
 // ---- tables ----
@@ -277,11 +356,12 @@ const FENCE = /^\s*(```+|~~~+)\s*([\w+#.-]*)/;
 const HEADING = /^(#{1,6})\s+(.*)$/;
 const QUOTE = /^\s*>/;
 const ITEM = /^\s*([-*+]|\d+[.)])\s+(.*)$/;
+const MATH_OPEN = /^\s*(\$\$|\\\[)/;
 
 function startsBlock(lines, index) {
   const line = lines[index];
 
-  return !line.trim() || FENCE.test(line) || HEADING.test(line) || QUOTE.test(line) || tableAt(lines, index) || ITEM.test(line);
+  return !line.trim() || FENCE.test(line) || MATH_OPEN.test(line) || HEADING.test(line) || QUOTE.test(line) || tableAt(lines, index) || ITEM.test(line);
 }
 
 function codeFence(parent, lines, index, fence) {
@@ -292,8 +372,51 @@ function codeFence(parent, lines, index, fence) {
     body.push(lines[index]);
     index += 1;
   }
-  index += 1;
-  parent.append(codeBlock(body.join("\n"), fence[2].toLowerCase()));
+
+  // A fence still open is a reply mid-stream: it is shown as code until it closes.
+  const closed = index < lines.length;
+  const code = body.join("\n");
+  const lang = fence[2].toLowerCase();
+  const kind = closed ? figureKind(lang, code) : "";
+
+  parent.append(kind ? figureBlock(code, kind, lang) : codeBlock(code, lang));
+
+  return index + 1;
+}
+
+// A display formula: $$ … $$ or \[ … \], on one line or across several.
+// One that has not closed yet is mid-stream, and shows as its TeX.
+function mathBlock(parent, lines, index) {
+  const open = MATH_OPEN.exec(lines[index])[1];
+  const close = open === "$$" ? "$$" : "\\]";
+  const body = [];
+
+  let line = lines[index].trim().slice(open.length);
+  let closed = false;
+
+  for (;;) {
+    const end = line.indexOf(close);
+
+    if (end !== -1) {
+      body.push(line.slice(0, end));
+      closed = true;
+      index += 1;
+
+      break;
+    }
+
+    body.push(line);
+    index += 1;
+
+    if (index >= lines.length) break;
+
+    line = lines[index];
+  }
+
+  const tex = body.join("\n").trim();
+
+  if (closed && tex) parent.append(formula(tex, true, "div"));
+  else if (tex) parent.append(element("p", "math-pending", `${open} ${tex}`));
 
   return index;
 }
@@ -358,6 +481,7 @@ export function markdown(parent, text) {
     const fence = FENCE.exec(line);
 
     if (fence) { index = codeFence(parent, lines, index, fence); continue; }
+    if (MATH_OPEN.test(line)) { index = mathBlock(parent, lines, index); continue; }
     if (!line.trim()) { index += 1; continue; }
 
     const heading = HEADING.exec(line);

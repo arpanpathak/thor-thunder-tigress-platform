@@ -3,6 +3,8 @@ import { initAppearance, closeHistoryOnMobile } from "./appearance.js";
 import { markdown, searchPanel, readPanel } from "./markdown.js";
 import { LocalHistory, newConversation, conversationTitle, preferences as store } from "./history.js";
 import { chatEvents } from "./stream.js";
+import { enrich } from "./rich.js";
+import { readFile, stored, describe, hasPictures, apiContent } from "./attachments.js";
 
 const API = "/";
 
@@ -26,6 +28,9 @@ let models = [];
 // can be told apart before it is chosen.
 const ENGINE_NAMES = { llamacpp: "llama.cpp", "tensorrt-edgellm": "TensorRT Edge-LLM" };
 let modelEngines = {};
+// What each model reads, from /v1/models (`architecture.input_modalities`).
+// An engine that doesn't say is given pictures and may refuse them itself.
+let modelInputs = {};
 let controller = null;
 
 const SUGGESTIONS = [
@@ -63,7 +68,8 @@ function renderMessage(message) {
   }
 
   if (message.role === "user") {
-    body.textContent = message.content;
+    if (message.attachments?.length) body.append(messageFiles(message.attachments));
+    if (message.content) body.append(message.content);
   } else {
     if (message.searches && message.searches.length) body.append(part("sources", searchPanel(message.searches)));
     if (message.reads && message.reads.length) body.append(part("read", readPanel(message.reads)));
@@ -84,6 +90,7 @@ function renderMessage(message) {
     } else {
       const content = element("div");
       markdown(content, message.content || "");
+      enrich(content);
       if (message.streaming) content.classList.add("cursor");
       body.append(part("content", content));
     }
@@ -348,7 +355,9 @@ function activateConversation(next) {
 }
 
 function exportChat() {
-  const text = messages.map((message) => `## ${message.role === "user" ? "You" : "Thor Tigress Cub"}\n\n${message.content}${message.error ? `\n\nError: ${message.error}` : ""}`).join("\n\n---\n\n");
+  const files = (message) => (message.attachments?.length ? `Attached: ${message.attachments.map((meta) => meta.name).join(", ")}\n\n` : "");
+
+  const text = messages.map((message) => `## ${message.role === "user" ? "You" : "Thor Tigress Cub"}\n\n${files(message)}${message.content}${message.error ? `\n\nError: ${message.error}` : ""}`).join("\n\n---\n\n");
   const draft = input.value ? `\n\n## Unsent draft\n\n${input.value}` : "";
   const url = URL.createObjectURL(new Blob([`# ${conversationTitle(conversation)}\n\n${text}${draft}\n`], { type: "text/markdown" }));
   const link = element("a");
@@ -398,12 +407,14 @@ async function connect() {
 
     models = (data.data || []).map((model) => model.id);
     modelEngines = Object.fromEntries((data.data || []).map((model) => [model.id, model.owned_by]));
+    modelInputs = Object.fromEntries((data.data || []).map((model) => [model.id, model.architecture?.input_modalities]));
 
     if (needsKey) showServer("bad", "access key needed");
     else if (models.length) showModels();
     else showServer("bad", "no model served");
 
     render();
+    updateAttachNote();
   } catch {
     showServer("bad", "server not reachable");
   }
@@ -412,6 +423,7 @@ async function connect() {
 $("model").addEventListener("change", () => {
   store.set("model", $("model").value);
   render();
+  updateAttachNote();
 });
 
 // The one place a request is built. `max_tokens` bounds every round; when
@@ -462,8 +474,8 @@ function chatRequest(history, thinking) {
   return body;
 }
 
-async function send(text) {
-  messages.push({ role: "user", content: text });
+async function send(text, attachments = []) {
+  messages.push({ role: "user", content: text, ...(attachments.length ? { attachments } : {}) });
   const reply = { role: "assistant", content: "", reasoning: "", streaming: true };
   messages.push(reply);
 
@@ -476,8 +488,17 @@ async function send(text) {
   const deadline = setTimeout(() => controller?.abort(new Error("The response exceeded ten minutes. The partial reply was saved.")), 600000);
   setBusy(true);
 
-  const history = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content)).map(({ role, content }) => ({ role, content }));
-  const formatting = "Write readable Markdown. Separate logical ideas with blank lines. Use short paragraphs and spaced lists when helpful; keep related points together. Preserve code indentation and blank lines between logical code sections.";
+  // A user turn with files becomes image and text parts; see attachments.js.
+  const vision = canSee();
+  const turns = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content));
+
+  const history = await Promise.all(turns.map(async (message) => ({
+    role: message.role,
+    content: message.role === "user" ? await apiContent(message, vision) : message.content,
+  })));
+
+  const formatting = "Write readable Markdown. Separate logical ideas with blank lines. Use short paragraphs and spaced lists when helpful; keep related points together. Preserve code indentation and blank lines between logical code sections. "
+    + "Write math in LaTeX: $…$ inline and $$…$$ on lines of their own. Draw diagrams (flowcharts, sequences, architectures, state machines) in a ```mermaid block, and drawings or illustrations as a ```svg block; you can't make photos.";
 
   // The models' training ends before today, so without the date they take
   // recent dates (a job ending last month) for typos or the future.
@@ -599,10 +620,210 @@ function setBusy(busy) {
   $("send").type = busy ? "button" : "submit";
 }
 
+// ---- attachments ----
+// Files picked for the next message: { meta, payload, done, ready, error }.
+let pending = [];
+
+function canSee(id = chosenModel()) {
+  const inputs = modelInputs[id];
+
+  return !Array.isArray(inputs) || inputs.includes("image");
+}
+
+const FILE_LABELS = { image: "IMG", pdf: "PDF", text: "TXT" };
+
+function chipState(item) {
+  if (item.error) return " failed";
+  if (item.ready === false) return " reading";
+
+  return "";
+}
+
+function fileChip(item, remove) {
+  const { meta } = item;
+
+  const chip = element("div", `attachment${chipState(item)}`);
+  chip.title = meta.name;
+
+  if (meta.thumb) {
+    const picture = element("img", "thumb");
+    picture.src = meta.thumb;
+    picture.alt = "";
+
+    chip.append(picture);
+  } else {
+    chip.append(element("span", "thumb", FILE_LABELS[meta.kind] || "FILE"));
+  }
+
+  const detail = item.error || (item.ready === false ? "reading…" : describe(meta));
+  const label = element("span", "label");
+  label.append(element("span", "name", meta.name), element("span", "detail", detail));
+  chip.append(label);
+
+  if (remove) {
+    const button = element("button", "remove", "×");
+    button.type = "button";
+    button.setAttribute("aria-label", `Remove ${meta.name}`);
+    button.addEventListener("click", remove);
+
+    chip.append(button);
+  }
+
+  return chip;
+}
+
+// A sent picture: a thumbnail that opens full size.
+function pictureButton(meta) {
+  const picture = element("img");
+  picture.src = meta.thumb;
+  picture.alt = meta.name;
+
+  const open = element("button", "picture");
+  open.type = "button";
+  open.setAttribute("aria-label", `Open ${meta.name}`);
+  open.append(picture);
+  open.addEventListener("click", () => viewPicture(meta));
+
+  return open;
+}
+
+// The files in a sent message: pictures as thumbnails, other files as chips.
+function messageFiles(attachments) {
+  const list = element("div", "attachments");
+
+  attachments.forEach((meta) => {
+    list.append(meta.kind === "image" ? pictureButton(meta) : fileChip({ meta }));
+  });
+
+  return list;
+}
+
+async function viewPicture(meta) {
+  const payload = await stored.get(meta.id);
+  const viewer = $("viewer");
+  const picture = viewer.querySelector("img");
+
+  picture.src = payload?.image || meta.thumb;
+  picture.alt = meta.name;
+
+  viewer.querySelector(".viewer-name").textContent = payload
+    ? meta.name
+    : `${meta.name} · only the thumbnail is still in this browser`;
+
+  viewer.showModal();
+}
+
+function updateAttachNote() {
+  const note = $("attach-note");
+
+  const pictures = pending.some((item) => item.ready && !item.error && hasPictures([item.meta]));
+  const blind = pictures && models.length && !canSee();
+
+  if (!blind) {
+    note.textContent = "";
+    note.hidden = true;
+
+    return;
+  }
+
+  const seeing = models.filter((id) => canSee(id)).map(modelLabel);
+  const others = seeing.length ? ` ${seeing.join(" and ")} can.` : "";
+
+  note.textContent = `${modelLabel(chosenModel() || "")} can't see pictures, so they'll be left out.${others}`;
+  note.hidden = false;
+}
+
+function renderPending() {
+  const chips = pending.map((item) => fileChip(item, () => {
+    pending = pending.filter((other) => other !== item);
+    renderPending();
+  }));
+
+  const box = $("attachments");
+  box.replaceChildren(...chips);
+  box.hidden = !pending.length;
+
+  updateAttachNote();
+}
+
+function guessKind(file) {
+  if (file.type.startsWith("image/")) return "image";
+  if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) return "pdf";
+
+  return "text";
+}
+
+function addFiles(files) {
+  [...files].forEach((file) => {
+    const meta = { id: "", name: file.name || "pasted file", size: file.size, kind: guessKind(file) };
+    const item = { meta, ready: false };
+
+    item.done = readFile(file)
+      .then((read) => {
+        item.meta = read.meta;
+        item.payload = read.payload;
+      })
+      .catch((error) => {
+        item.error = error.message;
+      })
+      .finally(() => {
+        item.ready = true;
+        renderPending();
+      });
+
+    pending.push(item);
+  });
+
+  renderPending();
+}
+
+$("attach").addEventListener("click", () => $("file-input").click());
+
+$("file-input").addEventListener("change", () => {
+  addFiles($("file-input").files);
+
+  $("file-input").value = "";
+  input.focus();
+});
+
+// Dropping files anywhere on the page attaches them.
+const carriesFiles = (event) => event.dataTransfer?.types?.includes("Files");
+
+document.addEventListener("dragover", (event) => {
+  if (!carriesFiles(event)) return;
+
+  event.preventDefault();
+  $("composer").classList.add("dropping");
+});
+
+document.addEventListener("dragleave", (event) => {
+  if (!event.relatedTarget) $("composer").classList.remove("dropping");
+});
+
+document.addEventListener("drop", (event) => {
+  $("composer").classList.remove("dropping");
+
+  if (!carriesFiles(event)) return;
+
+  event.preventDefault();
+  addFiles(event.dataTransfer.files);
+});
+
 // ---- input ----
 const input = $("input");
 
+// A pasted screenshot or file is attached; pasted text is typed as usual.
+input.addEventListener("paste", (event) => {
+  const files = event.clipboardData?.files;
+
+  if (!files?.length || event.clipboardData.types.includes("text/plain")) return;
+
+  event.preventDefault();
+  addFiles(files);
+});
+
 function autosize() { input.style.height = "auto"; input.style.height = `${input.scrollHeight}px`; }
+
 // The height limit depends on the window (and the on-screen keyboard), so re-fit on resize.
 window.addEventListener("resize", autosize);
 
@@ -619,17 +840,40 @@ window.addEventListener("storage", () => { renderHistory(); });
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && event.shiftKey && !event.isComposing) { event.preventDefault(); $("composer").requestSubmit(); }
 });
-$("composer").addEventListener("submit", (event) => {
+
+let submitting = false;
+
+$("composer").addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  if (controller || needsKey) return;
+  if (controller || needsKey || submitting) return;
+
   const text = input.value.trim();
-  if (!text) return;
 
-  input.value = "";
-  autosize();
+  if (!text && !pending.length) return;
 
-  send(text);
+  submitting = true;
+
+  try {
+    // A file still being read (a long PDF) is waited for; one that failed is left behind.
+    await Promise.all(pending.map((item) => item.done));
+
+    const files = pending.filter((item) => !item.error);
+
+    if (!text && !files.length) return;
+
+    await Promise.all(files.map((item) => stored.put(item.meta.id, item.payload)));
+
+    pending = [];
+    renderPending();
+
+    input.value = "";
+    autosize();
+
+    send(text, files.map((item) => item.meta));
+  } finally {
+    submitting = false;
+  }
 });
 $("send").addEventListener("click", () => { if (controller) controller.abort(); });
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && controller && !document.querySelector("dialog[open]") && !document.body.classList.contains("history-open")) controller.abort(); });
@@ -645,7 +889,15 @@ $("open-privacy").addEventListener("click", () => $("privacy").showModal());
 $("delete-chat").addEventListener("close", () => {
   if ($("delete-chat").returnValue !== "delete") return;
   const id = $("delete-chat").dataset.id;
-  if (history.remove(id) && id === conversation.id) activateConversation(history.list()[0] || newConversation());
+  const sent = history.read(id)?.messages || [];
+  const files = sent.flatMap((message) => (message.attachments || []).map((meta) => meta.id));
+
+  if (history.remove(id)) {
+    stored.remove(files);
+
+    if (id === conversation.id) activateConversation(history.list()[0] || newConversation());
+  }
+
   renderHistory();
 });
 $("think").checked = store.get("think", false);

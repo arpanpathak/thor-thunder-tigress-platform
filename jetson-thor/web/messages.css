@@ -50,6 +50,29 @@
   .tok-number { color: var(--tok-number); } .tok-macro { color: var(--tok-macro); font-weight: 600; }
   .tok-attr { color: var(--tok-attr); } .tok-lifetime { color: var(--tok-lifetime); } .tok-call { color: var(--tok-call); }
 
+  /* Files in a sent message. */
+  .msg.user .attachments { margin: 0 0 10px; white-space: normal; }
+  .msg.user .picture { min-height: 0; padding: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg); }
+  .msg.user .picture img { display: block; width: 112px; height: 112px; object-fit: cover; }
+  .msg.user .picture:hover { border-color: var(--accent); }
+
+  /* Formulas. Until KaTeX loads, a formula reads as its TeX. */
+  .math.display { display: block; margin: 14px 0; overflow-x: auto; overflow-y: hidden; text-align: center; }
+  .math:not(.typeset) { font: 13.5px/1.55 ui-monospace, monospace; color: var(--muted); white-space: pre-wrap; }
+  .math .katex { font-size: 1.08em; }
+  .math-pending { font: 13.5px/1.55 ui-monospace, monospace; color: var(--muted); white-space: pre-wrap; }
+
+  /* Diagrams and drawings: the picture, with its code one click away. */
+  .figure .view { display: grid; place-items: center; padding: 16px; min-height: 60px; overflow-x: auto; }
+  .figure .view img { max-width: 100%; height: auto; }
+  .figure[data-kind="svg"] .view { background: #fff; }
+  .figure pre { display: none; }
+  .figure.show-code pre, .figure.failed pre { display: block; }
+  .figure.show-code .view { display: none; }
+  .figure.failed .view { place-items: start; min-height: 0; padding: 10px 14px; }
+  .figure-note { color: var(--muted); font-size: 13px; }
+  .figure .bar button + button { margin-left: 4px; }
+
   /* Sources: each result is a small card with its title, domain and date. */
   details.sources { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
   details.sources summary { cursor: pointer; user-select: none; }

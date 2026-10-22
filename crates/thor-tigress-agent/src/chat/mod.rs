@@ -456,7 +456,8 @@ fn note(client: &mut dyn Write, ledger: &Ledger) -> Outcome {
 }
 
 /// The text of the user's own messages: one of the two places a fetchable
-/// address may come from, the other being a search result.
+/// address may come from, the other being a search result. A message sent with
+/// files is a list of parts; its text parts count, its pictures do not.
 fn user_text(fields: &Fields) -> String {
     fields
         .get(MESSAGES)
@@ -465,7 +466,8 @@ fn user_text(fields: &Fields) -> String {
             messages
                 .iter()
                 .filter(|message| message.get("role").and_then(Value::as_str) == Some("user"))
-                .filter_map(|message| message.get("content").and_then(Value::as_str))
+                .map(shape::text_of)
+                .filter(|text| !text.is_empty())
                 .collect::<Vec<_>>()
                 .join("\n")
         })

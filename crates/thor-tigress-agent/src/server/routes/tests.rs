@@ -132,6 +132,8 @@ fn serves_only_the_listed_files() {
         ("/history.js", "history.js"),
         ("/themes.css", "themes.css"),
         ("/thor-tigress-cub/messages.css", "messages.css"),
+        ("/rich.js", "rich.js"),
+        ("/thor-tigress-cub/attachments.js", "attachments.js"),
     ];
     let unlisted = [
         "/serve.sh",
@@ -147,6 +149,26 @@ fn serves_only_the_listed_files() {
     }
 
     for path in unlisted {
+        assert_eq!(listed_file(path), None, "{path}");
+    }
+}
+
+#[test]
+fn serves_the_libraries_only_by_their_versioned_names() {
+    for file in LIBRARIES {
+        for path in [
+            format!("/{}", file.name),
+            format!("/thor-tigress-cub/{}", file.name),
+        ] {
+            assert_eq!(listed_file(&path), Some(file), "{path}");
+        }
+    }
+
+    for path in [
+        "/mermaid.min.js",
+        "/katex.min.js",
+        "/node_modules/katex/dist/katex.min.js",
+    ] {
         assert_eq!(listed_file(path), None, "{path}");
     }
 }
@@ -172,6 +194,27 @@ async fn serves_the_page_and_health_without_a_key() -> Result<()> {
         "text/css; charset=utf-8"
     );
     assert_eq!(health.body, r#"{"status":"ok"}"#);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_library_may_be_kept_and_a_page_file_may_not() -> Result<()> {
+    let web = web_folder()?;
+    fs::write(web.path().join("pdf-6.4.299.min.mjs"), "export {}")?;
+
+    let config = setup(web.path(), Vec::new(), Some("k"))?;
+    let library = ask(&config, get("/thor-tigress-cub/pdf-6.4.299.min.mjs")).await?;
+    let style = ask(&config, get("/chat.css")).await?;
+
+    assert_eq!(library.status, StatusCode::OK);
+    assert_eq!(
+        library.header(header::CONTENT_TYPE),
+        "text/javascript; charset=utf-8",
+        "a module script must be served as JavaScript or the browser refuses it"
+    );
+    assert_eq!(library.header(header::CACHE_CONTROL), KEPT);
+    assert_eq!(style.header(header::CACHE_CONTROL), "no-store");
 
     Ok(())
 }
