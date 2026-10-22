@@ -356,6 +356,7 @@ function activateConversation(next) {
 
 function exportChat() {
   const files = (message) => (message.attachments?.length ? `Attached: ${message.attachments.map((meta) => meta.name).join(", ")}\n\n` : "");
+
   const text = messages.map((message) => `## ${message.role === "user" ? "You" : "Thor Tigress Cub"}\n\n${files(message)}${message.content}${message.error ? `\n\nError: ${message.error}` : ""}`).join("\n\n---\n\n");
   const draft = input.value ? `\n\n## Unsent draft\n\n${input.value}` : "";
   const url = URL.createObjectURL(new Blob([`# ${conversationTitle(conversation)}\n\n${text}${draft}\n`], { type: "text/markdown" }));
@@ -490,10 +491,12 @@ async function send(text, attachments = []) {
   // A user turn with files becomes image and text parts; see attachments.js.
   const vision = canSee();
   const turns = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content));
+
   const history = await Promise.all(turns.map(async (message) => ({
     role: message.role,
     content: message.role === "user" ? await apiContent(message, vision) : message.content,
   })));
+
   const formatting = "Write readable Markdown. Separate logical ideas with blank lines. Use short paragraphs and spaced lists when helpful; keep related points together. Preserve code indentation and blank lines between logical code sections. "
     + "Write math in LaTeX: $…$ inline and $$…$$ on lines of their own. Draw diagrams (flowcharts, sequences, architectures, state machines) in a ```mermaid block, and drawings or illustrations as a ```svg block; you can't make photos.";
 
@@ -629,23 +632,32 @@ function canSee(id = chosenModel()) {
 
 const FILE_LABELS = { image: "IMG", pdf: "PDF", text: "TXT" };
 
+function chipState(item) {
+  if (item.error) return " failed";
+  if (item.ready === false) return " reading";
+
+  return "";
+}
+
 function fileChip(item, remove) {
   const { meta } = item;
-  const chip = element("div", `attachment${item.error ? " failed" : item.ready === false ? " reading" : ""}`);
+
+  const chip = element("div", `attachment${chipState(item)}`);
   chip.title = meta.name;
 
   if (meta.thumb) {
     const picture = element("img", "thumb");
     picture.src = meta.thumb;
     picture.alt = "";
+
     chip.append(picture);
   } else {
     chip.append(element("span", "thumb", FILE_LABELS[meta.kind] || "FILE"));
   }
 
+  const detail = item.error || (item.ready === false ? "reading…" : describe(meta));
   const label = element("span", "label");
-  label.append(element("span", "name", meta.name),
-    element("span", "detail", item.error || (item.ready === false ? "reading…" : describe(meta))));
+  label.append(element("span", "name", meta.name), element("span", "detail", detail));
   chip.append(label);
 
   if (remove) {
@@ -653,29 +665,34 @@ function fileChip(item, remove) {
     button.type = "button";
     button.setAttribute("aria-label", `Remove ${meta.name}`);
     button.addEventListener("click", remove);
+
     chip.append(button);
   }
 
   return chip;
 }
 
-// The files in a sent message: pictures as thumbnails that open full size,
-// other files as chips.
+// A sent picture: a thumbnail that opens full size.
+function pictureButton(meta) {
+  const picture = element("img");
+  picture.src = meta.thumb;
+  picture.alt = meta.name;
+
+  const open = element("button", "picture");
+  open.type = "button";
+  open.setAttribute("aria-label", `Open ${meta.name}`);
+  open.append(picture);
+  open.addEventListener("click", () => viewPicture(meta));
+
+  return open;
+}
+
+// The files in a sent message: pictures as thumbnails, other files as chips.
 function messageFiles(attachments) {
   const list = element("div", "attachments");
 
   attachments.forEach((meta) => {
-    if (meta.kind !== "image") { list.append(fileChip({ meta })); return; }
-
-    const open = element("button", "picture");
-    open.type = "button";
-    open.setAttribute("aria-label", `Open ${meta.name}`);
-    const picture = element("img");
-    picture.src = meta.thumb;
-    picture.alt = meta.name;
-    open.append(picture);
-    open.addEventListener("click", () => viewPicture(meta));
-    list.append(open);
+    list.append(meta.kind === "image" ? pictureButton(meta) : fileChip({ meta }));
   });
 
   return list;
@@ -684,43 +701,75 @@ function messageFiles(attachments) {
 async function viewPicture(meta) {
   const payload = await stored.get(meta.id);
   const viewer = $("viewer");
-  viewer.querySelector("img").src = payload?.image || meta.thumb;
-  viewer.querySelector("img").alt = meta.name;
-  viewer.querySelector(".viewer-name").textContent = payload ? meta.name : `${meta.name} · only the thumbnail is still in this browser`;
+  const picture = viewer.querySelector("img");
+
+  picture.src = payload?.image || meta.thumb;
+  picture.alt = meta.name;
+
+  viewer.querySelector(".viewer-name").textContent = payload
+    ? meta.name
+    : `${meta.name} · only the thumbnail is still in this browser`;
+
   viewer.showModal();
 }
 
 function updateAttachNote() {
   const note = $("attach-note");
+
   const pictures = pending.some((item) => item.ready && !item.error && hasPictures([item.meta]));
-  const seeing = models.filter((id) => canSee(id)).map(modelLabel);
   const blind = pictures && models.length && !canSee();
 
-  note.textContent = blind
-    ? `${modelLabel(chosenModel() || "")} can't see pictures, so they'll be left out.${seeing.length ? ` ${seeing.join(" and ")} can.` : ""}`
-    : "";
-  note.hidden = !blind;
+  if (!blind) {
+    note.textContent = "";
+    note.hidden = true;
+
+    return;
+  }
+
+  const seeing = models.filter((id) => canSee(id)).map(modelLabel);
+  const others = seeing.length ? ` ${seeing.join(" and ")} can.` : "";
+
+  note.textContent = `${modelLabel(chosenModel() || "")} can't see pictures, so they'll be left out.${others}`;
+  note.hidden = false;
 }
 
 function renderPending() {
-  const box = $("attachments");
-  box.replaceChildren(...pending.map((item) => fileChip(item, () => {
+  const chips = pending.map((item) => fileChip(item, () => {
     pending = pending.filter((other) => other !== item);
     renderPending();
-  })));
+  }));
+
+  const box = $("attachments");
+  box.replaceChildren(...chips);
   box.hidden = !pending.length;
+
   updateAttachNote();
+}
+
+function guessKind(file) {
+  if (file.type.startsWith("image/")) return "image";
+  if (/pdf$/i.test(file.type) || /\.pdf$/i.test(file.name)) return "pdf";
+
+  return "text";
 }
 
 function addFiles(files) {
   [...files].forEach((file) => {
-    const guess = file.type.startsWith("image/") ? "image" : /pdf$/i.test(file.type) || /\.pdf$/i.test(file.name) ? "pdf" : "text";
-    const item = { meta: { id: "", name: file.name || "pasted file", size: file.size, kind: guess }, ready: false };
+    const meta = { id: "", name: file.name || "pasted file", size: file.size, kind: guessKind(file) };
+    const item = { meta, ready: false };
 
     item.done = readFile(file)
-      .then(({ meta, payload }) => { item.meta = meta; item.payload = payload; })
-      .catch((error) => { item.error = error.message; })
-      .finally(() => { item.ready = true; renderPending(); });
+      .then((read) => {
+        item.meta = read.meta;
+        item.payload = read.payload;
+      })
+      .catch((error) => {
+        item.error = error.message;
+      })
+      .finally(() => {
+        item.ready = true;
+        renderPending();
+      });
 
     pending.push(item);
   });
@@ -729,23 +778,33 @@ function addFiles(files) {
 }
 
 $("attach").addEventListener("click", () => $("file-input").click());
+
 $("file-input").addEventListener("change", () => {
   addFiles($("file-input").files);
+
   $("file-input").value = "";
   input.focus();
 });
 
 // Dropping files anywhere on the page attaches them.
 const carriesFiles = (event) => event.dataTransfer?.types?.includes("Files");
+
 document.addEventListener("dragover", (event) => {
   if (!carriesFiles(event)) return;
+
   event.preventDefault();
   $("composer").classList.add("dropping");
 });
-document.addEventListener("dragleave", (event) => { if (!event.relatedTarget) $("composer").classList.remove("dropping"); });
+
+document.addEventListener("dragleave", (event) => {
+  if (!event.relatedTarget) $("composer").classList.remove("dropping");
+});
+
 document.addEventListener("drop", (event) => {
   $("composer").classList.remove("dropping");
+
   if (!carriesFiles(event)) return;
+
   event.preventDefault();
   addFiles(event.dataTransfer.files);
 });
@@ -756,12 +815,15 @@ const input = $("input");
 // A pasted screenshot or file is attached; pasted text is typed as usual.
 input.addEventListener("paste", (event) => {
   const files = event.clipboardData?.files;
+
   if (!files?.length || event.clipboardData.types.includes("text/plain")) return;
+
   event.preventDefault();
   addFiles(files);
 });
 
 function autosize() { input.style.height = "auto"; input.style.height = `${input.scrollHeight}px`; }
+
 // The height limit depends on the window (and the on-screen keyboard), so re-fit on resize.
 window.addEventListener("resize", autosize);
 
@@ -778,13 +840,16 @@ window.addEventListener("storage", () => { renderHistory(); });
 input.addEventListener("keydown", (event) => {
   if (event.key === "Enter" && event.shiftKey && !event.isComposing) { event.preventDefault(); $("composer").requestSubmit(); }
 });
+
 let submitting = false;
 
 $("composer").addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (controller || needsKey || submitting) return;
+
   const text = input.value.trim();
+
   if (!text && !pending.length) return;
 
   submitting = true;
@@ -792,10 +857,13 @@ $("composer").addEventListener("submit", async (event) => {
   try {
     // A file still being read (a long PDF) is waited for; one that failed is left behind.
     await Promise.all(pending.map((item) => item.done));
+
     const files = pending.filter((item) => !item.error);
+
     if (!text && !files.length) return;
 
     await Promise.all(files.map((item) => stored.put(item.meta.id, item.payload)));
+
     pending = [];
     renderPending();
 
@@ -821,12 +889,15 @@ $("open-privacy").addEventListener("click", () => $("privacy").showModal());
 $("delete-chat").addEventListener("close", () => {
   if ($("delete-chat").returnValue !== "delete") return;
   const id = $("delete-chat").dataset.id;
-  const files = (history.read(id)?.messages || []).flatMap((message) => (message.attachments || []).map((meta) => meta.id));
+  const sent = history.read(id)?.messages || [];
+  const files = sent.flatMap((message) => (message.attachments || []).map((meta) => meta.id));
 
   if (history.remove(id)) {
     stored.remove(files);
+
     if (id === conversation.id) activateConversation(history.list()[0] || newConversation());
   }
+
   renderHistory();
 });
 $("think").checked = store.get("think", false);

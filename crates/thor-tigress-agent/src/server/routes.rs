@@ -364,6 +364,7 @@ async fn file(State(config): Shared, method: Method, uri: Uri) -> Outcome<Respon
 
 async fn send_file(folder: &Path, file: StaticFile) -> Outcome<Response> {
     let body = tokio::fs::read(folder.join(file.name)).await?;
+
     let mut response = ([(header::CONTENT_TYPE, file.content_type)], body).into_response();
 
     if LIBRARIES.contains(&file) {

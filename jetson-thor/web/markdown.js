@@ -211,6 +211,40 @@ function codeBlock(code, lang) {
   return block;
 }
 
+// Switches a figure between its drawing and its code.
+function toggleButton(block, kind) {
+  const toggle = element("button", "", "code");
+  toggle.type = "button";
+
+  toggle.addEventListener("click", () => {
+    const showing = block.classList.toggle("show-code");
+
+    toggle.textContent = showing ? (kind === "svg" ? "drawing" : "diagram") : "code";
+  });
+
+  return toggle;
+}
+
+// Saves the drawing as an .svg file: what rich.js drew, or the code itself.
+function downloadButton(block, code, kind) {
+  const save = element("button", "", "download");
+  save.type = "button";
+
+  save.addEventListener("click", () => {
+    const svg = block.dataset.svg || code;
+    const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+
+    const link = element("a");
+    link.href = url;
+    link.download = kind === "svg" ? "drawing.svg" : "diagram.svg";
+    link.click();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  return save;
+}
+
 // A ```mermaid diagram or ```svg drawing. rich.js draws it into `.view`; the
 // code stays one click away, and the drawing can be saved as an .svg file.
 function figureBlock(code, kind, lang) {
@@ -218,29 +252,11 @@ function figureBlock(code, kind, lang) {
   block.dataset.kind = kind;
 
   const bar = element("div", "bar");
-  const toggle = element("button", "", "code");
-  toggle.type = "button";
-  toggle.addEventListener("click", () => {
-    const showing = block.classList.toggle("show-code");
-    toggle.textContent = showing ? (kind === "svg" ? "drawing" : "diagram") : "code";
-  });
-
-  const save = element("button", "", "download");
-  save.type = "button";
-  save.addEventListener("click", () => {
-    const svg = block.dataset.svg || code;
-    const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
-    const link = element("a");
-    link.href = url;
-    link.download = kind === "svg" ? "drawing.svg" : "diagram.svg";
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  });
-
-  bar.append(element("span", "", lang), toggle, save, copyButton(code));
+  bar.append(element("span", "", lang), toggleButton(block, kind), downloadButton(block, code, kind), copyButton(code));
 
   const pre = element("pre");
   pre.append(element("code", "", code));
+
   block.append(bar, element("div", "view"), pre);
 
   return block;
@@ -373,17 +389,28 @@ function codeFence(parent, lines, index, fence) {
 function mathBlock(parent, lines, index) {
   const open = MATH_OPEN.exec(lines[index])[1];
   const close = open === "$$" ? "$$" : "\\]";
-  const first = lines[index].trim().slice(open.length);
   const body = [];
+
+  let line = lines[index].trim().slice(open.length);
   let closed = false;
 
-  for (let line = first; ; line = lines[index]) {
+  for (;;) {
     const end = line.indexOf(close);
 
-    if (end !== -1) { body.push(line.slice(0, end)); closed = true; index += 1; break; }
+    if (end !== -1) {
+      body.push(line.slice(0, end));
+      closed = true;
+      index += 1;
+
+      break;
+    }
+
     body.push(line);
     index += 1;
+
     if (index >= lines.length) break;
+
+    line = lines[index];
   }
 
   const tex = body.join("\n").trim();

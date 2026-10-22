@@ -19,7 +19,13 @@ function script(src) {
       const node = element("script");
       node.src = src;
       node.onload = resolve;
-      node.onerror = () => { loading.delete(src); node.remove(); reject(new Error(`${src} did not load`)); };
+
+      node.onerror = () => {
+        loading.delete(src);
+        node.remove();
+        reject(new Error(`${src} did not load`));
+      };
+
       document.head.append(node);
     }));
   }
@@ -33,6 +39,7 @@ function stylesheet(href) {
   const link = element("link");
   link.rel = "stylesheet";
   link.href = href;
+
   document.head.append(link);
 }
 
@@ -40,11 +47,20 @@ function stylesheet(href) {
 // `trust: false` keeps \href, \url, \includegraphics and the \html… commands
 // out, so a formula can only ever draw math. The limits stop a formula from
 // growing without bound or expanding macros forever.
-const KATEX_OPTIONS = { throwOnError: false, trust: false, strict: "ignore", maxSize: 30, maxExpand: 1000, output: "htmlAndMathml" };
+const KATEX_OPTIONS = {
+  throwOnError: false,
+  trust: false,
+  strict: "ignore",
+  maxSize: 30,
+  maxExpand: 1000,
+  output: "htmlAndMathml",
+};
 
 function typesetOne(node) {
+  const options = { ...KATEX_OPTIONS, displayMode: node.classList.contains("display") };
+
   try {
-    globalThis.katex.render(node.dataset.tex, node, { ...KATEX_OPTIONS, displayMode: node.classList.contains("display") });
+    globalThis.katex.render(node.dataset.tex, node, options);
     node.classList.add("typeset");
   } catch {
     // The TeX source stays on the page as text.
@@ -54,9 +70,14 @@ function typesetOne(node) {
 /** Draws every formula under `root`: at once when KaTeX is loaded, else after it loads. */
 export function typeset(root) {
   const pending = () => root.querySelectorAll(".math:not(.typeset)");
+
   if (!pending().length) return;
 
-  if (globalThis.katex) { pending().forEach(typesetOne); return; }
+  if (globalThis.katex) {
+    pending().forEach(typesetOne);
+
+    return;
+  }
 
   stylesheet(KATEX_STYLE);
   script(KATEX_SCRIPT).then(() => pending().forEach(typesetOne)).catch(() => {});
@@ -67,7 +88,9 @@ export function typeset(root) {
 // script in it runs and nothing it links to loads, so a model can draw anything
 // without being able to reach the page.
 function svgImage(svg, label) {
-  const text = /\sxmlns=/.test(svg.slice(0, svg.indexOf(">"))) ? svg : svg.replace(/<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  const opening = svg.slice(0, svg.indexOf(">"));
+  const text = /\sxmlns=/.test(opening) ? svg : svg.replace(/<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
+
   const image = element("img");
   image.alt = label;
   image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`;
@@ -84,6 +107,7 @@ function solid(value) {
   const probe = element("span");
   probe.style.color = value;
   probe.hidden = true;
+
   document.body.append(probe);
   const resolved = getComputedStyle(probe).color;
   probe.remove();
@@ -94,18 +118,22 @@ function solid(value) {
   pixel.fillStyle = resolved;
   pixel.fillRect(0, 0, 1, 1);
 
-  return `#${[...pixel.getImageData(0, 0, 1, 1).data.slice(0, 3)].map((n) => n.toString(16).padStart(2, "0")).join("")}`;
+  const [red, green, blue] = pixel.getImageData(0, 0, 1, 1).data;
+
+  return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 
 // The page theme's colours, so a diagram matches the theme it is drawn in.
 function themeColours() {
   const style = getComputedStyle(document.documentElement);
   const colour = (name) => solid(style.getPropertyValue(name).trim());
+
   const background = colour("--bg");
-  const [r, g, b] = background.match(/[\da-f]{2}/gi).map((hex) => parseInt(hex, 16));
+  const [red, green, blue] = background.match(/[\da-f]{2}/gi).map((hex) => parseInt(hex, 16));
+  const luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 
   return {
-    darkMode: 0.2126 * r + 0.7152 * g + 0.0722 * b < 128,
+    darkMode: luminance < 128,
     background,
     primaryColor: colour("--panel"),
     primaryTextColor: colour("--text"),
@@ -125,21 +153,34 @@ function themeColours() {
 // while it streams, and the same diagram must not be drawn again each time.
 const drawn = new Map();
 const finished = new Map();
+
 let queue = Promise.resolve();
 let counter = 0;
 
+function diagramKey(source) {
+  return `${JSON.stringify(themeColours())}\n${source}`;
+}
+
 function drawMermaid(source) {
-  const colours = themeColours();
-  const key = `${JSON.stringify(colours)}\n${source}`;
+  const key = diagramKey(source);
 
   if (!drawn.has(key)) {
+    const colours = themeColours();
+
     const result = queue.then(async () => {
       await script(MERMAID_SCRIPT);
+
       const { mermaid } = globalThis;
       mermaid.initialize({
-        startOnLoad: false, securityLevel: "strict", htmlLabels: false, suppressErrorRendering: true,
-        theme: "base", themeVariables: colours, fontFamily: colours.fontFamily,
+        startOnLoad: false,
+        securityLevel: "strict",
+        htmlLabels: false,
+        suppressErrorRendering: true,
+        theme: "base",
+        themeVariables: colours,
+        fontFamily: colours.fontFamily,
       });
+
       const { svg } = await mermaid.render(`thor-diagram-${counter += 1}`, source);
       finished.set(key, svg);
 
@@ -153,13 +194,10 @@ function drawMermaid(source) {
   return drawn.get(key);
 }
 
-function finishedMermaid(source) {
-  return finished.get(`${JSON.stringify(themeColours())}\n${source}`);
-}
-
 function showDrawing(figure, image) {
   figure.querySelector(".view").replaceChildren(image);
   figure.classList.add("drawn");
+
   figure.dataset.svg = decodeURIComponent(image.src.slice(image.src.indexOf(",") + 1));
 }
 
@@ -168,31 +206,45 @@ function showFailure(figure, reason) {
   figure.querySelector(".view").replaceChildren(element("div", "figure-note", reason));
 }
 
+function drawSvg(figure, source) {
+  if (source.length > MAX_SVG || !/<svg\b/i.test(source)) {
+    showFailure(figure, "Not a drawing this page can show; the code is below.");
+
+    return;
+  }
+
+  const image = svgImage(source.trim(), "Drawing from the reply");
+  const broken = () => showFailure(figure, "This SVG has an error, so it can't be drawn; the code is below.");
+
+  image.addEventListener("error", broken, { once: true });
+  showDrawing(figure, image);
+}
+
+function drawDiagram(figure, source) {
+  const ready = finished.get(diagramKey(source));
+
+  if (ready) {
+    showDrawing(figure, svgImage(ready, "Diagram from the reply"));
+
+    return;
+  }
+
+  figure.classList.add("drawing");
+  figure.querySelector(".view").replaceChildren(element("div", "figure-note", "drawing the diagram…"));
+
+  drawMermaid(source)
+    .then((svg) => showDrawing(figure, svgImage(svg, "Diagram from the reply")))
+    .catch((error) => showFailure(figure, `Couldn't draw this diagram: ${String(error.message || error).split("\n")[0]}`))
+    .finally(() => figure.classList.remove("drawing"));
+}
+
 /** Draws every finished ```mermaid and ```svg block under `root`. */
 export function drawFigures(root) {
   root.querySelectorAll(".figure:not(.drawn):not(.failed):not(.drawing)").forEach((figure) => {
     const source = figure.querySelector("pre").textContent;
 
-    if (figure.dataset.kind === "svg") {
-      if (source.length > MAX_SVG || !/<svg\b/i.test(source)) { showFailure(figure, "Not a drawing this page can show; the code is below."); return; }
-
-      const image = svgImage(source.trim(), "Drawing from the reply");
-      image.addEventListener("error", () => showFailure(figure, "This SVG has an error, so it can't be drawn; the code is below."), { once: true });
-      showDrawing(figure, image);
-
-      return;
-    }
-
-    const ready = finishedMermaid(source);
-    if (ready) { showDrawing(figure, svgImage(ready, "Diagram from the reply")); return; }
-
-    figure.classList.add("drawing");
-    figure.querySelector(".view").replaceChildren(element("div", "figure-note", "drawing the diagram…"));
-
-    drawMermaid(source)
-      .then((svg) => showDrawing(figure, svgImage(svg, "Diagram from the reply")))
-      .catch((error) => showFailure(figure, `Couldn't draw this diagram: ${String(error.message || error).split("\n")[0]}`))
-      .finally(() => figure.classList.remove("drawing"));
+    if (figure.dataset.kind === "svg") drawSvg(figure, source);
+    else drawDiagram(figure, source);
   });
 }
 
