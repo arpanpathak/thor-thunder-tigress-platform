@@ -131,7 +131,7 @@ fn is_system(message: &Value) -> bool {
 
 /// A message's text: its content when that is a string, or the text parts
 /// joined when it is a list of parts.
-fn text_of(message: &Value) -> String {
+pub(super) fn text_of(message: &Value) -> String {
     match message.get("content") {
         Some(Value::String(text)) => text.clone(),
         Some(Value::Array(parts)) => parts

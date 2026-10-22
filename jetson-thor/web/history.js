@@ -35,7 +35,9 @@ export function newConversation() {
 export function conversationTitle(conversation) {
   const first = conversation.messages.find((message) => message.role === "user");
 
-  return (first?.content || conversation.draft || "New chat").replace(/\s+/g, " ").trim().slice(0, 70);
+  const files = first?.attachments?.map((file) => file.name).join(", ");
+
+  return (first?.content || files || conversation.draft || "New chat").replace(/\s+/g, " ").trim().slice(0, 70);
 }
 
 export class LocalHistory {
