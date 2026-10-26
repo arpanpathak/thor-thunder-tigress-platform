@@ -834,6 +834,68 @@ fn a_call_on_the_answer_round_is_run() -> Outcome {
     Ok(())
 }
 
+/// A reply that writes `text` and then calls `tool` with `arguments`.
+fn says_and_calls(text: &str, tool: &str, arguments: &str) -> String {
+    let chunk = json!({ "choices": [{ "delta": { "content": text } }] }).to_string();
+
+    event_stream(&[&chunk, &call_event(tool, arguments)])
+}
+
+/// How many of the events sent to the page carry `text`.
+fn times_shown(sent: &[String], text: &str) -> usize {
+    sent.iter().filter(|event| event.contains(text)).count()
+}
+
+// Each fake server takes exactly the replies scripted, so a round past the
+// answer finds no model and the page is sent an error.
+#[test]
+fn an_answer_followed_by_a_search_already_run_is_written_once() -> Outcome {
+    let search = r#"{"query":"rust"}"#;
+    let answer = "Fit assessment: a strong match.";
+    let replies = vec![
+        calls("web_search", search),
+        says_and_calls(answer, "web_search", search),
+    ];
+
+    let results = vec![json_response(r#"{"results":[]}"#)];
+    let chat = searched(asking("fit?"), replies, results, FakeWeb::default())?;
+
+    assert_eq!(
+        times_shown(&chat.sent, r#"{"thor":{"error""#),
+        0,
+        "{:?}",
+        chat.sent
+    );
+    assert_eq!(chat.model.requests()?.len(), 2);
+
+    Ok(())
+}
+
+#[test]
+fn a_long_answer_followed_by_a_new_search_is_written_once() -> Outcome {
+    let answer = (1..=60)
+        .map(|n| format!("Requirement {n} is met. "))
+        .collect::<String>();
+    let replies = vec![
+        calls("web_search", r#"{"query":"rust"}"#),
+        says_and_calls(&answer, "web_search", r#"{"query":"rust jobs"}"#),
+    ];
+
+    let results = vec![json_response(r#"{"results":[]}"#)];
+    let chat = searched(asking("fit?"), replies, results, FakeWeb::default())?;
+
+    assert_eq!(
+        times_shown(&chat.sent, r#"{"thor":{"error""#),
+        0,
+        "{:?}",
+        chat.sent
+    );
+    assert_eq!(chat.model.requests()?.len(), 2);
+    assert_eq!(chat.search.requests()?.len(), 1);
+
+    Ok(())
+}
+
 #[test]
 fn text_beside_a_call_on_the_answer_round_does_not_end_the_answer() -> Outcome {
     let call = call_event("other", "{}");
