@@ -135,11 +135,11 @@ const LIBRARIES: [StaticFile; 5] = [
         content_type: "text/javascript; charset=utf-8",
     },
     StaticFile {
-        name: "pdf-6.4.299.min.mjs",
+        name: "pdf-6.4.299-legacy.min.mjs",
         content_type: "text/javascript; charset=utf-8",
     },
     StaticFile {
-        name: "pdf.worker-6.4.299.min.mjs",
+        name: "pdf.worker-6.4.299-legacy.min.mjs",
         content_type: "text/javascript; charset=utf-8",
     },
 ];

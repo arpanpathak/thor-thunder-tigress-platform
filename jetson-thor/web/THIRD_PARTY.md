@@ -9,8 +9,13 @@ browser downloads each one once. Their licences are in `licenses/`.
 | `katex-0.19.0.min.js` | npm `katex@0.19.0`, `dist/katex.min.js` | MIT | formulas |
 | `katex-0.19.0.css` | npm `katex@0.19.0`, `dist/katex.min.css`, with the 20 `woff2` fonts inlined as data URLs (the `woff`/`ttf` fallbacks dropped) | MIT | formulas |
 | `mermaid-12.1.0.min.js` | npm `mermaid@12.1.0`, `dist/mermaid.min.js` | MIT | diagrams |
-| `pdf-6.4.299.min.mjs` | npm `pdfjs-dist@6.4.299`, `build/pdf.min.mjs` | Apache-2.0 | reading attached PDFs |
-| `pdf.worker-6.4.299.min.mjs` | npm `pdfjs-dist@6.4.299`, `build/pdf.worker.min.mjs` | Apache-2.0 | reading attached PDFs |
+| `pdf-6.4.299-legacy.min.mjs` | npm `pdfjs-dist@6.4.299`, `legacy/build/pdf.min.mjs` | Apache-2.0 | reading attached PDFs |
+| `pdf.worker-6.4.299-legacy.min.mjs` | npm `pdfjs-dist@6.4.299`, `legacy/build/pdf.worker.min.mjs` | Apache-2.0 | reading attached PDFs |
+
+pdf.js is the `legacy` build. The modern `build/` calls JavaScript that most
+browsers don't have yet (`Map.prototype.getOrInsertComputed`), so every PDF
+failed with "undefined is not a function" in Safari and in Chrome before 145;
+the legacy build carries the polyfills.
 
 npm tarball integrity, checked when the files were taken:
 

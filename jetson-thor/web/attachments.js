@@ -7,8 +7,8 @@
 // message that uses it.
 import { element } from "./dom.js";
 
-const PDF_LIBRARY = "./pdf-6.4.299.min.mjs";
-const PDF_WORKER = "pdf.worker-6.4.299.min.mjs";
+const PDF_LIBRARY = "./pdf-6.4.299-legacy.min.mjs";
+const PDF_WORKER = "pdf.worker-6.4.299-legacy.min.mjs";
 
 const MAX_FILE_BYTES = 25 << 20;
 
@@ -150,7 +150,34 @@ async function readImage(file) {
 // ---- PDFs ----
 let pdfLibrary;
 
+// pdf.js reads a page's text with `for await` over a ReadableStream, which
+// Safari can't do, and the legacy build does not add it. This is what the
+// other browsers do: read until done, and cancel the stream on an early exit.
+function iterableStreams() {
+  if (Symbol.asyncIterator in ReadableStream.prototype) return;
+
+  ReadableStream.prototype[Symbol.asyncIterator] = async function* chunks() {
+    const reader = this.getReader();
+    let finished = false;
+
+    try {
+      while (!finished) {
+        const { done, value } = await reader.read();
+        finished = done;
+
+        if (!done) yield value;
+      }
+    } finally {
+      if (!finished) await reader.cancel();
+
+      reader.releaseLock();
+    }
+  };
+}
+
 function pdfjs() {
+  iterableStreams();
+
   pdfLibrary ??= import(PDF_LIBRARY)
     .then((library) => {
       library.GlobalWorkerOptions.workerSrc = PDF_WORKER;

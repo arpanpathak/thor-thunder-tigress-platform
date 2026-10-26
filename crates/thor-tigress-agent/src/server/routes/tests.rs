@@ -201,10 +201,10 @@ async fn serves_the_page_and_health_without_a_key() -> Result<()> {
 #[tokio::test]
 async fn a_library_may_be_kept_and_a_page_file_may_not() -> Result<()> {
     let web = web_folder()?;
-    fs::write(web.path().join("pdf-6.4.299.min.mjs"), "export {}")?;
+    fs::write(web.path().join("pdf-6.4.299-legacy.min.mjs"), "export {}")?;
 
     let config = setup(web.path(), Vec::new(), Some("k"))?;
-    let library = ask(&config, get("/thor-tigress-cub/pdf-6.4.299.min.mjs")).await?;
+    let library = ask(&config, get("/thor-tigress-cub/pdf-6.4.299-legacy.min.mjs")).await?;
     let style = ask(&config, get("/chat.css")).await?;
 
     assert_eq!(library.status, StatusCode::OK);

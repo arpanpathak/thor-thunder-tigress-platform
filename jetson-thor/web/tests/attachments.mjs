@@ -1,9 +1,9 @@
 // Attachments, formulas and diagrams, against a local static preview with
 // deterministic API fixtures. PLAYWRIGHT_MODULE and CHROME_PATH may point to an
-// existing local installation.
+// existing local installation; BROWSER=webkit runs it as Safari would.
 import assert from 'node:assert/strict';
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
-const browser = await chromium.launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
+const engines = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const browser = await engines[process.env.BROWSER || 'chromium'].launch({ headless: true, ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}) });
 const origin = process.env.CHAT_PREVIEW || 'http://127.0.0.1:8765';
 const page = await browser.newPage({ viewport: { width: 1180, height: 820 } });
 const errors = [];
