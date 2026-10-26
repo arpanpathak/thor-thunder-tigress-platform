@@ -69,6 +69,11 @@ const MAX_CALLS: usize = 8;
 /// the engine does.
 const MAX_ROUND_CHARS: usize = 48 * 1024;
 
+/// The answer text, in bytes, past which a round has written the answer rather
+/// than a line before a search. Every round's text reaches the page as it
+/// streams, so a round after it writes the whole answer again below the first.
+const ANSWERED_CHARS: usize = 1024;
+
 /// The most sources named in the note before the answer round.
 const MAX_CITED: usize = 40;
 
@@ -367,7 +372,7 @@ fn tool_rounds(
 
         let reply = stream_round(client, fields, engine.endpoint())?;
 
-        if reply.cut || reply.calls.is_empty() {
+        if reply.cut || reply.calls.is_empty() || answered(&reply, research) {
             return Ok(Ending::Replied);
         }
 
@@ -411,7 +416,7 @@ fn answer_rounds(
     for _ in 0..ANSWER_ROUNDS {
         let reply = stream_round(client, fields, model)?;
 
-        if reply.cut || (reply.calls.is_empty() && !reply.content.trim().is_empty()) {
+        if reply.cut || answered(&reply, research) {
             return Ok(Ending::Replied);
         }
 
@@ -424,6 +429,20 @@ fn answer_rounds(
     }
 
     Ok(Ending::Exhausted)
+}
+
+/// Whether a round's text is the answer, so no round may follow it: it called
+/// no tool, or it is too long to be a line before a search, or every call it
+/// made already ran. A model that answers and then repeats a search it has
+/// would otherwise write the same answer once per round.
+fn answered(reply: &Round, research: &Research) -> bool {
+    let text = reply.content.trim();
+
+    if text.is_empty() {
+        return false;
+    }
+
+    reply.calls.is_empty() || text.len() >= ANSWERED_CHARS || research.has_run(&reply.calls)
 }
 
 /// The numbered source list the answer cites from.
@@ -692,6 +711,11 @@ impl Research {
             Some(Tool::FetchPage) => self.read(client, call, &*upstreams.web),
             None => Ok(format!("Unknown tool {}.", call.name)),
         }
+    }
+
+    /// Whether every one of `calls` already ran in this answer.
+    fn has_run(&self, calls: &[ToolCall]) -> bool {
+        calls.iter().all(|call| self.ran.contains(&signature(call)))
     }
 
     /// Whether the search budget is spent.
