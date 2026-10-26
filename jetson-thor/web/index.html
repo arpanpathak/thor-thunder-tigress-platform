@@ -167,9 +167,14 @@
   <div id="storage-status" role="status" hidden></div>
   <form class="composer" id="composer">
     <div class="composer-heading"><label for="input">YOUR TURN</label><span>THINK IT. TYPE IT.</span></div>
+    <div id="attachments" class="attachments" aria-label="Files to send" hidden></div>
+    <p id="attach-note" class="attach-note" role="status" hidden></p>
     <textarea id="input" rows="1" placeholder="Give the cub something to work on…" aria-label="Message the cub" aria-describedby="keyboard-hint" autocomplete="off" enterkeyhint="enter"></textarea>
     <div class="composer-toolbar">
       <div class="tools">
+        <button id="attach" class="pill" type="button" title="Attach images, PDFs or text files (or drop or paste them)" aria-label="Attach files">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11.5-8.5 8.5a5 5 0 0 1-7-7l9-9a3.3 3.3 0 0 1 4.7 4.7l-9 9a1.7 1.7 0 0 1-2.4-2.4L16 7.1"/></svg></button>
+        <input id="file-input" type="file" multiple hidden>
         <label class="pill" title="Let the model search the web before answering"><input id="web" type="checkbox">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>Web</label>
   <label class="pill" title="Let the model reason before answering (slower, often better)"><input id="think" type="checkbox">
@@ -184,10 +189,18 @@
 </div>
 </div>
 
+<dialog id="viewer" class="viewer" aria-label="Picture">
+  <form method="dialog">
+    <img alt="">
+    <div class="row"><span class="viewer-name"></span><button class="primary">Close</button></div>
+  </form>
+</dialog>
+
 <dialog id="privacy" aria-labelledby="privacy-title">
   <form method="dialog">
     <h2 id="privacy-title">Your chat history is local.</h2>
     <p>Conversations are saved in this browser on this device. The server does not save your chat history. Clearing browser data removes it; export chats you want to keep.</p>
+    <p>Files you attach are kept in this browser too, and sent to Thor with the message that uses them.</p>
     <p>Your messages and the current conversation are sent to Thor to generate each reply. With Web enabled, search queries and page requests also go to external services.</p>
     <p>Access requests store your name and email on the server so you can be invited.</p>
     <div class="row"><button class="primary">Got it</button></div>

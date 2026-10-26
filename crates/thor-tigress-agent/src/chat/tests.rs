@@ -1030,6 +1030,21 @@ fn the_user_text_is_only_the_users_messages() {
     assert_eq!(user_text(&Fields::new()), "");
 }
 
+#[test]
+fn the_user_text_of_a_message_with_files_is_its_text_parts() {
+    let messages = json!({
+        "messages": [
+            { "role": "user", "content": [
+                { "type": "image_url", "image_url": { "url": "data:image/png;base64,AAAA" } },
+                { "type": "text", "text": "what is on https://user.example/page" }
+            ] }
+        ]
+    });
+    let fields = messages.as_object().cloned().unwrap_or_default();
+
+    assert_eq!(user_text(&fields), "what is on https://user.example/page");
+}
+
 fn fetched(content_type: &str, body: &str) -> crate::web::http::Fetched {
     crate::web::http::Fetched {
         status: 200,
