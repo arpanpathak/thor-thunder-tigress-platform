@@ -129,6 +129,10 @@ const REQUIRED: &str = "required";
 /// The request field holding the conversation.
 const MESSAGES: &str = "messages";
 
+/// The request field for the chat template's settings, where thinking is
+/// turned on and off.
+const TEMPLATE_SETTINGS: &str = "chat_template_kwargs";
+
 /// How a chat request is answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -266,11 +270,13 @@ pub fn answer(client: &mut dyn Client, body: &[u8], upstreams: &Upstreams) -> Ou
         Mode::Relay => model
             .post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?
             .relay(client),
-        Mode::Stream => as_events(client, &mut |client| {
-            stream_round(client, &fields, model)?;
-
-            Ok(())
-        }),
+        Mode::Stream => as_events(
+            client,
+            &mut |client| match stream_round(client, &fields, model)?.stop {
+                Some(reason) => report_stop(client, reason),
+                None => Ok(()),
+            },
+        ),
         Mode::Search => {
             fields.insert(STREAM.to_string(), Value::Bool(true));
             nudge_to_search(&mut fields);
@@ -311,85 +317,226 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
     response::send_event(client, &json!({ "thor": event }).to_string())
 }
 
-/// Asks the model, runs the tools it calls, and asks again, until it answers
-/// without a tool call or the tool rounds run out.
+/// Asks the model, runs the tools it calls, and asks again, until the model
+/// has written the answer.
 ///
-/// The first round requires a call, so both models look something up before
-/// they answer; later rounds leave the choice to the model. A call that repeats
-/// one already run is answered with a nudge instead of run again, so a model
-/// that loops cannot loop forever. [`Ledger`] holds every source found, gives it
-/// a number to cite, and holds the search and page budgets; the numbers go to
-/// the model again before the answer rounds.
+/// The loop is [`State`]: each round is asked for in one state, read once as a
+/// [`Turn`], and [`State::after`] names the next state. Entering a state
+/// changes the request ([`enter`]); nothing else moves the loop.
 ///
-/// After the tool rounds the search hint is taken back out of the system line
-/// and the answer rounds run with no tools at all, with a line asking for the
-/// answer. A call the model writes there is still run, because the text is
-/// streamed as it arrives and cutting the round short would end the answer on a
-/// half sentence. Only when no round writes any text does the note name the
-/// sources the ledger found, so the page still shows what the search turned up.
+/// The first round requires a call on llama-server, so the model looks
+/// something up before it answers. A call that repeats one already run is
+/// answered with a nudge instead of run again. [`Ledger`] holds every source
+/// found, gives it a number to cite, and holds the search and page budgets.
 fn search_loop(
     client: &mut dyn Write,
     mut fields: Fields,
     upstreams: &Upstreams,
     engine: &Engine,
 ) -> Outcome {
-    let model = engine.endpoint();
     let mut research = Research::new(&user_text(&fields));
+    let mut state = State::Researching { round: 1 };
 
-    match tool_rounds(client, &mut fields, upstreams, engine, &mut research)? {
-        Ending::Replied => return Ok(()),
-        Ending::Exhausted => (),
-    }
+    loop {
+        match state {
+            State::Done(end) => return finish(client, end, &research.ledger),
+            State::Researching { round } => {
+                prepare(&mut fields, Phase::of_tool_round(round, engine));
+            }
+            State::Answering { .. } => {}
+        }
 
-    ask(&mut fields, &research.ledger);
+        let reply = stream_round(client, &fields, engine.endpoint())?;
+        let turn = Turn::of(&reply, &research);
 
-    match answer_rounds(client, &mut fields, upstreams, model, &mut research)? {
-        Ending::Replied => Ok(()),
-        Ending::Exhausted => note(client, &research.ledger),
+        if turn == Turn::Again(Again::Calls) {
+            let results = research.run(client, &reply.calls, upstreams)?;
+            append_round(&mut fields, &reply, &results)?;
+        }
+
+        let next = state.after(turn, research.out_of_searches());
+        report(client, &reply, next)?;
+        enter(&mut fields, state, next, &research.ledger);
+        state = next;
     }
 }
 
-/// How a set of rounds ended.
+/// Where a searched answer stands between two rounds.
+///
+/// Every transition ends the answer, counts `round` up to [`MAX_ROUNDS`],
+/// moves from researching to answering, or counts `left` down, so the loop
+/// always ends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Ending {
-    /// The model stopped asking for tools, so what it wrote is the answer.
-    Replied,
-    /// The rounds ran out.
-    Exhausted,
+enum State {
+    /// The tools are offered. `round` counts from one.
+    Researching { round: usize },
+    /// The tools are gone and the model is asked for the answer, with `left`
+    /// rounds to write it in.
+    Answering { left: usize, think: Think },
+    /// The answer is over, in the way named.
+    Done(End),
 }
 
-/// The tool rounds: the model may search and read until it answers on its own,
-/// the rounds run out, or the search budget is spent.
-fn tool_rounds(
-    client: &mut dyn Write,
-    fields: &mut Fields,
-    upstreams: &Upstreams,
-    engine: &Engine,
-    research: &mut Research,
-) -> Outcome<Ending> {
-    for round in 1..=MAX_ROUNDS {
-        prepare(fields, Phase::of_tool_round(round, engine));
+/// Whether an answering round may think first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Think {
+    /// As the request asked.
+    AsAsked,
+    /// Off, because thinking got stuck once already.
+    Off,
+}
 
-        let reply = stream_round(client, fields, engine.endpoint())?;
+/// How an answer ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum End {
+    /// The model wrote it.
+    Answered,
+    /// The guard stopped a round, and the page was told why.
+    Stopped,
+    /// No round wrote anything, so the page gets the note naming the sources.
+    Unanswered,
+}
 
-        if reply.cut || reply.calls.is_empty() || answered(&reply, research) {
-            return Ok(Ending::Replied);
-        }
+/// What one round gave back, read once.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Turn {
+    /// The answer: text with no call, text too long to be a line before a
+    /// search ([`ANSWERED_CHARS`]), or text whose calls all already ran. Its
+    /// text is on the page, so another round would write it a second time.
+    Answer,
+    /// The guard stopped the round in the middle of the answer.
+    Cut,
+    /// No answer yet: the loop asks again, if it still may.
+    Again(Again),
+}
 
-        let results = research.run(client, &reply.calls, upstreams)?;
-        append_round(fields, &reply, &results)?;
+/// Why a round left the loop to ask again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Again {
+    /// New calls to run, perhaps after a line saying what it will look up.
+    Calls,
+    /// Neither text nor a call.
+    Nothing,
+    /// The guard stopped the round before any answer text: thinking that
+    /// looped or ran away. Nothing reached the answer, so it can be asked again.
+    Stuck,
+}
 
-        if research.out_of_searches() {
-            return Ok(Ending::Exhausted);
+impl Turn {
+    /// Reads a round. `research` knows which calls already ran.
+    fn of(reply: &Round, research: &Research) -> Turn {
+        let text = reply.content.trim();
+        let answered = text.len() >= ANSWERED_CHARS || research.has_run(&reply.calls);
+
+        match (
+            reply.stop.is_some(),
+            text.is_empty(),
+            reply.calls.is_empty(),
+        ) {
+            (true, true, _) => Turn::Again(Again::Stuck),
+            (true, false, _) => Turn::Cut,
+            (false, true, true) => Turn::Again(Again::Nothing),
+            (false, true, false) => Turn::Again(Again::Calls),
+            (false, false, true) => Turn::Answer,
+            (false, false, false) if answered => Turn::Answer,
+            (false, false, false) => Turn::Again(Again::Calls),
         }
     }
-
-    Ok(Ending::Exhausted)
 }
 
-/// Sets up the answer rounds: the tools go away, the search hint comes back out
-/// of the system line, and the numbered sources arrive with the ask as the last
-/// user turn — the turn a model that kept calling tools reads.
+impl State {
+    /// The first answering state: every answer round left, thinking as asked.
+    const ANSWERING: State = State::Answering {
+        left: ANSWER_ROUNDS,
+        think: Think::AsAsked,
+    };
+
+    /// The state after a round asked for in this one gave back `turn`.
+    const fn after(self, turn: Turn, out_of_searches: bool) -> State {
+        match (self, turn) {
+            (State::Done(end), _) => State::Done(end),
+            (_, Turn::Answer) => State::Done(End::Answered),
+            (_, Turn::Cut) => State::Done(End::Stopped),
+            (State::Researching { round }, Turn::Again(again)) => {
+                researched(round, again, out_of_searches)
+            }
+            (State::Answering { left, think }, Turn::Again(again)) => answered(left, think, again),
+        }
+    }
+}
+
+/// After research round `round`: more research while rounds and searches
+/// last, then the answer, with thinking off when this round got stuck.
+const fn researched(round: usize, again: Again, out_of_searches: bool) -> State {
+    match again {
+        Again::Calls if round < MAX_ROUNDS && !out_of_searches => {
+            State::Researching { round: round + 1 }
+        }
+        Again::Stuck => State::Answering {
+            left: ANSWER_ROUNDS,
+            think: Think::Off,
+        },
+        Again::Calls | Again::Nothing => State::ANSWERING,
+    }
+}
+
+/// After an answering round, with `left` rounds counting this one. Stuck
+/// thinking is asked once more with thinking off; stuck again, the answer
+/// stops. A round with calls or nothing uses up one round.
+const fn answered(left: usize, think: Think, again: Again) -> State {
+    let more = left > 1;
+
+    match (again, think, more) {
+        (Again::Stuck, Think::AsAsked, true) => State::Answering {
+            left: left - 1,
+            think: Think::Off,
+        },
+        (Again::Stuck, _, _) => State::Done(End::Stopped),
+        (Again::Calls | Again::Nothing, _, true) => State::Answering {
+            left: left - 1,
+            think,
+        },
+        (Again::Calls | Again::Nothing, _, false) => State::Done(End::Unanswered),
+    }
+}
+
+/// Changes the request for the state the loop moves into. The ask for the
+/// answer is added once, on the way from researching to answering; thinking
+/// is turned off whenever the new state says so.
+fn enter(fields: &mut Fields, from: State, to: State, ledger: &Ledger) {
+    let State::Answering { think, .. } = to else {
+        return;
+    };
+
+    if !matches!(from, State::Answering { .. }) {
+        ask(fields, ledger);
+    }
+
+    if think == Think::Off {
+        no_thinking(fields);
+    }
+}
+
+/// Tells the page why a round was stopped when the answer ends there. A stuck
+/// round that is asked again showed nothing, and the next one may answer.
+fn report(client: &mut dyn Write, reply: &Round, next: State) -> Outcome {
+    match (reply.stop, next) {
+        (Some(reason), State::Done(_)) => report_stop(client, reason),
+        (Some(_) | None, _) => Ok(()),
+    }
+}
+
+/// Ends the answer: the note when no round wrote one, nothing otherwise.
+fn finish(client: &mut dyn Write, end: End, ledger: &Ledger) -> Outcome {
+    match end {
+        End::Unanswered => note(client, ledger),
+        End::Answered | End::Stopped => Ok(()),
+    }
+}
+
+/// Sets up answering: the tools go away, the search hint comes back out of the
+/// system line, and the numbered sources arrive with the ask as the last user
+/// turn — the turn a model that kept calling tools reads.
 fn ask(fields: &mut Fields, ledger: &Ledger) {
     prepare(fields, Phase::Answering);
     retract_system(fields, SEARCH_HINT);
@@ -402,47 +549,16 @@ fn ask(fields: &mut Fields, ledger: &Ledger) {
     append_user(fields, ANSWER_ASK);
 }
 
-/// The answer rounds: no tools are offered, so the model writes. A call written
-/// anyway is run like any other, because the text is streamed as it arrives and
-/// stopping at the first sentence of a summary would end the answer with no
-/// links in it.
-fn answer_rounds(
-    client: &mut dyn Write,
-    fields: &mut Fields,
-    upstreams: &Upstreams,
-    model: &Endpoint,
-    research: &mut Research,
-) -> Outcome<Ending> {
-    for _ in 0..ANSWER_ROUNDS {
-        let reply = stream_round(client, fields, model)?;
+/// Turns thinking off through the chat template, which llama-server and the
+/// Edge-LLM engine both read.
+fn no_thinking(fields: &mut Fields) {
+    let settings = fields
+        .entry(TEMPLATE_SETTINGS.to_string())
+        .or_insert_with(|| json!({}));
 
-        if reply.cut || answered(&reply, research) {
-            return Ok(Ending::Replied);
-        }
-
-        if reply.calls.is_empty() {
-            continue;
-        }
-
-        let results = research.run(client, &reply.calls, upstreams)?;
-        append_round(fields, &reply, &results)?;
+    if let Some(settings) = settings.as_object_mut() {
+        settings.insert("enable_thinking".to_string(), Value::Bool(false));
     }
-
-    Ok(Ending::Exhausted)
-}
-
-/// Whether a round's text is the answer, so no round may follow it: it called
-/// no tool, or it is too long to be a line before a search, or every call it
-/// made already ran. A model that answers and then repeats a search it has
-/// would otherwise write the same answer once per round.
-fn answered(reply: &Round, research: &Research) -> bool {
-    let text = reply.content.trim();
-
-    if text.is_empty() {
-        return false;
-    }
-
-    reply.calls.is_empty() || text.len() >= ANSWERED_CHARS || research.has_run(&reply.calls)
 }
 
 /// The numbered source list the answer cites from.
@@ -907,12 +1023,7 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
         let value: Value = serde_json::from_str(data)?;
 
         if let Some(reason) = guard.observe(&value) {
-            round.cut = true;
-            send_thor(client, &ThorEvent::Error(reason.to_string()))?;
-
-            let event =
-                json!({ "choices": [{ "delta": {}, "finish_reason": "length" }] }).to_string();
-            response::send_event(client, &event)?;
+            round.stop = Some(reason);
             break;
         }
 
@@ -922,6 +1033,16 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
     finish_round(client, sieve, &mut round)?;
 
     Ok(round)
+}
+
+/// Tells the page that a round was stopped and why, and ends its answer the
+/// way a length limit does.
+fn report_stop(client: &mut dyn Write, reason: &str) -> Outcome {
+    send_thor(client, &ThorEvent::Error(reason.to_string()))?;
+
+    let event = json!({ "choices": [{ "delta": {}, "finish_reason": "length" }] }).to_string();
+
+    response::send_event(client, &event)
 }
 
 /// The model server's response when it took the request, or what it said
