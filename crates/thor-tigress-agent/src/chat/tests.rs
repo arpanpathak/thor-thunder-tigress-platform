@@ -520,7 +520,7 @@ fn added_messages_have_openais_shape() -> Outcome {
             name: "web_search".to_string(),
             arguments: "{}".to_string(),
         }],
-        cut: false,
+        stop: None,
     };
 
     assert_eq!(
@@ -830,6 +830,157 @@ fn a_call_on_the_answer_round_is_run() -> Outcome {
     assert!(chat.search.requests()?[0].contains("q=x"));
     assert!(!shown("<tool_call"), "{:?}", chat.sent);
     assert!(shown("the answer"), "{:?}", chat.sent);
+
+    Ok(())
+}
+
+/// A reply that writes `text` and then calls `tool` with `arguments`.
+fn says_and_calls(text: &str, tool: &str, arguments: &str) -> String {
+    let chunk = json!({ "choices": [{ "delta": { "content": text } }] }).to_string();
+
+    event_stream(&[&chunk, &call_event(tool, arguments)])
+}
+
+/// How many of the events sent to the page carry `text`.
+fn times_shown(sent: &[String], text: &str) -> usize {
+    sent.iter().filter(|event| event.contains(text)).count()
+}
+
+// Each fake server takes exactly the replies scripted, so a round past the
+// answer finds no model and the page is sent an error.
+#[test]
+fn an_answer_followed_by_a_search_already_run_is_written_once() -> Outcome {
+    let search = r#"{"query":"rust"}"#;
+    let answer = "Fit assessment: a strong match.";
+    let replies = vec![
+        calls("web_search", search),
+        says_and_calls(answer, "web_search", search),
+    ];
+
+    let results = vec![json_response(r#"{"results":[]}"#)];
+    let chat = searched(asking("fit?"), replies, results, FakeWeb::default())?;
+
+    assert_eq!(
+        times_shown(&chat.sent, r#"{"thor":{"error""#),
+        0,
+        "{:?}",
+        chat.sent
+    );
+    assert_eq!(chat.model.requests()?.len(), 2);
+
+    Ok(())
+}
+
+#[test]
+fn a_long_answer_followed_by_a_new_search_is_written_once() -> Outcome {
+    let answer = (1..=60)
+        .map(|n| format!("Requirement {n} is met. "))
+        .collect::<String>();
+    let replies = vec![
+        calls("web_search", r#"{"query":"rust"}"#),
+        says_and_calls(&answer, "web_search", r#"{"query":"rust jobs"}"#),
+    ];
+
+    let results = vec![json_response(r#"{"results":[]}"#)];
+    let chat = searched(asking("fit?"), replies, results, FakeWeb::default())?;
+
+    assert_eq!(
+        times_shown(&chat.sent, r#"{"thor":{"error""#),
+        0,
+        "{:?}",
+        chat.sent
+    );
+    assert_eq!(chat.model.requests()?.len(), 2);
+    assert_eq!(chat.search.requests()?.len(), 1);
+
+    Ok(())
+}
+
+const CALLS: Turn = Turn::Again(Again::Calls);
+const NOTHING: Turn = Turn::Again(Again::Nothing);
+const STUCK: Turn = Turn::Again(Again::Stuck);
+const FIRST: State = State::Researching { round: 1 };
+const LAST: State = State::Researching { round: MAX_ROUNDS };
+
+const fn answering(left: usize, think: Think) -> State {
+    State::Answering { left, think }
+}
+
+/// Every transition worth naming: a state, what its round gave back, whether
+/// the searches ran out, and the state that follows.
+#[rustfmt::skip]
+const TRANSITIONS: [(State, Turn, bool, State); 14] = [
+    (FIRST, CALLS, false, State::Researching { round: 2 }),
+    (LAST, CALLS, false, State::ANSWERING),
+    (FIRST, CALLS, true, State::ANSWERING),
+    (FIRST, NOTHING, false, State::ANSWERING),
+    (FIRST, STUCK, false, answering(ANSWER_ROUNDS, Think::Off)),
+    (FIRST, Turn::Answer, false, State::Done(End::Answered)),
+    (FIRST, Turn::Cut, false, State::Done(End::Stopped)),
+    (State::ANSWERING, STUCK, false, answering(ANSWER_ROUNDS - 1, Think::Off)),
+    (answering(2, Think::Off), STUCK, false, State::Done(End::Stopped)),
+    (answering(2, Think::AsAsked), NOTHING, false, answering(1, Think::AsAsked)),
+    (answering(1, Think::AsAsked), CALLS, false, State::Done(End::Unanswered)),
+    (answering(1, Think::AsAsked), STUCK, false, State::Done(End::Stopped)),
+    (State::ANSWERING, Turn::Answer, false, State::Done(End::Answered)),
+    (State::Done(End::Answered), CALLS, false, State::Done(End::Answered)),
+];
+
+#[test]
+fn every_state_moves_to_the_state_the_table_names() {
+    for (from, turn, out_of_searches, to) in TRANSITIONS {
+        assert_eq!(
+            from.after(turn, out_of_searches),
+            to,
+            "{from:?} after {turn:?}"
+        );
+    }
+}
+
+#[test]
+fn the_loop_ends_whatever_the_model_keeps_doing() {
+    for again in [Again::Calls, Again::Nothing, Again::Stuck] {
+        let mut state = State::Researching { round: 1 };
+        let mut rounds = 0;
+
+        while !matches!(state, State::Done(_)) {
+            state = state.after(Turn::Again(again), false);
+            rounds += 1;
+
+            assert!(rounds <= MAX_ROUNDS + ANSWER_ROUNDS, "{again:?} never ends");
+        }
+    }
+}
+
+#[test]
+fn stuck_thinking_is_asked_again_without_thinking_and_shows_no_error() -> Outcome {
+    let unit = (1..=60)
+        .map(|n| format!("I will mention fact {n}. "))
+        .collect::<String>();
+    let looping = json!({ "choices": [{ "delta": { "reasoning_content": unit.repeat(3) } }] });
+    let replies = vec![event_stream(&[&looping.to_string()]), says("The answer.")];
+    let chat = searched(
+        asking("who hires?"),
+        replies,
+        Vec::new(),
+        FakeWeb::default(),
+    )?;
+    let seen = chat.model.requests()?;
+
+    assert_eq!(seen.len(), 2);
+    assert!(
+        seen[1].contains(r#""enable_thinking":false"#),
+        "{}",
+        seen[1]
+    );
+    assert!(seen[1].contains(ANSWER_ASK), "{}", seen[1]);
+    assert_eq!(
+        times_shown(&chat.sent, r#"{"thor":{"error""#),
+        0,
+        "{:?}",
+        chat.sent
+    );
+    assert_eq!(times_shown(&chat.sent, "The answer."), 1, "{:?}", chat.sent);
 
     Ok(())
 }

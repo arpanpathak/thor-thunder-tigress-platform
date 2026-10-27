@@ -104,8 +104,9 @@ pub(super) struct ToolCall {
 pub(super) struct Round {
     pub(super) content: String,
     pub(super) calls: Vec<ToolCall>,
-    /// Whether the round was cut off at [`super::MAX_ROUND_CHARS`].
-    pub(super) cut: bool,
+    /// Why the guard stopped the round, when it did. Nothing about the stop
+    /// has been sent to the page yet; the loop decides whether it is.
+    pub(super) stop: Option<&'static str>,
 }
 
 /// A message this server adds to the conversation, in OpenAI's shape.
