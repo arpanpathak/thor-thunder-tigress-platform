@@ -5,8 +5,45 @@ use serde_json::Value;
 /// Consecutive whitespace bytes tolerated in either generated text channel.
 const MAX_BLANK: usize = 1024;
 
-/// The bounded suffix used to find exact repeated spans across SSE chunks.
-const TAIL_BYTES: usize = 4096;
+/// A short unit — a line, a sentence — counts as a loop after this many
+/// copies in a row: a table rule or a block of closing braces repeats a few.
+const SHORT: Repeat = Repeat {
+    widths: 32..=512,
+    copies: 6,
+};
+
+/// A long unit — a paragraph, a whole plan — counts after three copies. Three
+/// identical paragraphs in a row are never meant; a thinking loop writes
+/// one of about a kilobyte over and over.
+const LONG: Repeat = Repeat {
+    widths: 513..=2048,
+    copies: 3,
+};
+
+/// The bounded suffix used to find exact repeated spans across SSE chunks:
+/// enough for the longest unit's copies.
+const TAIL_BYTES: usize = 6144;
+
+/// Units of a range of widths, repeated `copies` times at the end of the text.
+struct Repeat {
+    widths: std::ops::RangeInclusive<usize>,
+    copies: usize,
+}
+
+impl Repeat {
+    /// Whether `tail` ends in one unit of these widths, `copies` times over.
+    fn ends(&self, tail: &[u8]) -> bool {
+        self.widths
+            .clone()
+            .take_while(|width| width * self.copies <= tail.len())
+            .any(|width| {
+                let mut spans = tail[tail.len() - width * self.copies..].chunks_exact(width);
+                let first = spans.next().unwrap_or_default();
+
+                spans.all(|span| span == first)
+            })
+    }
+}
 
 /// Independent text channels; a transition from reasoning to an answer must
 /// not itself count as repetition.
@@ -36,13 +73,7 @@ impl Text {
             self.tail.drain(..self.tail.len() - TAIL_BYTES);
         }
 
-        let repeated = (32..=512.min(self.tail.len() / 6)).any(|width| {
-            let suffix = &self.tail[self.tail.len() - width * 6..];
-            let mut spans = suffix.chunks_exact(width);
-            let first = spans.next().unwrap_or_default();
-
-            spans.all(|span| span == first)
-        });
+        let repeated = SHORT.ends(&self.tail) || LONG.ends(&self.tail);
 
         repeated.then_some("Stopped because the model kept repeating the same text.")
     }
@@ -117,6 +148,19 @@ mod tests {
         });
 
         assert!(stopped);
+    }
+
+    #[test]
+    fn a_long_unit_repeated_three_times_in_thinking_is_a_loop() {
+        let mut guard = Guard::default();
+        let unit = (1..=60).map(|n| format!("step {n}; ")).collect::<String>();
+        let observe = |guard: &mut Guard, text: &str| {
+            guard.observe(&json!({"choices":[{"delta":{"reasoning_content": text}}]}))
+        };
+
+        assert!(unit.len() > 512);
+        assert!(observe(&mut guard, &unit.repeat(2)).is_none());
+        assert!(observe(&mut guard, &unit).is_some());
     }
 
     #[test]
