@@ -1,0 +1,6 @@
+# GitHub's language bar should describe this project's source, not the
+# third-party browser builds that the chat page serves offline. Their sources,
+# versions and licences are recorded in jetson-thor/web/THIRD_PARTY.md.
+jetson-thor/web/*.min.js linguist-vendored
+jetson-thor/web/*.min.mjs linguist-vendored
+jetson-thor/web/katex-0.19.0.css linguist-vendored
