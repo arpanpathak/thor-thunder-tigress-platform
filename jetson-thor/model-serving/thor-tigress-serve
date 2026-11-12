@@ -66,7 +66,9 @@ loaded, and loads one only at startup or when "load" asks. Adding a second one i
 That writes thor-edge-llm-<name>.service beside thor-edge-llm.service, starts
 it (the first start builds the engine, later ones reuse the cache), and reloads
 the agent so the picker grows a row. The checkpoint folder must sit next to
-EDGE_MODEL's, under ~/models/edge-llm.
+EDGE_MODEL's, under ~/models/edge-llm. A draft model in
+~/models/edge-llm/drafters/<same folder name> (Gemma 4's "assistant"
+checkpoints) is paired with it for multi-token prediction.
 """
 
 import concurrent.futures
@@ -835,7 +837,18 @@ def edge(values, wanted=None):
                                      "--cache-dir", str(edge_root(values) / "cache"),
                                      "--max-input-len", str(edge_prompt(entry, values)),
                                      "--max-kv-cache-capacity", str(context),
-                                     "--max-batch-size", "1"])
+                                     "--max-batch-size", "1", *drafter_arguments(entry, values)])
+
+
+def drafter_arguments(entry, values):
+    """The arguments that pair a model with its draft model, which guesses tokens ahead:
+    ~/models/edge-llm/drafters/FOLDER, e.g. Gemma 4's own "assistant" checkpoints.
+    Nothing when there is no such folder."""
+    drafter = edge_root(values) / "drafters" / entry["name"]
+    if not drafter.is_dir():
+        return []
+
+    return ["--speculative-config", json.dumps({"method": "mtp", "model": str(drafter)})]
 
 
 VLLM_CONTAINER = "thor-vllm"

@@ -23,7 +23,7 @@ pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((at) =
 pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
 
 await page.route('**/v1/models', (route) => route.fulfill({ json: { data: [
-  { id: 'Seeing-Test', owned_by: 'llamacpp', architecture: { input_modalities: ['text', 'image'] } },
+  { id: 'Seeing-Test', owned_by: 'llamacpp', max_model_len: 131072, architecture: { input_modalities: ['text', 'image'] } },
   { id: 'Text-Test', owned_by: 'llamacpp', architecture: { input_modalities: ['text'] } },
 ] } }));
 await page.route('**/v1/chat/completions', async (route) => {
@@ -110,8 +110,35 @@ try {
   assert.deepEqual(await page.locator('#viewer img').evaluate((image) => [image.naturalWidth, image.naturalHeight]), [4, 3]);
   await page.keyboard.press('Escape');
 
+  // A long file goes whole to a model with a large window. A model that gives no
+  // window is taken to have 32,768 tokens, half of them for the prompt, so at three
+  // characters a token about 46k characters of the file fit.
+  await page.click('#new');
+  const long = 'Every line of this report is about the harbour. '.repeat(1000);
+  await page.setInputFiles('#file-input', [{ name: 'long.txt', mimeType: 'text/plain', buffer: Buffer.from(long) }]);
+  await until(() => document.querySelectorAll('#attachments .attachment').length === 1 && !document.querySelector('#attachments .reading'));
+
+  await page.selectOption('#model', 'Seeing-Test');
+  await page.fill('#input', 'Summarise it.');
+  await page.click('#send');
+  await until(() => document.querySelectorAll('.msg.assistant .stats').length === 1);
+
+  const whole = requests.at(-1).messages.at(-1).content.at(-1).text;
+  assert.ok(whole.includes(long.trim()), 'a large window gets the whole file');
+  assert.ok(!whole.includes('cut to fit'));
+
+  await page.selectOption('#model', 'Text-Test');
+  await page.fill('#input', 'Again.');
+  await page.click('#send');
+  await until(() => document.querySelectorAll('.msg.assistant .stats').length === 2);
+
+  const cut = requests.at(-1).messages.find((message) => Array.isArray(message.content)).content.at(-1).text;
+  assert.ok(!cut.includes(long.trim()), 'the default window gets part of the file');
+  assert.ok(cut.length < (32768 / 2 - 1024) * 3 + 200, `the cut fits the budget (${cut.length} chars)`);
+  assert.match(cut, /\[the rest of the file was cut to fit\]/);
+
   assert.deepEqual(errors, []);
-  console.log('PASS: formulas, prices kept as text, diagrams, sandboxed drawings, image/PDF/text attachments, refused binaries, text-only models, reload, no browser errors');
+  console.log('PASS: formulas, prices kept as text, diagrams, sandboxed drawings, image/PDF/text attachments, refused binaries, text-only models, reload, files cut to fit the model, no browser errors');
 } finally {
   await browser.close();
 }
