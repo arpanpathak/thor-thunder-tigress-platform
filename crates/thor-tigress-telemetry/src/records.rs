@@ -3,7 +3,9 @@
 //! [`Tail`] remembers how far it has read, so each call reads only the new
 //! lines. A line still being written (no newline yet) is left for the next
 //! call. A log that got shorter was rotated or emptied, and is read again from
-//! the start.
+//! the start. Each line goes on as it was written, with OpenObserve's time
+//! field `_timestamp` (microseconds) added from the agent's `at_ms`, so a field
+//! the agent adds later reaches the dashboard without a change here.
 
 use std::{
     fs::File,
@@ -11,41 +13,9 @@ use std::{
     path::PathBuf,
 };
 
-use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 
 use crate::error::Outcome;
-
-/// One model request, as the agent writes it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Record {
-    /// When the request arrived, in microseconds since 1970: OpenObserve's
-    /// time field. Filled from `at_ms`.
-    #[serde(rename = "_timestamp")]
-    pub timestamp_us: u64,
-    /// When the request arrived, in milliseconds since 1970.
-    pub at_ms: u64,
-    /// The person the key belongs to.
-    pub who: String,
-    /// The route, such as `/v1/chat/completions`.
-    pub path: String,
-    /// The model the request named, if any.
-    pub model: Option<String>,
-    /// The HTTP status of the answer.
-    pub status: u16,
-    /// Whether the person's limits refused it.
-    pub limited: bool,
-    /// Milliseconds from arrival to the first byte of the answer.
-    pub first_byte_ms: u64,
-    /// Milliseconds from arrival to the end of the answer.
-    pub total_ms: u64,
-    /// Bytes of answer sent.
-    pub bytes: u64,
-    /// Tokens in the prompt.
-    pub input_tokens: u64,
-    /// Tokens in the answer.
-    pub output_tokens: u64,
-}
 
 /// How far the log has been read.
 #[derive(Debug)]
@@ -61,13 +31,13 @@ impl Tail {
         Tail { path, offset: 0 }
     }
 
-    /// The complete lines written since the last call, as records. A line
-    /// that is not a record is skipped. A missing log has no lines yet.
+    /// The complete lines written since the last call, as JSON objects. A
+    /// line that is not an object is skipped. A missing log has no lines yet.
     ///
     /// # Errors
     ///
     /// The I/O error when the log exists but cannot be read.
-    pub fn read_new(&mut self) -> Outcome<Vec<Record>> {
+    pub fn read_new(&mut self) -> Outcome<Vec<Value>> {
         let Some(file) = open_if_present(&self.path)? else {
             return Ok(Vec::new());
         };
@@ -111,13 +81,13 @@ fn open_if_present(path: &PathBuf) -> Outcome<Option<File>> {
     }
 }
 
-fn parse(line: &str) -> Option<Record> {
-    let record: Record = serde_json::from_str(line).ok()?;
+fn parse(line: &str) -> Option<Value> {
+    let mut record: Map<String, Value> = serde_json::from_str(line).ok()?;
+    let at_ms = record.get("at_ms").and_then(Value::as_u64).unwrap_or(0);
 
-    Some(Record {
-        timestamp_us: record.at_ms * 1000,
-        ..record
-    })
+    record.insert("_timestamp".to_string(), Value::from(at_ms * 1000));
+
+    Some(Value::Object(record))
 }
 
 #[cfg(test)]
@@ -132,8 +102,11 @@ mod tests {
         format!("{{\"at_ms\":{at_ms},\"who\":\"{who}\",\"status\":200}}\n")
     }
 
-    fn names(records: &[Record]) -> Vec<&str> {
-        records.iter().map(|record| record.who.as_str()).collect()
+    fn names(records: &[Value]) -> Vec<&str> {
+        records
+            .iter()
+            .filter_map(|record| record["who"].as_str())
+            .collect()
     }
 
     #[test]
@@ -143,7 +116,7 @@ mod tests {
         let mut tail = Tail::new(path.clone());
         let missing = tail.read_new()?;
 
-        fs::write(&path, line(1, "ada") + "not json\n" + "{\"at_ms\":2")?;
+        fs::write(&path, line(1, "ada") + "not json\n[1]\n" + "{\"at_ms\":2")?;
         let first = tail.read_new()?;
 
         fs::OpenOptions::new()
@@ -155,7 +128,7 @@ mod tests {
 
         assert!(missing.is_empty());
         assert_eq!(names(&first), ["ada"]);
-        assert_eq!(first[0].timestamp_us, 1_000);
+        assert_eq!(first[0]["_timestamp"], 1_000);
         assert_eq!(names(&second), ["grace"]);
         assert!(third.is_empty());
 

@@ -1,7 +1,7 @@
 {
   "version": 8,
   "title": "Thor traffic",
-  "description": "Model requests through thor-tigress-agent, and the health of each engine",
+  "description": "Every request through thor-tigress-agent, and the health of each engine",
   "tabs": [
     {
       "tabId": "default",
@@ -10,7 +10,7 @@
         {
           "id": "panel_1",
           "type": "metric",
-          "title": "Requests",
+          "title": "All requests",
           "description": "",
           "config": {
             "show_legends": true,
@@ -51,7 +51,7 @@
           "layout": {
             "x": 0,
             "y": 0,
-            "w": 48,
+            "w": 32,
             "h": 7,
             "i": 1
           }
@@ -59,7 +59,7 @@
         {
           "id": "panel_2",
           "type": "metric",
-          "title": "Answer tokens",
+          "title": "Model requests",
           "description": "",
           "config": {
             "show_legends": true,
@@ -69,7 +69,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT sum(output_tokens) AS \"y_axis_1\" FROM \"requests\"",
+              "query": "SELECT count(*) AS \"y_axis_1\" FROM \"requests\" WHERE path IN ('/v1/chat/completions', '/v1/messages')",
               "customQuery": true,
               "fields": {
                 "stream": "requests",
@@ -98,9 +98,9 @@
             }
           ],
           "layout": {
-            "x": 48,
+            "x": 32,
             "y": 0,
-            "w": 48,
+            "w": 32,
             "h": 7,
             "i": 2
           }
@@ -108,7 +108,7 @@
         {
           "id": "panel_3",
           "type": "metric",
-          "title": "Errors",
+          "title": "Unique clients",
           "description": "",
           "config": {
             "show_legends": true,
@@ -118,7 +118,56 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT count(*) AS \"y_axis_1\" FROM \"requests\" WHERE status >= 400 AND limited = false",
+              "query": "SELECT count(DISTINCT client) AS \"y_axis_1\" FROM \"requests\"",
+              "customQuery": true,
+              "fields": {
+                "stream": "requests",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Value",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 64,
+            "y": 0,
+            "w": 32,
+            "h": 7,
+            "i": 3
+          }
+        },
+        {
+          "id": "panel_4",
+          "type": "metric",
+          "title": "No or invalid key (401)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "decimals": 0
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(*) AS \"y_axis_1\" FROM \"requests\" WHERE status = 401",
               "customQuery": true,
               "fields": {
                 "stream": "requests",
@@ -149,15 +198,15 @@
           "layout": {
             "x": 96,
             "y": 0,
-            "w": 48,
+            "w": 32,
             "h": 7,
-            "i": 3
+            "i": 4
           }
         },
         {
-          "id": "panel_4",
+          "id": "panel_5",
           "type": "metric",
-          "title": "Rate-limited",
+          "title": "Rate-limited (429)",
           "description": "",
           "config": {
             "show_legends": true,
@@ -196,17 +245,66 @@
             }
           ],
           "layout": {
-            "x": 144,
+            "x": 128,
             "y": 0,
-            "w": 48,
+            "w": 32,
             "h": 7,
-            "i": 4
+            "i": 5
           }
         },
         {
-          "id": "panel_5",
+          "id": "panel_6",
+          "type": "metric",
+          "title": "Server errors (5xx)",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "decimals": 0
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT count(*) AS \"y_axis_1\" FROM \"requests\" WHERE status >= 500",
+              "customQuery": true,
+              "fields": {
+                "stream": "requests",
+                "stream_type": "logs",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Value",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 160,
+            "y": 0,
+            "w": 32,
+            "h": 7,
+            "i": 6
+          }
+        },
+        {
+          "id": "panel_7",
           "type": "line",
-          "title": "Requests per minute, by model",
+          "title": "Requests per minute, by route",
           "description": "",
           "config": {
             "show_legends": true,
@@ -215,7 +313,71 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", model AS \"breakdown_1\", count(*) AS \"y_axis_1\" FROM \"requests\" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", path AS \"breakdown_1\", count(*) AS \"y_axis_1\" FROM \"requests\" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "requests",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "x_axis_1",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Requests",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "z": [],
+                "breakdown": [
+                  {
+                    "label": "Route",
+                    "alias": "breakdown_1",
+                    "column": "breakdown_1",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 96,
+            "h": 14,
+            "i": 7
+          }
+        },
+        {
+          "id": "panel_8",
+          "type": "line",
+          "title": "Model requests per minute, by model",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom"
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", model AS \"breakdown_1\", count(*) AS \"y_axis_1\" FROM \"requests\" WHERE path IN ('/v1/chat/completions', '/v1/messages') GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
               "customQuery": true,
               "fields": {
                 "stream": "requests",
@@ -260,18 +422,18 @@
             }
           ],
           "layout": {
-            "x": 0,
+            "x": 96,
             "y": 7,
             "w": 96,
             "h": 14,
-            "i": 5
+            "i": 8
           }
         },
         {
-          "id": "panel_6",
+          "id": "panel_9",
           "type": "line",
           "title": "Output tokens per second, by model",
-          "description": "Answer tokens over the time spent writing them, first byte to last; only streamed answers",
+          "description": "Answer tokens over the time spent writing them, first byte to last; streamed answers only",
           "config": {
             "show_legends": true,
             "legends_position": "bottom"
@@ -279,7 +441,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", model AS \"breakdown_1\", sum(output_tokens) * 1000.0 / sum(total_ms - first_byte_ms) AS \"y_axis_1\" FROM \"requests\" WHERE limited = false AND output_tokens > 0 AND total_ms > first_byte_ms GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", model AS \"breakdown_1\", sum(output_tokens) * 1000.0 / sum(total_ms - first_byte_ms) AS \"y_axis_1\" FROM \"requests\" WHERE path IN ('/v1/chat/completions', '/v1/messages') AND limited = false AND output_tokens > 0 AND total_ms > first_byte_ms GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
               "customQuery": true,
               "fields": {
                 "stream": "requests",
@@ -324,15 +486,15 @@
             }
           ],
           "layout": {
-            "x": 96,
-            "y": 7,
-            "w": 96,
+            "x": 0,
+            "y": 21,
+            "w": 64,
             "h": 14,
-            "i": 6
+            "i": 9
           }
         },
         {
-          "id": "panel_7",
+          "id": "panel_10",
           "type": "line",
           "title": "p95 request time (ms), by model",
           "description": "",
@@ -343,7 +505,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", model AS \"breakdown_1\", approx_percentile_cont(total_ms, 0.95) AS \"y_axis_1\" FROM \"requests\" WHERE limited = false GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", model AS \"breakdown_1\", approx_percentile_cont(total_ms, 0.95) AS \"y_axis_1\" FROM \"requests\" WHERE path IN ('/v1/chat/completions', '/v1/messages') AND limited = false GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
               "customQuery": true,
               "fields": {
                 "stream": "requests",
@@ -388,15 +550,15 @@
             }
           ],
           "layout": {
-            "x": 0,
+            "x": 64,
             "y": 21,
-            "w": 96,
+            "w": 64,
             "h": 14,
-            "i": 7
+            "i": 10
           }
         },
         {
-          "id": "panel_8",
+          "id": "panel_11",
           "type": "line",
           "title": "p50 time to first byte (ms), by model",
           "description": "",
@@ -407,7 +569,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", model AS \"breakdown_1\", approx_percentile_cont(first_byte_ms, 0.5) AS \"y_axis_1\" FROM \"requests\" WHERE limited = false GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "query": "SELECT histogram(_timestamp, '1 minute') AS \"x_axis_1\", model AS \"breakdown_1\", approx_percentile_cont(first_byte_ms, 0.5) AS \"y_axis_1\" FROM \"requests\" WHERE path IN ('/v1/chat/completions', '/v1/messages') AND limited = false GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
               "customQuery": true,
               "fields": {
                 "stream": "requests",
@@ -452,17 +614,17 @@
             }
           ],
           "layout": {
-            "x": 96,
+            "x": 128,
             "y": 21,
-            "w": 96,
+            "w": 64,
             "h": 14,
-            "i": 8
+            "i": 11
           }
         },
         {
-          "id": "panel_9",
+          "id": "panel_12",
           "type": "table",
-          "title": "Use per person",
+          "title": "Traffic by route",
           "description": "",
           "config": {
             "show_legends": true,
@@ -471,14 +633,14 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT who AS \"x_axis_1\", count(*) AS \"y_axis_1\", sum(CASE WHEN limited THEN 1 ELSE 0 END) AS \"y_axis_2\", sum(output_tokens) AS \"y_axis_3\" FROM \"requests\" GROUP BY x_axis_1 ORDER BY y_axis_1 DESC",
+              "query": "SELECT path AS \"x_axis_1\", count(*) AS \"y_axis_1\", sum(CASE WHEN status = 401 THEN 1 ELSE 0 END) AS \"y_axis_2\", sum(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS \"y_axis_3\", approx_percentile_cont(total_ms, 0.5) AS \"y_axis_4\" FROM \"requests\" GROUP BY x_axis_1 ORDER BY y_axis_1 DESC",
               "customQuery": true,
               "fields": {
                 "stream": "requests",
                 "stream_type": "logs",
                 "x": [
                   {
-                    "label": "Person",
+                    "label": "Route",
                     "alias": "x_axis_1",
                     "column": "x_axis_1",
                     "color": null,
@@ -494,16 +656,23 @@
                     "type": "custom"
                   },
                   {
-                    "label": "Rate-limited",
+                    "label": "401",
                     "alias": "y_axis_2",
                     "column": "y_axis_2",
                     "color": null,
                     "type": "custom"
                   },
                   {
-                    "label": "Answer tokens",
+                    "label": "5xx",
                     "alias": "y_axis_3",
                     "column": "y_axis_3",
+                    "color": null,
+                    "type": "custom"
+                  },
+                  {
+                    "label": "p50 ms",
+                    "alias": "y_axis_4",
+                    "column": "y_axis_4",
                     "color": null,
                     "type": "custom"
                   }
@@ -526,11 +695,158 @@
             "y": 35,
             "w": 96,
             "h": 14,
-            "i": 9
+            "i": 12
           }
         },
         {
-          "id": "panel_10",
+          "id": "panel_13",
+          "type": "table",
+          "title": "Top clients",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom"
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT client AS \"x_axis_1\", count(*) AS \"y_axis_1\", count(DISTINCT path) AS \"y_axis_2\", max(user_agent) AS \"y_axis_3\" FROM \"requests\" GROUP BY x_axis_1 ORDER BY y_axis_1 DESC LIMIT 50",
+              "customQuery": true,
+              "fields": {
+                "stream": "requests",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Client",
+                    "alias": "x_axis_1",
+                    "column": "x_axis_1",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Requests",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": null,
+                    "type": "custom"
+                  },
+                  {
+                    "label": "Routes",
+                    "alias": "y_axis_2",
+                    "column": "y_axis_2",
+                    "color": null,
+                    "type": "custom"
+                  },
+                  {
+                    "label": "User agent",
+                    "alias": "y_axis_3",
+                    "column": "y_axis_3",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 35,
+            "w": 96,
+            "h": 14,
+            "i": 13
+          }
+        },
+        {
+          "id": "panel_14",
+          "type": "table",
+          "title": "Use per person",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom"
+          },
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT who AS \"x_axis_1\", count(*) AS \"y_axis_1\", sum(CASE WHEN path IN ('/v1/chat/completions', '/v1/messages') THEN 1 ELSE 0 END) AS \"y_axis_2\", sum(CASE WHEN limited THEN 1 ELSE 0 END) AS \"y_axis_3\", sum(output_tokens) AS \"y_axis_4\" FROM \"requests\" GROUP BY x_axis_1 ORDER BY y_axis_1 DESC",
+              "customQuery": true,
+              "fields": {
+                "stream": "requests",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Person",
+                    "alias": "x_axis_1",
+                    "column": "x_axis_1",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Requests",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1",
+                    "color": null,
+                    "type": "custom"
+                  },
+                  {
+                    "label": "Model requests",
+                    "alias": "y_axis_2",
+                    "column": "y_axis_2",
+                    "color": null,
+                    "type": "custom"
+                  },
+                  {
+                    "label": "Rate-limited",
+                    "alias": "y_axis_3",
+                    "column": "y_axis_3",
+                    "color": null,
+                    "type": "custom"
+                  },
+                  {
+                    "label": "Answer tokens",
+                    "alias": "y_axis_4",
+                    "column": "y_axis_4",
+                    "color": null,
+                    "type": "custom"
+                  }
+                ],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 49,
+            "w": 96,
+            "h": 12,
+            "i": 14
+          }
+        },
+        {
+          "id": "panel_15",
           "type": "bar",
           "title": "Answers by status",
           "description": "",
@@ -579,14 +895,14 @@
           ],
           "layout": {
             "x": 96,
-            "y": 35,
+            "y": 49,
             "w": 96,
-            "h": 14,
-            "i": 10
+            "h": 12,
+            "i": 15
           }
         },
         {
-          "id": "panel_11",
+          "id": "panel_16",
           "type": "table",
           "title": "Servers: uptime and check time",
           "description": "",
@@ -642,14 +958,14 @@
           ],
           "layout": {
             "x": 0,
-            "y": 49,
+            "y": 61,
             "w": 96,
             "h": 12,
-            "i": 11
+            "i": 16
           }
         },
         {
-          "id": "panel_12",
+          "id": "panel_17",
           "type": "line",
           "title": "Memory available (MiB)",
           "description": "",
@@ -698,10 +1014,10 @@
           ],
           "layout": {
             "x": 96,
-            "y": 49,
+            "y": 61,
             "w": 96,
             "h": 12,
-            "i": 12
+            "i": 17
           }
         }
       ]

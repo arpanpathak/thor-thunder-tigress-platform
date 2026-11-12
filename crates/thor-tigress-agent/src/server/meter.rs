@@ -1,6 +1,7 @@
-//! One line of JSON per model request, written to the request log when the
-//! answer ends: who asked, which model, the status, the time to the first byte
-//! and to the last, the bytes sent, and the tokens the engine reported.
+//! One line of JSON per request, written to the request log when the answer
+//! ends: who asked, from where, the route, the model, the status, the time to
+//! the first byte and to the last, the bytes sent, and the tokens the engine
+//! reported.
 //!
 //! The answer is watched as it streams to the client, so a long reply is not
 //! held back. Token counts are read from the `usage` the engines put in their
@@ -15,7 +16,12 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
-use axum::{body::Body, response::Response};
+use axum::{
+    body::{Body, HttpBody},
+    extract::Request,
+    http::{HeaderMap, HeaderValue, header},
+    response::Response,
+};
 use serde::Serialize;
 use tokio_stream::StreamExt;
 
@@ -35,15 +41,21 @@ pub struct RequestLog {
     file: Mutex<File>,
 }
 
-/// One model request, as written to the log.
+/// One request, as written to the log.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 pub struct Record {
     /// When the request arrived, in milliseconds since 1970.
     pub at_ms: u64,
-    /// The person the key belongs to.
+    /// The person the key belongs to, or `anonymous`.
     pub who: String,
+    /// The HTTP method.
+    pub method: String,
     /// The route, such as `/v1/chat/completions`.
     pub path: String,
+    /// The client's address, the first one in `X-Forwarded-For`.
+    pub client: Option<String>,
+    /// The client's `User-Agent`.
+    pub user_agent: Option<String>,
     /// The model the request named, if any.
     pub model: Option<String>,
     /// The HTTP status of the answer.
@@ -107,6 +119,33 @@ impl Record {
             ..Record::default()
         }
     }
+
+    /// A record for `request` from `who`, arriving now.
+    #[must_use]
+    pub fn of(request: &Request, who: &str) -> Self {
+        let headers = request.headers();
+
+        Record {
+            method: request.method().to_string(),
+            client: forwarded_for(headers),
+            user_agent: text(headers, header::USER_AGENT.as_str()),
+            ..Record::new(who, request.uri().path(), None)
+        }
+    }
+}
+
+/// The first address in `X-Forwarded-For`: the client, before any proxy.
+fn forwarded_for(headers: &HeaderMap) -> Option<String> {
+    let list = text(headers, "x-forwarded-for")?;
+    let first = list.split(',').next()?.trim();
+
+    Some(first.to_string())
+}
+
+fn text(headers: &HeaderMap, name: &str) -> Option<String> {
+    let value = headers.get(name)?.to_str().ok()?;
+
+    Some(value.to_string())
 }
 
 /// What is known of an answer while it streams, written to the log when the
@@ -149,7 +188,8 @@ impl Drop for Tally {
 }
 
 /// Passes `response` on unchanged, and writes `record` to `log` once its body
-/// has been sent. `permit` is held until then.
+/// has been sent. `permit` is held until then. A body whose length is known
+/// keeps its `Content-Length`, so only a streamed answer is sent in chunks.
 pub fn metered(
     response: Response,
     mut record: Record,
@@ -167,7 +207,10 @@ pub fn metered(
         log,
         _permit: permit,
     };
-    let (parts, body) = response.into_parts();
+    let length = response.body().size_hint().exact();
+    let (mut parts, body) = response.into_parts();
+    keep_length(&mut parts.headers, length);
+
     let watched = body.into_data_stream().map(move |chunk| {
         if let Ok(bytes) = &chunk {
             tally.see(bytes);
@@ -177,6 +220,12 @@ pub fn metered(
     });
 
     Response::from_parts(parts, Body::from_stream(watched))
+}
+
+fn keep_length(headers: &mut HeaderMap, length: Option<u64>) {
+    if let Some(length) = length {
+        headers.insert(header::CONTENT_LENGTH, HeaderValue::from(length));
+    }
 }
 
 /// Writes a record for a request that got no answer from an engine, such as
@@ -316,6 +365,28 @@ mod tests {
 
         assert_eq!(lines.lines().count(), 1);
         assert!(lines.contains(r#""limited":true"#));
+
+        Ok(())
+    }
+
+    #[test]
+    fn a_record_of_a_request_has_its_method_client_and_agent() -> Result<()> {
+        let request = Request::builder()
+            .method("POST")
+            .uri("/v1/messages?beta=true")
+            .header("x-forwarded-for", "203.0.113.5, 10.0.0.1")
+            .header("user-agent", "curl/8.5")
+            .body(Body::empty())?;
+        let bare = Request::builder().uri("/").body(Body::empty())?;
+
+        let record = Record::of(&request, "ada");
+        let anonymous = Record::of(&bare, "anonymous");
+
+        assert_eq!(record.method, "POST");
+        assert_eq!(record.path, "/v1/messages");
+        assert_eq!(record.client.as_deref(), Some("203.0.113.5"));
+        assert_eq!(record.user_agent.as_deref(), Some("curl/8.5"));
+        assert_eq!((anonymous.client, anonymous.user_agent), (None, None));
 
         Ok(())
     }

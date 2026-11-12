@@ -33,7 +33,7 @@ use serde::Serialize;
 use crate::{
     cli::{Options, Target},
     error::Outcome,
-    records::{Record, Tail},
+    records::Tail,
     ship::OpenObserve,
 };
 
@@ -51,7 +51,7 @@ struct Stamped<T> {
 struct Shipper {
     sink: OpenObserve,
     tail: Tail,
-    pending: Vec<Record>,
+    pending: Vec<serde_json::Value>,
     targets: Vec<Target>,
 }
 
