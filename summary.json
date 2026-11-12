@@ -1,11 +1,11 @@
 {
-  "commit": "9f42e93",
-  "measured_at": "2026-11-12T05:00:11Z",
+  "commit": "75cab04",
+  "measured_at": "2026-11-12T07:42:32Z",
   "all_passed": true,
-  "coverage": 97.72,
-  "tests": 505,
+  "coverage": 97.9,
+  "tests": 534,
   "rules": {
-    "files": 122,
+    "files": 132,
     "problems": 0
   },
   "crates": [
@@ -39,11 +39,11 @@
     {
       "crate": "thor-tigress-agent",
       "passed": true,
-      "tests": 221,
+      "tests": 234,
       "failed": 0,
-      "lines": 4166,
-      "covered": 4017,
-      "coverage": 96.42342774843975
+      "lines": 4587,
+      "covered": 4438,
+      "coverage": 96.75168955744495
     },
     {
       "crate": "thor-tigress-keyring",
@@ -61,6 +61,15 @@
       "failed": 0,
       "lines": 1502,
       "covered": 1502,
+      "coverage": 100.0
+    },
+    {
+      "crate": "thor-tigress-telemetry",
+      "passed": true,
+      "tests": 16,
+      "failed": 0,
+      "lines": 580,
+      "covered": 580,
       "coverage": 100.0
     }
   ]
