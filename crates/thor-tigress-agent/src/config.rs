@@ -73,6 +73,9 @@ pub const BEARER: &str = "Bearer ";
 /// Who is asking on a server with no key and no keyring.
 pub const ANYONE: &str = "anyone";
 
+/// Who a request without a valid key is recorded as.
+pub const ANONYMOUS: &str = "anonymous";
+
 /// How many model requests one person may start in a minute by default.
 const DEFAULT_PER_MINUTE: usize = 30;
 

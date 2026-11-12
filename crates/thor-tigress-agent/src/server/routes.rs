@@ -25,7 +25,7 @@ use crate::{
         response::{self, Client, JSON},
     },
     chat,
-    config::{BEARER, Config},
+    config::{ANONYMOUS, BEARER, Config},
     error::Outcome,
     engines::{messages, models},
     paths,
@@ -205,41 +205,50 @@ async fn guard(State(config): Shared, request: Request, next: Next) -> Response 
 }
 
 /// The answer to `request`: a preflight, a refusal without a valid key, a
-/// recorded model call, or whatever the route answers.
+/// model call within its person's limits, or whatever the route answers.
+/// Everything but a preflight is recorded; a request without a valid key is
+/// recorded as [`ANONYMOUS`].
 async fn admitted(config: &Arc<Config>, request: Request, next: Next) -> Response {
     let needs_key = request.uri().path().starts_with(paths::API);
     let who = config.holder(sent_key(request.headers()).as_deref());
+    let record = Record::of(&request, who.as_deref().unwrap_or(ANONYMOUS));
+    let started = Instant::now();
 
-    match (request.method() == Method::OPTIONS, needs_key, who) {
+    match (
+        request.method() == Method::OPTIONS,
+        needs_key,
+        who.is_some(),
+    ) {
         (true, _, _) => preflight(),
-        (false, true, None) => unauthorized(),
-        (false, true, Some(who)) => metered(config, &who, request, next).await,
-        (false, false, _) => next.run(request).await,
+        (false, true, false) => logged(config, unauthorized(), record, started),
+        (false, true, true) => metered(config, record, started, request, next).await,
+        (false, false, _) => logged(config, next.run(request).await, record, started),
     }
 }
 
-/// A request from `who` that passed the key check. A model call is counted
-/// against `who`'s limits and recorded; anything else goes straight on.
-async fn metered(config: &Arc<Config>, who: &str, request: Request, next: Next) -> Response {
-    let path = request.uri().path().to_string();
-
-    if !MODEL_CALLS.contains(&path.as_str()) {
-        return next.run(request).await;
+/// A request that passed the key check. A model call is counted against its
+/// person's limits; anything else goes straight on.
+async fn metered(
+    config: &Arc<Config>,
+    record: Record,
+    started: Instant,
+    request: Request,
+    next: Next,
+) -> Response {
+    if !MODEL_CALLS.contains(&record.path.as_str()) {
+        return logged(config, next.run(request).await, record, started);
     }
 
-    let started = Instant::now();
     let Some((request, model)) = with_model(request).await else {
-        return too_large();
+        return logged(config, too_large(), record, started);
     };
 
-    limited(
-        config,
-        Record::new(who, &path, model),
-        started,
-        request,
-        next,
-    )
-    .await
+    limited(config, Record { model, ..record }, started, request, next).await
+}
+
+/// `response`, recorded once its body has been sent.
+fn logged(config: &Config, response: Response, record: Record, started: Instant) -> Response {
+    meter::metered(response, record, started, config.log.clone(), None)
 }
 
 /// Runs a model call when `record.who`'s limits allow it, and records it.

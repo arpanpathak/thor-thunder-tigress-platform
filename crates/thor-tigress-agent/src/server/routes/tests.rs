@@ -459,7 +459,7 @@ async fn records_each_model_call_and_refuses_past_the_limit() -> Result<()> {
 }
 
 #[tokio::test]
-async fn other_routes_are_not_recorded_and_a_huge_body_is_refused() -> Result<()> {
+async fn every_route_is_recorded_and_a_huge_body_is_refused() -> Result<()> {
     let web = web_folder()?;
     let log = web.path().join("requests.jsonl");
     let config = metered_setup(web.path(), &log, vec![json_response(r#"{"data":[]}"#)])?;
@@ -467,10 +467,83 @@ async fn other_routes_are_not_recorded_and_a_huge_body_is_refused() -> Result<()
 
     let models = ask(&config, get("/v1/models")).await?;
     let refused = ask(&config, post("/v1/messages", &huge)).await?;
+    let records = logged(&log)?;
 
     assert_eq!(models.status, StatusCode::OK);
     assert_eq!(refused.status, StatusCode::PAYLOAD_TOO_LARGE);
-    assert!(!log.exists() || logged(&log)?.is_empty());
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0]["path"], "/v1/models");
+    assert_eq!(records[1]["status"], 413);
+
+    Ok(())
+}
+
+/// A server with the single key `k` that records requests in `log`.
+fn keyed_and_logged(web: &Path, log: &Path) -> Result<Arc<Config>> {
+    let arguments = [
+        "--web".to_string(),
+        web.display().to_string(),
+        "--engine".to_string(),
+        "nemotron=127.0.0.1:1".to_string(),
+        "--key-file".to_string(),
+        "/nonexistent".to_string(),
+        "--request-log".to_string(),
+        log.display().to_string(),
+    ];
+    let mut config = Config::from_args(arguments)?;
+    config.key = Some("k".to_string());
+
+    Ok(Arc::new(config))
+}
+
+#[tokio::test]
+async fn a_page_load_is_recorded_with_its_client() -> Result<()> {
+    let web = web_folder()?;
+    let log = web.path().join("requests.jsonl");
+    let config = keyed_and_logged(web.path(), &log)?;
+    let visitor = [
+        ("x-forwarded-for", "203.0.113.5"),
+        ("user-agent", "Mozilla/5.0"),
+    ];
+
+    let page = ask(&config, get("/").with(&visitor)).await?;
+    let records = logged(&log)?;
+
+    assert_eq!(page.status, StatusCode::OK);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["who"], "anonymous");
+    assert_eq!(records[0]["method"], "GET");
+    assert_eq!(records[0]["client"], "203.0.113.5");
+    assert_eq!(records[0]["user_agent"], "Mozilla/5.0");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_wrong_key_is_recorded_and_a_preflight_is_not() -> Result<()> {
+    let web = web_folder()?;
+    let log = web.path().join("requests.jsonl");
+    let config = keyed_and_logged(web.path(), &log)?;
+    let wrong = [("authorization", "Bearer nope")];
+
+    let refused = ask(&config, post("/v1/chat/completions", QUESTION).with(&wrong)).await?;
+    let preflight = ask(
+        &config,
+        Asked {
+            method: "OPTIONS",
+            ..get("/v1/models")
+        },
+    )
+    .await?;
+    let records = logged(&log)?;
+
+    assert_eq!(refused.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(preflight.status, StatusCode::NO_CONTENT);
+    assert_eq!(records.len(), 1);
+    assert_eq!(
+        (records[0]["who"].as_str(), records[0]["status"].as_u64()),
+        (Some("anonymous"), Some(401))
+    );
 
     Ok(())
 }
