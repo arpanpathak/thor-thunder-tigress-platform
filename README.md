@@ -14,7 +14,21 @@
   <a href="LICENSE"><img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/license.svg" alt="License" height="28"></a>
 </p>
 
-<p align="center">Coding tools that run on the Thor's models, and the models they use</p>
+<p align="center"><b>Engines</b></p>
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><a href="#engines-and-models"><img src="jetson-thor/clients/logos/nvidia.png" alt="TensorRT Edge-LLM" height="44"></a><br><sub>TensorRT Edge-LLM</sub></td>
+    <td align="center"><a href="#engines-and-models"><img src="jetson-thor/clients/logos/nvidia.png" alt="TensorRT-LLM" height="44"></a><br><sub>TensorRT-LLM</sub></td>
+    <td align="center"><a href="#engines-and-models"><picture><source media="(prefers-color-scheme: dark)" srcset="jetson-thor/clients/logos/vllm-dark.png"><img src="jetson-thor/clients/logos/vllm-light.png" alt="vLLM" height="30"></picture></a><br><sub>vLLM</sub></td>
+    <td align="center"><a href="#engines-and-models"><img src="jetson-thor/clients/logos/sglang.svg" alt="SGLang" height="34"></a><br><sub>SGLang</sub></td>
+    <td align="center"><a href="#engines-and-models"><img src="jetson-thor/clients/logos/llamacpp.jpg" alt="llama.cpp" height="44"></a><br><sub>llama.cpp</sub></td>
+    <td align="center"><a href="#engines-and-models"><picture><source media="(prefers-color-scheme: dark)" srcset="jetson-thor/clients/logos/ollama-dark.png"><img src="jetson-thor/clients/logos/ollama.svg" alt="Ollama" height="44"></picture></a><br><sub>Ollama</sub></td>
+  </tr>
+</table>
+</div>
+
+<p align="center"><b>Coding tools</b></p>
 <div align="center">
 <table>
   <tr>
@@ -23,29 +37,49 @@
     <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/openbatrangs.svg" alt="openbatrangs" height="44"></a><br><sub>openbatrangs</sub></td>
     <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/deepcode.svg" alt="Deep Code" height="44"></a><br><sub>Deep Code</sub></td>
     <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/deepseek.png" alt="DeepSeek Harness" height="44"></a><br><sub>DeepSeek Harness</sub></td>
-    <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/gemma.svg" alt="Gemma 4" height="44"></a><br><sub>Gemma 4 26B-A4B</sub></td>
-    <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/qwen.png" alt="Qwen3.6" height="44"></a><br><sub>Qwen3.6 35B-A3B</sub></td>
   </tr>
 </table>
 </div>
 
-Local language models write slop. In prose it is filler, hedging and
-sentences that announce their own importance. In Rust it is `unwrap`, comments
-inside function bodies, index loops and errors passed around as strings.
+<p align="center"><b>Models</b></p>
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><a href="#engines-and-models"><img src="jetson-thor/clients/logos/gemma.svg" alt="Gemma 4" height="44"></a><br><sub>Gemma 4</sub></td>
+    <td align="center"><a href="#engines-and-models"><img src="jetson-thor/clients/logos/qwen.png" alt="Qwen" height="44"></a><br><sub>Qwen3.8, Qwen3.6, Qwen3.5, Qwen2.5-Coder</sub></td>
+    <td align="center"><a href="#engines-and-models"><img src="jetson-thor/clients/logos/nvidia.png" alt="Nemotron" height="44"></a><br><sub>Nemotron 3 and 3.5</sub></td>
+  </tr>
+</table>
+</div>
 
-This project teaches a model that runs on an NVIDIA Jetson to stop. It builds
-a training set from text and code that do not have those habits, and it has a
-checker that counts each habit in a model's answers, so a fine-tune can be
-judged by numbers. It also runs the models on the device and puts them behind
-a chat page and an API. Claude Code, OpenCode, openbatrangs, Deep Code and
-DeepSeek Harness work against that API; see [Coding tools](#coding-tools).
+Thor Thunder Tigress Platform runs open language models on an NVIDIA Jetson
+AGX Thor and serves them to coding tools and a chat page.
+`thor-tigress-agent` exposes OpenAI and Anthropic APIs and routes each request
+to the engine serving the requested model. TensorRT Edge-LLM, vLLM, llama.cpp and Ollama have
+all served models on the Thor, and any other OpenAI-compatible server, such as
+SGLang or TensorRT-LLM's `trtllm-serve`, connects the same way.
 
-The data, the checker and the serving are built and in use. The fine-tune
-itself has not started; see [Status](#status).
+Since October 2026, the Thor has run 10 models from Google, Alibaba and NVIDIA
+on these engines, from 12B to 74B parameters; see
+[Engines and models](#engines-and-models). It serves Gemma 4 26B-A4B and
+Qwen3.6 35B-A3B now. Claude Code, OpenCode, openbatrangs, Deep Code and
+DeepSeek Harness each start on these models with one command; see
+[Coding tools](#coding-tools). The chat page searches the web, cites the pages
+it read, and takes PDFs up to 200 MB.
 
-**The book** explains every part, with the measurements:
-https://arpanpathak.github.io/thor-thunder-tigress-platform/
-(or `mdbook serve book` to read it locally).
+The platform also measures how the models write. The checker, `spark`, counts
+the habits we want to train out. In prose, those are filler, hedging and
+sentences about their own importance. In Rust, they are `unwrap`, comments
+inside function bodies, index loops and errors kept as strings. On the same
+Rust tasks, Qwen2.5-Coder 7B passed all five rules in 1 of 24 answers, and
+Qwen3.5 9B in 0 of 22.
+
+The training set holds 13,114 examples, about 6.5M tokens from 35 sources,
+picked because they do not have those habits. The fine-tune on the Thor has not
+started; [Status](#status) lists each stage.
+
+The [book](https://arpanpathak.github.io/thor-thunder-tigress-platform/) covers
+every part with its measurements. `mdbook serve book` shows it locally.
 
 ## What is in this repository
 
@@ -78,6 +112,43 @@ A chat page and an API on the Jetson Thor, for anyone with an invite.
 
 Where to read more in the book: "Web chat", "Tool calling", "Bring your own
 agent", "Model serving" and "Coding tools on TensorRT Edge-LLM".
+
+## Engines and models
+
+`thor-tigress-agent` takes a TensorRT Edge-LLM model as
+`--engine NAME=HOST:PORT` and an OpenAI-compatible server as
+`--model HOST:PORT`. [`thor-tigress-serve`](jetson-thor/model-serving/thor-tigress-serve)
+starts the engines on the Thor as systemd services and checks the memory
+before it loads a model.
+
+| | Engine | Used for |
+|---|---|---|
+| <img src="jetson-thor/clients/logos/nvidia.png" alt="" height="24"> | [TensorRT Edge-LLM](https://github.com/NVIDIA/TensorRT-Edge-LLM) | NVFP4 models, with draft models for multi-token prediction. Serves Gemma 4 and Qwen3.6 now |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="jetson-thor/clients/logos/vllm-dark.png"><img src="jetson-thor/clients/logos/vllm-light.png" alt="" height="16"></picture> | [vLLM](https://github.com/vllm-project/vllm) | Qwen3.8 Flash Next in NVIDIA's Jetson container, with a 262,144-token window |
+| <img src="jetson-thor/clients/logos/llamacpp.jpg" alt="" height="24"> | [llama.cpp](https://github.com/ggml-org/llama.cpp) | GGUF models, several loaded at once behind one router, with draft models and up to 1M-token windows |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="jetson-thor/clients/logos/ollama-dark.png"><img src="jetson-thor/clients/logos/ollama.svg" alt="" height="24"></picture> | [Ollama](https://github.com/ollama/ollama) | Qwen3.6 27B |
+| <img src="jetson-thor/clients/logos/nvidia.png" alt="" height="24"> | [TensorRT-LLM](https://github.com/NVIDIA/TensorRT-LLM) | The Qwen2.5-Coder 7B baseline on the Orin NX development board, and the teacher endpoint `lasso` is written for |
+| <img src="jetson-thor/clients/logos/sglang.svg" alt="" height="18"> | [SGLang](https://github.com/sgl-project/sglang) | Connects as an OpenAI-compatible server, like vLLM; not run on the Thor yet |
+
+Every model run so far, with the speed of one request. All of them ran on the
+Thor except the two `spark` baselines, which ran on the Orin NX development
+board.
+
+| Model | Engine | Weights | Tokens/s | Notes |
+|---|---|---|---|---|
+| Gemma 4 26B-A4B | TensorRT Edge-LLM | NVFP4, MTP draft model | 47–72 | Served. 131,072-token window, 65,536-token prompts |
+| Gemma 4 12B | TensorRT Edge-LLM | NVFP4, MTP draft model | 43–53 | Built, 29.5 GB |
+| Gemma 4 31B | TensorRT Edge-LLM | NVFP4, MTP draft model | 11–14 | Built; dense, so every token reads all 31B weights |
+| Qwen3.6 35B-A3B | TensorRT Edge-LLM | NVFP4 | 62–78 | Served. On 20 Rust tasks, 18 compiled and 14 passed their tests |
+| Qwen3.6 27B | Ollama | Q4_K_M | 12 | |
+| Qwen3.8 Flash Next | vLLM | NVFP4, MTP draft | 43–45 | 262,144-token window; 16 minutes to load |
+| Qwen3.8 27B | llama.cpp | Q8_0 | 8.3 | Edge-LLM 0.11 cannot build its FP8 checkpoint |
+| Qwen3.5 9B | llama.cpp | Q4_K_XL | | `spark` baseline, on the Orin NX |
+| Qwen2.5-Coder 7B | TensorRT-LLM | GPTQ INT4 | | `spark` baseline, on the Orin NX |
+| Nemotron 3 Nano 30B-A3B | llama.cpp and TensorRT Edge-LLM | Q8_0 and NVFP4 | 51–53, about 58 | 1M-token window. On the same 20 Rust tasks, 15 compiled and 14 passed |
+| Nemotron 3.5 Lightning 30B-A3B | llama.cpp and TensorRT Edge-LLM | GGUF and NVFP4 | 52.5 | |
+| Nemotron 3.5 Bolt 74B-A9B | llama.cpp | IQ2_XXS, DFlash draft model | 40–52 | 27 tokens/s without the draft model |
+| Nemotron 3.5 Super VL 120B-A12B | llama.cpp | NVFP4 GGUF | | Not run yet |
 
 ## Coding tools
 
