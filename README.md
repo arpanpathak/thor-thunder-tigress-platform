@@ -52,34 +52,26 @@
 </table>
 </div>
 
-Thor Thunder Tigress Platform runs open language models on an NVIDIA Jetson
-AGX Thor and serves them to coding tools and a chat page.
-`thor-tigress-agent` exposes OpenAI and Anthropic APIs and routes each request
-to the engine serving the requested model. TensorRT Edge-LLM, vLLM, llama.cpp and Ollama have
-all served models on the Thor, and any other OpenAI-compatible server, such as
-SGLang or TensorRT-LLM's `trtllm-serve`, connects the same way.
+Fullstack private LLM cloud platform for edge hardware: multi-engine model serving, an API gateway, coding agents and evaluation.
 
-Since October 2026, the Thor has run 10 models from Google, Alibaba and NVIDIA
-on these engines, from 12B to 74B parameters; see
-[Engines and models](#engines-and-models). It serves Gemma 4 26B-A4B and
-Qwen3.6 35B-A3B now. Claude Code, OpenCode, openbatrangs, Deep Code and
-DeepSeek Harness each start on these models with one command; see
-[Coding tools](#coding-tools). The chat page searches the web, cites the pages
-it read, and takes PDFs up to 200 MB.
+- Engines: TensorRT Edge-LLM, vLLM, llama.cpp, Ollama. Any OpenAI-compatible
+  backend (SGLang, `trtllm-serve`) can be added.
+- API: OpenAI `/v1/chat/completions` and Anthropic `/v1/messages`, routed by
+  model name (`thor-tigress-agent`).
+- Coding agents: Claude Code, OpenCode, openbatrangs, Deep Code, DeepSeek
+  Harness. One command each, see [Coding tools](#coding-tools).
+- Models: Gemma 4 26B-A4B, 12B and 31B; Qwen3.6 35B-A3B and 27B; Qwen3.8
+  Flash Next and 27B; Qwen3.5 9B; Qwen2.5-Coder 7B; Nemotron 3 Nano 30B-A3B;
+  Nemotron 3.5 Lightning 30B-A3B, Bolt 74B-A9B and Super VL 120B-A12B. Gemma 4
+  26B-A4B and Qwen3.6 35B-A3B are served now. Speeds in
+  [Engines and models](#engines-and-models).
+- Chat UI: web search with citations, image and PDF attachments up to 200 MB.
+- Eval: `spark` scores model output for prose and code quality.
+- Training data: 13,114 examples, 6.5M tokens, 35 sources. Fine-tune not
+  started, see [Status](#status).
 
-The platform also measures how the models write. The checker, `spark`, counts
-the habits we want to train out. In prose, those are filler, hedging and
-sentences about their own importance. In Rust, they are `unwrap`, comments
-inside function bodies, index loops and errors kept as strings. On the same
-Rust tasks, Qwen2.5-Coder 7B passed all five rules in 1 of 24 answers, and
-Qwen3.5 9B in 0 of 22.
-
-The training set holds 13,114 examples, about 6.5M tokens from 35 sources,
-picked because they do not have those habits. The fine-tune on the Thor has not
-started; [Status](#status) lists each stage.
-
-The [book](https://arpanpathak.github.io/thor-thunder-tigress-platform/) covers
-every part with its measurements. `mdbook serve book` shows it locally.
+Docs: https://arpanpathak.github.io/thor-thunder-tigress-platform/
+(`mdbook serve book` to build locally).
 
 ## What is in this repository
 
