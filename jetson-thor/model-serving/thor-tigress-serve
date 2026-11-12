@@ -53,6 +53,9 @@ Settings go in ~/.config/thor-chat/env as KEY=value lines:
   VLLM_IMAGE    the vLLM image                                         none
   VLLM_PORT     its server's port                                      8000
   VLLM_ARGS     the model's own vllm serve options                     none
+  REQUEST_LOG   one JSON line per model request, for thor-tigress-telemetry
+                                         ~/.local/state/thor-tigress/requests.jsonl
+  LIMIT_PER_MINUTE, LIMIT_AT_ONCE  model requests per person      30, 4
   PORT, MODEL_PORT, SEARCH_PORT            8080, 8079, 8888
 
 Every Edge-LLM model is offered in the chat page's picker: the agent is given
@@ -127,6 +130,9 @@ DEFAULTS = {
     "KEYRING_BIN": str(HOME / ".cargo" / "bin" / "thor-tigress-keyring"),
     "KEYRING": str(CONFIG / "keyring"),
     "KEYRING_PASSPHRASE": str(CONFIG / "keyring-passphrase"),
+    "REQUEST_LOG": str(HOME / ".local" / "state" / "thor-tigress" / "requests.jsonl"),
+    "LIMIT_PER_MINUTE": "30",
+    "LIMIT_AT_ONCE": "4",
 }
 
 TRY_CONTEXT = 65536
@@ -907,6 +913,9 @@ def agent(values):
                                *servers,
                                "--search", f"127.0.0.1:{values['SEARCH_PORT']}",
                                "--web", str(WEB), "--key-file", str(CONFIG / "api-key"),
+                               "--request-log", values["REQUEST_LOG"],
+                               "--limit-per-minute", values["LIMIT_PER_MINUTE"],
+                               "--limit-at-once", values["LIMIT_AT_ONCE"],
                                *keyring_arguments(values)])
 
 

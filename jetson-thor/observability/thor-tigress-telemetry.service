@@ -1,0 +1,13 @@
+[Unit]
+Description=Ships the thor-tigress-agent request log and engine health to OpenObserve
+After=thor-openobserve.service thor-tigress-agent.service
+Wants=thor-openobserve.service
+
+[Service]
+ExecStart=%h/.cargo/bin/thor-tigress-telemetry --engine Gemma-4-26B-A4B-NVFP4=127.0.0.1:8081 --engine Qwen3.6-35B-A3B-NVFP4=127.0.0.1:8082
+Restart=on-failure
+RestartSec=10
+MemoryMax=256M
+
+[Install]
+WantedBy=default.target

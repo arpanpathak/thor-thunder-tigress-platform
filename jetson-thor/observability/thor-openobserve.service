@@ -1,0 +1,12 @@
+[Unit]
+Description=OpenObserve (traffic dashboards) on 127.0.0.1:5080
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/opt/openobserve/run.sh
+Restart=on-failure
+RestartSec=5
+MemoryMax=4G
+
+[Install]
+WantedBy=default.target
