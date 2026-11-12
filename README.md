@@ -53,10 +53,9 @@
 </div>
 
 Thor Thunder Tigress Platform runs open language models on an NVIDIA Jetson
-AGX Thor and serves them to coding tools and a chat page. One server,
-`thor-tigress-agent`, sits in front of every engine and offers OpenAI's and
-Anthropic's APIs. A request names a model, and the server sends it to the
-engine that runs that model. TensorRT Edge-LLM, vLLM, llama.cpp and Ollama have
+AGX Thor and serves them to coding tools and a chat page.
+`thor-tigress-agent` exposes OpenAI and Anthropic APIs and routes each request
+to the engine serving the requested model. TensorRT Edge-LLM, vLLM, llama.cpp and Ollama have
 all served models on the Thor, and any other OpenAI-compatible server, such as
 SGLang or TensorRT-LLM's `trtllm-serve`, connects the same way.
 
