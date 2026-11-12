@@ -60,8 +60,11 @@ Fullstack private LLM cloud platform for edge hardware: multi-engine model servi
   model name (`thor-tigress-agent`).
 - Coding agents: Claude Code, OpenCode, openbatrangs, Deep Code, DeepSeek
   Harness. One command each, see [Coding tools](#coding-tools).
-- Models: Gemma 4 26B-A4B and Qwen3.6 35B-A3B served; 12 models run so far,
-  see [Engines and models](#engines-and-models).
+- Models: Gemma 4 26B-A4B, 12B and 31B; Qwen3.6 35B-A3B and 27B; Qwen3.8
+  Flash Next and 27B; Qwen3.5 9B; Qwen2.5-Coder 7B; Nemotron 3 Nano 30B-A3B;
+  Nemotron 3.5 Lightning 30B-A3B, Bolt 74B-A9B and Super VL 120B-A12B. Gemma 4
+  26B-A4B and Qwen3.6 35B-A3B are served now. Speeds in
+  [Engines and models](#engines-and-models).
 - Chat UI: web search with citations, image and PDF attachments up to 200 MB.
 - Eval: `spark` scores model output for prose and code quality.
 - Training data: 13,114 examples, 6.5M tokens, 35 sources. Fine-tune not
