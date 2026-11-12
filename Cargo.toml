@@ -7,6 +7,7 @@ members = [
     "crates/thor-tigress-agent",
     "crates/thor-tigress-keyring",
     "crates/thor-tigress-reinforcer-frontend",
+    "crates/thor-tigress-telemetry",
 ]
 
 [workspace.lints.clippy]
