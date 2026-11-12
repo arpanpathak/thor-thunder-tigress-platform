@@ -52,7 +52,7 @@
 </table>
 </div>
 
-Multi-engine LLM serving and evaluation platform for NVIDIA Jetson AGX Thor.
+Private LLM cloud for edge hardware: multi-engine model serving, an API gateway, coding agents and evaluation.
 
 - Engines: TensorRT Edge-LLM, vLLM, llama.cpp, Ollama. Any OpenAI-compatible
   backend (SGLang, `trtllm-serve`) can be added.
@@ -63,8 +63,7 @@ Multi-engine LLM serving and evaluation platform for NVIDIA Jetson AGX Thor.
 - Models: Gemma 4 26B-A4B and Qwen3.6 35B-A3B served; 12 models run so far,
   see [Engines and models](#engines-and-models).
 - Chat UI: web search with citations, image and PDF attachments up to 200 MB.
-- Eval: `spark` scores prose slop and five Rust rules. Answers passing all
-  five rules: Qwen2.5-Coder 7B 1/24, Qwen3.5 9B 0/22.
+- Eval: `spark` scores model output for prose and code quality.
 - Training data: 13,114 examples, 6.5M tokens, 35 sources. Fine-tune not
   started, see [Status](#status).
 
