@@ -395,3 +395,82 @@ async fn the_registration_form_is_closed_without_a_keyring() -> Result<()> {
 
     Ok(())
 }
+
+/// A server with no key, so every request comes from `anyone`, that records
+/// model requests in `log` and allows one a minute.
+fn metered_setup(web: &Path, log: &Path, responses: Vec<String>) -> Result<Arc<Config>> {
+    let model = FakeServer::start(responses)?;
+    let arguments = [
+        "--web".to_string(),
+        web.display().to_string(),
+        "--engine".to_string(),
+        format!("nemotron={}", model.address()),
+        "--key-file".to_string(),
+        "/nonexistent".to_string(),
+        "--request-log".to_string(),
+        log.display().to_string(),
+        "--limit-per-minute".to_string(),
+        "1".to_string(),
+    ];
+
+    Ok(Arc::new(Config::from_args(arguments)?))
+}
+
+fn logged(log: &Path) -> Result<Vec<serde_json::Value>> {
+    let text = fs::read_to_string(log)?;
+    let records = text
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(records)
+}
+
+#[tokio::test]
+async fn records_each_model_call_and_refuses_past_the_limit() -> Result<()> {
+    let web = web_folder()?;
+    let log = web.path().join("requests.jsonl");
+    let answer = r#"{"choices":[{"message":{"role":"assistant","content":"hi"}}],"usage":{"prompt_tokens":9,"completion_tokens":2}}"#;
+    let config = metered_setup(web.path(), &log, vec![json_response(answer)])?;
+    let question = r#"{"model":"nemotron","messages":[{"role":"user","content":"hi"}]}"#;
+
+    let first = ask(&config, post("/v1/chat/completions", question)).await?;
+    let second = ask(&config, post("/v1/chat/completions", question)).await?;
+    let records = logged(&log)?;
+
+    assert_eq!(first.status, StatusCode::OK);
+    assert_eq!(second.status, StatusCode::TOO_MANY_REQUESTS);
+    assert!(
+        second
+            .header(header::RETRY_AFTER)
+            .parse::<u64>()
+            .is_ok_and(|seconds| seconds > 0)
+    );
+    assert!(second.body.contains("rate_limit_error"));
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0]["who"], "anyone");
+    assert_eq!(records[0]["model"], "nemotron");
+    assert_eq!(records[0]["status"], 200);
+    assert_eq!(records[0]["output_tokens"], 2);
+    assert_eq!(records[1]["limited"], true);
+    assert_eq!(records[1]["status"], 429);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn other_routes_are_not_recorded_and_a_huge_body_is_refused() -> Result<()> {
+    let web = web_folder()?;
+    let log = web.path().join("requests.jsonl");
+    let config = metered_setup(web.path(), &log, vec![json_response(r#"{"data":[]}"#)])?;
+    let huge = "x".repeat(MAX_BODY + 1);
+
+    let models = ask(&config, get("/v1/models")).await?;
+    let refused = ask(&config, post("/v1/messages", &huge)).await?;
+
+    assert_eq!(models.status, StatusCode::OK);
+    assert_eq!(refused.status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert!(!log.exists() || logged(&log)?.is_empty());
+
+    Ok(())
+}
