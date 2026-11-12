@@ -14,17 +14,20 @@
   <a href="LICENSE"><img src="https://raw.githubusercontent.com/arpanpathak/thor-thunder-tigress-platform/badges/license.svg" alt="License" height="28"></a>
 </p>
 
-<p align="center"><b>Works with</b></p>
-<p align="center">
-  <a href="#coding-tools"><img src="jetson-thor/clients/logos/claude.svg" alt="Claude Code" title="Claude Code" height="40"></a>&nbsp;&nbsp;
-  <a href="#coding-tools"><picture><source media="(prefers-color-scheme: dark)" srcset="jetson-thor/clients/logos/opencode-dark.svg"><img src="jetson-thor/clients/logos/opencode-light.svg" alt="OpenCode" title="OpenCode" height="34"></picture></a>&nbsp;&nbsp;
-  <a href="#coding-tools"><img src="jetson-thor/clients/logos/openbatrangs.svg" alt="openbatrangs" title="openbatrangs" height="40"></a>&nbsp;&nbsp;
-  <a href="#coding-tools"><img src="jetson-thor/clients/logos/deepcode.svg" alt="Deep Code" title="Deep Code" height="40"></a>&nbsp;&nbsp;
-  <a href="#coding-tools"><img src="jetson-thor/clients/logos/deepseek.png" alt="DeepSeek Harness" title="DeepSeek Harness" height="40"></a>
-</p>
-<p align="center">
-  Models: <img src="jetson-thor/clients/logos/gemma.svg" alt="" height="18"> Gemma 4 26B-A4B and <img src="jetson-thor/clients/logos/qwen.png" alt="" height="18"> Qwen3.6 35B-A3B on TensorRT Edge-LLM
-</p>
+<p align="center">Coding tools that run on the Thor's models, and the models they use</p>
+<div align="center">
+<table>
+  <tr>
+    <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/claude.svg" alt="Claude Code" height="44"></a><br><sub>Claude Code</sub></td>
+    <td align="center"><a href="#coding-tools"><picture><source media="(prefers-color-scheme: dark)" srcset="jetson-thor/clients/logos/opencode-dark.svg"><img src="jetson-thor/clients/logos/opencode-light.svg" alt="OpenCode" height="26"></picture></a><br><sub>OpenCode</sub></td>
+    <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/openbatrangs.svg" alt="openbatrangs" height="44"></a><br><sub>openbatrangs</sub></td>
+    <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/deepcode.svg" alt="Deep Code" height="44"></a><br><sub>Deep Code</sub></td>
+    <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/deepseek.png" alt="DeepSeek Harness" height="44"></a><br><sub>DeepSeek Harness</sub></td>
+    <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/gemma.svg" alt="Gemma 4" height="44"></a><br><sub>Gemma 4 26B-A4B</sub></td>
+    <td align="center"><a href="#coding-tools"><img src="jetson-thor/clients/logos/qwen.png" alt="Qwen3.6" height="44"></a><br><sub>Qwen3.6 35B-A3B</sub></td>
+  </tr>
+</table>
+</div>
 
 Local language models write slop. In prose it is filler, hedging and
 sentences that announce their own importance. In Rust it is `unwrap`, comments
