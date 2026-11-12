@@ -13,6 +13,15 @@ const API = "/";
 // model answers; max_tokens bounds the round, and the agent cuts the stream as
 // a last floor.
 const MAX_ANSWER_TOKENS = 8192;
+
+// File text is cut so the request fits the longest prompt the model takes. An
+// Edge-LLM engine takes half its window (thor-tigress-serve's edge_prompt) and
+// refuses more with a 413; half is safe for llama.cpp too. The reserve is for
+// the system line and the template; three characters a token is safe for
+// English, which runs nearer four.
+const PROMPT_RESERVE_TOKENS = 1024;
+const CHARS_PER_TOKEN = 3;
+const DEFAULT_WINDOW = 32768;
 const DEFAULT_THINK_BUDGET = 1024;
 
 let settings = store.get("settings", { key: "", system: "", temperature: "", thinkbudget: String(DEFAULT_THINK_BUDGET) });
@@ -31,6 +40,9 @@ let modelEngines = {};
 // What each model reads, from /v1/models (`architecture.input_modalities`).
 // An engine that doesn't say is given pictures and may refuse them itself.
 let modelInputs = {};
+
+// Each model's context window in tokens, from /v1/models (`max_model_len`).
+let modelWindows = {};
 let controller = null;
 
 const SUGGESTIONS = [
@@ -408,6 +420,7 @@ async function connect() {
     models = (data.data || []).map((model) => model.id);
     modelEngines = Object.fromEntries((data.data || []).map((model) => [model.id, model.owned_by]));
     modelInputs = Object.fromEntries((data.data || []).map((model) => [model.id, model.architecture?.input_modalities]));
+    modelWindows = Object.fromEntries((data.data || []).map((model) => [model.id, model.max_model_len]));
 
     if (needsKey) showServer("bad", "access key needed");
     else if (models.length) showModels();
@@ -440,6 +453,35 @@ $("model").addEventListener("change", () => {
 // vLLM has no budget either. Qwen3.8's template thinks at effort xhigh by
 // default and spends all of max_tokens on a mid-sized coding question, so the
 // page asks vLLM for medium effort instead.
+// Characters of file text this request can carry: what half the window holds
+// once the reserve and the conversation's own words are taken out.
+function fileBudget(turns) {
+  const window = modelWindows[chosenModel()] || DEFAULT_WINDOW;
+  const words = turns.reduce((total, message) => total + message.content.length, 0);
+
+  return (window / 2 - PROMPT_RESERVE_TOKENS) * CHARS_PER_TOKEN - words;
+}
+
+// One turn as the API takes it: a user turn with files becomes image and text
+// parts; see attachments.js.
+async function apiTurn(message, vision, budget) {
+  const content = message.role === "user" ? await apiContent(message, vision, budget) : message.content;
+
+  return { role: message.role, content };
+}
+
+// The turns in order, so earlier files take the file budget first.
+async function apiHistory(turns, vision) {
+  const budget = { chars: fileBudget(turns) };
+  const history = [];
+
+  for (const message of turns) {
+    history.push(await apiTurn(message, vision, budget));
+  }
+
+  return history;
+}
+
 function servedByLlamaCpp() {
   const engine = modelEngines[chosenModel()];
   return !engine || engine === "llamacpp";
@@ -492,10 +534,7 @@ async function send(text, attachments = []) {
   const vision = canSee();
   const turns = messages.slice(0, -1).filter((m) => !m.error && (m.role === "user" || m.content));
 
-  const history = await Promise.all(turns.map(async (message) => ({
-    role: message.role,
-    content: message.role === "user" ? await apiContent(message, vision) : message.content,
-  })));
+  const history = await apiHistory(turns, vision);
 
   const formatting = "Write readable Markdown. Separate logical ideas with blank lines. Use short paragraphs and spaced lists when helpful; keep related points together. Preserve code indentation and blank lines between logical code sections. "
     + "Write math in LaTeX: $…$ inline and $$…$$ on lines of their own. Draw diagrams (flowcharts, sequences, architectures, state machines) in a ```mermaid block, and drawings or illustrations as a ```svg block; you can't make photos.";

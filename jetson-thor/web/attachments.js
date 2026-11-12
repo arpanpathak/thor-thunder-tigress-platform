@@ -10,10 +10,11 @@ import { element } from "./dom.js";
 const PDF_LIBRARY = "./pdf-6.4.299-legacy.min.mjs";
 const PDF_WORKER = "pdf.worker-6.4.299-legacy.min.mjs";
 
-const MAX_FILE_BYTES = 25 << 20;
+const MAX_FILE_BYTES = 200 << 20;
 
-// About 40k tokens; past that the model can't hold the file and the question.
-const MAX_TEXT = 160000;
+// What is kept of a file's text: more than any model here can read at once. Each
+// request cuts it again to what the chosen model holds; see apiContent.
+const MAX_TEXT = 1000000;
 
 // Long edge of an image sent to the model: enough to read a screenshot, small
 // enough that a vision encoder turns it into a few thousand tokens.
@@ -24,7 +25,7 @@ const THUMB_EDGE = 160;
 // pictures. A scan has next to none; a short real page has a sentence.
 const SCANNED_CHARS_PER_PAGE = 16;
 const SCANNED_PAGES = 8;
-const PDF_TEXT_PAGES = 400;
+const PDF_TEXT_PAGES = 2000;
 
 // ---- storage ----
 const memory = new Map();
@@ -307,7 +308,7 @@ function isImage(file) {
 
 /** Reads a picked, dropped or pasted file into `{ meta, payload }`, or throws an Error to show. */
 export async function readFile(file) {
-  if (file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is larger than 25 MB.`);
+  if (file.size > MAX_FILE_BYTES) throw new Error(`${file.name} is larger than 200 MB.`);
 
   const read = isImage(file) ? await readImage(file)
     : isPdf(file) ? await readPdf(file)
@@ -361,19 +362,31 @@ function fileName(name) {
   return name.replace(/["<>\n]/g, "_");
 }
 
-function fileText(meta, payload, name) {
-  const pages = meta.kind === "pdf" ? ` pages="${meta.pages}"` : "";
-  const cut = meta.truncated ? "\n[the rest of the file was cut to fit]" : "";
+// The part of a file's text the request still has room for, and whether any of
+// the file is left out. The budget shrinks by what this file takes, so files
+// after it get the rest.
+function fitText(text, budget, truncated) {
+  const kept = text.slice(0, Math.max(0, budget.chars));
+  budget.chars -= kept.length;
 
-  return `<file name="${name}"${pages}>\n${payload.text}${cut}\n</file>`;
+  return { kept, cut: truncated || kept.length < text.length };
+}
+
+function fileText(meta, payload, name, budget) {
+  const { kept, cut } = fitText(payload.text, budget, meta.truncated);
+  const pages = meta.kind === "pdf" ? ` pages="${meta.pages}"` : "";
+  const note = cut ? "\n[the rest of the file was cut to fit]" : "";
+
+  return `<file name="${name}"${pages}>\n${kept}${note}\n</file>`;
 }
 
 /**
  * The `content` of a user message for the API: a string when it has no files,
  * else image parts followed by one text part holding the files' text and the
  * message. A model that can't see gets a note in place of each picture.
+ * `budget.chars` is how much file text the request may still carry.
  */
-export async function apiContent(message, canSee) {
+export async function apiContent(message, canSee, budget) {
   const attachments = message.attachments || [];
 
   if (!attachments.length) return message.content;
@@ -399,7 +412,7 @@ export async function apiContent(message, canSee) {
       texts.push(`[${name}: ${meta.kind === "image" ? "an image" : "a scanned PDF"} the current model can't see]`);
     }
 
-    if (payload.text) texts.push(fileText(meta, payload, name));
+    if (payload.text) texts.push(fileText(meta, payload, name, budget));
   }
 
   const text = [...texts, message.content].filter(Boolean).join("\n\n");
