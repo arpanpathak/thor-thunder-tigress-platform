@@ -5,6 +5,7 @@
 //!                    [--engine MODEL=HOST:PORT]... [--search 127.0.0.1:8888]
 //!                    [--web DIR] [--key-file FILE]
 //!                    [--keyring FILE] [--keyring-passphrase-file FILE]
+//!                    [--request-log FILE] [--limit-per-minute N] [--limit-at-once N]
 //! ```
 //!
 //! `--model` is llama-server, which answers for the models it has loaded.
@@ -19,19 +20,30 @@
 //! personal keys in it are what visitors may use. The
 //! keyring's passphrase comes from `--keyring-passphrase-file` or the
 //! `THOR_KEYRING_PASSPHRASE` environment variable.
+//!
+//! `--request-log` names the file each model request is recorded in, one line
+//! of JSON per request. `--limit-per-minute` (default 30) and `--limit-at-once`
+//! (default 4) bound each person's model requests; the operator has no limits.
 
 use std::{
     fs,
     path::{Path, PathBuf},
-    sync::{Mutex, MutexGuard},
+    sync::{Arc, Mutex, MutexGuard},
     time::SystemTime,
 };
 
-use thor_tigress_keyring::{error::KeyringError, store::Keyring};
+use thor_tigress_keyring::{
+    error::KeyringError,
+    store::{Keyring, Status},
+};
 use zeroize::Zeroizing;
 
 use crate::{
     error::{AgentError, Outcome},
+    server::{
+        limits::{Limits, OPERATOR},
+        meter::RequestLog,
+    },
     web::http::{HttpWeb, Web},
     engines::{
         body::{self, Fields},
@@ -57,6 +69,15 @@ const KEYRING_ENV: &str = "THOR_KEYRING_PASSPHRASE";
 
 /// How a key is sent in an `Authorization` header.
 pub const BEARER: &str = "Bearer ";
+
+/// Who is asking on a server with no key and no keyring.
+pub const ANYONE: &str = "anyone";
+
+/// How many model requests one person may start in a minute by default.
+const DEFAULT_PER_MINUTE: usize = 30;
+
+/// How many model requests one person may have running at once by default.
+const DEFAULT_AT_ONCE: usize = 4;
 
 /// The model servers and the search engine.
 pub struct Upstreams {
@@ -191,11 +212,18 @@ pub struct People {
     state: Mutex<Loaded>,
 }
 
-/// The active keys, and the keyring file's timestamp when they were read.
+/// The active keys with their holders' names, and the keyring file's
+/// timestamp when they were read.
 #[derive(Default)]
 struct Loaded {
-    keys: Vec<String>,
+    holders: Vec<Holder>,
     modified: Option<SystemTime>,
+}
+
+/// An active key and the name of the person it was given to.
+struct Holder {
+    key: String,
+    name: String,
 }
 
 impl People {
@@ -208,7 +236,7 @@ impl People {
     pub fn new(path: PathBuf, passphrase: Zeroizing<String>) -> Outcome<Self> {
         let keyring = Keyring::open(&path, &passphrase)?;
         let loaded = Loaded {
-            keys: keyring.active_keys(),
+            holders: holders(&keyring),
             modified: modified(&path),
         };
 
@@ -219,20 +247,21 @@ impl People {
         })
     }
 
-    /// Whether `sent` carries the key of someone the keyring calls active.
+    /// The name of the active person whose key `sent` carries.
     #[must_use]
-    pub fn admit(&self, sent: Option<&str>) -> bool {
-        let Some(sent) = sent.and_then(|value| value.strip_prefix(BEARER)) else {
-            return false;
-        };
-
+    pub fn holder(&self, sent: Option<&str>) -> Option<String> {
+        let sent = sent.and_then(|value| value.strip_prefix(BEARER))?;
         let mut loaded = self.lock();
 
         if let Err(error) = self.refresh(&mut loaded) {
             eprintln!("keyring: {error}");
         }
 
-        loaded.keys.iter().any(|key| same_secret(sent, key))
+        loaded
+            .holders
+            .iter()
+            .find(|holder| same_secret(sent, &holder.key))
+            .map(|holder| holder.name.clone())
     }
 
     /// Records a request from the registration form, so the author can approve
@@ -259,7 +288,7 @@ impl People {
         }
 
         let keyring = Keyring::open(&self.path, &self.passphrase)?;
-        loaded.keys = keyring.active_keys();
+        loaded.holders = holders(&keyring);
         loaded.modified = modified;
 
         Ok(())
@@ -285,6 +314,10 @@ pub struct Config {
     pub people: Option<People>,
     /// Where model and search requests go.
     pub upstreams: Upstreams,
+    /// The file each model request is recorded in, when one is configured.
+    pub log: Option<Arc<RequestLog>>,
+    /// How many model requests each person may make.
+    pub limits: Arc<Limits>,
 }
 
 impl Config {
@@ -307,20 +340,16 @@ impl Config {
             .next()
             .unwrap_or_else(|| Engine::llama(DEFAULT_MODEL.to_string(), authorization.clone()));
 
-        let people = match &options.keyring {
-            Some(path) => {
-                let passphrase = keyring_passphrase(&options, std::env::var(KEYRING_ENV).ok())?;
-
-                Some(People::new(path.clone(), passphrase)?)
-            }
-            None => None,
-        };
+        let people = people(&options)?;
+        let log = request_log(&options)?;
 
         Ok(Config {
             listen: options.listen,
             web: options.web,
             key,
             people,
+            log,
+            limits: Limits::new(options.per_minute, options.at_once),
             upstreams: Upstreams {
                 default,
                 others: engines.collect(),
@@ -330,24 +359,24 @@ impl Config {
         })
     }
 
-    /// Whether a request carrying the `Authorization` value `sent` may use
-    /// the model: a personal key from the keyring, or the single key.
+    /// Who a request carrying the `Authorization` value `sent` comes from: the
+    /// keyring's name for a personal key, [`OPERATOR`] for the single key, and
+    /// [`ANYONE`] on a server with neither. `None` when the key is not accepted.
     #[must_use]
-    pub fn admits(&self, sent: Option<&str>) -> bool {
-        if self
-            .people
-            .as_ref()
-            .is_some_and(|people| people.admit(sent))
-        {
-            return true;
-        }
+    pub fn holder(&self, sent: Option<&str>) -> Option<String> {
+        let person = self.people.as_ref().and_then(|people| people.holder(sent));
 
+        person.or_else(|| self.single_key_holder(sent))
+    }
+
+    fn single_key_holder(&self, sent: Option<&str>) -> Option<String> {
         match (&self.key, sent) {
-            (None, _) => self.people.is_none(),
-            (Some(_), None) => false,
+            (None, _) => self.people.is_none().then(|| ANYONE.to_string()),
+            (Some(_), None) => None,
             (Some(key), Some(sent)) => sent
                 .strip_prefix(BEARER)
-                .is_some_and(|given| same_secret(given, key)),
+                .filter(|given| same_secret(given, key))
+                .map(|_| OPERATOR.to_string()),
         }
     }
 
@@ -396,6 +425,9 @@ struct Options {
     key_file: PathBuf,
     keyring: Option<PathBuf>,
     keyring_passphrase_file: Option<PathBuf>,
+    request_log: Option<PathBuf>,
+    per_minute: usize,
+    at_once: usize,
 }
 
 impl Default for Options {
@@ -412,6 +444,9 @@ impl Default for Options {
             key_file: home.join(KEY_FILE),
             keyring: None,
             keyring_passphrase_file: None,
+            request_log: None,
+            per_minute: DEFAULT_PER_MINUTE,
+            at_once: DEFAULT_AT_ONCE,
         }
     }
 }
@@ -444,11 +479,60 @@ impl Options {
             "--keyring-passphrase-file" => {
                 self.keyring_passphrase_file = Some(PathBuf::from(value))
             }
+            "--request-log" => self.request_log = Some(PathBuf::from(value)),
+            "--limit-per-minute" => self.per_minute = count(flag, &value)?,
+            "--limit-at-once" => self.at_once = count(flag, &value)?,
             unknown => return Err(AgentError::Config(format!("unknown option {unknown}"))),
         }
 
         Ok(())
     }
+}
+
+/// The people in the keyring `--keyring` names, when it names one.
+fn people(options: &Options) -> Outcome<Option<People>> {
+    let Some(path) = &options.keyring else {
+        return Ok(None);
+    };
+
+    let passphrase = keyring_passphrase(options, std::env::var(KEYRING_ENV).ok())?;
+
+    Ok(Some(People::new(path.clone(), passphrase)?))
+}
+
+/// The request log `--request-log` names, opened for appending.
+fn request_log(options: &Options) -> Outcome<Option<Arc<RequestLog>>> {
+    let Some(path) = &options.request_log else {
+        return Ok(None);
+    };
+
+    Ok(Some(Arc::new(RequestLog::open(path)?)))
+}
+
+/// Reads a limit: a whole number of at least 1.
+fn count(flag: &str, value: &str) -> Outcome<usize> {
+    value
+        .parse()
+        .ok()
+        .filter(|count| *count > 0)
+        .ok_or_else(|| AgentError::Config(format!("{flag} {value}: expected a number above 0")))
+}
+
+/// The active people in `keyring`, each with their key.
+fn holders(keyring: &Keyring) -> Vec<Holder> {
+    keyring
+        .records()
+        .iter()
+        .filter(|person| person.status == Status::Active)
+        .filter_map(|person| {
+            let key = person.key.clone()?;
+
+            Some(Holder {
+                key,
+                name: person.name.clone(),
+            })
+        })
+        .collect()
 }
 
 /// Reads `MODEL=HOST:PORT`.

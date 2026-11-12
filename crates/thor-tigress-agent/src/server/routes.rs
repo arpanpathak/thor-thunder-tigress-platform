@@ -4,11 +4,11 @@
 //! Everything that calls an engine is blocking code, so its handler hands the
 //! work to [`bridge::answered`].
 
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, time::Instant};
 
 use axum::{
     Router,
-    body::Bytes,
+    body::{Body, Bytes, to_bytes},
     extract::{DefaultBodyLimit, Query, Request, State},
     http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header},
     middleware::{self, Next},
@@ -20,6 +20,8 @@ use serde::Deserialize;
 use crate::{
     server::{
         bridge,
+        limits::Refusal,
+        meter::{self, Record},
         response::{self, Client, JSON},
     },
     chat,
@@ -43,6 +45,18 @@ const MAX_BODY: usize = 32 << 20;
 
 /// The header Anthropic clients send the key in.
 const API_KEY: &str = "x-api-key";
+
+/// The routes that run a model: each is recorded in the request log, and
+/// counted against the person's limits.
+const MODEL_CALLS: [&str; 2] = [paths::CHAT_COMPLETIONS, paths::MESSAGES];
+
+/// What the server sends back when a person's limits refuse a request, in
+/// the error format OpenAI clients expect.
+const TOO_MANY: &str = r#"{"error":{"code":429,"message":"Too many requests for this key; wait and retry","type":"rate_limit_error"}}"#;
+
+/// What the server sends back when a request body cannot be read whole.
+const TOO_LARGE: &str =
+    r#"{"error":{"code":413,"message":"The request is too large","type":"invalid_request_error"}}"#;
 
 /// A file the server hands out, with its content type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -176,17 +190,7 @@ pub fn router(config: Arc<Config>) -> Router {
 /// Letting other sites call is safe because access is by a key in a header,
 /// not by cookies: a site can't use a visitor's key without having it.
 async fn guard(State(config): Shared, request: Request, next: Next) -> Response {
-    let needs_key = request.uri().path().starts_with(paths::API);
-    let key = sent_key(request.headers());
-
-    let mut response = if request.method() == Method::OPTIONS {
-        preflight()
-    } else if needs_key && !config.admits(key.as_deref()) {
-        unauthorized()
-    } else {
-        next.run(request).await
-    };
-
+    let mut response = admitted(&config, request, next).await;
     let headers = response.headers_mut();
 
     headers.insert(
@@ -198,6 +202,109 @@ async fn guard(State(config): Shared, request: Request, next: Next) -> Response 
         .or_insert(HeaderValue::from_static("no-store"));
 
     response
+}
+
+/// The answer to `request`: a preflight, a refusal without a valid key, a
+/// recorded model call, or whatever the route answers.
+async fn admitted(config: &Arc<Config>, request: Request, next: Next) -> Response {
+    let needs_key = request.uri().path().starts_with(paths::API);
+    let who = config.holder(sent_key(request.headers()).as_deref());
+
+    match (request.method() == Method::OPTIONS, needs_key, who) {
+        (true, _, _) => preflight(),
+        (false, true, None) => unauthorized(),
+        (false, true, Some(who)) => metered(config, &who, request, next).await,
+        (false, false, _) => next.run(request).await,
+    }
+}
+
+/// A request from `who` that passed the key check. A model call is counted
+/// against `who`'s limits and recorded; anything else goes straight on.
+async fn metered(config: &Arc<Config>, who: &str, request: Request, next: Next) -> Response {
+    let path = request.uri().path().to_string();
+
+    if !MODEL_CALLS.contains(&path.as_str()) {
+        return next.run(request).await;
+    }
+
+    let started = Instant::now();
+    let Some((request, model)) = with_model(request).await else {
+        return too_large();
+    };
+
+    limited(
+        config,
+        Record::new(who, &path, model),
+        started,
+        request,
+        next,
+    )
+    .await
+}
+
+/// Runs a model call when `record.who`'s limits allow it, and records it.
+async fn limited(
+    config: &Arc<Config>,
+    record: Record,
+    started: Instant,
+    request: Request,
+    next: Next,
+) -> Response {
+    match config.limits.admit(&record.who, started) {
+        Ok(permit) => {
+            let response = next.run(request).await;
+
+            meter::metered(response, record, started, config.log.clone(), Some(permit))
+        }
+        Err(refusal) => refused(config, record, refusal),
+    }
+}
+
+/// The request with its body read, and the model its JSON names; `None` when
+/// the body is larger than [`MAX_BODY`].
+async fn with_model(request: Request) -> Option<(Request, Option<String>)> {
+    #[derive(Deserialize)]
+    struct Named {
+        model: Option<String>,
+    }
+
+    let (parts, body) = request.into_parts();
+    let bytes = to_bytes(body, MAX_BODY).await.ok()?;
+    let model = serde_json::from_slice::<Named>(&bytes)
+        .ok()
+        .and_then(|named| named.model);
+
+    Some((Request::from_parts(parts, Body::from(bytes)), model))
+}
+
+/// Records a request the limits refused and tells the client when to retry.
+fn refused(config: &Config, record: Record, refusal: Refusal) -> Response {
+    let record = Record {
+        status: 429,
+        limited: true,
+        ..record
+    };
+
+    meter::note(config.log.as_deref(), &record);
+
+    (
+        StatusCode::TOO_MANY_REQUESTS,
+        [
+            (header::CONTENT_TYPE, JSON.to_string()),
+            (header::RETRY_AFTER, refusal.retry_after().to_string()),
+        ],
+        TOO_MANY,
+    )
+        .into_response()
+}
+
+fn too_large() -> Response {
+    (
+        StatusCode::PAYLOAD_TOO_LARGE,
+        [(header::CONTENT_TYPE, JSON)],
+        TOO_LARGE,
+    )
+        .into_response()
 }
 
 /// The `Authorization` value a request carries; an `x-api-key` header

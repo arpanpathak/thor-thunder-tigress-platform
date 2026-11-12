@@ -232,12 +232,12 @@ fn admits_only_the_right_bearer_key() -> Outcome {
     let open = with_key(None)?;
     let locked = with_key(Some("k3y"))?;
 
-    assert!(open.admits(None));
-    assert!(locked.admits(Some("Bearer k3y")));
-    assert!(!locked.admits(None));
-    assert!(!locked.admits(Some("Bearer k3")));
-    assert!(!locked.admits(Some("Bearer k3yy")));
-    assert!(!locked.admits(Some("k3y")));
+    assert_eq!(open.holder(None).as_deref(), Some(ANYONE));
+    assert_eq!(locked.holder(Some("Bearer k3y")).as_deref(), Some(OPERATOR));
+    assert_eq!(locked.holder(None), None);
+    assert_eq!(locked.holder(Some("Bearer k3")), None);
+    assert_eq!(locked.holder(Some("Bearer k3yy")), None);
+    assert_eq!(locked.holder(Some("k3y")), None);
 
     Ok(())
 }
@@ -260,10 +260,13 @@ fn a_keyring_lets_each_person_in() -> Outcome {
         .unwrap_or_default();
 
     assert!(!ada.is_empty());
-    assert!(config.admits(Some(&format!("Bearer {ada}"))));
-    assert!(!config.admits(Some("Bearer not-a-key")));
-    assert!(!config.admits(None));
-    assert!(!config.admits(Some("nonsense")));
+    assert_eq!(
+        config.holder(Some(&format!("Bearer {ada}"))).as_deref(),
+        Some("Ada")
+    );
+    assert_eq!(config.holder(Some("Bearer not-a-key")), None);
+    assert_eq!(config.holder(None), None);
+    assert_eq!(config.holder(Some("nonsense")), None);
 
     config.request_access("Bob", "bob@example.com")?;
 
@@ -273,7 +276,10 @@ fn a_keyring_lets_each_person_in() -> Outcome {
 
     let bob = reopened.approve("bob@example.com")?;
 
-    assert!(config.admits(Some(&format!("Bearer {bob}"))));
+    assert_eq!(
+        config.holder(Some(&format!("Bearer {bob}"))).as_deref(),
+        Some("Bob")
+    );
 
     Ok(())
 }
@@ -285,7 +291,7 @@ fn a_keyring_that_goes_away_is_reported_and_keeps_the_old_keys() -> Outcome {
 
     fs::remove_file(folder.keyring())?;
 
-    assert!(!config.admits(Some("Bearer anything")));
+    assert_eq!(config.holder(Some("Bearer anything")), None);
 
     Ok(())
 }
@@ -392,5 +398,40 @@ fn a_listed_but_unloaded_name_is_kept_so_the_router_can_load_it() -> Outcome {
     vllm_upstreams(&server).route(&mut fields);
 
     assert_eq!(body::model(&fields), Some("nano"));
+    Ok(())
+}
+
+#[test]
+fn limits_and_the_request_log_come_from_their_flags() -> Outcome {
+    let folder = Folder::new()?;
+    let log = folder
+        .path()
+        .join("logs/requests.jsonl")
+        .display()
+        .to_string();
+    let config = Config::from_args(args(&[
+        "--key-file",
+        "/none",
+        "--request-log",
+        &log,
+        "--limit-per-minute",
+        "5",
+        "--limit-at-once",
+        "2",
+    ]))?;
+
+    assert!(config.log.is_some());
+    assert!(Path::new(&log).exists());
+
+    for (flag, value) in [("--limit-per-minute", "0"), ("--limit-at-once", "many")] {
+        let error = Config::from_args(args(&[flag, value])).err();
+
+        assert!(matches!(error, Some(AgentError::Config(message)) if message.contains("above 0")));
+    }
+
+    let unwritable = Config::from_args(args(&["--request-log", "/proc/none/requests.jsonl"]));
+
+    assert!(unwritable.is_err());
+
     Ok(())
 }
