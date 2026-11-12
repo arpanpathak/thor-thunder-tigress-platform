@@ -52,7 +52,7 @@
 </table>
 </div>
 
-Private LLM cloud for edge hardware: multi-engine model serving, an API gateway, coding agents and evaluation.
+Fullstack private LLM cloud platform for edge hardware: multi-engine model serving, an API gateway, coding agents and evaluation.
 
 - Engines: TensorRT Edge-LLM, vLLM, llama.cpp, Ollama. Any OpenAI-compatible
   backend (SGLang, `trtllm-serve`) can be added.
