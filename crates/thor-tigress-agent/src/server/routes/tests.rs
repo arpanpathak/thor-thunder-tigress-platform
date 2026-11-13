@@ -8,7 +8,8 @@ use tower::ServiceExt;
 use super::*;
 use crate::{
     config::Engine,
-    testing::{FakeServer, json_response},
+    system::Monitor,
+    testing::{FakeServer, fake_sources, json_response},
 };
 
 const QUESTION: &str = r#"{"model":"qwen","messages":[{"role":"user","content":"hi"}]}"#;
@@ -544,6 +545,80 @@ async fn a_wrong_key_is_recorded_and_a_preflight_is_not() -> Result<()> {
         (records[0]["who"].as_str(), records[0]["status"].as_u64()),
         (Some("anonymous"), Some(401))
     );
+
+    Ok(())
+}
+
+/// What the fake engine lists: one model, and an entry without an id.
+const GEMMA_LISTED: &str = r#"{"data":[
+    {"id":"Gemma-4-26B-A4B-NVFP4","object":"model","owned_by":"tensorrt-edgellm"},
+    {"object":"model"}]}"#;
+
+/// A server with the key `k`, one engine listing [`GEMMA_LISTED`], and a fake
+/// sampler of a Thor-like machine reading files in `web`.
+fn with_fake_system(web: &Path) -> Result<Arc<Config>> {
+    let engine = FakeServer::start(vec![json_response(GEMMA_LISTED)])?;
+    let mut config = Config::from_args([
+        "--engine".to_string(),
+        format!("Gemma-4-26B-A4B-NVFP4={}", engine.address()),
+        "--key-file".to_string(),
+        "/nonexistent".to_string(),
+    ])?;
+
+    config.key = Some("k".to_string());
+    config.system = Monitor::new(fake_sources(web)?);
+
+    Ok(Arc::new(config))
+}
+
+#[tokio::test]
+async fn the_system_report_needs_the_key() -> Result<()> {
+    let web = web_folder()?;
+    let config = with_fake_system(web.path())?;
+
+    let refused = ask(&config, get(paths::SYSTEM)).await?;
+
+    assert_eq!(refused.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(refused.body, INVALID_KEY);
+
+    Ok(())
+}
+
+/// The report of the fake sampler and engine, without the time it was taken.
+fn fake_thor_report() -> serde_json::Value {
+    serde_json::json!({
+        "host": "thor",
+        "gpu": {
+            "name": "NVIDIA Thor",
+            "utilization_percent": 0.0,
+            "memory_used_bytes": 768_000,
+            "memory_total_bytes": 1_024_000,
+            "memory_is_unified": true,
+            "power_watts": 4.37,
+            "temperature_celsius": 41.0
+        },
+        "cpu": { "utilization_percent": null, "cores": 1 },
+        "models": [{ "id": "Gemma-4-26B-A4B-NVFP4", "engine": "tensorrt-edgellm" }]
+    })
+}
+
+#[tokio::test]
+async fn the_system_report_holds_the_sample_and_the_served_models() -> Result<()> {
+    let web = web_folder()?;
+    let config = with_fake_system(web.path())?;
+    let key = [("authorization", "Bearer k")];
+
+    let answered = ask(&config, get(paths::SYSTEM).with(&key)).await?;
+    let mut report: serde_json::Value = serde_json::from_str(&answered.body)?;
+    let sampled_at = report
+        .as_object_mut()
+        .and_then(|fields| fields.remove("sampled_at_unix_ms"))
+        .and_then(|sampled_at| sampled_at.as_u64());
+
+    assert_eq!(answered.status, StatusCode::OK);
+    assert_eq!(answered.header(header::CONTENT_TYPE), "application/json");
+    assert!(sampled_at.is_some_and(|ms| ms > 0));
+    assert_eq!(report, fake_thor_report());
 
     Ok(())
 }

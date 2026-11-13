@@ -16,6 +16,10 @@ pub const MODELS: &str = "/v1/models";
 /// OpenAI: chat.
 pub const CHAT_COMPLETIONS: &str = "/v1/chat/completions";
 
+/// The machine's GPU, CPU and served models, for coding tools that show the
+/// server's load.
+pub const SYSTEM: &str = "/v1/system";
+
 /// Web search for remote coding tools, answered in SearXNG's JSON format.
 pub const SEARCH: &str = "/v1/search";
 

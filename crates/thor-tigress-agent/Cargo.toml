@@ -9,7 +9,7 @@ workspace = true
 
 [dependencies]
 axum = "0.8"
-tokio = { version = "1", features = ["fs", "macros", "net", "rt-multi-thread", "signal", "sync"] }
+tokio = { version = "1", features = ["fs", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 tokio-stream = "0.1"
 thiserror = "2"
 html2text = "0.16.7"

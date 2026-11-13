@@ -22,14 +22,19 @@ const LOADED: &str = "loaded";
 ///
 /// `AgentError::Io` when the client is gone.
 pub fn list(client: &mut dyn Client, upstreams: &Upstreams) -> Outcome {
-    let data: Vec<Value> = upstreams
+    let list = json!({ "object": "list", "data": served(upstreams) });
+
+    response::respond(client, StatusCode::OK, JSON, &serde_json::to_vec(&list)?)
+}
+
+/// Every model `/v1/models` lists, default engine first. A server that
+/// doesn't answer adds nothing.
+pub fn served(upstreams: &Upstreams) -> Vec<Value> {
+    upstreams
         .engines()
         .flat_map(offered)
         .map(with_context)
-        .collect();
-    let list = json!({ "object": "list", "data": data });
-
-    response::respond(client, StatusCode::OK, JSON, &serde_json::to_vec(&list)?)
+        .collect()
 }
 
 /// The models a server can answer for now: everything an Edge-LLM server

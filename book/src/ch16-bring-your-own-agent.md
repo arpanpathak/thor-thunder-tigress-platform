@@ -258,6 +258,7 @@ Leave out `extra_body` to let it think first.
 | Path | What `thor-tigress-agent` does |
 |---|---|
 | `/v1/models` | passes it to llama-server |
+| `/v1/system` | answers itself: the GPU and CPU load from `nvidia-smi` and `/proc`, and the served models |
 | `/v1/chat/completions` | streams it through; answers plain JSON when the request doesn't ask for streaming (the OpenAI SDKs' default) |
 | `/v1/messages` | passes it to llama-server's Anthropic API, turning thinking off unless the request asks for it |
 | `/v1/messages/count_tokens` | passes it through |

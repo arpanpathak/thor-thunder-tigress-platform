@@ -208,6 +208,7 @@ connection:
 | `GET /about.html`, `/chat.css`, `/chat.js`, `/cub.svg`, `/cub.png` | the About page, the page's own styles and script, and the art; a fixed list, nothing else in the folder is served |
 | `GET /health` | `{"status":"ok"}` (no key needed) |
 | `GET /v1/models` | the served models: llama-server's, plus each engine's given with `--engine` |
+| `GET /v1/system` | the GPU's name, load, memory, power and temperature, the CPU's load and core count, and the served models, measured at most every 2 seconds |
 | `POST /v1/chat/completions` | streamed through; with `thor_web_search: true`, the search loop; without `stream: true`, plain JSON |
 | `POST /v1/messages` | Anthropic's API, for Claude Code (chapter "Bring your own agent") |
 | `OPTIONS *` | CORS preflight, so pages and tools on other sites may call the API with a key |
