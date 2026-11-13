@@ -102,10 +102,13 @@ pub(super) struct ToolCall {
 /// What one streamed round produced besides the tokens already forwarded.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct Round {
+    /// The answer text the round wrote, without tool-call tags.
     pub(super) content: String,
+    /// The tool calls the round made, structured or written as text.
     pub(super) calls: Vec<ToolCall>,
-    /// Whether the round was cut off at [`super::MAX_ROUND_CHARS`].
-    pub(super) cut: bool,
+    /// Why the guard stopped the round, when it did. Nothing about the stop
+    /// has been sent to the page yet; the caller decides whether it is.
+    pub(super) stop: Option<&'static str>,
 }
 
 /// A message this server adds to the conversation, in OpenAI's shape.

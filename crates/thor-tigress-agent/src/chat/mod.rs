@@ -23,6 +23,7 @@
 
 mod guard;
 mod shape;
+mod state;
 pub mod tooltext;
 mod wire;
 
@@ -30,6 +31,7 @@ use std::io::{BufRead, Write};
 
 use serde_json::{Value, json};
 
+use self::state::{Again, End, State, Think, Turn};
 use self::wire::{Added, Round, Source, ThorEvent, ToolCall};
 use crate::{
     web::{
@@ -123,6 +125,10 @@ const REQUIRED: &str = "required";
 
 /// The request field holding the conversation.
 const MESSAGES: &str = "messages";
+
+/// The request field for the chat template's settings, where thinking is
+/// turned on and off.
+const TEMPLATE_SETTINGS: &str = "chat_template_kwargs";
 
 /// How a chat request is answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -306,85 +312,161 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
     response::send_event(client, &json!({ "thor": event }).to_string())
 }
 
-/// Asks the model, runs the tools it calls, and asks again, until it answers
-/// without a tool call or the tool rounds run out.
+/// Asks the model, runs the tools it calls, and asks again, until the model
+/// has written the answer.
 ///
-/// The first round requires a call, so both models look something up before
-/// they answer; later rounds leave the choice to the model. A call that repeats
-/// one already run is answered with a nudge instead of run again, so a model
-/// that loops cannot loop forever. [`Ledger`] holds every source found, gives it
-/// a number to cite, and holds the search and page budgets; the numbers go to
-/// the model again before the answer rounds.
+/// The loop moves through [`State`]: each state asks for one round, reads it
+/// once as a [`Turn`], and names the state that follows. Researching rounds
+/// offer the tools; the first one requires a call on llama-server, so the
+/// model looks something up before it answers. A call that repeats one
+/// already run is answered with a nudge instead of run again. [`Ledger`]
+/// holds every source found, gives it a number to cite, and holds the search
+/// and page budgets.
 ///
-/// After the tool rounds the search hint is taken back out of the system line
-/// and the answer rounds run with no tools at all, with a line asking for the
-/// answer. A call the model writes there is still run, because the text is
-/// streamed as it arrives and cutting the round short would end the answer on a
-/// half sentence. Only when no round writes any text does the note name the
-/// sources the ledger found, so the page still shows what the search turned up.
+/// Answering rounds offer no tools, and the first of them takes the search
+/// hint back out of the system line and asks for the answer. A call written
+/// there is still run, because the text is streamed as it arrives and cutting
+/// the round short would end the answer on a half sentence. Only when no round
+/// writes any text does the note name the sources the ledger found.
 fn search_loop(
     client: &mut dyn Write,
-    mut fields: Fields,
+    fields: Fields,
     upstreams: &Upstreams,
     engine: &Engine,
 ) -> Outcome {
-    let model = engine.endpoint();
-    let mut research = Research::new(&user_text(&fields));
+    let research = Research::new(&user_text(&fields));
+    let mut search = Search {
+        client,
+        fields,
+        upstreams,
+        engine,
+        research,
+    };
+    let mut state = State::Researching { round: 1 };
 
-    match tool_rounds(client, &mut fields, upstreams, engine, &mut research)? {
-        Ending::Replied => return Ok(()),
-        Ending::Exhausted => (),
-    }
-
-    ask(&mut fields, &research.ledger);
-
-    match answer_rounds(client, &mut fields, upstreams, model, &mut research)? {
-        Ending::Replied => Ok(()),
-        Ending::Exhausted => note(client, &research.ledger),
+    loop {
+        state = match state {
+            State::Researching { round } => search.research(round)?,
+            State::Answering { round, think } => search.answer(round, think)?,
+            State::Done(end) => return search.finish(end),
+        };
     }
 }
 
-/// How a set of rounds ended.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Ending {
-    /// The model stopped asking for tools, so what it wrote is the answer.
-    Replied,
-    /// The rounds ran out.
-    Exhausted,
+/// One searched answer while the loop runs: the page it streams to, the
+/// request as it grows round by round, and what the research found.
+struct Search<'a> {
+    /// The chat page, which every token and search event is sent to.
+    client: &'a mut dyn Write,
+    /// The request sent for the next round.
+    fields: Fields,
+    /// The search engine and the web the tools reach.
+    upstreams: &'a Upstreams,
+    /// The model server that answers.
+    engine: &'a Engine,
+    /// The calls already run and the sources found.
+    research: Research,
 }
 
-/// The tool rounds: the model may search and read until it answers on its own,
-/// the rounds run out, or the search budget is spent.
-fn tool_rounds(
-    client: &mut dyn Write,
-    fields: &mut Fields,
-    upstreams: &Upstreams,
-    engine: &Engine,
-    research: &mut Research,
-) -> Outcome<Ending> {
-    for round in 1..=MAX_ROUNDS {
-        prepare(fields, Phase::of_tool_round(round, engine));
+impl Search<'_> {
+    /// Asks for research round `round` with the tools offered, and names the
+    /// state that follows.
+    fn research(&mut self, round: usize) -> Outcome<State> {
+        prepare(&mut self.fields, Phase::of_tool_round(round, self.engine));
 
-        let reply = stream_round(client, fields, engine.endpoint())?;
+        let turn = self.round()?;
 
-        if reply.cut || reply.calls.is_empty() {
-            return Ok(Ending::Replied);
+        Ok(State::after_research(
+            round,
+            turn,
+            self.research.out_of_searches(),
+        ))
+    }
+
+    /// Asks for answering round `round` with no tools, and names the state
+    /// that follows.
+    fn answer(&mut self, round: usize, think: Think) -> Outcome<State> {
+        self.prepare_answer(round, think);
+
+        let turn = self.round()?;
+
+        Ok(State::after_answer(round, think, turn))
+    }
+
+    /// Sets up the request for answering round `round`: the first adds the ask
+    /// for the answer, and every round sets thinking as `think` says.
+    fn prepare_answer(&mut self, round: usize, think: Think) {
+        if round == 1 {
+            ask(&mut self.fields, &self.research.ledger);
         }
 
-        let results = research.run(client, &reply.calls, upstreams)?;
-        append_round(fields, &reply, &results)?;
+        think.apply(&mut self.fields);
+    }
 
-        if research.out_of_searches() {
-            return Ok(Ending::Exhausted);
+    /// Ends the answer: the reason when the guard stopped it, the note when
+    /// no round wrote one, and nothing when the model answered.
+    fn finish(&mut self, end: End) -> Outcome {
+        match end {
+            End::Answered => Ok(()),
+            End::Stopped(reason) => send_stop(self.client, reason),
+            End::Unanswered => note(self.client, &self.research.ledger),
         }
     }
 
-    Ok(Ending::Exhausted)
+    /// Streams one round and reads it as a turn. A turn with calls has them
+    /// run, and the calls and their results join the request.
+    fn round(&mut self) -> Outcome<Turn> {
+        let reply = stream_tokens(self.client, &self.fields, self.engine.endpoint())?;
+        let turn = Turn::of(&reply, self.research.has_run(&reply.calls));
+
+        self.run_calls(&reply, turn).map(|()| turn)
+    }
+
+    /// Runs the round's calls when the turn asks for it.
+    fn run_calls(&mut self, reply: &Round, turn: Turn) -> Outcome {
+        match turn {
+            Turn::Again(Again::Calls) => self.run(reply),
+            Turn::Answer | Turn::Cut(_) | Turn::Again(Again::Nothing | Again::Stuck(_)) => Ok(()),
+        }
+    }
+
+    /// Runs the round's calls and adds them, with their results, to the request.
+    fn run(&mut self, reply: &Round) -> Outcome {
+        let results = self
+            .research
+            .run(self.client, &reply.calls, self.upstreams)?;
+
+        append_round(&mut self.fields, reply, &results)
+    }
 }
 
-/// Sets up the answer rounds: the tools go away, the search hint comes back out
-/// of the system line, and the numbered sources arrive with the ask as the last
-/// user turn — the turn a model that kept calling tools reads.
+impl Think {
+    /// Sets thinking on the request: off through the chat template, or as the
+    /// request asked.
+    fn apply(self, fields: &mut Fields) {
+        match self {
+            Think::AsAsked => {}
+            Think::Off => turn_thinking_off(fields),
+        }
+    }
+}
+
+/// Turns thinking off through the chat template settings, which llama-server
+/// and the Edge-LLM engine both read. Settings that are not an object are left
+/// as they are.
+fn turn_thinking_off(fields: &mut Fields) {
+    let settings = fields
+        .entry(TEMPLATE_SETTINGS.to_string())
+        .or_insert_with(|| json!({}));
+
+    if let Some(settings) = settings.as_object_mut() {
+        settings.insert("enable_thinking".to_string(), Value::Bool(false));
+    }
+}
+
+/// Sets up the answering rounds: the tools go away, the search hint comes back
+/// out of the system line, and the numbered sources arrive with the ask as the
+/// last user turn, the turn a model that kept calling tools reads.
 fn ask(fields: &mut Fields, ledger: &Ledger) {
     prepare(fields, Phase::Answering);
     retract_system(fields, SEARCH_HINT);
@@ -395,35 +477,6 @@ fn ask(fields: &mut Fields, ledger: &Ledger) {
     }
 
     append_user(fields, ANSWER_ASK);
-}
-
-/// The answer rounds: no tools are offered, so the model writes. A call written
-/// anyway is run like any other, because the text is streamed as it arrives and
-/// stopping at the first sentence of a summary would end the answer with no
-/// links in it.
-fn answer_rounds(
-    client: &mut dyn Write,
-    fields: &mut Fields,
-    upstreams: &Upstreams,
-    model: &Endpoint,
-    research: &mut Research,
-) -> Outcome<Ending> {
-    for _ in 0..ANSWER_ROUNDS {
-        let reply = stream_round(client, fields, model)?;
-
-        if reply.cut || (reply.calls.is_empty() && !reply.content.trim().is_empty()) {
-            return Ok(Ending::Replied);
-        }
-
-        if reply.calls.is_empty() {
-            continue;
-        }
-
-        let results = research.run(client, &reply.calls, upstreams)?;
-        append_round(fields, &reply, &results)?;
-    }
-
-    Ok(Ending::Exhausted)
 }
 
 /// The numbered source list the answer cites from.
@@ -694,6 +747,11 @@ impl Research {
         }
     }
 
+    /// Whether every one of `calls` already ran in this answer.
+    fn has_run(&self, calls: &[ToolCall]) -> bool {
+        calls.iter().all(|call| self.ran.contains(&signature(call)))
+    }
+
     /// Whether the search budget is spent.
     fn out_of_searches(&self) -> bool {
         self.ledger.searches_left(MAX_SEARCHES) == 0
@@ -859,45 +917,145 @@ fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
         .collect()
 }
 
+/// Streams one model reply to the client and, when the guard stopped it, tells
+/// the page why. This is the whole answer when web search is off.
+fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome {
+    let round = stream_tokens(client, fields, model)?;
+
+    round
+        .stop
+        .map_or(Ok(()), |reason| send_stop(client, reason))
+}
+
 /// Streams one model reply to the client, collecting any tool calls. A call the
 /// model writes into the text is taken out by [`Sieve`] and runs like a
-/// structured one, and the reader never sees the tags.
-fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
+/// structured one, and the reader never sees the tags. When the guard stops
+/// the reply, the reason is kept in [`Round::stop`] and nothing about it is
+/// sent: the caller decides whether the page hears of it.
+fn stream_tokens(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
     let request = serde_json::to_vec(fields)?;
     let response = accepted(model.post(paths::CHAT_COMPLETIONS, &request)?)?;
-    let mut round = Round::default();
-    let mut sieve = Sieve::new();
-    let mut guard = guard::Guard::default();
+    let mut streaming = Streaming::new();
 
-    for line in response.body.lines() {
-        let line = line?;
+    streaming.read(client, response.body)?;
 
-        let Some(data) = line.strip_prefix(EVENT_PREFIX).map(str::trim) else {
-            continue;
-        };
+    streaming.finish(client)
+}
 
-        if data == DONE {
-            break;
+/// Tells the page that the guard stopped a round and why, and ends its answer
+/// the way a length limit does.
+fn send_stop(client: &mut dyn Write, reason: &str) -> Outcome {
+    send_thor(client, &ThorEvent::Error(reason.to_string()))?;
+
+    let event = json!({ "choices": [{ "delta": {}, "finish_reason": "length" }] }).to_string();
+
+    response::send_event(client, &event)
+}
+
+/// What one line of the model's event stream holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Line<'a> {
+    /// Not an event: a blank line or a comment.
+    Other,
+    /// The `[DONE]` event that ends the reply.
+    End,
+    /// An event's JSON text.
+    Data(&'a str),
+}
+
+impl Line<'_> {
+    /// Reads one line of the event stream.
+    fn of(line: &str) -> Line<'_> {
+        match line.strip_prefix(EVENT_PREFIX).map(str::trim) {
+            None => Line::Other,
+            Some(DONE) => Line::End,
+            Some(data) => Line::Data(data),
         }
+    }
+}
 
-        let value: Value = serde_json::from_str(data)?;
+/// Whether a reply goes on after one line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Flow {
+    /// More lines may follow.
+    More,
+    /// The reply ended, or the guard stopped it.
+    Over,
+}
 
-        if let Some(reason) = guard.observe(&value) {
-            round.cut = true;
-            send_thor(client, &ThorEvent::Error(reason.to_string()))?;
+/// One reply while it streams: what it produced so far, the sieve that takes
+/// calls out of its text, and the guard that bounds it.
+struct Streaming {
+    /// The text, calls and stop reason so far.
+    round: Round,
+    /// Takes tool calls written as text out of the answer.
+    sieve: Sieve,
+    /// Stops a reply that runs too long or repeats itself.
+    guard: guard::Guard,
+}
 
-            let event =
-                json!({ "choices": [{ "delta": {}, "finish_reason": "length" }] }).to_string();
-            response::send_event(client, &event)?;
-            break;
+impl Streaming {
+    /// A reply that has produced nothing yet.
+    fn new() -> Streaming {
+        Streaming {
+            round: Round::default(),
+            sieve: Sieve::new(),
+            guard: guard::Guard::default(),
         }
-
-        relay_chunk(client, data, value, &mut sieve, &mut round)?;
     }
 
-    finish_round(client, sieve, &mut round)?;
+    /// Reads the reply line by line until it ends, the guard stops it, or a
+    /// line cannot be read.
+    fn read(&mut self, client: &mut dyn Write, body: Box<dyn BufRead + Send>) -> Outcome {
+        let last = body
+            .lines()
+            .map(|line| self.line(client, &line?))
+            .find(|flow| !matches!(flow, Ok(Flow::More)));
 
-    Ok(round)
+        last.transpose().map(drop)
+    }
+
+    /// Handles one line of the event stream.
+    fn line(&mut self, client: &mut dyn Write, line: &str) -> Outcome<Flow> {
+        match Line::of(line) {
+            Line::Other => Ok(Flow::More),
+            Line::End => Ok(Flow::Over),
+            Line::Data(data) => self.chunk(client, data),
+        }
+    }
+
+    /// Checks one chunk with the guard, and sends it on when the guard lets
+    /// it through.
+    fn chunk(&mut self, client: &mut dyn Write, data: &str) -> Outcome<Flow> {
+        let value: Value = serde_json::from_str(data)?;
+
+        self.round.stop = self.guard.observe(&value);
+
+        self.relay_unless_stopped(client, data, value)
+    }
+
+    /// Sends a chunk on to the client and adds it to the round, unless the
+    /// guard stopped the reply at it.
+    fn relay_unless_stopped(
+        &mut self,
+        client: &mut dyn Write,
+        data: &str,
+        value: Value,
+    ) -> Outcome<Flow> {
+        if self.round.stop.is_some() {
+            return Ok(Flow::Over);
+        }
+
+        relay_chunk(client, data, value, &mut self.sieve, &mut self.round).map(|()| Flow::More)
+    }
+
+    /// Ends the reply: the text the sieve still held is sent, and the calls it
+    /// took out of the text join the round.
+    fn finish(mut self, client: &mut dyn Write) -> Outcome<Round> {
+        finish_round(client, self.sieve, &mut self.round)?;
+
+        Ok(self.round)
+    }
 }
 
 /// The model server's response when it took the request, or what it said

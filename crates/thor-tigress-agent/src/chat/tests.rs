@@ -520,7 +520,7 @@ fn added_messages_have_openais_shape() -> Outcome {
             name: "web_search".to_string(),
             arguments: "{}".to_string(),
         }],
-        cut: false,
+        stop: None,
     };
 
     assert_eq!(
@@ -832,6 +832,135 @@ fn a_call_on_the_answer_round_is_run() -> Outcome {
     assert!(shown("the answer"), "{:?}", chat.sent);
 
     Ok(())
+}
+
+/// A reply that writes `text` and then calls `tool` with `arguments`.
+fn says_and_calls(text: &str, tool: &str, arguments: &str) -> String {
+    let chunk = json!({ "choices": [{ "delta": { "content": text } }] }).to_string();
+
+    event_stream(&[&chunk, &call_event(tool, arguments)])
+}
+
+/// A reply whose thinking repeats a 900-byte block three times, which the
+/// guard stops before any answer text.
+fn thinks_in_a_loop() -> String {
+    let unit = (1..=90)
+        .map(|n| format!("fact {n:03}; "))
+        .collect::<String>();
+    let looping = json!({ "choices": [{ "delta": { "reasoning_content": unit.repeat(3) } }] });
+
+    event_stream(&[&looping.to_string()])
+}
+
+/// How many of the events sent to the page carry `text`.
+fn times_shown(sent: &[String], text: &str) -> usize {
+    sent.iter().filter(|event| event.contains(text)).count()
+}
+
+/// The start of an error event sent to the page.
+const ERROR_EVENT: &str = r#"{"thor":{"error""#;
+
+// Each fake server gives exactly the replies listed, so a round past the
+// answer finds no reply and the page is sent an error.
+#[test]
+fn an_answer_followed_by_a_search_already_run_is_written_once() -> Outcome {
+    let search = r#"{"query":"rust"}"#;
+    let answer = "Fit assessment: a strong match.";
+    let replies = vec![
+        calls("web_search", search),
+        says_and_calls(answer, "web_search", search),
+    ];
+    let results = vec![json_response(r#"{"results":[]}"#)];
+    let chat = searched(asking("fit?"), replies, results, FakeWeb::default())?;
+
+    assert_eq!(times_shown(&chat.sent, ERROR_EVENT), 0, "{:?}", chat.sent);
+    assert_eq!(times_shown(&chat.sent, answer), 1, "{:?}", chat.sent);
+    assert_eq!(chat.model.requests()?.len(), 2);
+
+    Ok(())
+}
+
+#[test]
+fn a_long_answer_followed_by_a_new_search_is_written_once() -> Outcome {
+    let answer = (1..=60)
+        .map(|n| format!("Requirement {n} is met. "))
+        .collect::<String>();
+    let replies = vec![
+        calls("web_search", r#"{"query":"rust"}"#),
+        says_and_calls(&answer, "web_search", r#"{"query":"rust jobs"}"#),
+    ];
+    let results = vec![json_response(r#"{"results":[]}"#)];
+    let chat = searched(asking("fit?"), replies, results, FakeWeb::default())?;
+
+    assert!(answer.trim().len() >= state::ANSWERED_CHARS);
+    assert_eq!(times_shown(&chat.sent, ERROR_EVENT), 0, "{:?}", chat.sent);
+    assert_eq!(times_shown(&chat.sent, &answer), 1, "{:?}", chat.sent);
+    assert_eq!(chat.model.requests()?.len(), 2);
+    assert_eq!(chat.search.requests()?.len(), 1);
+
+    Ok(())
+}
+
+#[test]
+fn stuck_thinking_is_asked_again_without_thinking_and_shows_no_error() -> Outcome {
+    let replies = vec![thinks_in_a_loop(), says("The answer.")];
+    let chat = searched(
+        asking("who hires?"),
+        replies,
+        Vec::new(),
+        FakeWeb::default(),
+    )?;
+    let seen = chat.model.requests()?;
+
+    assert_eq!(seen.len(), 2);
+    assert!(!seen[0].contains("enable_thinking"), "{}", seen[0]);
+    assert!(
+        seen[1].contains(r#""enable_thinking":false"#),
+        "{}",
+        seen[1]
+    );
+    assert!(seen[1].contains(ANSWER_ASK), "{}", seen[1]);
+    assert_eq!(times_shown(&chat.sent, ERROR_EVENT), 0, "{:?}", chat.sent);
+    assert_eq!(times_shown(&chat.sent, "The answer."), 1, "{:?}", chat.sent);
+
+    Ok(())
+}
+
+#[test]
+fn thinking_stuck_with_thinking_off_ends_with_the_reason() -> Outcome {
+    let replies = vec![thinks_in_a_loop(), thinks_in_a_loop()];
+    let chat = searched(
+        asking("who hires?"),
+        replies,
+        Vec::new(),
+        FakeWeb::default(),
+    )?;
+    let reason = "kept repeating the same text";
+
+    assert_eq!(chat.model.requests()?.len(), 2);
+    assert_eq!(times_shown(&chat.sent, ERROR_EVENT), 1, "{:?}", chat.sent);
+    assert_eq!(times_shown(&chat.sent, reason), 1, "{:?}", chat.sent);
+    assert_eq!(times_shown(&chat.sent, r#""finish_reason":"length""#), 1);
+    assert_eq!(chat.sent.last().map(String::as_str), Some(DONE));
+
+    Ok(())
+}
+
+#[test]
+fn thinking_is_turned_off_beside_the_template_settings_already_sent() {
+    let mut fields = Fields::new();
+    fields.insert(
+        TEMPLATE_SETTINGS.to_string(),
+        json!({ "reasoning_effort": "low" }),
+    );
+
+    Think::Off.apply(&mut fields);
+    Think::AsAsked.apply(&mut fields);
+
+    assert_eq!(
+        fields[TEMPLATE_SETTINGS],
+        json!({ "reasoning_effort": "low", "enable_thinking": false })
+    );
 }
 
 #[test]

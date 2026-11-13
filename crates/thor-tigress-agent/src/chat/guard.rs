@@ -5,46 +5,102 @@ use serde_json::Value;
 /// Consecutive whitespace bytes tolerated in either generated text channel.
 const MAX_BLANK: usize = 1024;
 
-/// The bounded suffix used to find exact repeated spans across SSE chunks.
-const TAIL_BYTES: usize = 4096;
+/// A short unit, such as a line or a sentence, counts as a loop after six
+/// copies in a row: a table rule or a block of closing braces repeats a few.
+const SHORT: Repeat = Repeat {
+    widths: 32..=512,
+    copies: 6,
+};
+
+/// A long unit, such as a paragraph or a whole plan, counts after three
+/// copies. Three identical paragraphs in a row are never meant; Qwen3.6 wrote
+/// one block of about 900 bytes of thinking over and over.
+const LONG: Repeat = Repeat {
+    widths: 513..=2048,
+    copies: 3,
+};
+
+/// The bounded suffix used to find exact repeated spans across SSE chunks:
+/// room for three copies of the longest [`LONG`] unit.
+const TAIL_BYTES: usize = 6144;
+
+/// Units of a range of widths, repeated a number of times at the end of the
+/// text.
+struct Repeat {
+    /// The unit widths checked, in bytes.
+    widths: std::ops::RangeInclusive<usize>,
+    /// How many copies in a row make a loop.
+    copies: usize,
+}
+
+impl Repeat {
+    /// Whether `tail` ends in `copies` copies of one unit of these widths.
+    fn ends(&self, tail: &[u8]) -> bool {
+        self.widths
+            .clone()
+            .take_while(|width| width * self.copies <= tail.len())
+            .any(|width| self.ends_at_width(tail, width))
+    }
+
+    /// Whether the last `copies` spans of `width` bytes in `tail` are the
+    /// same. The caller makes sure `tail` holds that many.
+    fn ends_at_width(&self, tail: &[u8], width: usize) -> bool {
+        let mut spans = tail.rchunks_exact(width).take(self.copies);
+        let last = spans.next();
+
+        spans.all(|span| Some(span) == last)
+    }
+}
 
 /// Independent text channels; a transition from reasoning to an answer must
 /// not itself count as repetition.
 #[derive(Default)]
 struct Text {
+    /// The last [`TAIL_BYTES`] of the channel's text.
     tail: Vec<u8>,
+    /// Whitespace bytes in a row at the end of the channel's text.
     blank: usize,
 }
 
 impl Text {
+    /// Adds a chunk's text to the channel, and names why the reply must stop
+    /// when it runs blank or repeats itself.
     fn observe(&mut self, text: &str) -> Option<&'static str> {
-        for character in text.chars() {
-            self.blank = if character.is_whitespace() {
-                self.blank.saturating_add(character.len_utf8())
-            } else {
-                0
-            };
+        self.blank_run(text).or_else(|| self.repeated(text))
+    }
 
-            if self.blank >= MAX_BLANK {
-                return Some("Stopped because the model kept generating blank output.");
-            }
-        }
+    /// Counts the whitespace in a row, across chunks, and says when it
+    /// reaches [`MAX_BLANK`].
+    fn blank_run(&mut self, text: &str) -> Option<&'static str> {
+        let too_long = text
+            .chars()
+            .any(|character| self.count_blank(character) >= MAX_BLANK);
 
+        too_long.then_some("Stopped because the model kept generating blank output.")
+    }
+
+    /// Adds `character` to the run of whitespace, or ends the run, and
+    /// returns its length in bytes.
+    fn count_blank(&mut self, character: char) -> usize {
+        self.blank = if character.is_whitespace() {
+            self.blank.saturating_add(character.len_utf8())
+        } else {
+            0
+        };
+
+        self.blank
+    }
+
+    /// Adds `text` to the tail and says when the tail ends in a short or a
+    /// long unit repeated.
+    fn repeated(&mut self, text: &str) -> Option<&'static str> {
         self.tail.extend_from_slice(text.as_bytes());
+        self.tail
+            .drain(..self.tail.len().saturating_sub(TAIL_BYTES));
 
-        if self.tail.len() > TAIL_BYTES {
-            self.tail.drain(..self.tail.len() - TAIL_BYTES);
-        }
+        let looped = [SHORT, LONG].iter().any(|repeat| repeat.ends(&self.tail));
 
-        let repeated = (32..=512.min(self.tail.len() / 6)).any(|width| {
-            let suffix = &self.tail[self.tail.len() - width * 6..];
-            let mut spans = suffix.chunks_exact(width);
-            let first = spans.next().unwrap_or_default();
-
-            spans.all(|span| span == first)
-        });
-
-        repeated.then_some("Stopped because the model kept repeating the same text.")
+        looped.then_some("Stopped because the model kept repeating the same text.")
     }
 }
 
@@ -117,6 +173,30 @@ mod tests {
         });
 
         assert!(stopped);
+    }
+
+    #[test]
+    fn a_900_byte_unit_repeated_three_times_in_thinking_is_a_loop() {
+        let mut guard = Guard::default();
+        let unit = (1..=90)
+            .map(|n| format!("step {n:03}; "))
+            .collect::<String>();
+        let thinking = |text: &str| json!({"choices":[{"delta":{"reasoning_content": text}}]});
+
+        assert_eq!(unit.len(), 900);
+        assert!(guard.observe(&thinking(&unit.repeat(2))).is_none());
+        assert!(guard.observe(&thinking(&unit)).is_some());
+    }
+
+    #[test]
+    fn a_long_unit_repeated_twice_is_not_a_loop() {
+        let mut guard = Guard::default();
+        let unit = (1..=90)
+            .map(|n| format!("line {n:03}; "))
+            .collect::<String>();
+        let answer = json!({"choices":[{"delta":{"content": unit.repeat(2)}}]});
+
+        assert!(guard.observe(&answer).is_none());
     }
 
     #[test]
