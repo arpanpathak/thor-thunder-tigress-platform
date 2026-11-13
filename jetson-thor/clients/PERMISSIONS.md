@@ -2,9 +2,9 @@
 
 We can let each coding tool in [`thor-clients.sh`](thor-clients.sh) edit files
 and run commands without a prompt at every step. We keep the permission rules in
-files and variables on our own machine, so the same rules work with any local
-server that offers OpenAI's or Anthropic's API, such as llama.cpp, vLLM, Ollama
-or TensorRT Edge-LLM.
+files and variables on our own machine. The same rules therefore work with any
+local server that offers OpenAI's or Anthropic's API, such as llama.cpp, vLLM,
+Ollama or TensorRT Edge-LLM.
 
 | Tool | Where we set it | Default | Setting with no prompts |
 |---|---|---|---|
