@@ -172,19 +172,20 @@ DeepSeek keys of Deep Code and `dsh` are never sent to the Thor.
 
 ### Permissions
 
-[`PERMISSIONS.md`](jetson-thor/clients/PERMISSIONS.md) covers each tool's
-permission settings, its default, and a setting that builds, tests and commits
-without a prompt for every step. These settings work with any local server.
+In [`PERMISSIONS.md`](jetson-thor/clients/PERMISSIONS.md), we list each tool's
+permission settings, its default, and a setting for building, testing and
+committing without a prompt at every step. These settings work with any local
+server.
 
-Claude Code's auto mode asks Anthropic's safety classifier before it runs each
-command. The Thor has no classifier, so in auto mode every command fails with
-"classifier unavailable", `cargo build` included. Use the other modes with
-`claude-thor`.
+We avoid Claude Code's auto mode on the Thor. In auto mode, Anthropic's safety
+classifier must approve each command before it runs. The Thor has no
+classifier, so every command in auto mode fails with "classifier unavailable",
+`cargo build` included.
 
-On its first start, `claude-thor` copies
+When we start `claude-thor` for the first time, it copies
 [`claude-thor-settings.json`](jetson-thor/clients/claude-thor-settings.json) to
-`~/.claude-thor/settings.json`. It accepts file edits and runs these commands
-without asking:
+`~/.claude-thor/settings.json`, unless that file already exists. With these
+settings, file edits and the following commands run without a prompt:
 
 - Build and test: `cargo`, `rustc`, `rustup`, `npm`, `node`, `python3`,
   `pytest`, `make`
@@ -194,8 +195,8 @@ without asking:
 - Files: `ls`, `cat`, `grep`, `rg`, `find`, `head`, `tail`, `wc`,
   `mkdir`
 
-`git push --force`, `git push -f` and `git reset --hard` are denied. Any other
-command asks first. An existing `~/.claude-thor/settings.json` is left as it is.
+The settings deny `git push --force`, `git push -f` and `git reset --hard`.
+Any other command needs our approval at a prompt.
 
 ### The models
 
