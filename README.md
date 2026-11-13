@@ -172,20 +172,20 @@ DeepSeek keys of Deep Code and `dsh` are never sent to the Thor.
 
 ### Permissions
 
-In [`PERMISSIONS.md`](jetson-thor/clients/PERMISSIONS.md), you'll find each
-tool's permission settings, its default, and a setting for building, testing
-and committing without a prompt at every step. These settings work with any
-local server.
+In [`PERMISSIONS.md`](jetson-thor/clients/PERMISSIONS.md), we list each tool's
+permission settings, its default, and a setting for building, testing and
+committing without a prompt at every step. These settings work with any local
+server.
 
-In Claude Code's auto mode, each command goes to Anthropic's safety classifier
-before it is run. The Thor has no classifier, so in auto mode every command
-fails with "classifier unavailable", `cargo build` included. Use one of the
-other modes with `claude-thor`.
+We avoid Claude Code's auto mode on the Thor. In auto mode, Anthropic's safety
+classifier must approve each command before it runs. The Thor has no
+classifier, so every command in auto mode fails with "classifier unavailable",
+`cargo build` included.
 
-On the first start of `claude-thor`, the file
-[`claude-thor-settings.json`](jetson-thor/clients/claude-thor-settings.json) is
-copied to `~/.claude-thor/settings.json`. With it, file edits and these
-commands run with no prompt:
+When we start `claude-thor` for the first time, it copies
+[`claude-thor-settings.json`](jetson-thor/clients/claude-thor-settings.json) to
+`~/.claude-thor/settings.json`, unless that file already exists. With these
+settings, file edits and the following commands run without a prompt:
 
 - Build and test: `cargo`, `rustc`, `rustup`, `npm`, `node`, `python3`,
   `pytest`, `make`
@@ -195,9 +195,8 @@ commands run with no prompt:
 - Files: `ls`, `cat`, `grep`, `rg`, `find`, `head`, `tail`, `wc`,
   `mkdir`
 
-`git push --force`, `git push -f` and `git reset --hard` are denied. For any
-other command, you'll see a prompt. If `~/.claude-thor/settings.json` already
-exists, it is not replaced.
+The settings deny `git push --force`, `git push -f` and `git reset --hard`.
+Any other command needs our approval at a prompt.
 
 ### The models
 
