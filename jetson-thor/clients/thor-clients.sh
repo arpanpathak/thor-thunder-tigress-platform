@@ -18,6 +18,22 @@
 # THOR_URL      the agent's address
 # THOR_CONTEXT  the context window when the server reports none (65536)
 THOR_URL=${THOR_URL:-https://arpanpathak.taildb9a39.ts.net}
+THOR_CLIENTS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+
+# Claude Code's auto mode asks Anthropic's safety classifier before each command.
+# The Thor has no classifier, so auto mode blocks every command. The first start
+# copies an allow list of build, test, git and gh commands instead; an existing
+# ~/.claude-thor/settings.json stays as it is.
+thor-claude-settings() {
+  local settings="$HOME/.claude-thor/settings.json"
+
+  if [ -e "$settings" ]; then
+    return
+  fi
+
+  mkdir -p "$HOME/.claude-thor"
+  cp "$THOR_CLIENTS_DIR/claude-thor-settings.json" "$settings"
+}
 
 # One line per served model: its name, max_model_len (0 when unknown) and engine.
 thor-served() {
@@ -90,6 +106,7 @@ claude-thor() {
   context=$(ctx "$model")
   [ "$context" -gt 0 ] 2>/dev/null || context=${THOR_CONTEXT:-65536}
   echo "claude-thor: $model, $context-token context (opus $opus, sonnet $sonnet, haiku $haiku)" >&2
+  thor-claude-settings
 
   CLAUDE_CONFIG_DIR="$HOME/.claude-thor" \
   ANTHROPIC_BASE_URL="$THOR_URL" \
