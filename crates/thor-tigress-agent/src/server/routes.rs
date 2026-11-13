@@ -7,7 +7,7 @@
 use std::{path::Path, sync::Arc, time::Instant};
 
 use axum::{
-    Router,
+    Json, Router,
     body::{Body, Bytes, to_bytes},
     extract::{DefaultBodyLimit, Query, Request, State},
     http::{HeaderMap, HeaderValue, Method, StatusCode, Uri, header},
@@ -28,7 +28,7 @@ use crate::{
     config::{ANONYMOUS, BEARER, Config},
     error::Outcome,
     engines::{messages, models},
-    paths,
+    paths, system,
     web::search,
 };
 
@@ -170,6 +170,7 @@ pub fn router(config: Arc<Config>) -> Router {
     Router::new()
         .route(paths::HEALTH, get(health))
         .route(paths::MODELS, get(models))
+        .route(paths::SYSTEM, get(system_report))
         .route(paths::CHAT_COMPLETIONS, post(chat_completions))
         .route(paths::MESSAGES, post(messages))
         .route(paths::COUNT_TOKENS, post(count_tokens))
@@ -362,6 +363,18 @@ async fn health() -> Response {
 
 async fn models(State(config): Shared) -> Response {
     bridge::answered(move |client| models::list(client, &config.upstreams)).await
+}
+
+/// The GPU, CPU and served models, sampled at most once per
+/// [`system::MAX_AGE`].
+async fn system_report(State(config): Shared) -> Response {
+    let listing = Arc::clone(&config);
+    let report = config
+        .system
+        .report(move || system::served_models(&listing.upstreams))
+        .await;
+
+    Json(report).into_response()
 }
 
 async fn chat_completions(State(config): Shared, body: Bytes) -> Response {

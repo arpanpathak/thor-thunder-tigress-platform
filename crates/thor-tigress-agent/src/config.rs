@@ -44,6 +44,7 @@ use crate::{
         limits::{Limits, OPERATOR},
         meter::RequestLog,
     },
+    system::{Monitor, Sources},
     web::http::{HttpWeb, Web},
     engines::{
         body::{self, Fields},
@@ -321,6 +322,8 @@ pub struct Config {
     pub log: Option<Arc<RequestLog>>,
     /// How many model requests each person may make.
     pub limits: Arc<Limits>,
+    /// The latest sample of the GPU, CPU and served models.
+    pub system: Monitor,
 }
 
 impl Config {
@@ -353,6 +356,7 @@ impl Config {
             people,
             log,
             limits: Limits::new(options.per_minute, options.at_once),
+            system: Monitor::new(Sources::this_machine()),
             upstreams: Upstreams {
                 default,
                 others: engines.collect(),

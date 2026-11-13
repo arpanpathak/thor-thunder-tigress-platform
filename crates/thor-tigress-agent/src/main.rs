@@ -15,6 +15,7 @@
 //! | [`chat`] | a chat request: tool rounds, web search, and the events sent to the page |
 //! | [`engines`] | calling llama-server or an engine: the client, the model list, Anthropic requests |
 //! | [`web`] | search, the source ledger, and reading a cited page and its links |
+//! | [`system`] | `/v1/system`: GPU, CPU and served models, sampled at most every 2 seconds |
 
 #![forbid(unsafe_code)]
 
@@ -24,6 +25,7 @@ mod engines;
 mod error;
 mod paths;
 mod server;
+mod system;
 #[cfg(test)]
 mod testing;
 mod web;

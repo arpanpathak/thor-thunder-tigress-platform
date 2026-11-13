@@ -4,7 +4,9 @@
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
+    path::Path,
     thread,
+    time::Duration,
 };
 
 use axum::http::StatusCode;
@@ -16,7 +18,34 @@ use crate::{
     },
     error::{AgentError, Outcome},
     server::response::Client,
+    system::Sources,
 };
+
+/// The line `nvidia-smi` prints on the Thor, whose GPU shares system RAM.
+pub const THOR_GPU_LINE: &str = "NVIDIA Thor, 0, [N/A], [N/A], 4.37, 41";
+
+/// Sources for a sample of a Thor-like machine: `nvidia-smi` is an `echo` of
+/// [`THOR_GPU_LINE`], and `/proc/meminfo`, `/proc/stat` and the hostname are
+/// files written in `folder`. Both readings of `/proc/stat` see the same
+/// file, so no CPU time passes between them.
+pub fn fake_sources(folder: &Path) -> Outcome<Sources> {
+    let meminfo = folder.join("meminfo");
+    let stat = folder.join("stat");
+    let hostname = folder.join("hostname");
+
+    std::fs::write(&meminfo, "MemTotal: 1000 kB\nMemAvailable: 250 kB\n")?;
+    std::fs::write(&stat, "cpu  1 2 3 4 5 6 7 8 0 0\ncpu0 1 2 3 4 5 6 7\n")?;
+    std::fs::write(&hostname, "thor\n")?;
+
+    Ok(Sources {
+        gpu_command: vec!["echo".to_string(), THOR_GPU_LINE.to_string()],
+        gpu_timeout: Duration::from_secs(5),
+        meminfo,
+        stat,
+        cpu_interval: Duration::ZERO,
+        hostname,
+    })
+}
 
 /// A server on `127.0.0.1` at a free port, serving canned responses in order.
 pub struct FakeServer {
