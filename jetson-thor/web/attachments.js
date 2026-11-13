@@ -26,6 +26,12 @@ const THUMB_EDGE = 160;
 const SCANNED_CHARS_PER_PAGE = 16;
 const SCANNED_PAGES = 8;
 const PDF_TEXT_PAGES = 2000;
+// Two text pieces whose baselines differ by less than this share of the text
+// height sit on the same line.
+const SAME_LINE = 0.5;
+// A space goes between two pieces of a line when the gap between them is wider
+// than this share of the text height.
+const WORD_GAP = 0.15;
 
 // ---- storage ----
 const memory = new Map();
@@ -225,13 +231,52 @@ async function renderPage(page, edge) {
   return canvas;
 }
 
+// A piece's position and size on the page. pdf.js gives the position in the
+// last two entries of `transform`, with y growing up the page.
+const left = (piece) => piece.transform[4];
+const baseline = (piece) => piece.transform[5];
+const tall = (piece) => piece.height || Math.abs(piece.transform[3]) || 1;
+
+// The text of a page in reading order: lines from the top of the page down,
+// and the pieces of each line from left to right. A PDF can store its text in
+// any order, so the order of `items` is not used.
+function readingOrder(items) {
+  const pieces = items.filter((item) => item.str?.trim()).sort((upper, lower) => baseline(lower) - baseline(upper));
+  const lines = [];
+
+  for (const piece of pieces) {
+    const line = lines.at(-1);
+    const onLine = line && Math.abs(baseline(line[0]) - baseline(piece)) < tall(piece) * SAME_LINE;
+
+    if (onLine) line.push(piece);
+    else lines.push([piece]);
+  }
+
+  return lines.map(lineText).join("\n");
+}
+
+// The pieces of one line from left to right, with a space where they are apart.
+function lineText(line) {
+  const pieces = [...line].sort((first, second) => left(first) - left(second));
+  let text = pieces[0].str;
+
+  for (let index = 1; index < pieces.length; index += 1) {
+    const previous = pieces[index - 1];
+    const gap = left(pieces[index]) - (left(previous) + previous.width);
+
+    text += (gap > tall(pieces[index]) * WORD_GAP ? " " : "") + pieces[index].str;
+  }
+
+  return text.replace(/\s+/g, " ").trim();
+}
+
 // The text of each page, under a `--- page N ---` line, cut at MAX_TEXT.
 async function pdfText(pdf, reading) {
   let text = "";
 
   for (let number = 1; number <= reading; number += 1) {
     const content = await (await pdf.getPage(number)).getTextContent();
-    const page = content.items.map((item) => (item.str ?? "") + (item.hasEOL ? "\n" : "")).join("").trim();
+    const page = readingOrder(content.items);
 
     text += `${text ? "\n\n" : ""}--- page ${number} ---\n${page}`;
 
