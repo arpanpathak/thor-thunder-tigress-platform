@@ -20,10 +20,10 @@
 THOR_URL=${THOR_URL:-https://arpanpathak.taildb9a39.ts.net}
 THOR_CLIENTS_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
-# Claude Code's auto mode asks Anthropic's safety classifier before each command.
-# The Thor has no classifier, so auto mode blocks every command. The first start
-# copies an allow list of build, test, git and gh commands instead; an existing
-# ~/.claude-thor/settings.json stays as it is.
+# In Claude Code's auto mode, each command needs approval from Anthropic's safety
+# classifier. The Thor has no classifier, so every command in auto mode fails.
+# On the first start, we copy an allow list of build, test, git and gh commands
+# to ~/.claude-thor/settings.json. An existing settings file is not replaced.
 thor-claude-settings() {
   local settings="$HOME/.claude-thor/settings.json"
 

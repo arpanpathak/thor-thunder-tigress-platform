@@ -172,19 +172,20 @@ DeepSeek keys of Deep Code and `dsh` are never sent to the Thor.
 
 ### Permissions
 
-[`PERMISSIONS.md`](jetson-thor/clients/PERMISSIONS.md) covers each tool's
-permission settings, its default, and a setting that builds, tests and commits
-without a prompt for every step. These settings work with any local server.
+In [`PERMISSIONS.md`](jetson-thor/clients/PERMISSIONS.md), you'll find each
+tool's permission settings, its default, and a setting for building, testing
+and committing without a prompt at every step. These settings work with any
+local server.
 
-Claude Code's auto mode asks Anthropic's safety classifier before it runs each
-command. The Thor has no classifier, so in auto mode every command fails with
-"classifier unavailable", `cargo build` included. Use the other modes with
-`claude-thor`.
+In Claude Code's auto mode, each command goes to Anthropic's safety classifier
+before it is run. The Thor has no classifier, so in auto mode every command
+fails with "classifier unavailable", `cargo build` included. Use one of the
+other modes with `claude-thor`.
 
-On its first start, `claude-thor` copies
-[`claude-thor-settings.json`](jetson-thor/clients/claude-thor-settings.json) to
-`~/.claude-thor/settings.json`. It accepts file edits and runs these commands
-without asking:
+On the first start of `claude-thor`, the file
+[`claude-thor-settings.json`](jetson-thor/clients/claude-thor-settings.json) is
+copied to `~/.claude-thor/settings.json`. With it, file edits and these
+commands run with no prompt:
 
 - Build and test: `cargo`, `rustc`, `rustup`, `npm`, `node`, `python3`,
   `pytest`, `make`
@@ -194,8 +195,9 @@ without asking:
 - Files: `ls`, `cat`, `grep`, `rg`, `find`, `head`, `tail`, `wc`,
   `mkdir`
 
-`git push --force`, `git push -f` and `git reset --hard` are denied. Any other
-command asks first. An existing `~/.claude-thor/settings.json` is left as it is.
+`git push --force`, `git push -f` and `git reset --hard` are denied. For any
+other command, you'll see a prompt. If `~/.claude-thor/settings.json` already
+exists, it is not replaced.
 
 ### The models
 
