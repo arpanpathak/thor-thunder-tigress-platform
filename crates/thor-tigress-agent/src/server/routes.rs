@@ -21,7 +21,7 @@ use crate::{
     server::{
         bridge,
         limits::Refusal,
-        meter::{self, Record},
+        meter::{self, Record, RequestLog},
         response::{self, Client, JSON},
     },
     chat,
@@ -249,7 +249,18 @@ async fn metered(
 
 /// `response`, recorded once its body has been sent.
 fn logged(config: &Config, response: Response, record: Record, started: Instant) -> Response {
-    meter::metered(response, record, started, config.log.clone(), None)
+    let log = log_for(config, &record.path, response.status());
+
+    meter::metered(response, record, started, log, None)
+}
+
+/// The request log for an answer to `path` with `status`. Successful answers
+/// on [`paths::UNLOGGED`] routes, which clients poll every few seconds, are not
+/// logged; refusals and errors on them still are.
+fn log_for(config: &Config, path: &str, status: StatusCode) -> Option<Arc<RequestLog>> {
+    let is_routine_poll = paths::UNLOGGED.contains(&path) && status.is_success();
+
+    config.log.clone().filter(|_| !is_routine_poll)
 }
 
 /// Runs a model call when `record.who`'s limits allow it, and records it.
