@@ -10,9 +10,11 @@ const errors = [];
 const requests = [];
 page.on('pageerror', (error) => errors.push(error.message));
 
-// A 4×3 PNG, and a one-page PDF whose text layer says PELICAN.
+// A 4×3 PNG, and a one-page PDF whose text layer says PELICAN. The file stores
+// the lower line first, so the test also checks that text reaches the model in
+// reading order.
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAIAAAA7ljmRAAAAEElEQVR4nGO4IyICRww4OQD3Lwwx0Tw4hAAAAABJRU5ErkJggg==', 'base64');
-const stream = 'BT /F1 18 Tf 72 720 Td (The secret word is PELICAN.) Tj ET';
+const stream = 'BT /F1 18 Tf 72 680 Td (It comes after the heading.) Tj ET BT /F1 18 Tf 72 720 Td (The secret word is PELICAN.) Tj ET';
 const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
   '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
   `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>'];
@@ -89,7 +91,7 @@ try {
   assert.equal(sent.role, 'user');
   assert.equal(sent.content[0].type, 'image_url');
   assert.match(sent.content[0].image_url.url, /^data:image\/png;base64,/);
-  assert.match(sent.content[1].text, /<file name="secret.pdf" pages="1">[\s\S]*PELICAN[\s\S]*What is in these\?$/);
+  assert.match(sent.content[1].text, /<file name="secret.pdf" pages="1">[\s\S]*PELICAN\.\nIt comes after the heading\.[\s\S]*What is in these\?$/);
   assert.equal(await page.locator('#attachments .attachment').count(), 0, 'sent files leave the composer');
   assert.equal(await page.locator('.msg.user .picture img').count(), 1);
   await until(() => document.querySelector('.msg.assistant .math.typeset') && document.querySelector('.msg.assistant .figure.drawn img'));
