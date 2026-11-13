@@ -20,6 +20,10 @@ pub const CHAT_COMPLETIONS: &str = "/v1/chat/completions";
 /// server's load.
 pub const SYSTEM: &str = "/v1/system";
 
+/// Routes whose successful answers stay out of the request log, because
+/// clients poll them every few seconds.
+pub const UNLOGGED: &[&str] = &[SYSTEM];
+
 /// Web search for remote coding tools, answered in SearXNG's JSON format.
 pub const SEARCH: &str = "/v1/search";
 

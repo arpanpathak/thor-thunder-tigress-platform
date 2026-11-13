@@ -622,3 +622,40 @@ async fn the_system_report_holds_the_sample_and_the_served_models() -> Result<()
 
     Ok(())
 }
+
+/// [`with_fake_system`] with a request log at `log`.
+fn fake_system_with_log(web: &Path, log: &Path) -> Result<Arc<Config>> {
+    let engine = FakeServer::start(vec![json_response(GEMMA_LISTED)])?;
+    let mut config = Config::from_args([
+        "--engine".to_string(),
+        format!("Gemma-4-26B-A4B-NVFP4={}", engine.address()),
+        "--key-file".to_string(),
+        "/nonexistent".to_string(),
+        "--request-log".to_string(),
+        log.display().to_string(),
+    ])?;
+
+    config.key = Some("k".to_string());
+    config.system = Monitor::new(fake_sources(web)?);
+
+    Ok(Arc::new(config))
+}
+
+#[tokio::test]
+async fn a_system_poll_stays_out_of_the_log_and_a_refused_one_does_not() -> Result<()> {
+    let web = web_folder()?;
+    let log = web.path().join("requests.jsonl");
+    let config = fake_system_with_log(web.path(), &log)?;
+    let key = [("authorization", "Bearer k")];
+
+    let answered = ask(&config, get(paths::SYSTEM).with(&key)).await?;
+    let refused = ask(&config, get(paths::SYSTEM)).await?;
+    let records = logged(&log)?;
+
+    assert_eq!(answered.status, StatusCode::OK);
+    assert_eq!(refused.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["status"], 401);
+
+    Ok(())
+}
