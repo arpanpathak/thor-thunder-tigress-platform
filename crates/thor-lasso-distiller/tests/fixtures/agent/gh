@@ -1,0 +1,11 @@
+#!/bin/sh
+# Stands in for gh in the tests of `lasso agent tasks`. It answers from
+# output recorded from arpanpathak/openbatrangs on 2026-11-14.
+here=$(dirname "$0")
+
+case "$1 $2" in
+  "pr list") cat "$here/pr_list.json" ;;
+  "issue list") cat "$here/issue_list.json" ;;
+  "api "*) cat "$here/commits/$(basename "$2").json" ;;
+  *) echo "fake gh: no recording for: $*" >&2; exit 1 ;;
+esac

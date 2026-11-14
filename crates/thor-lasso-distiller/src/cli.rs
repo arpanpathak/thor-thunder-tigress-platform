@@ -1,6 +1,7 @@
 //! The `lasso` command line, as a library so it can be tested.
 //!
 //! ```text
+//! lasso agent tasks|run|score|export ...
 //! lasso conversations [--train data/train.jsonl] [--out data/conversations.jsonl]
 //!                     [--books trpl,rbe,...] [--turns 3] [--limit N]
 //!                     [--server 127.0.0.1:8000] [--model NAME] [--dry-run]
@@ -30,6 +31,7 @@ use std::{
 use serde_json::json;
 
 use crate::{
+    agent,
     client::Client,
     conversations::{self, Passage},
     error::DistillError,
@@ -77,6 +79,7 @@ pub fn main_with(
 ) -> Result<(), DistillError> {
     match arguments.split_first() {
         Some((command, rest)) if command == "conversations" => run(&options(rest, key)?, out),
+        Some((command, rest)) if command == "agent" => agent::main_with(rest, out),
         _ => Err(DistillError::Usage(usage())),
     }
 }
@@ -85,7 +88,8 @@ pub fn main_with(
 #[must_use]
 pub fn usage() -> String {
     "usage: lasso conversations [--train FILE] [--out FILE] [--books a,b] [--turns N] \
-     [--limit N] [--server HOST:PORT] [--model NAME] [--dry-run]"
+     [--limit N] [--server HOST:PORT] [--model NAME] [--dry-run]\n       \
+     lasso agent tasks|run|score|export ..."
         .to_string()
 }
 

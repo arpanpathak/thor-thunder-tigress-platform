@@ -251,6 +251,7 @@ target/release/reinforcer data/train.jsonl 8787    # review it at http://127.0.0
 target/release/spark rs crates                     # check Rust code against the five rules
 target/release/spark score RUN.jsonl --field text  # score a model's answers
 target/release/lasso conversations --dry-run       # plan conversations; needs no model
+target/release/lasso agent tasks --repo OWNER/NAME --out tasks.jsonl  # coding tasks from merged PRs
 target/release/thor-tigress-keyring init           # the encrypted registry of invited people
 ```
 
