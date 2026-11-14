@@ -1,0 +1,11 @@
+# Training stack for lora.py, pinned to the versions the script was tested with.
+# torch is not listed: Colab ships its own CUDA build, and the Thor needs the Jetson wheel
+# from pypi.jetson-ai-lab.io/sbsa/cu130 (installed in ~/finetune).
+transformers==5.20.0
+peft==0.21.2
+trl==1.18.0
+accelerate==1.15.0
+datasets==5.1.0
+huggingface_hub==2.2.0
+# 4-bit QLoRA in Colab. The Thor trains in bf16 and does not need it.
+bitsandbytes==0.50.2; platform_machine == "x86_64"
