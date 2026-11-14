@@ -52,10 +52,14 @@ const TEACHER: &str = concat!(
     "\n"
 );
 
-/// Two datasets in a folder that lasts as long as the test.
+/// Fixture with three runs: passed, failed, and stopped at the step limit.
+const RUNS: &str = include_str!("../../tests/fixtures/agent_runs.jsonl");
+
+/// Training and teacher datasets plus the agent runs, in a temporary folder
+/// removed on drop.
 struct Setup {
     workspace: Arc<Workspace>,
-    _folder: TempDir,
+    folder: TempDir,
 }
 
 impl Setup {
@@ -66,6 +70,7 @@ impl Setup {
         let teacher = folder.file("teacher.jsonl", TEACHER)?;
         let flags = folder.file("flags.jsonl", FLAGS)?;
         let slop = folder.file("slop.jsonl", "{\"id\":\"gone\",\"response\":\"old\"}\n")?;
+        let runs = folder.file("runs.jsonl", RUNS)?;
         let specs = [
             DatasetSpec::new("train", &train, &flags, &slop),
             DatasetSpec::new(
@@ -74,11 +79,12 @@ impl Setup {
                 &folder.path().join("f2.jsonl"),
                 &folder.path().join("r2.jsonl"),
             ),
+            DatasetSpec::runs(&runs, &folder.path().join("labels/agent_run_flags.jsonl")),
         ];
 
         Ok(Setup {
             workspace: Arc::new(Workspace::open(&specs)?),
-            _folder: folder,
+            folder,
         })
     }
 
@@ -117,6 +123,13 @@ impl Setup {
             cache,
             body: serde_json::from_str(&text).unwrap_or(Value::String(text)),
         })
+    }
+
+    /// Returns the contents of the agent runs' flags file.
+    fn run_flags(&self) -> Result<String> {
+        let path = self.folder.path().join("labels/agent_run_flags.jsonl");
+
+        Ok(std::fs::read_to_string(path)?)
     }
 
     async fn get(&self, target: &str) -> Result<Reply> {
@@ -429,6 +442,82 @@ async fn answers_over_a_real_connection() -> Result<()> {
 
     assert!(reply.starts_with("HTTP/1.1 200 OK"), "{reply}");
     assert!(reply.contains(r#""name":"train""#), "{reply}");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn shows_agent_runs_and_filters_them_by_result() -> Result<()> {
+    let setup = Setup::new()?;
+    let listed = setup.get("/api/datasets").await?.body;
+
+    assert_eq!(
+        (
+            &listed["datasets"][2]["name"],
+            &listed["datasets"][2]["kind"]
+        ),
+        (&json!("runs"), &json!("runs"))
+    );
+    assert_eq!(listed["datasets"][0]["kind"], "records");
+
+    let meta = setup.get("/api/meta?dataset=runs").await?.body;
+    let failed = setup
+        .get("/api/page?dataset=runs&source=failed")
+        .await?
+        .body;
+
+    assert_eq!(
+        meta["sources"][0],
+        json!({ "name": "failed", "title": "Failed", "count": 2 })
+    );
+    assert_eq!(failed["items"][1]["outcome"], "step_limit");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_run_carries_its_result_and_transcript() -> Result<()> {
+    let setup = Setup::new()?;
+    let run = &setup
+        .get("/api/page?dataset=runs&source=passed")
+        .await?
+        .body["items"][0];
+
+    assert_eq!(
+        (
+            run["id"].as_str(),
+            run["origin"].as_str(),
+            run["task_id"].as_str()
+        ),
+        (Some("pr-31-run-1"), Some("pr-31"), Some("pr-31"))
+    );
+    assert_eq!(
+        (run["passed"].as_bool(), run["steps"].as_u64()),
+        (Some(true), Some(5))
+    );
+    assert_eq!(run["wall_seconds"], 84.6);
+    assert_eq!(run["transcript"]["model"], "gemma-4-26B-A4B-it");
+    assert_eq!(run["transcript"]["messages"][3]["role"], "tool");
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_slop_run_is_flagged_by_its_run_id() -> Result<()> {
+    let setup = Setup::new()?;
+    let body = r#"{"id":"pr-22-run-1","note":"claims a fix the tests refute","spans":[{"field":"response","text":"Great news:","category":"flattery_filler_opener"}]}"#;
+    let saved = setup.post("/api/flag?dataset=runs", body).await?;
+
+    assert_eq!(saved.body, json!({ "ok": true, "flagged": true }));
+    assert_eq!(setup.run_flags()?, format!("{body}\n"));
+
+    let flagged = setup.get("/api/page?dataset=runs&flagged=1").await?.body;
+
+    assert_eq!(
+        flagged["items"][0]["flag"]["note"],
+        "claims a fix the tests refute"
+    );
+    assert_eq!(setup.get("/api/meta").await?.body["flagged"], 4);
 
     Ok(())
 }
