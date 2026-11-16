@@ -14,6 +14,7 @@
 
 - [Access and syncing](ch07-thor-access.md)
 - [Model serving](ch21-model-serving.md)
+- [Choosing an engine and a model: thor](ch33-thor-command.md)
 - [Local models](ch08-local-models.md)
 - [Web chat: Thor Tigress Cub](ch09-web-chat.md)
 - [Tool calling](ch19-tool-calling.md)

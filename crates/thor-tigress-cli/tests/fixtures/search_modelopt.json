@@ -1,0 +1,156 @@
+[
+    {
+        "_id": "69ce9da280df2f332faf7588",
+        "id": "nvidia/Gemma-4-31B-IT-NVFP4",
+        "baseModels": {
+            "relation": "quantized",
+            "models": [
+                {
+                    "_id": "69b1b2ec895b2d5026e6bc2e",
+                    "id": "google/gemma-4-31B-it"
+                }
+            ]
+        },
+        "downloads": 1126472,
+        "tags": [
+            "Model Optimizer",
+            "safetensors",
+            "gemma4",
+            "nvidia",
+            "ModelOpt",
+            "Gemma-4-31B-IT",
+            "lighthouse",
+            "quantized",
+            "NVFP4",
+            "text-generation",
+            "conversational",
+            "base_model:google/gemma-4-31B-it",
+            "base_model:quantized:google/gemma-4-31B-it",
+            "license:other",
+            "modelopt",
+            "deploy:azure",
+            "deploy:sagemaker",
+            "region:us"
+        ]
+    },
+    {
+        "_id": "6a2338e4f8da813318de6ca3",
+        "id": "melcheikh/gemma-4-31B-it-qat-NVFP4-Blackwell",
+        "baseModels": {
+            "relation": "quantized",
+            "models": [
+                {
+                    "_id": "69f11edac81f299cb2c488aa",
+                    "id": "google/gemma-4-31B-it-qat-q4_0-unquantized"
+                }
+            ]
+        },
+        "downloads": 532708,
+        "tags": [
+            "safetensors",
+            "gemma4",
+            "tensorizer",
+            "modelopt",
+            "nvidia",
+            "fp4",
+            "nvfp4",
+            "blackwell",
+            "vllm",
+            "qat",
+            "text-generation",
+            "conversational",
+            "base_model:google/gemma-4-31B-it-qat-q4_0-unquantized",
+            "base_model:quantized:google/gemma-4-31B-it-qat-q4_0-unquantized",
+            "license:apache-2.0",
+            "8-bit",
+            "region:us"
+        ]
+    },
+    {
+        "_id": "69db186661f7dc0587c1bad2",
+        "id": "AEON-7/Gemma-4-31B-it-DECKARD-HERETIC-Uncensored-NVFP4",
+        "baseModels": {
+            "relation": "quantized",
+            "models": [
+                {
+                    "_id": "69d300878b740d944d0af2a0",
+                    "id": "DavidAU/gemma-4-31B-it-The-DECKARD-HERETIC-UNCENSORED-Thinking"
+                }
+            ]
+        },
+        "downloads": 33770,
+        "tags": [
+            "transformers",
+            "safetensors",
+            "gemma4",
+            "image-text-to-text",
+            "31b",
+            "4-bit",
+            "aarch64",
+            "abliterated",
+            "activation-aware",
+            "aeon",
+            "aeon-7",
+            "agentic",
+            "arm64",
+            "awq",
+            "awq-full",
+            "blackwell",
+            "chat",
+            "chunked-prefill",
+            "coding",
+            "conversational",
+            "creative-writing",
+            "deckard",
+            "dense",
+            "dgx-spark",
+            "eagle",
+            "english",
+            "flashinfer-cutlass",
+            "fp4",
+            "fp8-kv-cache",
+            "function-calling",
+            "gb10",
+            "gemma",
+            "gemma-4",
+            "google",
+            "gpu",
+            "grace-blackwell",
+            "heretic",
+            "instruct",
+            "long-context",
+            "modelopt",
+            "multimodal",
+            "native-fp4",
+            "nvfp4",
+            "nvidia",
+            "openai-api",
+            "openai-compatible",
+            "prefix-caching",
+            "production-ready",
+            "quantized",
+            "reasoning",
+            "refusal-removed",
+            "sliding-window-attention",
+            "sm_121a",
+            "speculative-decoding",
+            "text-generation",
+            "thinking",
+            "tool-calling",
+            "transformer",
+            "uncensored",
+            "unfiltered",
+            "vision",
+            "vision-language",
+            "vllm",
+            "weight-quantization",
+            "en",
+            "base_model:DavidAU/gemma-4-31B-it-The-DECKARD-HERETIC-UNCENSORED-Thinking",
+            "base_model:quantized:DavidAU/gemma-4-31B-it-The-DECKARD-HERETIC-UNCENSORED-Thinking",
+            "license:gemma",
+            "endpoints_compatible",
+            "8-bit",
+            "region:us"
+        ]
+    }
+]

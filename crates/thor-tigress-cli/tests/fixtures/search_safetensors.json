@@ -1,0 +1,66 @@
+[
+    {
+        "_id": "69b1b2ec895b2d5026e6bc2e",
+        "id": "google/gemma-4-31B-it",
+        "baseModels": {
+            "relation": "finetune",
+            "models": [
+                {
+                    "_id": "69b20b043fadc91fa2784660",
+                    "id": "google/gemma-4-31B"
+                }
+            ]
+        },
+        "downloads": 6435249,
+        "tags": [
+            "transformers",
+            "safetensors",
+            "gemma4",
+            "image-text-to-text",
+            "conversational",
+            "arxiv:2607.02770",
+            "base_model:google/gemma-4-31B",
+            "base_model:finetune:google/gemma-4-31B",
+            "license:apache-2.0",
+            "eval-results",
+            "endpoints_compatible",
+            "deploy:sagemaker",
+            "deploy:azure",
+            "region:us"
+        ]
+    },
+    {
+        "_id": "69ce9da280df2f332faf7588",
+        "id": "nvidia/Gemma-4-31B-IT-NVFP4",
+        "baseModels": {
+            "relation": "quantized",
+            "models": [
+                {
+                    "_id": "69b1b2ec895b2d5026e6bc2e",
+                    "id": "google/gemma-4-31B-it"
+                }
+            ]
+        },
+        "downloads": 1126472,
+        "tags": [
+            "Model Optimizer",
+            "safetensors",
+            "gemma4",
+            "nvidia",
+            "ModelOpt",
+            "Gemma-4-31B-IT",
+            "lighthouse",
+            "quantized",
+            "NVFP4",
+            "text-generation",
+            "conversational",
+            "base_model:google/gemma-4-31B-it",
+            "base_model:quantized:google/gemma-4-31B-it",
+            "license:other",
+            "modelopt",
+            "deploy:azure",
+            "deploy:sagemaker",
+            "region:us"
+        ]
+    }
+]

@@ -1,0 +1,264 @@
+{
+ "tree": [
+  {
+   "path": ".agents/skills/add-recipe/SKILL.md",
+   "type": "blob"
+  },
+  {
+   "path": "AGENTS.md",
+   "type": "blob"
+  },
+  {
+   "path": "ArceeAI/Trinity-Large-Thinking.md",
+   "type": "blob"
+  },
+  {
+   "path": "CLAUDE.md",
+   "type": "blob"
+  },
+  {
+   "path": "CONTRIBUTING.md",
+   "type": "blob"
+  },
+  {
+   "path": "DeepSeek/DeepSeek-OCR-2.md",
+   "type": "blob"
+  },
+  {
+   "path": "DeepSeek/DeepSeek-OCR.md",
+   "type": "blob"
+  },
+  {
+   "path": "DeepSeek/DeepSeek-V3.md",
+   "type": "blob"
+  },
+  {
+   "path": "DeepSeek/DeepSeek-V3_1.md",
+   "type": "blob"
+  },
+  {
+   "path": "DeepSeek/DeepSeek-V3_2-Exp.md",
+   "type": "blob"
+  },
+  {
+   "path": "DeepSeek/DeepSeek-V3_2.md",
+   "type": "blob"
+  },
+  {
+   "path": "Ernie/Ernie4.5-VL.md",
+   "type": "blob"
+  },
+  {
+   "path": "Ernie/Ernie4.5.md",
+   "type": "blob"
+  },
+  {
+   "path": "GLM/GLM-ASR.md",
+   "type": "blob"
+  },
+  {
+   "path": "GLM/GLM-GA.md",
+   "type": "blob"
+  },
+  {
+   "path": "GLM/GLM-Image.md",
+   "type": "blob"
+  },
+  {
+   "path": "GLM/GLM-OCR.md",
+   "type": "blob"
+  },
+  {
+   "path": "GLM/GLM-V.md",
+   "type": "blob"
+  },
+  {
+   "path": "GLM/GLM.md",
+   "type": "blob"
+  },
+  {
+   "path": "GLM/GLM5.md",
+   "type": "blob"
+  },
+  {
+   "path": "GLM/Glyph.md",
+   "type": "blob"
+  },
+  {
+   "path": "Google/Gemma4.md",
+   "type": "blob"
+  },
+  {
+   "path": "Google/TranslateGemma.md",
+   "type": "blob"
+  },
+  {
+   "path": "InternLM/Intern-S1.md",
+   "type": "blob"
+  },
+  {
+   "path": "InternVL/InternVL3_5.md",
+   "type": "blob"
+  },
+  {
+   "path": "Jina/Jina-reranker-m0.md",
+   "type": "blob"
+  },
+  {
+   "path": "LiquidAI/LFM2.5.md",
+   "type": "blob"
+  },
+  {
+   "path": "Llama/Llama3.1.md",
+   "type": "blob"
+  },
+  {
+   "path": "Llama/Llama3.3-70B.md",
+   "type": "blob"
+  },
+  {
+   "path": "Llama/Llama4-Scout.md",
+   "type": "blob"
+  },
+  {
+   "path": "Meituan/Longcat.md",
+   "type": "blob"
+  },
+  {
+   "path": "MiMo/MiMo-V2-Flash.md",
+   "type": "blob"
+  },
+  {
+   "path": "Microsoft/Phi-4.md",
+   "type": "blob"
+  },
+  {
+   "path": "MiniMax/MiniMax-M2.md",
+   "type": "blob"
+  },
+  {
+   "path": "Mistral/Ministral-3-Instruct.md",
+   "type": "blob"
+  },
+  {
+   "path": "Mistral/Ministral-3-Reasoning.md",
+   "type": "blob"
+  },
+  {
+   "path": "Mistral/Mistral-Large-3.md",
+   "type": "blob"
+  },
+  {
+   "path": "NVIDIA/Nemotron-3-Nano-30B-A3B.md",
+   "type": "blob"
+  },
+  {
+   "path": "NVIDIA/Nemotron-Nano-12B-v2-VL.md",
+   "type": "blob"
+  },
+  {
+   "path": "OpenAI/GPT-OSS.md",
+   "type": "blob"
+  },
+  {
+   "path": "PaddlePaddle/PaddleOCR-VL.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen-Image.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen2.5-VL.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen3-ASR.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen3-Coder-480B-A35B.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen3-Next.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen3-VL.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen3.5.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen3.md",
+   "type": "blob"
+  },
+  {
+   "path": "Qwen/Qwen3Guard-Gen.md",
+   "type": "blob"
+  },
+  {
+   "path": "README.md",
+   "type": "blob"
+  },
+  {
+   "path": "SCHEMA.md",
+   "type": "blob"
+  },
+  {
+   "path": "Seed/Seed-OSS-36B.md",
+   "type": "blob"
+  },
+  {
+   "path": "StabilityAI/Stable-Audio-Open.md",
+   "type": "blob"
+  },
+  {
+   "path": "StabilityAI/Stable-Diffusion3.5.md",
+   "type": "blob"
+  },
+  {
+   "path": "StepFun/Step-3.5-Flash.md",
+   "type": "blob"
+  },
+  {
+   "path": "StepFun/Step-3.7-Flash.md",
+   "type": "blob"
+  },
+  {
+   "path": "Tencent-Hunyuan/Hunyuan-Instruct.md",
+   "type": "blob"
+  },
+  {
+   "path": "Tencent-Hunyuan/HunyuanOCR.md",
+   "type": "blob"
+  },
+  {
+   "path": "Wan-AI/Wan2.2.md",
+   "type": "blob"
+  },
+  {
+   "path": "inclusionAI/Ring-1T-FP8.md",
+   "type": "blob"
+  },
+  {
+   "path": "moonshotai/Kimi-K2-Think.md",
+   "type": "blob"
+  },
+  {
+   "path": "moonshotai/Kimi-K2.5.md",
+   "type": "blob"
+  },
+  {
+   "path": "moonshotai/Kimi-K2.md",
+   "type": "blob"
+  },
+  {
+   "path": "moonshotai/Kimi-Linear.md",
+   "type": "blob"
+  }
+ ]
+}
