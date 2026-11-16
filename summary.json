@@ -1,9 +1,9 @@
 {
   "commit": "5f25d41",
-  "measured_at": "2026-11-16T08:37:05Z",
-  "all_passed": false,
-  "coverage": 95.47,
-  "tests": 652,
+  "measured_at": "2026-11-16T15:16:19Z",
+  "all_passed": true,
+  "coverage": 95.69,
+  "tests": 653,
   "rules": {
     "files": 163,
     "problems": 0
@@ -20,12 +20,12 @@
     },
     {
       "crate": "thor-lasso-distiller",
-      "passed": false,
-      "tests": 25,
-      "failed": 1,
-      "lines": 0,
-      "covered": 0,
-      "coverage": 0.0
+      "passed": true,
+      "tests": 26,
+      "failed": 0,
+      "lines": 785,
+      "covered": 785,
+      "coverage": 100.0
     },
     {
       "crate": "thor-spark-safety-eval",
