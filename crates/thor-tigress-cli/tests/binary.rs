@@ -1,4 +1,4 @@
-//! The `thor` binary end to end, against a fake `systemctl`, `journalctl`, `docker` and `sg`
+//! The `thor-tigress` binary end to end, against a fake `systemctl`, `journalctl`, `docker` and `sg`
 //! on the PATH,
 //! a fake engine server on a free local port, and `HF_HUB_OFFLINE=1`. Nothing here touches
 //! the network, a real service or a real model.
@@ -111,11 +111,11 @@ impl FakeThor {
         self.path().join("edge/Gemma-4-31B-IT-NVFP4")
     }
 
-    /// Runs `thor` with this home, the fake programs first on the PATH, and the Hub off.
+    /// Runs `thor-tigress` with this home, the fake programs first on the PATH, and the Hub off.
     fn run(&self, arguments: &[&str], extra_environment: &[(&str, &str)]) -> Result<Output> {
         let path = format!("{}:/usr/bin:/bin", self.path().join("bin").display());
         let settings = self.path().join("env");
-        let mut command = Command::new(env!("CARGO_BIN_EXE_thor"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_thor-tigress"));
         command
             .args(arguments)
             .args(["--settings", &settings.display().to_string()])
@@ -133,7 +133,7 @@ impl FakeThor {
         Ok(command.output()?)
     }
 
-    /// Runs `thor` against the fake Hub on `hub_port`, with the test token.
+    /// Runs `thor-tigress` against the fake Hub on `hub_port`, with the test token.
     fn run_with_hub(&self, hub_port: u16, arguments: &[&str]) -> Result<Output> {
         let endpoint = format!("http://127.0.0.1:{hub_port}");
         let environment = [
@@ -145,7 +145,7 @@ impl FakeThor {
         self.run(arguments, &environment)
     }
 
-    /// Runs `thor serve --yes` on the checkpoint with Edge-LLM and the given context.
+    /// Runs `thor-tigress serve --yes` on the checkpoint with Edge-LLM and the given context.
     fn serve_checkpoint(
         &self,
         context: &str,
@@ -168,7 +168,7 @@ impl FakeThor {
         self.run(&arguments, extra_environment)
     }
 
-    /// The text of the settings backup `thor serve` made.
+    /// The text of the settings backup `thor-tigress serve` made.
     fn backup(&self) -> Result<String> {
         let backup = fs::read_dir(self.path())?
             .flatten()
@@ -209,7 +209,7 @@ fn free_port() -> Result<u16> {
     Ok(listener.local_addr()?.port())
 }
 
-/// The token the fake Hub expects; it must never appear in `thor`'s output.
+/// The token the fake Hub expects; it must never appear in `thor-tigress`'s output.
 const TEST_TOKEN: &str = "hf_test_token_never_printed";
 
 /// A fake Hugging Face Hub on a new local port. Each request's path, without the query, is
@@ -388,7 +388,7 @@ fn a_model_that_does_not_fit_changes_nothing() -> Result<()> {
         stderr.contains("Gemma-4-31B-IT-NVFP4 at 262,144 tokens needs about 11.2 GB;"),
         "{stderr}"
     );
-    assert!(stderr.contains("To make room, stop thor-chat (1.0 GB): thor stop thor-chat"));
+    assert!(stderr.contains("To make room, stop thor-chat (1.0 GB): thor-tigress stop thor-chat"));
     assert_eq!(thor.settings()?, before);
     assert!(!thor.calls().contains("restart"));
 
@@ -458,7 +458,7 @@ fn engines_detects_what_is_installed() -> Result<()> {
         docker.display()
     )));
     assert!(stdout.contains(
-        "example: thor serve --engine vllm --model ORGANIZATION/REPOSITORY --context max"
+        "example: thor-tigress serve --engine vllm --model ORGANIZATION/REPOSITORY --context max"
     ));
 
     Ok(())
@@ -487,7 +487,7 @@ fn a_hub_name_is_not_asked_for_when_offline() -> Result<()> {
     Ok(())
 }
 
-/// `thor serve` for the fake Hub's checkpoint, without fetching documentation.
+/// `thor-tigress serve` for the fake Hub's checkpoint, without fetching documentation.
 const HUB_SERVE: [&str; 11] = [
     "serve",
     "--engine",
@@ -552,7 +552,7 @@ fn an_engine_that_is_not_installed_is_reported() -> Result<()> {
         stderr.contains("llama.cpp is not installed here:"),
         "{stderr}"
     );
-    assert!(stderr.contains("missing/llama-server not found. See thor engines."));
+    assert!(stderr.contains("missing/llama-server not found. See thor-tigress engines."));
 
     Ok(())
 }

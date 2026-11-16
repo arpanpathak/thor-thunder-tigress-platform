@@ -22,7 +22,7 @@ use crate::{
     web,
 };
 
-/// One search result, with the fields `thor` asks the Hub to include.
+/// One search result, with the fields `thor-tigress` asks the Hub to include.
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct HubModel {
     /// The repository, such as `ORGANIZATION/NAME`.
@@ -134,7 +134,7 @@ pub struct Hub {
     pub endpoint: String,
     /// The access token, when one was found.
     token: Option<String>,
-    /// Whether `HF_HUB_OFFLINE` is set. When it is, `thor` sends no request to the Hub.
+    /// Whether `HF_HUB_OFFLINE` is set. When it is, `thor-tigress` sends no request to the Hub.
     pub offline: bool,
     /// The HTTP client.
     client: ureq::Agent,

@@ -16,7 +16,7 @@ const RECORDED: RecordedBuilds = RecordedBuilds {
     failed: 96 * GIBIBYTE,
 };
 
-/// The note's outlook for a context, with the prompt `thor` writes (context minus 8,192).
+/// The note's outlook for a context, with the prompt `thor-tigress` writes (context minus 8,192).
 fn outlook_at(context: u64) -> Option<BuildOutlook> {
     drafter_build_note(Some(GEMMA_VOCAB), context, context - 8192, RECORDED)
         .map(|note| note.outlook)

@@ -232,7 +232,9 @@ fn the_memory_message_says_what_fits_and_what_to_stop() {
         message.starts_with("Gemma at 262,144 tokens needs about 31.2 GB; 26.0 GB can be used.")
     );
     assert!(message.contains("The largest context that fits is 131,072: --context 131072"));
-    assert!(message.contains("To make room, stop thor-chat (57.8 GB): thor stop thor-chat"));
+    assert!(
+        message.contains("To make room, stop thor-chat (57.8 GB): thor-tigress stop thor-chat")
+    );
 }
 
 #[test]

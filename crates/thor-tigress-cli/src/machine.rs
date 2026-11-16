@@ -21,7 +21,7 @@ pub const SETTINGS_FILE: &str = ".config/thor-chat/env";
 /// Where the kernel reports memory.
 const MEMINFO: &str = "/proc/meminfo";
 
-/// What `thor` knows about the machine it runs on.
+/// What `thor-tigress` knows about the machine it runs on.
 #[derive(Debug)]
 pub struct Machine {
     /// The settings file.

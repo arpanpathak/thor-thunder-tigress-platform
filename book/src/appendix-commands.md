@@ -17,16 +17,16 @@ Run these from `/home/jetson/Projects/thor-thunder-tigress-platform`.
 | Make the keyring (the encrypted registry of who may chat) | `thor-tigress-serve keyring-init` |
 | See who asked, approve, revoke | `thor-tigress-serve keyring requests` / `approve EMAIL` / `revoke EMAIL` / `revoke-all` |
 | Run the keyring tool itself | `cargo run -p thor-tigress-keyring -- --keyring FILE --passphrase-file FILE keys` |
-| Install `thor` | `cargo install --path crates/thor-tigress-cli` |
-| See the engines and what is installed | `thor engines` |
-| Choose an engine, a model and a context, then serve it | `thor serve` |
-| Serve without questions | `thor serve --engine edge-llm --model REPO --context 65536 --yes` |
-| Services and models on disk, with memory | `thor list` |
-| Stop a service; for vLLM, also its container | `thor stop thor-vllm` |
-| Follow a service's log | `thor logs thor-edge-llm` |
+| Install `thor-tigress` | `cargo install --path crates/thor-tigress-cli` |
+| See the engines and what is installed | `thor-tigress engines` |
+| Choose an engine, a model and a context, then serve it | `thor-tigress serve` |
+| Serve without questions | `thor-tigress serve --engine edge-llm --model REPO --context 65536 --yes` |
+| Services and models on disk, with memory | `thor-tigress list` |
+| Stop a service; for vLLM, also its container | `thor-tigress stop thor-vllm` |
+| Follow a service's log | `thor-tigress logs thor-edge-llm` |
 | Stop the vLLM container by hand | `sg docker -c "docker stop thor-vllm"` |
 | See whether the vLLM container still runs | `sg docker -c "docker ps --filter name=thor-vllm"` |
-| Go back to the settings before a `thor serve` | `cp ~/.config/thor-chat/env.backup-SECONDS ~/.config/thor-chat/env`, then `systemctl --user restart SERVICE` |
+| Go back to the settings before a `thor-tigress serve` | `cp ~/.config/thor-chat/env.backup-SECONDS ~/.config/thor-chat/env`, then `systemctl --user restart SERVICE` |
 | List the settings backups | `ls ~/.config/thor-chat/env.backup-*` |
 | Run the tests | `cargo test` |
 | Lint | `cargo clippy --all-targets -- -D warnings` |

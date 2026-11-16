@@ -1,8 +1,8 @@
-//! The errors the `thor` command reports, each naming what it was working on.
+//! The errors the `thor-tigress` command reports, each naming what it was working on.
 
 use std::path::PathBuf;
 
-/// Everything that can stop a `thor` command.
+/// Everything that can stop a `thor-tigress` command.
 #[derive(Debug, thiserror::Error)]
 pub enum ThorError {
     /// A file or folder could not be read or written.

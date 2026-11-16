@@ -1,7 +1,7 @@
-//! `thor`: serves a model on the Jetson Thor with the engine a person chooses.
+//! `thor-tigress`: serves a model on the Jetson Thor with the engine a person chooses.
 //!
 //! A person picks an engine (TensorRT Edge-LLM, llama.cpp or vLLM), then a model from disk
-//! or from a live Hugging Face search, then a context. `thor` estimates the memory from the
+//! or from a live Hugging Face search, then a context. `thor-tigress` estimates the memory from the
 //! model's own `config.json` and stops before any change when the model does not fit.
 //! Otherwise it downloads the model, backs up and writes `~/.config/thor-chat/env`,
 //! restarts the engine's systemd user service, and waits until the server answers. Every

@@ -1,6 +1,6 @@
 //! The recipes and documentation each engine's makers publish for a model family.
 //!
-//! The lists are fetched each time `thor serve` runs, so a newly published recipe appears
+//! The lists are fetched each time `thor-tigress serve` runs, so a newly published recipe appears
 //! on the next run. vLLM keeps one recipe page per family in its `recipes` repository; NVIDIA lists
 //! the checkpoints Edge-LLM supports on one page; llama.cpp publishes no per-model recipes,
 //! so the model's own page is shown.
@@ -26,7 +26,7 @@ const EDGE_SUPPORTED_MODELS: &str =
 const LLAMA_SERVER_DOCS: &str =
     "https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md";
 
-/// The lines `thor serve` prints about the engine's documentation for this model.
+/// The lines `thor-tigress serve` prints about the engine's documentation for this model.
 /// `model_page` is the model's Hub page. A page that cannot be fetched is named, not hidden.
 pub fn lines(engine: Engine, candidate: &Candidate, model_page: Option<String>) -> Vec<String> {
     let client = web::client(Duration::from_secs(10), Duration::from_secs(20));

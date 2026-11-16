@@ -2,9 +2,9 @@
 //!
 //! `thor-tigress-serve` starts vLLM with `docker run --rm --name thor-vllm` from the
 //! `thor-vllm` user service. The container's memory is not in that service's cgroup, and
-//! stopping the service leaves the container running, so `thor` asks Docker directly.
+//! stopping the service leaves the container running, so `thor-tigress` asks Docker directly.
 //! A session started before the user joined the `docker` group cannot reach the Docker
-//! daemon, so `thor` then runs `docker` through `sg docker -c`, as `thor-tigress-serve` does.
+//! daemon, so `thor-tigress` then runs `docker` through `sg docker -c`, as `thor-tigress-serve` does.
 
 use std::{
     thread,
@@ -16,7 +16,7 @@ use crate::{
     service,
 };
 
-/// How long `thor stop` waits for a stopped container to disappear.
+/// How long `thor-tigress stop` waits for a stopped container to disappear.
 const STOP_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// Sizes Docker prints, with their bytes: binary units first, then decimal ones.

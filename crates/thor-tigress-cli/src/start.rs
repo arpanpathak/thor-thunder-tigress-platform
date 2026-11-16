@@ -58,7 +58,7 @@ pub fn carry_out(
 
 /// Downloads the model's files into the plan's folder, and saves the `config.json` that
 /// was read for the memory estimate when the download has none (a GGUF repository's base
-/// model's), so `thor list` can estimate it later.
+/// model's), so `thor-tigress list` can estimate it later.
 fn download(hub: &Hub, candidate: &Candidate, plan: &Plan) -> Outcome<()> {
     let (Some(folder), Some(repo)) = (&plan.download_folder, &candidate.repo) else {
         return Ok(());
@@ -195,12 +195,12 @@ pub fn going_back(plan: &Plan, backup: Option<&Path>) -> String {
 
     match backup {
         Some(backup) => format!(
-            "To go back:\n  cp {} {settings}\n  systemctl --user restart {unit}\nTo stop it from restarting: thor stop {unit}",
+            "To go back:\n  cp {} {settings}\n  systemctl --user restart {unit}\nTo stop it from restarting: thor-tigress stop {unit}",
             tilde(backup, &plan.home)
         ),
         None => format!(
             "To go back: remove the lines above from {settings} (there was no file before), then\n  \
-             systemctl --user restart {unit}\nTo stop it from restarting: thor stop {unit}"
+             systemctl --user restart {unit}\nTo stop it from restarting: thor-tigress stop {unit}"
         ),
     }
 }
@@ -210,7 +210,7 @@ fn go_back(plan: &Plan, backup: Option<&Path>) -> Outcome<()> {
     let unit = plan.engine.service();
     let Some(backup) = backup else {
         return Err(ThorError::Condition(format!(
-            "there is no backup to restore; stop the service with: thor stop {unit}"
+            "there is no backup to restore; stop the service with: thor-tigress stop {unit}"
         )));
     };
 

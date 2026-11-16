@@ -1,4 +1,4 @@
-//! The `thor` command line.
+//! The `thor-tigress` command line.
 
 use std::{collections::BTreeMap, path::PathBuf, time::Duration};
 
@@ -9,13 +9,13 @@ use crate::{
 
 /// The help text.
 pub const USAGE: &str = "\
-usage: thor COMMAND [OPTIONS]
+usage: thor-tigress COMMAND [OPTIONS]
 
-  thor engines              what each engine is for, and whether it is installed here
-  thor serve                choose an engine, a model and a context, then serve it
-  thor list                 the models on disk and the services running, with memory
-  thor stop [NAME]          stop a service, such as thor-edge-llm
-  thor logs [NAME]          follow a service's log
+  thor-tigress engines              what each engine is for, and whether it is installed here
+  thor-tigress serve                choose an engine, a model and a context, then serve it
+  thor-tigress list                 the models on disk and the services running, with memory
+  thor-tigress stop [NAME]          stop a service, such as thor-edge-llm
+  thor-tigress logs [NAME]          follow a service's log
 
 serve options, for scripts:
   --engine edge-llm|llama.cpp|vllm
@@ -52,7 +52,7 @@ pub enum ContextChoice {
     Tokens(u64),
 }
 
-/// What `thor serve` was told on the command line; anything left out is asked.
+/// What `thor-tigress serve` was told on the command line; anything left out is asked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ServeOptions {
     /// The engine.
@@ -78,25 +78,25 @@ pub struct ServeOptions {
 /// One command.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Command {
-    /// `thor engines`.
+    /// `thor-tigress engines`.
     Engines,
-    /// `thor serve`.
+    /// `thor-tigress serve`.
     Serve(ServeOptions),
-    /// `thor list`.
+    /// `thor-tigress list`.
     List,
-    /// `thor stop [NAME]`.
+    /// `thor-tigress stop [NAME]`.
     Stop {
         /// The service, or `None` to choose from a menu.
         name: Option<String>,
         /// Skip the confirmation.
         yes: bool,
     },
-    /// `thor logs [NAME]`.
+    /// `thor-tigress logs [NAME]`.
     Logs {
         /// The service, or `None` to choose from a menu.
         name: Option<String>,
     },
-    /// `thor`, `thor help` or `--help`.
+    /// `thor-tigress`, `thor-tigress help` or `--help`.
     Help,
 }
 
@@ -171,7 +171,7 @@ fn words_and_flags(arguments: &[String]) -> Outcome<(Vec<String>, BTreeMap<Strin
     Ok((words, values))
 }
 
-/// The value after a flag, when the flag is one `thor` knows and a value follows it.
+/// The value after a flag, when the flag is one `thor-tigress` knows and a value follows it.
 fn flag_value(flag: &str, next: Option<&String>) -> Outcome<String> {
     if !VALUE_FLAGS.contains(&flag) {
         return Err(ThorError::Usage(format!("no option --{flag}")));
@@ -181,7 +181,7 @@ fn flag_value(flag: &str, next: Option<&String>) -> Outcome<String> {
         .ok_or_else(|| ThorError::Usage(format!("--{flag} needs a value")))
 }
 
-/// The options of `thor serve`.
+/// The options of `thor-tigress serve`.
 fn serve_options(
     values: &BTreeMap<String, String>,
     yes: bool,

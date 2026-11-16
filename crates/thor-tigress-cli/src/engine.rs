@@ -98,7 +98,7 @@ impl Engine {
                  a TensorRT engine on first start, which takes minutes; later starts reuse the \
                  engine cache. The longest prompt is fixed when the engine is built, and a longer \
                  prompt is not accepted. With a draft model and a large vocabulary, a long build \
-                 length can make the build fail; thor serve warns before such a build. Choose it \
+                 length can make the build fail; thor-tigress serve warns before such a build. Choose it \
                  for short and medium prompts."
             }
             Engine::LlamaCpp => {
@@ -191,10 +191,10 @@ impl Engine {
         }
     }
 
-    /// The command that serves a model on this engine, for `thor engines`.
+    /// The command that serves a model on this engine, for `thor-tigress engines`.
     pub fn example(self) -> String {
         format!(
-            "thor serve --engine {} --model ORGANIZATION/REPOSITORY --context max",
+            "thor-tigress serve --engine {} --model ORGANIZATION/REPOSITORY --context max",
             self.flag()
         )
     }

@@ -1,9 +1,9 @@
 //! The settings file the services read, `~/.config/thor-chat/env`: one `KEY=value` per line.
 //!
-//! `thor` reads it much as `thor-tigress-serve` does: the last line for a key wins, and a
+//! `thor-tigress` reads it much as `thor-tigress-serve` does: the last line for a key wins, and a
 //! leading `~` or `$HOME` means the home folder. Quotes differ. `thor-tigress-serve` strips
 //! every quote character from both ends of a value, so `VLLM_ARGS=--x '{"a":1}'` reaches
-//! vLLM as `--x '{"a":1}` and fails to parse. `thor` removes only one matching pair around
+//! vLLM as `--x '{"a":1}` and fails to parse. `thor-tigress` removes only one matching pair around
 //! the whole value (`"65536"` or `'--a b'`), so it reads such a line as written.
 //! A key the file does not set falls back to the default `thor-tigress-serve` uses. Writing
 //! replaces a key's line in place, or appends one, and keeps every other line as it was.
@@ -15,7 +15,7 @@ use std::{
 
 use crate::error::{Outcome, file_error};
 
-/// The defaults `thor-tigress-serve` uses for the keys `thor` reads. Paths start at `~`.
+/// The defaults `thor-tigress-serve` uses for the keys `thor-tigress` reads. Paths start at `~`.
 const DEFAULTS: [(&str, &str); 14] = [
     (
         "EDGE_SERVER",
@@ -186,7 +186,7 @@ pub fn without_surrounding_quotes(value: &str) -> &str {
 }
 
 /// What `thor-tigress-serve` reads for a value: every quote character stripped from both
-/// ends. A value `thor` writes must come through this unchanged.
+/// ends. A value `thor-tigress` writes must come through this unchanged.
 pub fn as_thor_tigress_serve_reads(value: &str) -> &str {
     value.trim().trim_matches(['"', '\''])
 }
