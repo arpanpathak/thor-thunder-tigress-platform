@@ -1,0 +1,37 @@
+#!/bin/sh
+# Stands in for openbatrangs in the tests of `lasso agent run`. What it does
+# depends on the prompt: "hang" sleeps past the time limit, "crash" fails
+# without a transcript, "give up" stops at the step limit, and anything else
+# writes done.txt into the workspace, empties tests/check.rs (which lasso
+# must put back before the check), and answers.
+while [ $# -gt 1 ]; do
+  case "$1" in
+    --workspace) workspace=$2; shift 2 ;;
+    --transcript-out) transcript=$2; shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+case "$1" in
+  *hang*) exec sleep 30 ;;
+  *crash*) echo "fake openbatrangs: crashed" >&2; exit 1 ;;
+  *"give up"*) outcome=step_limit ;;
+  *)
+    outcome=answered
+    echo done > "$workspace/done.txt"
+    : > "$workspace/tests/check.rs"
+    ;;
+esac
+
+cat > "$transcript" <<JSON
+{"model": "fake",
+ "tools": [{"type": "function", "function": {"name": "write_file", "parameters": {"type": "object"}}}],
+ "messages": [
+  {"role": "system", "content": "You are a coding agent."},
+  {"role": "user", "content": "Make the test pass."},
+  {"role": "assistant", "content": "Now I will write the file.", "tool_calls": [{"id": "call_1", "type": "function", "function": {"name": "write_file", "arguments": "{\"path\": \"done.txt\"}"}}]},
+  {"role": "tool", "tool_call_id": "call_1", "content": "wrote done.txt"},
+  {"role": "assistant", "content": "done.txt now exists, so the check passes."}
+ ],
+ "outcome": "$outcome", "steps": 2}
+JSON

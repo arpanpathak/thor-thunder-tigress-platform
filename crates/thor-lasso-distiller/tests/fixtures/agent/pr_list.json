@@ -1,0 +1,433 @@
+[
+ {
+  "closingIssuesReferences": [
+   {
+    "id": "I_kwDOT_ILwc8AAAABfJtT8Q",
+    "number": 94,
+    "repository": {
+     "id": "R_kgDOT_ILwQ",
+     "name": "openbatrangs",
+     "owner": {
+      "id": "MDQ6VXNlcjIwMTI1NTkw",
+      "login": "arpanpathak"
+     }
+    },
+    "url": "https://github.com/arpanpathak/openbatrangs/issues/94"
+   }
+  ],
+  "files": [
+   {
+    "path": "Cargo.lock",
+    "additions": 1,
+    "deletions": 1,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "Cargo.toml",
+    "additions": 1,
+    "deletions": 1,
+    "changeType": "MODIFIED"
+   }
+  ],
+  "mergeCommit": {
+   "oid": "9590bc4c7bc149de0fbeed5555e79abb36889fd2"
+  },
+  "number": 95
+ },
+ {
+  "closingIssuesReferences": [],
+  "files": [
+   {
+    "path": "README.md",
+    "additions": 66,
+    "deletions": 6,
+    "changeType": "MODIFIED"
+   }
+  ],
+  "mergeCommit": {
+   "oid": "e3134bc7baad66e71d775b9de69f3e73db9f5f19"
+  },
+  "number": 75
+ },
+ {
+  "closingIssuesReferences": [
+   {
+    "id": "I_kwDOT_ILwc8AAAABe3k6gg",
+    "number": 38,
+    "repository": {
+     "id": "R_kgDOT_ILwQ",
+     "name": "openbatrangs",
+     "owner": {
+      "id": "MDQ6VXNlcjIwMTI1NTkw",
+      "login": "arpanpathak"
+     }
+    },
+    "url": "https://github.com/arpanpathak/openbatrangs/issues/38"
+   }
+  ],
+  "files": [
+   {
+    "path": "README.md",
+    "additions": 9,
+    "deletions": 2,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/cli/args.rs",
+    "additions": 23,
+    "deletions": 1,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/commands/agent.rs",
+    "additions": 66,
+    "deletions": 3,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/commands/mod.rs",
+    "additions": 3,
+    "deletions": 0,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/commands/update.rs",
+    "additions": 76,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/constants/mod.rs",
+    "additions": 1,
+    "deletions": 0,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/constants/update.rs",
+    "additions": 32,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/main.rs",
+    "additions": 3,
+    "deletions": 1,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/app.rs",
+    "additions": 50,
+    "deletions": 6,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/mod.rs",
+    "additions": 209,
+    "deletions": 9,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/worker.rs",
+    "additions": 80,
+    "deletions": 0,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/update/cache.rs",
+    "additions": 138,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/update/installer.rs",
+    "additions": 144,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/update/mod.rs",
+    "additions": 305,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/update/version.rs",
+    "additions": 158,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "tests/cli.rs",
+    "additions": 129,
+    "deletions": 3,
+    "changeType": "MODIFIED"
+   }
+  ],
+  "mergeCommit": {
+   "oid": "454c2b891bea1d225bd70c1066782ae6013d1872"
+  },
+  "number": 39
+ },
+ {
+  "closingIssuesReferences": [
+   {
+    "id": "I_kwDOT_ILwc8AAAABe2OTTg",
+    "number": 24,
+    "repository": {
+     "id": "R_kgDOT_ILwQ",
+     "name": "openbatrangs",
+     "owner": {
+      "id": "MDQ6VXNlcjIwMTI1NTkw",
+      "login": "arpanpathak"
+     }
+    },
+    "url": "https://github.com/arpanpathak/openbatrangs/issues/24"
+   },
+   {
+    "id": "I_kwDOT_ILwc8AAAABe2OUaQ",
+    "number": 25,
+    "repository": {
+     "id": "R_kgDOT_ILwQ",
+     "name": "openbatrangs",
+     "owner": {
+      "id": "MDQ6VXNlcjIwMTI1NTkw",
+      "login": "arpanpathak"
+     }
+    },
+    "url": "https://github.com/arpanpathak/openbatrangs/issues/25"
+   },
+   {
+    "id": "I_kwDOT_ILwc8AAAABe2OVdw",
+    "number": 26,
+    "repository": {
+     "id": "R_kgDOT_ILwQ",
+     "name": "openbatrangs",
+     "owner": {
+      "id": "MDQ6VXNlcjIwMTI1NTkw",
+      "login": "arpanpathak"
+     }
+    },
+    "url": "https://github.com/arpanpathak/openbatrangs/issues/26"
+   },
+   {
+    "id": "I_kwDOT_ILwc8AAAABe2OWWg",
+    "number": 27,
+    "repository": {
+     "id": "R_kgDOT_ILwQ",
+     "name": "openbatrangs",
+     "owner": {
+      "id": "MDQ6VXNlcjIwMTI1NTkw",
+      "login": "arpanpathak"
+     }
+    },
+    "url": "https://github.com/arpanpathak/openbatrangs/issues/27"
+   },
+   {
+    "id": "I_kwDOT_ILwc8AAAABe2SY7A",
+    "number": 31,
+    "repository": {
+     "id": "R_kgDOT_ILwQ",
+     "name": "openbatrangs",
+     "owner": {
+      "id": "MDQ6VXNlcjIwMTI1NTkw",
+      "login": "arpanpathak"
+     }
+    },
+    "url": "https://github.com/arpanpathak/openbatrangs/issues/31"
+   },
+   {
+    "id": "I_kwDOT_ILwc8AAAABe2SaKQ",
+    "number": 32,
+    "repository": {
+     "id": "R_kgDOT_ILwQ",
+     "name": "openbatrangs",
+     "owner": {
+      "id": "MDQ6VXNlcjIwMTI1NTkw",
+      "login": "arpanpathak"
+     }
+    },
+    "url": "https://github.com/arpanpathak/openbatrangs/issues/32"
+   }
+  ],
+  "files": [
+   {
+    "path": "Cargo.lock",
+    "additions": 18,
+    "deletions": 0,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "Cargo.toml",
+    "additions": 1,
+    "deletions": 0,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/execute.rs",
+    "additions": 110,
+    "deletions": 65,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/fakes.rs",
+    "additions": 13,
+    "deletions": 12,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/json_loop.rs",
+    "additions": 308,
+    "deletions": 164,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/mod.rs",
+    "additions": 5,
+    "deletions": 2,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/native.rs",
+    "additions": 390,
+    "deletions": 261,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/quality.rs",
+    "additions": 68,
+    "deletions": 178,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/reporter.rs",
+    "additions": 383,
+    "deletions": 29,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/research.rs",
+    "additions": 4,
+    "deletions": 4,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/stream.rs",
+    "additions": 28,
+    "deletions": 66,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/agent/summary.rs",
+    "additions": 135,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/agent/tool.rs",
+    "additions": 41,
+    "deletions": 2,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/commands/agent.rs",
+    "additions": 1,
+    "deletions": 1,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/constants/agent.rs",
+    "additions": 18,
+    "deletions": 17,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/constants/tui.rs",
+    "additions": 8,
+    "deletions": 12,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/app.rs",
+    "additions": 619,
+    "deletions": 188,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/block.rs",
+    "additions": 1066,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/tui/chat.rs",
+    "additions": 90,
+    "deletions": 237,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/commands.rs",
+    "additions": 100,
+    "deletions": 93,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/markdown.rs",
+    "additions": 755,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/tui/mod.rs",
+    "additions": 16,
+    "deletions": 10,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/scroll.rs",
+    "additions": 61,
+    "deletions": 20,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/session.rs",
+    "additions": 92,
+    "deletions": 406,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/text.rs",
+    "additions": 98,
+    "deletions": 14,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/transcript.rs",
+    "additions": 832,
+    "deletions": 0,
+    "changeType": "ADDED"
+   },
+   {
+    "path": "src/tui/ui.rs",
+    "additions": 103,
+    "deletions": 99,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "src/tui/worker.rs",
+    "additions": 37,
+    "deletions": 29,
+    "changeType": "MODIFIED"
+   },
+   {
+    "path": "tests/cli.rs",
+    "additions": 41,
+    "deletions": 0,
+    "changeType": "MODIFIED"
+   }
+  ],
+  "mergeCommit": {
+   "oid": "a7db3338c41d5b3d8188ae082dbf02656785290e"
+  },
+  "number": 33
+ }
+]

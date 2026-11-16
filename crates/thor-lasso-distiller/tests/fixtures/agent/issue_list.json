@@ -1,0 +1,42 @@
+[
+ {
+  "body": "- Set the version to 0.3.1, tag v0.3.1 so the release workflow builds the binaries, and publish the crate to crates.io\n- Brings the command sandbox, the step-limit and repeat fixes, the streaming fixes and the Colab notebook to people who install the latest release",
+  "number": 94,
+  "title": "Release 0.3.1"
+ },
+ {
+  "body": "- At most once a day, check the latest GitHub release in the background, with a short timeout, so startup never waits on the network\n- In the TUI, when a newer version exists, ask: \"openbatrangs X is available (you have Y). Install it now? y/n\"; on y, run the release installer into the folder of the running binary and ask for a restart\n- In one-shot mode, print one line about the new version at the end, with no prompt\n- Add `openbatrangs update` to update on demand\n- Turn the check off with `--no-update-check` or `OPENBATRANGS_NO_UPDATE_CHECK=1`",
+  "number": 38,
+  "title": "Check for new releases and offer to install them"
+ },
+ {
+  "body": "- The prompt says never to ask the user, and a question in place of an answer is rejected by the finish gate, so the loop forces the model to continue\n- Add an `ask_user` tool that ends the turn and shows the question\n- In the TUI, the next message answers it and continues the same conversation; in one-shot mode, print the question and exit",
+  "number": 32,
+  "title": "Let the model ask the user a question"
+ },
+ {
+  "body": "- Asking for example code, such as reading a directory recursively, makes the agent list the workspace instead of answering\n- The native system prompt requires a tool call in every reply and says to list directories before assuming a layout\n- `requires_file_work` matches words such as \"write \", \"add \", \"fix \" and \"tests\" in the task, and then rejects any finish that wrote no files\n- Rewrite the prompt so questions that do not need the workspace get a direct answer\n- Remove the keyword gate; require a passing check only after the model changed files in a project with a build or test setup",
+  "number": 31,
+  "title": "Answer questions directly instead of forcing tool calls"
+ },
+ {
+  "body": "- Cache each block's rendered lines for the current width\n- Keep running line heights and draw only the blocks on screen\n- Move old blocks to the session file on disk and load them back when scrolled to\n- Test with 10,000 blocks and check that memory stays bounded",
+  "number": 27,
+  "title": "Draw only the visible part of the transcript"
+ },
+ {
+  "body": "- Parse replies with pulldown-cmark\n- Style headings, bold and italics, inline code, lists, quotes, links, rules and tables\n- Highlight fenced code with syntect in every message, however long the session",
+  "number": 26,
+  "title": "Render Markdown in replies"
+ },
+ {
+  "body": "- Fold each step to one line: step number, title, model and time taken\n- Take the title from the model's own heading, or the first sentence of its reasoning\n- Show the thinking, the decision and one line per tool call inside an open step; open those to see the full reasoning, arguments and output\n- Fold with a click, or move between the input and the transcript with Tab, between blocks with arrow keys, and fold with Enter or Space\n- Keep the running step open and fold finished steps automatically\n\nDepends on #24.",
+  "number": 25,
+  "title": "Fold agent steps in the TUI transcript"
+ },
+ {
+  "body": "- Rebuild the native and JSON step loops as `loop { state = match state { ... } }`, one small function per state\n- Send structured events to the reporter: step started, reasoning, tool call, tool result, answer, finished\n- Keep the one-shot CLI output unchanged",
+  "number": 24,
+  "title": "Run the agent loops as a state machine with structured events"
+ }
+]
