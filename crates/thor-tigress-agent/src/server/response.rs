@@ -5,7 +5,13 @@
 //! status and content type once with [`Client::begin`], and then writes the
 //! body; [`crate::server::bridge`] turns that into the response.
 
-use std::io::Write;
+use std::{
+    io::{self, Write},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use axum::{
     http::{StatusCode, header},
@@ -27,6 +33,49 @@ pub const JSON: &str = "application/json";
 /// The content type of a stream of events.
 pub const EVENT_STREAM: &str = "text/event-stream";
 
+/// Whether a client is still waiting for its answer, readable without writing
+/// to it. A handler checks it while the engine is silent, for example while it
+/// reads a long prompt, so a request the client left stops at once instead of
+/// at the next write.
+#[derive(Debug, Clone, Default)]
+pub struct Presence {
+    gone: Option<Arc<AtomicBool>>,
+}
+
+impl Presence {
+    /// A presence that follows `gone`, which is set when the client leaves.
+    #[must_use]
+    pub fn new(gone: Arc<AtomicBool>) -> Presence {
+        Presence { gone: Some(gone) }
+    }
+
+    /// A presence for a client that cannot leave, such as a buffer in memory.
+    #[must_use]
+    pub fn unwatched() -> Presence {
+        Presence::default()
+    }
+
+    /// Whether this presence follows a real client.
+    #[must_use]
+    pub fn is_watched(&self) -> bool {
+        self.gone.is_some()
+    }
+
+    /// Whether the client has left.
+    #[must_use]
+    pub fn is_gone(&self) -> bool {
+        self.gone
+            .as_ref()
+            .is_some_and(|gone| gone.load(Ordering::Acquire))
+    }
+
+    /// The I/O error that ends work for a client that has left.
+    #[must_use]
+    pub fn left() -> io::Error {
+        io::Error::new(io::ErrorKind::ConnectionAborted, "the client went away")
+    }
+}
+
 /// A client waiting for an answer. The body is whatever is written to it
 /// after [`Client::begin`].
 pub trait Client: Write {
@@ -36,6 +85,11 @@ pub trait Client: Write {
     ///
     /// `AgentError::Io` when the client is gone or the answer has already begun.
     fn begin(&mut self, status: StatusCode, content_type: &str) -> Outcome;
+
+    /// Whether the client is still there, for checks that write nothing.
+    fn presence(&self) -> Presence {
+        Presence::unwatched()
+    }
 }
 
 /// Writes a complete response.

@@ -3,7 +3,10 @@ use super::{
     *,
 };
 use crate::web::{research::MAX_QUERIES_PER_CALL, search::TimeRange};
-use crate::testing::{FakeServer, FakeWeb, event_stream, json_response};
+use crate::testing::{
+    FakeServer, FakeWeb, Leaving, SlowServer, event_stream, json_response, leave_after,
+};
+use std::time::{Duration, Instant};
 
 fn upstreams(model: &FakeServer, search: &FakeServer) -> Upstreams {
     upstreams_with(model, search, FakeWeb::default())
@@ -1587,4 +1590,147 @@ fn a_chunk_with_a_finish_reason_or_more_than_text_carries_more() {
     assert!(!carries_more(&text));
     assert!(carries_more(&finished));
     assert!(carries_more(&reasoning));
+}
+
+/// The head of a streamed model reply.
+const STREAM_HEAD: &str = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n";
+
+/// How long after leaving a client the model connection must be closed. The
+/// slow server keeps writing for 10 s, so a close inside this bound comes from
+/// the handler.
+const CLOSE_BOUND: Duration = Duration::from_secs(2);
+
+/// Upstreams whose model server is the slow server at `model`.
+fn slow_upstreams(model: &SlowServer, search: &FakeServer) -> Upstreams {
+    Upstreams {
+        default: Engine::edge("nemotron".to_string(), model.address()),
+        others: Vec::new(),
+        search: Endpoint::new(search.address(), None),
+        web: Box::new(FakeWeb::default()),
+    }
+}
+
+/// One event-stream line carrying `content` as answer text.
+fn text_event(content: &str) -> String {
+    let chunk = json!({ "choices": [{ "delta": { "content": content } }] });
+
+    format!("data: {chunk}\n\n")
+}
+
+/// Answers `request` for a client that leaves after 300 ms, and returns what
+/// the client received and how long the model connection stayed open after
+/// the request began.
+fn answer_for_leaving_client(
+    request: &[u8],
+    pieces: Vec<(Duration, String)>,
+) -> Outcome<(String, Duration)> {
+    let model = SlowServer::start(STREAM_HEAD.to_string(), pieces)?;
+    let search = FakeServer::start(Vec::new())?;
+    let mut client = Leaving::default();
+    let started = Instant::now();
+
+    leave_after(client.door(), Duration::from_millis(300));
+    let outcome = answer(&mut client, request, &slow_upstreams(&model, &search));
+    let closed = model
+        .closed_within(Duration::from_secs(5))
+        .ok_or_else(|| AgentError::Upstream("the model connection stayed open".to_string()))?;
+
+    assert!(outcome.is_ok() || outcome.is_err_and(|error| error.to_string().contains("went away")));
+
+    Ok((
+        String::from_utf8_lossy(&client.written).into_owned(),
+        closed.duration_since(started),
+    ))
+}
+
+/// A streamed request without tools or web search.
+const STREAMED: &[u8] =
+    br#"{"model":"m","stream":true,"messages":[{"role":"user","content":"hi"}]}"#;
+
+#[test]
+fn a_client_that_leaves_while_the_sieve_holds_a_call_closes_the_model_connection() -> Outcome {
+    let opening = text_event(r#"<tool_call>{"name": "web_search", "#);
+    let inside = text_event(r#""arguments": "#);
+    let pieces = std::iter::once((Duration::ZERO, opening))
+        .chain(std::iter::repeat_n(
+            (Duration::from_millis(100), inside),
+            100,
+        ))
+        .collect();
+
+    let (written, open_for) = answer_for_leaving_client(STREAMED, pieces)?;
+
+    assert!(open_for < CLOSE_BOUND, "open for {open_for:?}");
+    assert!(!written.contains("tool_call"));
+    assert!(written.contains("the client went away"));
+
+    Ok(())
+}
+
+#[test]
+fn a_client_that_leaves_between_chunks_closes_the_model_connection() -> Outcome {
+    let pieces = vec![
+        (Duration::ZERO, text_event("Hello")),
+        (Duration::from_secs(10), text_event(" there")),
+    ];
+
+    let (written, open_for) = answer_for_leaving_client(STREAMED, pieces)?;
+
+    assert!(open_for < CLOSE_BOUND, "open for {open_for:?}");
+    assert!(written.contains("Hello"));
+    assert!(!written.contains("there"));
+
+    Ok(())
+}
+
+#[test]
+fn a_client_that_leaves_before_the_first_chunk_closes_the_model_connection() -> Outcome {
+    let pieces = vec![(Duration::from_secs(10), text_event("late"))];
+
+    let (written, open_for) = answer_for_leaving_client(STREAMED, pieces)?;
+
+    assert!(open_for < CLOSE_BOUND, "open for {open_for:?}");
+    assert!(!written.contains("late"));
+
+    Ok(())
+}
+
+#[test]
+fn a_relayed_stream_closes_the_model_connection_when_its_client_leaves() -> Outcome {
+    let request = br#"{"model":"m","stream":true,"tools":[{"type":"function","function":{"name":"read_file"}}],"messages":[{"role":"user","content":"hi"}]}"#;
+    let pieces = vec![
+        (Duration::ZERO, text_event("Hello")),
+        (Duration::from_secs(10), text_event(" there")),
+    ];
+
+    let (written, open_for) = answer_for_leaving_client(request, pieces)?;
+
+    assert!(open_for < CLOSE_BOUND, "open for {open_for:?}");
+    assert!(written.contains("Hello"));
+    assert!(!written.contains("there"));
+
+    Ok(())
+}
+
+#[test]
+fn a_client_that_stays_gets_the_whole_slow_answer() -> Outcome {
+    let model = SlowServer::start(
+        STREAM_HEAD.to_string(),
+        vec![
+            (Duration::ZERO, text_event("Hello")),
+            (Duration::from_millis(1200), text_event(" there")),
+            (Duration::ZERO, "data: [DONE]\n\n".to_string()),
+        ],
+    )?;
+    let search = FakeServer::start(Vec::new())?;
+    let mut client = Leaving::default();
+
+    answer(&mut client, STREAMED, &slow_upstreams(&model, &search))?;
+
+    let written = String::from_utf8_lossy(&client.written);
+
+    assert!(written.contains("Hello") && written.contains(" there"));
+    assert!(!written.contains("went away"));
+
+    Ok(())
 }

@@ -4,18 +4,22 @@
 use std::{
     io::{self, BufRead, BufReader, Read, Write},
     net::TcpStream,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use axum::http::StatusCode;
 
 use crate::{
     error::{AgentError, Outcome},
-    server::response::Client,
+    server::response::{Client, Presence},
 };
 
 /// How long an upstream call may stay silent before it is given up on.
 const TIMEOUT: Duration = Duration::from_secs(600);
+
+/// How often a silent upstream read checks whether its client is still there.
+/// An engine says nothing while it reads a long prompt, sometimes for minutes.
+const CLIENT_CHECK: Duration = Duration::from_millis(500);
 
 /// HTTP's "OK".
 const HTTP_OK: u16 = 200;
@@ -47,8 +51,45 @@ pub struct UpstreamResponse {
 /// the caller reads them one after another.
 #[derive(Debug)]
 pub struct Sent {
-    stream: TcpStream,
+    connection: Connection,
     address: String,
+}
+
+/// The connection to an upstream server, and the client it works for. Reads
+/// wait at most [`CLIENT_CHECK`] at a time when the client is watched, and the
+/// client is checked before every read, so a request whose client has left
+/// ends even while the server is silent. Dropping the connection closes it,
+/// and the engine then stops working on the request.
+#[derive(Debug)]
+struct Connection {
+    stream: TcpStream,
+    presence: Presence,
+}
+
+impl Read for Connection {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let started = Instant::now();
+
+        loop {
+            if self.presence.is_gone() {
+                return Err(Presence::left());
+            }
+
+            match self.stream.read(buffer) {
+                Err(error) if is_wait_over(&error) && started.elapsed() < TIMEOUT => {}
+                outcome => return outcome,
+            }
+        }
+    }
+}
+
+/// Whether a read ended because its wait ran out, rather than with data or a
+/// failure.
+fn is_wait_over(error: &io::Error) -> bool {
+    matches!(
+        error.kind(),
+        io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+    )
 }
 
 impl Sent {
@@ -58,7 +99,7 @@ impl Sent {
     ///
     /// As for [`Endpoint::get`].
     pub fn response(self) -> Outcome<UpstreamResponse> {
-        read_response(Box::new(BufReader::new(self.stream)), &self.address)
+        read_response(Box::new(BufReader::new(self.connection)), &self.address)
     }
 }
 
@@ -92,7 +133,7 @@ impl Endpoint {
     /// `AgentError::Upstream` when the server can't be reached or sends no
     /// status line; `AgentError::Io` when the connection fails midway.
     pub fn get(&self, path: &str) -> Outcome<UpstreamResponse> {
-        self.send("GET", path, &[])
+        self.send("GET", path, &[], Presence::unwatched())
     }
 
     /// Writes `GET path` and returns before the server answers, so the next
@@ -103,26 +144,54 @@ impl Endpoint {
     /// `AgentError::Upstream` when the server can't be reached; `AgentError::Io`
     /// when the request can't be written.
     pub fn start_get(&self, path: &str) -> Outcome<Sent> {
-        self.start("GET", path, &[])
+        self.start("GET", path, &[], Presence::unwatched())
     }
 
-    /// `POST path` with a JSON `body`.
+    /// `POST path` with a JSON `body`, for a caller with no client to watch.
     ///
     /// # Errors
     ///
     /// As for [`Endpoint::get`].
+    #[cfg(test)]
     pub fn post(&self, path: &str, body: &[u8]) -> Outcome<UpstreamResponse> {
-        self.send("POST", path, body)
+        self.send("POST", path, body, Presence::unwatched())
     }
 
-    fn send(&self, method: &str, path: &str, body: &[u8]) -> Outcome<UpstreamResponse> {
-        self.start(method, path, body)?.response()
+    /// `POST path` with a JSON `body`, for a client whose `presence` is
+    /// checked while the server works. When the client leaves, the next read
+    /// of the response fails and dropping the response closes the connection.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Endpoint::get`], and `AgentError::Io` once the client has left.
+    pub fn post_for(
+        &self,
+        path: &str,
+        body: &[u8],
+        presence: Presence,
+    ) -> Outcome<UpstreamResponse> {
+        self.send("POST", path, body, presence)
     }
 
-    fn start(&self, method: &str, path: &str, body: &[u8]) -> Outcome<Sent> {
+    fn send(
+        &self,
+        method: &str,
+        path: &str,
+        body: &[u8],
+        presence: Presence,
+    ) -> Outcome<UpstreamResponse> {
+        self.start(method, path, body, presence)?.response()
+    }
+
+    fn start(&self, method: &str, path: &str, body: &[u8], presence: Presence) -> Outcome<Sent> {
         let mut stream = TcpStream::connect(&self.address)
             .map_err(|error| AgentError::Upstream(format!("{}: {error}", self.address)))?;
-        stream.set_read_timeout(Some(TIMEOUT))?;
+        let wait = if presence.is_watched() {
+            CLIENT_CHECK
+        } else {
+            TIMEOUT
+        };
+        stream.set_read_timeout(Some(wait))?;
 
         let authorization = self
             .authorization
@@ -137,7 +206,7 @@ impl Endpoint {
         stream.write_all(body)?;
 
         Ok(Sent {
-            stream,
+            connection: Connection { stream, presence },
             address: self.address.clone(),
         })
     }

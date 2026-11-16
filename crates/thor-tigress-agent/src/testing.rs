@@ -3,10 +3,15 @@
 
 use std::{
     io::{BufRead, BufReader, Read, Write},
-    net::{TcpListener, TcpStream},
+    net::{Shutdown, TcpListener, TcpStream},
     path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use axum::http::StatusCode;
@@ -17,7 +22,7 @@ use crate::{
         http::{Fetched, Web},
     },
     error::{AgentError, Outcome},
-    server::response::Client,
+    server::response::{Client, Presence},
     system::Sources,
 };
 
@@ -172,6 +177,117 @@ impl Client for Vec<u8> {
 
         Ok(())
     }
+}
+
+/// A client kept in memory that can leave, as a chat page does when its tab
+/// closes. Writes keep working, so a test sees what the handler does without
+/// a failed write to tell it.
+#[derive(Debug, Default)]
+pub struct Leaving {
+    /// The answer's head as text, then its body.
+    pub written: Vec<u8>,
+    gone: Arc<AtomicBool>,
+}
+
+impl Leaving {
+    /// A handle that makes the client leave from another thread.
+    #[must_use]
+    pub fn door(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.gone)
+    }
+}
+
+impl Write for Leaving {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        self.written.write(buffer)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl Client for Leaving {
+    fn begin(&mut self, status: StatusCode, content_type: &str) -> Outcome {
+        self.written.begin(status, content_type)
+    }
+
+    fn presence(&self) -> Presence {
+        Presence::new(Arc::clone(&self.gone))
+    }
+}
+
+/// Makes `client` leave after `delay`, from another thread.
+pub fn leave_after(door: Arc<AtomicBool>, delay: Duration) {
+    thread::spawn(move || {
+        thread::sleep(delay);
+        door.store(true, Ordering::Release);
+    });
+}
+
+/// A model server that answers one request slowly: it sends `head`, then each
+/// piece after its delay, and reports the moment the caller closes the
+/// connection.
+pub struct SlowServer {
+    address: String,
+    closed: mpsc::Receiver<Instant>,
+}
+
+impl SlowServer {
+    /// Starts the server on a free port.
+    pub fn start(head: String, pieces: Vec<(Duration, String)>) -> Outcome<Self> {
+        let listener = TcpListener::bind("127.0.0.1:0")?;
+        let address = listener.local_addr()?.to_string();
+        let (closed_sender, closed) = mpsc::channel();
+
+        thread::spawn(move || serve_slowly(&listener, &head, &pieces, closed_sender));
+
+        Ok(SlowServer { address, closed })
+    }
+
+    /// The `host:port` to call.
+    pub fn address(&self) -> String {
+        self.address.clone()
+    }
+
+    /// When the caller closed the connection, if it did within `limit`.
+    pub fn closed_within(&self, limit: Duration) -> Option<Instant> {
+        self.closed.recv_timeout(limit).ok()
+    }
+}
+
+/// Accepts one connection, sends `head` and the timed pieces, and reports
+/// the caller's close from a second thread that reads until the end. After
+/// the last piece, the server closes the connection itself, so a caller that
+/// keeps reading sees the end of the reply.
+fn serve_slowly(
+    listener: &TcpListener,
+    head: &str,
+    pieces: &[(Duration, String)],
+    closed: mpsc::Sender<Instant>,
+) -> Outcome {
+    let (mut stream, _) = listener.accept()?;
+    read_raw_request(&stream)?;
+    stream.write_all(head.as_bytes())?;
+
+    let mut watcher = stream.try_clone()?;
+    thread::spawn(move || {
+        let mut rest = Vec::new();
+        let ended = watcher.read_to_end(&mut rest);
+        let reported = closed.send(Instant::now());
+
+        (ended.is_ok(), reported.is_ok())
+    });
+
+    for (delay, piece) in pieces {
+        thread::sleep(*delay);
+
+        if stream.write_all(piece.as_bytes()).is_err() {
+            break;
+        }
+    }
+
+    Ok(stream.shutdown(Shutdown::Both)?)
 }
 
 /// A stand-in for the real web: canned pages, keyed by address.
