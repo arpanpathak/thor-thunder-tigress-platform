@@ -28,27 +28,36 @@ ROOT = Path(__file__).resolve().parents[2]
 CRATES = sorted(path.name for path in (ROOT / "crates").iterdir() if (path / "Cargo.toml").exists())
 TEST_RESULT = re.compile(r"test result: (\w+)\. (\d+) passed; (\d+) failed")
 SPARK_SUMMARY = re.compile(r"(\d+) files, (\d+) problems")
+OUTPUT_TAIL_LINES = 200
 
 GREEN, TEAL, AMBER, RED, BLUE, SLATE, RUST = "#16a34a", "#0d9488", "#d97706", "#dc2626", "#2563eb", "#1e293b", "#b7410e"
 
 
 def run(command):
-    """Runs `command` in the repository; returns its exit code and combined output."""
-    result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
-    return result.returncode, result.stdout + result.stderr
+    """Runs `command` in the repository; returns its exit code and its standard output and
+    standard error interleaved in the order they were written."""
+    result = subprocess.run(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    return result.returncode, result.stdout
 
 
 def measure_crate(crate):
-    """Line coverage, test count and pass/fail of one crate."""
+    """Line coverage, test count and pass/fail of one crate. When its tests fail, prints the
+    end of cargo's output, so the CI log shows the cause."""
     run(["cargo", "llvm-cov", "clean", "--workspace"])
     with tempfile.TemporaryDirectory() as folder:
         report = Path(folder) / "coverage.json"
         code, output = run(["cargo", "llvm-cov", "-p", crate, "--json", "--summary-only", "--output-path", str(report)])
         lines = json.loads(report.read_text())["data"][0]["totals"]["lines"] if report.exists() else {"count": 0, "covered": 0}
     results = TEST_RESULT.findall(output)
+    tests_passed = code == 0 and all(status == "ok" for status, _, _ in results)
+
+    if not tests_passed:
+        tail = "\n".join(output.splitlines()[-OUTPUT_TAIL_LINES:])
+        print(f"{crate}: cargo llvm-cov exited with {code}; the last {OUTPUT_TAIL_LINES} lines of its output:\n{tail}\n", flush=True)
+
     return {
         "crate": crate,
-        "passed": code == 0 and all(status == "ok" for status, _, _ in results),
+        "passed": tests_passed,
         "tests": sum(int(passed) + int(failed) for _, passed, failed in results),
         "failed": sum(int(failed) for _, _, failed in results),
         "lines": lines["count"],

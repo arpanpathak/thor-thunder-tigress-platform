@@ -5,8 +5,6 @@
 
 use std::{fmt, iter};
 
-use inquire::{Confirm, CustomType, Select, Text};
-
 use crate::{
     catalog::{self, Candidate, Source},
     cli::{ContextChoice, ServeOptions},
@@ -17,13 +15,11 @@ use crate::{
     machine::{self, Machine},
     memory::{self, Budget, gigabytes, or_unknown, tokens},
     plan::{self, Plan},
+    prompt::Prompt,
     recipes,
     service::UnitState,
     start,
 };
-
-/// Rows shown at once in a menu.
-const PAGE_SIZE: usize = 15;
 
 /// What the columns of the model menu mean.
 const MODEL_COLUMNS: &str = "name, weights, longest context, memory at that context, fit; ↑↓ to move, enter to choose, type to filter";
@@ -69,9 +65,9 @@ struct Session<'a> {
     options: &'a ServeOptions,
 }
 
-/// Runs `thor-tigress serve`.
-pub fn serve(machine: &Machine, options: &ServeOptions) -> Outcome<()> {
-    let engine = choose_engine(machine, options.engine)?;
+/// Runs `thor-tigress serve`, asking `prompt` whatever the options leave open.
+pub fn serve(machine: &Machine, options: &ServeOptions, prompt: &mut impl Prompt) -> Outcome<()> {
+    let engine = choose_engine(machine, options.engine, prompt)?;
     check_installed(machine, engine)?;
     let hub = Hub::from_environment(&machine.home);
     let session = Session {
@@ -83,23 +79,27 @@ pub fn serve(machine: &Machine, options: &ServeOptions) -> Outcome<()> {
         options,
     };
 
-    let mut candidate = choose_model(&session)?;
+    let mut candidate = choose_model(&session, prompt)?;
     print_recipes(&hub, &candidate, options.docs);
-    choose_files(&session, &mut candidate)?;
+    choose_files(&session, &mut candidate, prompt)?;
 
-    let context = choose_context(&session, &candidate)?;
+    let context = choose_context(&session, &candidate, prompt)?;
     check_window(&candidate, context, options.reply_tokens)?;
     check_fits(&session, &candidate, context)?;
 
     let plan = Plan::new(machine, &candidate, context, options.reply_tokens);
     plan.print(&candidate, &session.budget, session.slots);
-    confirm(options.yes, "Go ahead?")?;
+    confirm(prompt, options.yes, "Go ahead?")?;
 
-    start::carry_out(machine, &hub, &candidate, &plan, options)
+    start::carry_out(machine, &hub, &candidate, &plan, options, prompt)
 }
 
 /// The engine from `--engine`, or from a menu that says what each one is for.
-fn choose_engine(machine: &Machine, wanted: Option<Engine>) -> Outcome<Engine> {
+fn choose_engine(
+    machine: &Machine,
+    wanted: Option<Engine>,
+    prompt: &mut impl Prompt,
+) -> Outcome<Engine> {
     if let Some(engine) = wanted {
         return Ok(engine);
     }
@@ -119,7 +119,7 @@ fn choose_engine(machine: &Machine, wanted: Option<Engine>) -> Outcome<Engine> {
         })
         .collect();
 
-    Ok(Select::new("Engine:", items).prompt()?.value)
+    Ok(prompt.select("Engine:", None, items)?.value)
 }
 
 /// Checks that the engine's program is on this machine.
@@ -134,36 +134,36 @@ fn check_installed(machine: &Machine, engine: Engine) -> Outcome<()> {
 }
 
 /// The model from `--model`, or from the model menu.
-fn choose_model(session: &Session<'_>) -> Outcome<Candidate> {
+fn choose_model(session: &Session<'_>, prompt: &mut impl Prompt) -> Outcome<Candidate> {
     match &session.options.model {
         Some(name) => resolve_name(session, name),
-        None => model_menu(session, ""),
+        None => model_menu(session, "", prompt),
     }
 }
 
 /// The model menu: models on disk first, then a Hub search in the engine's format, then
 /// "search for something else" and "enter a name or a folder".
-fn model_menu(session: &Session<'_>, query: &str) -> Outcome<Candidate> {
+fn model_menu(session: &Session<'_>, query: &str, prompt: &mut impl Prompt) -> Outcome<Candidate> {
     let items = model_items(session, query);
     let title = format!(
         "{} model ({} usable now):",
         session.engine.title(),
         gigabytes(session.budget.usable())
     );
-    let chosen = Select::new(&title, items)
-        .with_page_size(PAGE_SIZE)
-        .with_help_message(MODEL_COLUMNS)
-        .prompt()?;
+    let chosen = prompt.select(&title, Some(MODEL_COLUMNS), items)?;
 
     match chosen.value {
         ModelChoice::Model(candidate) => Ok(*candidate),
         ModelChoice::SearchAgain => {
-            model_menu(session, &Text::new("Search Hugging Face for:").prompt()?)
+            let words = prompt.text("Search Hugging Face for:")?;
+
+            model_menu(session, &words, prompt)
         }
-        ModelChoice::EnterName => resolve_name(
-            session,
-            &Text::new("Hugging Face name or local folder:").prompt()?,
-        ),
+        ModelChoice::EnterName => {
+            let name = prompt.text("Hugging Face name or local folder:")?;
+
+            resolve_name(session, &name)
+        }
     }
 }
 
@@ -279,16 +279,13 @@ fn resolve_name(session: &Session<'_>, name: &str) -> Outcome<Candidate> {
 
     eprintln!("Reading {name} from Hugging Face…");
     let model = session.hub.model(name.trim())?;
-    let format = engine_for(&model.tags, &[]);
+    let other_format =
+        engine_for(&model.tags, &[]).filter(|format| !session.engine.can_serve(*format));
 
-    if format.is_some_and(|format| !session.engine.can_serve(format)) {
+    if let Some(format) = other_format {
         return Err(ThorError::Condition(format!(
-            "{name} is not in {}'s format; its tags say {}",
-            session.engine.title(),
-            format.map_or_else(
-                || "nothing".to_string(),
-                |format| format!("--engine {format}")
-            )
+            "{name} is not in {}'s format; its tags say --engine {format}",
+            session.engine.title()
         )));
     }
 
@@ -315,9 +312,13 @@ fn print_recipes(hub: &Hub, candidate: &Candidate, wanted: bool) {
 
 /// Narrows the files to download: one GGUF variant of a llama.cpp repository, and none for
 /// vLLM, whose container downloads the model itself on first start.
-fn choose_files(session: &Session<'_>, candidate: &mut Candidate) -> Outcome<()> {
+fn choose_files(
+    session: &Session<'_>,
+    candidate: &mut Candidate,
+    prompt: &mut impl Prompt,
+) -> Outcome<()> {
     match (candidate.engine, &candidate.source) {
-        (Engine::LlamaCpp, Source::Hub) => keep_variant(session, candidate),
+        (Engine::LlamaCpp, Source::Hub) => keep_variant(session, candidate, prompt),
         (Engine::Vllm, _) => {
             candidate.files.clear();
             Ok(())
@@ -327,7 +328,11 @@ fn choose_files(session: &Session<'_>, candidate: &mut Candidate) -> Outcome<()>
 }
 
 /// Keeps the files of one GGUF variant and counts its size as the weights.
-fn keep_variant(session: &Session<'_>, candidate: &mut Candidate) -> Outcome<()> {
+fn keep_variant(
+    session: &Session<'_>,
+    candidate: &mut Candidate,
+    prompt: &mut impl Prompt,
+) -> Outcome<()> {
     let variants = catalog::gguf_variants(&candidate.files);
 
     if variants.is_empty() {
@@ -337,7 +342,7 @@ fn keep_variant(session: &Session<'_>, candidate: &mut Candidate) -> Outcome<()>
         )));
     }
 
-    let variant = choose_variant(session, &variants)?;
+    let variant = choose_variant(session, &variants, prompt)?;
 
     candidate
         .files
@@ -348,7 +353,11 @@ fn keep_variant(session: &Session<'_>, candidate: &mut Candidate) -> Outcome<()>
 }
 
 /// The GGUF variant from `--file`, the largest that fits with `--yes`, or from a menu.
-fn choose_variant(session: &Session<'_>, variants: &[catalog::GgufVariant<'_>]) -> Outcome<String> {
+fn choose_variant(
+    session: &Session<'_>,
+    variants: &[catalog::GgufVariant<'_>],
+    prompt: &mut impl Prompt,
+) -> Outcome<String> {
     let budget = &session.budget;
     let chosen = match (&session.options.file, session.options.yes) {
         (Some(wanted), _) => variants.iter().find(|variant| {
@@ -361,7 +370,7 @@ fn choose_variant(session: &Session<'_>, variants: &[catalog::GgufVariant<'_>]) 
             .iter()
             .rev()
             .find(|variant| budget.fits(variant.bytes)),
-        (None, false) => return variant_menu(variants, budget),
+        (None, false) => return variant_menu(variants, budget, prompt),
     };
 
     chosen
@@ -380,7 +389,11 @@ fn choose_variant(session: &Session<'_>, variants: &[catalog::GgufVariant<'_>]) 
 }
 
 /// The variant menu, smallest first, each with its size and fit.
-fn variant_menu(variants: &[catalog::GgufVariant<'_>], budget: &Budget) -> Outcome<String> {
+fn variant_menu(
+    variants: &[catalog::GgufVariant<'_>],
+    budget: &Budget,
+    prompt: &mut impl Prompt,
+) -> Outcome<String> {
     let items = variants
         .iter()
         .map(|variant| {
@@ -401,15 +414,16 @@ fn variant_menu(variants: &[catalog::GgufVariant<'_>], budget: &Budget) -> Outco
         })
         .collect();
 
-    Ok(Select::new("Variant:", items)
-        .with_page_size(PAGE_SIZE)
-        .prompt()?
-        .value)
+    Ok(prompt.select("Variant:", None, items)?.value)
 }
 
 /// The context from `--context`, or from a menu of the maximum and its halves, each with
 /// its memory cost.
-fn choose_context(session: &Session<'_>, candidate: &Candidate) -> Outcome<u64> {
+fn choose_context(
+    session: &Session<'_>,
+    candidate: &Candidate,
+    prompt: &mut impl Prompt,
+) -> Outcome<u64> {
     match session.options.context {
         Some(ContextChoice::Tokens(context)) => Ok(context),
         Some(ContextChoice::Max) => candidate.max_context().ok_or_else(|| {
@@ -418,16 +432,18 @@ fn choose_context(session: &Session<'_>, candidate: &Candidate) -> Outcome<u64> 
                 candidate.name()
             ))
         }),
-        None => context_menu(session, candidate),
+        None => context_menu(session, candidate, prompt),
     }
 }
 
 /// The context menu. The first row is the model's maximum, so Enter keeps it.
-fn context_menu(session: &Session<'_>, candidate: &Candidate) -> Outcome<u64> {
+fn context_menu(
+    session: &Session<'_>,
+    candidate: &Candidate,
+    prompt: &mut impl Prompt,
+) -> Outcome<u64> {
     let Some(max) = candidate.max_context() else {
-        return Ok(
-            CustomType::<u64>::new("Context in tokens (config.json gives no maximum):").prompt()?,
-        );
+        return prompt.number("Context in tokens (config.json gives no maximum):");
     };
 
     let items: Vec<MenuItem<Option<u64>>> =
@@ -442,13 +458,11 @@ fn context_menu(session: &Session<'_>, candidate: &Candidate) -> Outcome<u64> {
                 value: None,
             }))
             .collect();
-    let chosen = Select::new("Context:", items)
-        .with_page_size(PAGE_SIZE)
-        .prompt()?;
+    let chosen = prompt.select("Context:", None, items)?;
 
     match chosen.value {
         Some(context) => Ok(context),
-        None => Ok(CustomType::<u64>::new("Context in tokens:").prompt()?),
+        None => prompt.number("Context in tokens:"),
     }
 }
 
@@ -595,12 +609,12 @@ pub fn largest_fitting_context(candidate: &Candidate, slots: u64, budget: &Budge
 }
 
 /// Asks a yes-or-no question, unless `--yes` answered it. No stops with nothing changed.
-pub fn confirm(yes: bool, question: &str) -> Outcome<()> {
+pub fn confirm(prompt: &mut impl Prompt, yes: bool, question: &str) -> Outcome<()> {
     if yes {
         return Ok(());
     }
 
-    if Confirm::new(question).with_default(false).prompt()? {
+    if prompt.confirm(question, false)? {
         return Ok(());
     }
 
