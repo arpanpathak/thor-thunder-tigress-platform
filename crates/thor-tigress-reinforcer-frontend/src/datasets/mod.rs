@@ -3,5 +3,6 @@
 pub mod app;
 pub mod index;
 pub mod jsonl;
+pub mod runs;
 pub mod titles;
 pub mod workspace;

@@ -2,7 +2,7 @@
 
 use std::{
     collections::HashSet,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Mutex, MutexGuard},
 };
 
@@ -14,6 +14,7 @@ use crate::{
     datasets::{
         index::{Ids, Index},
         jsonl,
+        workspace::DatasetSpec,
     },
 };
 
@@ -35,18 +36,19 @@ struct Removed {
 }
 
 impl App {
-    /// Opens the training file, the flags and the removed examples.
+    /// Opens the records, flags and removed-examples files named by `spec`.
+    /// Missing flags and removed-examples files read as empty.
     ///
     /// # Errors
     ///
     /// `ReviewError::Io` or `ReviewError::Json` for any unreadable file.
-    pub fn open(training: &Path, flags: &Path, slop: &Path) -> Outcome<App> {
-        let removed: Vec<Removed> = jsonl::read_lines(slop)?;
+    pub fn open(spec: &DatasetSpec) -> Outcome<App> {
+        let removed: Vec<Removed> = jsonl::read_lines(&spec.removed)?;
 
         Ok(App {
-            index: Index::open(training)?,
-            flags: Mutex::new(FlagStore::open(flags)?),
-            slop: slop.to_path_buf(),
+            index: Index::open_as(&spec.records, spec.kind)?,
+            flags: Mutex::new(FlagStore::open(&spec.flags)?),
+            slop: spec.removed.clone(),
             slop_ids: removed.into_iter().filter_map(|line| line.id).collect(),
         })
     }
@@ -82,7 +84,7 @@ mod tests {
         let training = folder.file("train.jsonl", line)?;
         let flags = folder.path().join("flags.jsonl");
         let slop = folder.path().join("slop.jsonl");
-        let app = App::open(&training, &flags, &slop)?;
+        let app = App::open(&DatasetSpec::new("train", &training, &flags, &slop))?;
 
         assert_eq!(app.index.len(), 1);
         assert_eq!(app.flagged_ids()?.len(), 0);
@@ -96,7 +98,8 @@ mod tests {
         let folder = TempDir::new()?;
         let training = folder.file("train.jsonl", "")?;
         let slop = folder.file("slop.jsonl", "{\"id\":\"gone\"}\n{\"other\":1}\n")?;
-        let app = App::open(&training, &folder.path().join("flags.jsonl"), &slop)?;
+        let flags = folder.path().join("flags.jsonl");
+        let app = App::open(&DatasetSpec::new("train", &training, &flags, &slop))?;
 
         assert_eq!(app.slop_ids, ["gone".to_string()].into_iter().collect());
 

@@ -126,6 +126,28 @@
   .notes div { font-size: 12px; color: var(--warn); }
   .rejected .spans li .category { color: var(--warn); }
 
+  .badge.passed { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+  .badge.failed { background: color-mix(in srgb, var(--slop) 14%, transparent); color: var(--slop); }
+  .turn.step .avatar { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+  .turn.step .body { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .tool-call { border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); overflow: hidden; }
+  .tool-call .call-head { display: flex; gap: 8px; align-items: center; padding: 6px 10px; font-size: 13px; }
+  .tool-call .call-head .name { font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 700; color: var(--tok-call); }
+  .tool-call .call-head .arrow { color: var(--faint); }
+  .tool-call .code-block { margin: 0; border-width: 1px 0 0; border-radius: 0; }
+  .tool-call .arg-name { padding: 6px 10px 0; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); border-top: 1px solid var(--border); }
+  .tool-result { border-top: 1px solid var(--border); background: var(--code-bg); }
+  .tool-result summary { padding: 6px 10px; cursor: pointer; font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; list-style: none; }
+  .tool-result summary::-webkit-details-marker { display: none; }
+  .tool-result summary::before { content: "▸"; transition: transform .15s; }
+  .tool-result[open] summary::before { transform: rotate(90deg); }
+  .tool-result summary .preview { color: var(--faint); font-family: "JetBrains Mono", ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+  .tool-result[open] summary .preview { display: none; }
+  .tool-result .code-block { margin: 0; border-width: 1px 0 0; border-radius: 0; max-height: 520px; overflow: auto; }
+  .tool-result.error summary { color: var(--warn); }
+  .final { background: color-mix(in srgb, var(--good) 5%, transparent); }
+  .final.none { color: var(--muted); font-size: 14px; }
+
   .prose { overflow-wrap: anywhere; }
   .prose p { margin: .4em 0; white-space: pre-wrap; }
   .prose h3 { font-size: 15px; margin: .8em 0 .3em; }
@@ -746,6 +768,7 @@ const DATASET_TITLES = {
   train: ["Training set", "Books, docs, chat export and your own pairs"],
   teacher: ["Teacher set", "Conversations the teacher wrote, checked by toolchains"],
   conversations: ["Distilled conversations", "Questions from the teacher, answers from the books"],
+  runs: ["Agent runs", "Coding tasks the agent ran, with every tool call"],
 };
 let datasets = [];
 let dataset = "";
@@ -901,8 +924,14 @@ function rememberFlags(items) {
 }
 
 function normalize(example) {
-  example.hits = highlightRanges(`${example.instruction || ""}\n${example.response || ""}`, []);
+  example.hits = highlightRanges(`${example.instruction || ""}\n${example.response || ""}\n${runText(example)}`, []);
   return example;
+}
+
+// Returns the run's message texts joined by newlines, or "" for a non-run
+// record. Used for the personal-data scan.
+function runText(example) {
+  return isRun(example) ? runMessages(example).map((message) => message.content).join("\n") : "";
 }
 
 async function showPage(index) {
@@ -965,7 +994,9 @@ function card(example) {
   article.append(cardHead(example));
   if (example.source_text) article.append(grounding(example));
   if (Array.isArray(example.notes) && example.notes.length > 0) article.append(notesOf(example));
-  if (Array.isArray(example.messages)) {
+  if (isRun(example)) {
+    article.append(...runParts(example));
+  } else if (Array.isArray(example.messages)) {
     article.append(...conversationParts(example));
   } else {
     const isPassage = (example.instruction || "").trim() === "";
@@ -982,8 +1013,9 @@ function cardHead(example) {
   head.append(
     element("span", `dot${reviewed.has(example.id) || slopFlags.has(example.id) ? " on" : ""}`),
     element("span", "", `#${example.position + 1}`),
-    element("span", "badge", example.source_title || example.source),
+    element("span", isRun(example) ? `badge ${example.source}` : "badge", example.source_title || example.source),
   );
+  if (isRun(example)) head.append(...runChips(example));
   if (example.collection_title) head.append(element("span", "collection", example.collection_title));
   const origin = element("span", "origin", example.origin);
   origin.title = example.entry ? `${example.origin} (entry ${example.entry})` : example.origin;
@@ -1086,6 +1118,183 @@ function conversationParts(example) {
     parts.push(section);
   }
   return parts;
+}
+
+// ---------------------------------------------------------------------------
+// Agent runs. Spans in the task use field "instruction"; spans in assistant
+// text use field "response". Elements with class "no-mark" (tool calls and
+// tool output) are excluded from selection marking.
+
+// Tool output with more lines or characters than these starts folded.
+const FOLD_LINES = 12;
+const FOLD_CHARS = 1200;
+
+// Returns true when the record carries a transcript with a messages array.
+function isRun(example) {
+  return Array.isArray(Object(example.transcript).messages);
+}
+
+// Returns the run's messages with `content` as a string and `tool_calls` as
+// an array, defaulting missing values.
+function runMessages(example) {
+  return example.transcript.messages.map((message) => ({ content: "", tool_calls: [], ...message, content: String(message.content ?? "") }));
+}
+
+// Returns an outcome such as "step_limit" as display text ("step limit").
+function words(outcome) {
+  return String(outcome ?? "no outcome").replace("_", " ");
+}
+
+// Returns the card-head chips: outcome, steps, wall seconds and model.
+function runChips(example) {
+  const seconds = Number(example.wall_seconds).toFixed(1);
+  const chips = [words(example.outcome), `${example.steps} steps`, `${seconds} s`];
+  const model = element("span", "chip mono", String(example.transcript.model ?? "unknown model"));
+  return [...chips.map((text) => element("span", "chip", text)), model];
+}
+
+// Returns the final assistant message if it has text and no tool calls;
+// otherwise null.
+function finalAnswerOf(messages) {
+  const last = messages[messages.length - 1];
+  const answered = [last.role === "assistant", last.tool_calls.length === 0, last.content.trim() !== ""];
+  return answered.every(Boolean) ? last : null;
+}
+
+// Returns the card sections of a run: system prompt, task, one section per
+// step, and the final answer.
+function runParts(example) {
+  const messages = runMessages(example);
+  const results = new Map(messages.filter((message) => message.role === "tool").map((message) => [message.tool_call_id, message.content]));
+  const answer = finalAnswerOf(messages);
+  const steps = messages.filter((message) => message.role === "assistant" && message !== answer);
+  return [
+    ...messages.filter((message) => message.role === "system").map((message) => systemPrompt(message, example.transcript.tools)),
+    ...messages.filter((message) => message.role === "user").slice(0, 1).map((message) => taskPart(example, message)),
+    ...steps.map((message, position) => stepPart(example, message, position + 1, results)),
+    finalPart(example, answer),
+  ];
+}
+
+// Returns a folded section with the system prompt and the tool names.
+function systemPrompt(system, tools) {
+  const names = (Array.isArray(tools) ? tools : []).map((tool) => Object(tool.function).name);
+  const details = element("details", "grounding");
+  details.append(element("summary", "", `System prompt and ${names.length} tools: ${names.join(", ")}`));
+  const body = element("div", "body");
+  renderText(body, system.content, [], "");
+  details.append(body);
+  return details;
+}
+
+// Returns the task section (field "instruction") for the first user message.
+function taskPart(example, task) {
+  const section = element("section", "part");
+  section.dataset.field = "instruction";
+  const head = element("div", "label");
+  head.append(element("span", "", "Task"), element("span", "size", example.task_id));
+  section.append(head);
+  renderText(section, task.content, spansOf(example, "instruction"), "");
+  return section;
+}
+
+// Renders assistant text into `parent` with response-field spans and
+// suggestions.
+function agentText(parent, example, text) {
+  renderText(parent, text, spansOf(example, "response"), "", suggestionsFor({ ...example, response: text }, "response"));
+}
+
+// Returns the section for one assistant step: its text, then each tool call
+// with its result looked up in `results` by tool_call_id.
+function stepPart(example, message, number, results) {
+  const turn = element("section", "turn step part");
+  turn.dataset.field = "response";
+  const avatar = element("div", "avatar", String(number));
+  avatar.title = `Step ${number}`;
+  const body = element("div", "body");
+  agentText(body, example, message.content);
+  body.append(...message.tool_calls.map((call) => toolCall(call, results)));
+  turn.append(avatar, body);
+  return turn;
+}
+
+// Parses a tool call's JSON argument string. Returns { arguments: raw } when
+// `raw` is not valid JSON.
+function parsedArguments(raw) {
+  try { return Object(JSON.parse(raw)); } catch { return { arguments: raw }; }
+}
+
+// Returns the [name, value] pairs of arguments whose value spans several lines.
+function multiLineArguments(args) {
+  return Object.entries(args).filter(([, value]) => String(value).includes("\n"));
+}
+
+// Renders the arguments as pretty-printed JSON, then each multi-line argument
+// verbatim, highlighted by the extension of `path`.
+function renderArguments(box, args, path) {
+  renderCode(box, JSON.stringify(args, null, 2), "json", "", [], [], []);
+  for (const [name, value] of multiLineArguments(args)) {
+    box.append(element("div", "arg-name", `${name}, as written`));
+    renderCode(box, String(value).replace(/\n$/, ""), "", path, [], [], []);
+  }
+}
+
+// Returns the block for one tool call: name, arguments, and the matching
+// tool result when `results` has one.
+function toolCall(call, results) {
+  const fn = { name: "(no name)", arguments: "{}", ...call.function };
+  const args = parsedArguments(fn.arguments);
+  const { path = "" } = args;
+  const box = element("div", "tool-call no-mark");
+  const head = element("div", "call-head");
+  head.append(element("span", "arrow", "→"), element("span", "name", fn.name));
+  box.append(head);
+  renderArguments(box, args, String(path));
+  const outputs = [results.get(call.id)].filter((output) => output !== undefined);
+  box.append(...outputs.map((output) => toolResult(fn.name, output, String(path))));
+  return box;
+}
+
+// Returns "<count> <word>", pluralized with "s" unless count is 1.
+function countOf(count, word) {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+// Returns the highlighting for tool output: by file extension for read_file,
+// plain text otherwise.
+function outputLanguage(name, path) {
+  return name === "read_file" ? { lang: "", origin: path } : { lang: "text", origin: "" };
+}
+
+// Returns a <details> block for tool output, closed when it exceeds
+// FOLD_LINES or FOLD_CHARS. Output matching error, FAILED or panicked gets
+// the "error" class.
+function toolResult(name, output, path) {
+  const lines = output.split("\n");
+  const details = element("details", "tool-result");
+  details.classList.toggle("error", /^error\b|FAILED|panicked/.test(output));
+  details.open = [lines.length <= FOLD_LINES, output.length <= FOLD_CHARS].every(Boolean);
+  const summary = element("summary");
+  summary.append(element("span", "", `Output of ${name} · ${countOf(lines.length, "line")}`), element("span", "preview", lines[0]));
+  details.append(summary);
+  const { lang, origin } = outputLanguage(name, path);
+  renderCode(details, output.replace(/\n+$/, "") || "(no output)", lang, origin, [], [], []);
+  return details;
+}
+
+// Returns the final-answer section (field "response"), or a notice with the
+// outcome and step count when `answer` is null.
+function finalPart(example, answer) {
+  const section = element("section", "part final");
+  section.append(element("div", "label", "Final answer"));
+  if (answer) {
+    section.dataset.field = "response";
+    agentText(section, example, answer.content);
+    return section;
+  }
+  section.classList.add("none");
+  section.append(element("div", "", `No final answer: the run ended with ${words(example.outcome)} after ${example.steps} steps.`));
+  return section;
 }
 
 // Under each example: the marked phrases, and the note of a flag.
@@ -1198,6 +1407,7 @@ function selectionTarget() {
   const range = current.getRangeAt(0);
   const container = range.commonAncestorContainer;
   const start = container.nodeType === Node.ELEMENT_NODE ? container : container.parentElement;
+  if (start.closest(".no-mark")) return null;
   const section = start.closest("[data-field]");
   const article = start.closest("article");
   if (!section || !article) return null;
@@ -1412,8 +1622,10 @@ async function loadDataset() {
   flaggedCount = meta.flagged;
   $("title").textContent = datasetTitle(dataset);
   $("file").textContent = meta.file;
+  const runs = (datasets.find((info) => info.name === dataset) || {}).kind === "runs";
   const source = $("source");
-  source.replaceChildren(new Option("All sources", ""));
+  source.replaceChildren(new Option(runs ? "Passed and failed runs" : "All sources", ""));
+  $("collection").hidden = runs;
   for (const entry of meta.sources) source.append(new Option(`${entry.title} (${entry.count.toLocaleString()})`, entry.name));
   const collection = $("collection");
   collection.replaceChildren(new Option("All books, docs and repositories", ""));

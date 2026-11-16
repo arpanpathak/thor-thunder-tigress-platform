@@ -12,6 +12,7 @@ Run these from `/home/jetson/Projects/thor-thunder-tigress-platform`.
 | Build it into another folder | `cargo run --release -p thor-hammer-trainer -- OUTPUT_DIR` |
 | Open the review page (every dataset) | `cargo run --release -p thor-tigress-reinforcer-frontend`, then <http://127.0.0.1:8787> |
 | Review another file, port or flags file | `cargo run --release -p thor-tigress-reinforcer-frontend -- --port PORT --dataset NAME=FILE,FLAGS` |
+| Review agent runs too (Slop flags go to `labels/agent_run_flags.jsonl`) | `cargo run --release -p thor-tigress-reinforcer-frontend -- --runs RUNS_JSONL` |
 | Check the teacher set | `cargo run --release -p thor-hammer-trainer --bin teacher` |
 | Queue real sections to write from | `cargo run --release -p thor-hammer-trainer --bin teacher -- pick 2` |
 | Make the keyring (the encrypted registry of who may chat) | `thor-tigress-serve keyring-init` |

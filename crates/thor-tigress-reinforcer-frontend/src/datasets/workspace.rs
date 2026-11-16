@@ -8,9 +8,16 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use crate::{
-    datasets::app::App,
+    datasets::{app::App, index::Kind},
     error::{Outcome, ReviewError},
 };
+
+/// Dataset name of the agent runs.
+const RUNS: &str = "runs";
+
+/// Removed-examples path for the agent runs. No tool writes this file, so it
+/// reads as empty.
+const RUNS_REMOVED: &str = "data/runs_removed.jsonl";
 
 /// Where one dataset's files are.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +30,8 @@ pub struct DatasetSpec {
     pub flags: PathBuf,
     /// The examples a build removed as slop, if the dataset has such a file.
     pub removed: PathBuf,
+    /// Record format of each line in the records file.
+    pub kind: Kind,
 }
 
 impl DatasetSpec {
@@ -34,6 +43,17 @@ impl DatasetSpec {
             records: records.to_path_buf(),
             flags: flags.to_path_buf(),
             removed: removed.to_path_buf(),
+            kind: Kind::Records,
+        }
+    }
+
+    /// Returns the spec of the agent-runs dataset named `runs`, reading runs
+    /// from `runs` and flags from `flags`.
+    #[must_use]
+    pub fn runs(runs: &Path, flags: &Path) -> Self {
+        Self {
+            kind: Kind::Runs,
+            ..Self::new(RUNS, runs, flags, Path::new(RUNS_REMOVED))
         }
     }
 }
@@ -57,6 +77,8 @@ pub struct Workspace {
 pub struct DatasetInfo {
     /// The name to send back as `?dataset=`.
     pub name: String,
+    /// Record format, used by the page to choose a renderer.
+    pub kind: Kind,
     /// The records file, for the reviewer's reference.
     pub file: String,
     /// How many records it has.
@@ -85,7 +107,7 @@ impl Workspace {
                 continue;
             }
 
-            let app = App::open(&spec.records, &spec.flags, &spec.removed)?;
+            let app = App::open(spec)?;
 
             datasets.push(Dataset {
                 name: spec.name.clone(),
@@ -128,6 +150,7 @@ impl Workspace {
             .map(|dataset| {
                 Ok(DatasetInfo {
                     name: dataset.name.clone(),
+                    kind: dataset.app.index.kind(),
                     file: dataset.app.index.path().display().to_string(),
                     records: dataset.app.index.len(),
                     flagged: dataset.app.flags()?.len(),

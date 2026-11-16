@@ -2,6 +2,7 @@
 //!
 //! ```text
 //!   reinforcer [serve] [--port PORT] [--dataset NAME=RECORDS[,FLAGS[,REMOVED]]]...
+//!                      [--runs RUNS_JSONL[,FLAGS]]
 //!   reinforcer RECORDS_JSONL [PORT] [FLAGS_JSONL] [REMOVED_JSONL]
 //!   reinforcer scan  [TRAIN_JSONL]  [AUTO_FLAGS_JSONL]
 //!   reinforcer apply [AUTO_FLAGS_JSONL] [FLAGS_JSONL]
@@ -9,7 +10,8 @@
 //!
 //! With no `--dataset`, `serve` shows the training set, the teacher set and
 //! the generated conversations, each with its own flags file, on one port.
-//! The second form shows one file, as earlier versions did.
+//! `--runs` appends an agent-runs dataset after the other datasets. The
+//! second form serves a single records file.
 
 use std::path::{Path, PathBuf};
 
@@ -26,6 +28,9 @@ const DEFAULT_FLAGS: &str = "labels/slop_flags.jsonl";
 
 /// The examples a build removed from the training set.
 const DEFAULT_SLOP: &str = "data/slop.jsonl";
+
+/// Default flags file for the agent-runs dataset.
+const DEFAULT_RUN_FLAGS: &str = "labels/agent_run_flags.jsonl";
 
 /// Where the scan writes the flags it suggests.
 const DEFAULT_AUTO_FLAGS: &str = "labels/auto_flags.jsonl";
@@ -48,7 +53,7 @@ const DEFAULT_DATASETS: [(&str, &str, &str, &str); 3] = [
 ];
 
 /// The usage text.
-pub const USAGE: &str = "usage: reinforcer [serve] [--port PORT] [--dataset NAME=RECORDS[,FLAGS[,REMOVED]]]...\n       reinforcer RECORDS_JSONL [PORT] [FLAGS_JSONL] [REMOVED_JSONL]\n       reinforcer scan [TRAIN_JSONL] [AUTO_FLAGS_JSONL]\n       reinforcer apply [AUTO_FLAGS_JSONL] [FLAGS_JSONL]";
+pub const USAGE: &str = "usage: reinforcer [serve] [--port PORT] [--dataset NAME=RECORDS[,FLAGS[,REMOVED]]]... [--runs RUNS_JSONL[,FLAGS]]\n       reinforcer RECORDS_JSONL [PORT] [FLAGS_JSONL] [REMOVED_JSONL]\n       reinforcer scan [TRAIN_JSONL] [AUTO_FLAGS_JSONL]\n       reinforcer apply [AUTO_FLAGS_JSONL] [FLAGS_JSONL]";
 
 /// What the tool was asked to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +127,7 @@ fn nth_or(arguments: &[String], position: usize, default: &str) -> String {
 fn serve(options: &[String]) -> Command {
     let mut port = DEFAULT_PORT.to_string();
     let mut datasets = Vec::new();
+    let mut runs = Vec::new();
     let mut rest = options.iter();
 
     while let Some(option) = rest.next() {
@@ -131,6 +137,7 @@ fn serve(options: &[String]) -> Command {
 
         match option.as_str() {
             "--port" => port.clone_from(value),
+            "--runs" => runs.push(runs_spec(value)),
             "--dataset" => {
                 let Some(spec) = dataset(value) else {
                     let expected = "expected NAME=RECORDS[,FLAGS[,REMOVED]]";
@@ -148,6 +155,8 @@ fn serve(options: &[String]) -> Command {
         datasets = default_datasets();
     }
 
+    datasets.extend(runs);
+
     Command::Serve { port, datasets }
 }
 
@@ -164,6 +173,14 @@ fn default_datasets() -> Vec<DatasetSpec> {
             )
         })
         .collect()
+}
+
+/// Parses a `--runs` value of the form `RUNS_JSONL[,FLAGS]` into a dataset
+/// spec. `FLAGS` defaults to [`DEFAULT_RUN_FLAGS`].
+fn runs_spec(value: &str) -> DatasetSpec {
+    let (runs, flags) = value.split_once(',').unwrap_or((value, DEFAULT_RUN_FLAGS));
+
+    DatasetSpec::runs(Path::new(runs), Path::new(flags))
 }
 
 /// Reads `NAME=RECORDS[,FLAGS[,REMOVED]]`. Missing files default to
@@ -254,6 +271,26 @@ mod tests {
             datasets[1].removed,
             PathBuf::from("data/other_removed.jsonl")
         );
+    }
+
+    #[test]
+    fn adds_the_agent_runs_after_the_datasets() {
+        let served = specs(command(&["serve", "--runs", "runs.jsonl"]));
+        let named = specs(command(&[
+            "--dataset",
+            "mine=a.jsonl",
+            "--runs",
+            "r.jsonl,labels/r.jsonl",
+        ]));
+
+        assert_eq!(served.len(), 4);
+        assert_eq!(
+            served[3],
+            DatasetSpec::runs(Path::new("runs.jsonl"), Path::new(DEFAULT_RUN_FLAGS))
+        );
+        assert_eq!(names(&command(&["--runs", "r.jsonl"]))[3], "runs");
+        assert_eq!(named.len(), 2);
+        assert_eq!(named[1].flags, PathBuf::from("labels/r.jsonl"));
     }
 
     #[test]

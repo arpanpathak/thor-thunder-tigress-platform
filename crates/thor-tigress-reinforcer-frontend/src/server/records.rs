@@ -5,7 +5,7 @@ use serde_json::Value;
 
 use super::params::Params;
 use crate::{
-    datasets::{app::App, index::Filter, titles},
+    datasets::{app::App, index::Filter, runs::RunFields, titles},
     error::{Outcome, ReviewError},
     review::flags::Flag,
     suggest::stage0::{self, Suggestions},
@@ -92,14 +92,9 @@ pub(super) struct Item {
     response_chars: usize,
     shortened: bool,
     flag: Option<Flag>,
-    messages: Value,
-    rejected: Value,
     suggestions: Suggestions,
-    source_text: Option<String>,
-    licence: Option<String>,
-    based_on: Option<String>,
-    entry: Option<String>,
-    notes: Vec<String>,
+    #[serde(flatten)]
+    details: Details,
 }
 
 /// The parts of a record the page shows besides what the index holds.
@@ -109,6 +104,13 @@ pub(super) struct RecordText {
     instruction: String,
     #[serde(default)]
     pub(super) response: String,
+    #[serde(flatten)]
+    details: Details,
+}
+
+/// Record fields passed to the page unchanged from the file.
+#[derive(Serialize, Deserialize)]
+pub(super) struct Details {
     #[serde(default)]
     messages: Value,
     #[serde(default)]
@@ -123,6 +125,8 @@ pub(super) struct RecordText {
     entry: Option<String>,
     #[serde(default)]
     notes: Vec<String>,
+    #[serde(flatten)]
+    run: RunFields,
 }
 
 /// One record, with its flag if it has one. The length of the whole answer
@@ -151,13 +155,7 @@ pub(super) fn item(app: &App, position: usize, length: Length) -> Outcome<Item> 
         response_chars,
         shortened,
         flag: app.flags()?.get(&entry.id).cloned(),
-        messages: record.messages,
-        rejected: record.rejected,
-        source_text: record.source_text,
-        licence: record.licence,
-        based_on: record.based_on,
-        entry: record.entry,
-        notes: record.notes,
+        details: record.details,
     })
 }
 

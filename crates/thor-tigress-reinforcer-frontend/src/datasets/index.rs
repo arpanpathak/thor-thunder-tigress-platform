@@ -21,9 +21,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
-use crate::error::{Outcome, ReviewError};
+use crate::{
+    datasets::runs,
+    error::{Outcome, ReviewError},
+};
 
 /// Read buffer for scanning the training file.
 const READ_BUFFER: usize = 1 << 20;
@@ -38,10 +41,34 @@ pub type Ids = HashSet<String>;
 /// purpose: it is the large field and it is not needed to list or search a
 /// record.
 #[derive(Deserialize)]
-struct Header<'a> {
-    id: &'a str,
-    source: &'a str,
-    origin: &'a str,
+pub struct Header {
+    /// Record id; flags are keyed by it.
+    pub id: String,
+    /// Source label matched by the source filter.
+    pub source: String,
+    /// Origin of the record, such as a file path or task id.
+    pub origin: String,
+}
+
+/// Record format of each line in a dataset file.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    /// Training record with `id`, `source` and `origin` fields.
+    #[default]
+    Records,
+    /// Agent run in the format documented in [`runs`].
+    Runs,
+}
+
+impl Kind {
+    /// Parses the index header of `line` according to this format.
+    fn header(self, line: &str) -> serde_json::Result<Header> {
+        match self {
+            Kind::Records => serde_json::from_str(line),
+            Kind::Runs => runs::header(line),
+        }
+    }
 }
 
 /// Where one record lives, and what the list needs to draw it.
@@ -130,6 +157,7 @@ where
 
 /// The training file, addressed by byte offset.
 pub struct Index {
+    kind: Kind,
     file: File,
     path: PathBuf,
     entries: Vec<Entry>,
@@ -139,20 +167,32 @@ pub struct Index {
 }
 
 impl Index {
-    /// Scans `path` once and builds the index.
+    /// Builds the index of a training-records file. Equivalent to
+    /// `Index::open_as(path, Kind::Records)`.
     ///
     /// # Errors
     ///
-    /// `ReviewError::Io` for an unreadable file, `ReviewError::Json` for a
-    /// line without `id`, `source` and `origin`, `ReviewError::BadRequest` for
-    /// more distinct sources or origins than the index can number.
+    /// As for [`Index::open_as`].
     pub fn open(path: &Path) -> Outcome<Self> {
+        Self::open_as(path, Kind::Records)
+    }
+
+    /// Builds the index of `path`, parsing each non-blank line as `kind`.
+    /// Reads the file once; record bodies are not kept in memory.
+    ///
+    /// # Errors
+    ///
+    /// `ReviewError::Io` if the file cannot be read, `ReviewError::Json` if a
+    /// line lacks the fields `kind` requires, and `ReviewError::BadRequest` if
+    /// the distinct sources or origins exceed the index's id range.
+    pub fn open_as(path: &Path, kind: Kind) -> Outcome<Self> {
         let file = File::open(path).map_err(ReviewError::io(path))?;
         let mut reader = BufReader::with_capacity(
             READ_BUFFER,
             file.try_clone().map_err(ReviewError::io(path))?,
         );
         let mut index = Index {
+            kind,
             file,
             path: path.to_path_buf(),
             entries: Vec::new(),
@@ -173,9 +213,7 @@ impl Index {
             }
 
             if !line.trim().is_empty() {
-                let header: Header =
-                    serde_json::from_str(&line).map_err(ReviewError::json(path, line_number))?;
-                index.add(&header, offset, read)?;
+                index.add(&line, line_number, offset, read)?;
             }
 
             offset += u64::try_from(read).unwrap_or(u64::MAX);
@@ -184,20 +222,32 @@ impl Index {
         Ok(index)
     }
 
-    fn add(&mut self, header: &Header, offset: u64, length: usize) -> Outcome {
+    /// Parses `line` and appends its entry at byte `offset` with `length`
+    /// bytes. `line_number` is 1-based and used only in errors.
+    fn add(&mut self, line: &str, line_number: usize, offset: u64, length: usize) -> Outcome {
+        let header = self
+            .kind
+            .header(line)
+            .map_err(ReviewError::json(&self.path, line_number))?;
         let too_many =
             || ReviewError::BadRequest("too many distinct sources or origins".to_string());
         let entry = Entry {
-            id: header.id.to_string(),
+            id: header.id.clone(),
             offset,
             length,
-            source: self.sources.id_of(header.source).ok_or_else(too_many)?,
-            origin: self.origins.id_of(header.origin).ok_or_else(too_many)?,
+            source: self.sources.id_of(&header.source).ok_or_else(too_many)?,
+            origin: self.origins.id_of(&header.origin).ok_or_else(too_many)?,
         };
         self.ids.insert(entry.id.clone());
         self.entries.push(entry);
 
         Ok(())
+    }
+
+    /// Record format of each line in the file.
+    #[must_use]
+    pub fn kind(&self) -> Kind {
+        self.kind
     }
 
     /// The number of records.
