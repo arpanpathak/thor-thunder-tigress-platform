@@ -2,8 +2,6 @@
 
 use std::{iter, process::Command};
 
-use inquire::Select;
-
 use crate::{
     catalog::{self, Candidate},
     engine::Engine,
@@ -11,6 +9,7 @@ use crate::{
     docker,
     machine::Machine,
     memory::{self, gigabytes, or_unknown, tokens},
+    prompt::Prompt,
     serve::confirm,
     service::{self, UnitState},
 };
@@ -167,12 +166,18 @@ fn disk_row(machine: &Machine, candidate: &Candidate) -> String {
 /// A service named on the command line is stopped without a question, so scripts and
 /// `ssh thor thor-tigress stop NAME` work without a terminal; a service chosen from the menu is
 /// confirmed first.
-pub fn stop(machine: &Machine, name: Option<String>, yes: bool) -> Outcome<()> {
+pub fn stop(
+    machine: &Machine,
+    name: Option<String>,
+    yes: bool,
+    prompt: &mut impl Prompt,
+) -> Outcome<()> {
     let named = name.is_some();
     let units = service::thor_units()?;
-    let unit = choose_unit(units, name, "Stop which service?")?;
+    let unit = choose_unit(units, name, "Stop which service?", prompt)?;
 
     confirm(
+        prompt,
         yes || named,
         &format!("Stop {unit}? Everything it serves stops answering."),
     )?;
@@ -212,9 +217,9 @@ fn stop_container(machine: &Machine, unit: &str) -> Outcome<()> {
 }
 
 /// Follows a service's log, starting with its last 100 lines.
-pub fn logs(name: Option<String>) -> Outcome<()> {
+pub fn logs(name: Option<String>, prompt: &mut impl Prompt) -> Outcome<()> {
     let units = service::thor_units()?;
-    let unit = choose_unit(units, name, "Whose log?")?;
+    let unit = choose_unit(units, name, "Whose log?", prompt)?;
 
     Command::new("journalctl")
         .args(["--user", "-u", &unit, "-n", "100", "-f"])
@@ -228,10 +233,15 @@ pub fn logs(name: Option<String>) -> Outcome<()> {
 }
 
 /// The service a name gives, or one chosen from a menu when there is no name.
-fn choose_unit(units: Vec<String>, name: Option<String>, question: &str) -> Outcome<String> {
+fn choose_unit(
+    units: Vec<String>,
+    name: Option<String>,
+    question: &str,
+    prompt: &mut impl Prompt,
+) -> Outcome<String> {
     match name {
         Some(name) => find_unit(&units, &name),
-        None => Ok(Select::new(question, units).prompt()?),
+        None => prompt.select(question, None, units),
     }
 }
 

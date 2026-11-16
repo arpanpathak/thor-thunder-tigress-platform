@@ -1,10 +1,18 @@
 //! Reading the Hub's replies, recorded from huggingface.co, and telling formats apart.
 
+use std::{
+    io::{Read, Write},
+    net::TcpListener,
+    thread,
+    time::Duration,
+};
+
 use anyhow::{Result, anyhow};
 use thor_tigress_cli::{
     catalog::{gguf_variants, model_id},
     engine::{Engine, engine_for},
     hub::{parse_files, parse_search, search_url},
+    web,
 };
 
 /// `filter=modelopt&search=gemma-4-31b`.
@@ -189,6 +197,53 @@ fn paths_that_leave_the_download_folder_are_dropped() -> Result<()> {
         .collect();
 
     assert_eq!(paths, vec!["config.json", "BF16/part.gguf"]);
+
+    Ok(())
+}
+
+#[test]
+fn replies_that_are_not_json_name_what_was_read() {
+    let search = parse_search("<html>rate limited</html>").map(drop);
+    let files = parse_files("<html>rate limited</html>").map(drop);
+
+    assert!(search.err().is_some_and(|error| {
+        error
+            .to_string()
+            .starts_with("the Hub's search reply is not")
+    }));
+    assert!(
+        files
+            .err()
+            .is_some_and(|error| error.to_string().starts_with("the Hub's file list is not"))
+    );
+}
+
+#[test]
+fn a_reply_cut_short_is_an_error_naming_the_address() -> Result<()> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let url = format!("http://{}/api/models", listener.local_addr()?);
+
+    thread::spawn(move || {
+        let Some(Ok(mut stream)) = listener.incoming().next() else {
+            return;
+        };
+        let mut request = [0_u8; 4096];
+
+        if stream.read(&mut request).is_ok() {
+            stream
+                .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 100\r\n\r\n[{\"id\"")
+                .ok();
+        }
+    });
+
+    let client = web::client(Duration::from_secs(5), Duration::from_secs(5));
+    let outcome = web::get_text(&client, &url, None).map(drop);
+
+    assert!(
+        outcome
+            .err()
+            .is_some_and(|error| error.to_string().starts_with(&format!("{url}: ")))
+    );
 
     Ok(())
 }

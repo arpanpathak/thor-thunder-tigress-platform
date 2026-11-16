@@ -7,8 +7,6 @@ use std::{
     process::Child,
 };
 
-use inquire::Confirm;
-
 use crate::{
     catalog::Candidate,
     cli::ServeOptions,
@@ -17,6 +15,7 @@ use crate::{
     machine::{self, Machine, tilde},
     memory::{self, gigabytes},
     plan::{AGENT_SERVICE, Plan},
+    prompt::Prompt,
     service::{self, Readiness},
     settings::Settings,
 };
@@ -31,6 +30,7 @@ pub fn carry_out(
     candidate: &Candidate,
     plan: &Plan,
     options: &ServeOptions,
+    prompt: &mut impl Prompt,
 ) -> Outcome<()> {
     download(hub, candidate, plan)?;
 
@@ -50,9 +50,14 @@ pub fn carry_out(
 
     match readiness {
         Readiness::Ready => announce_ready(machine, plan),
-        Readiness::Failed | Readiness::TimedOut => {
-            explain_failure(plan, readiness, started, backup.as_deref(), options.yes)
-        }
+        Readiness::Failed | Readiness::TimedOut => explain_failure(
+            plan,
+            readiness,
+            started,
+            backup.as_deref(),
+            options.yes,
+            prompt,
+        ),
     }
 }
 
@@ -166,6 +171,7 @@ fn explain_failure(
     started: u64,
     backup: Option<&Path>,
     yes: bool,
+    prompt: &mut impl Prompt,
 ) -> Outcome<()> {
     let unit = plan.engine.service();
     let log = service::log_since(unit, started).unwrap_or_default();
@@ -178,7 +184,7 @@ fn explain_failure(
         going_back(plan, backup)
     );
 
-    if yes || !Confirm::new("Go back now?").with_default(true).prompt()? {
+    if yes || !prompt.confirm("Go back now?", true)? {
         return Err(ThorError::Condition(format!(
             "{} is not serving",
             plan.served_name

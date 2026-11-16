@@ -1,7 +1,10 @@
 //! The command line, systemd's and the engines' replies, recipe matching, and the
 //! messages people read.
 
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::Result;
 use thor_tigress_cli::{
@@ -12,7 +15,10 @@ use thor_tigress_cli::{
     memory::{Budget, KvShape},
     recipes::{edge_listing, matching_recipes},
     serve::{check_window, does_not_fit_message, fit_word, largest_fitting_context},
-    service::{UnitState, error_lines, parse_model_ids, parse_show, parse_unit_list},
+    service::{
+        Readiness, UnitState, error_lines, parse_model_ids, parse_show, parse_unit_list, run,
+    },
+    settings::Settings,
 };
 
 /// The `.md` files of vLLM's recipes repository.
@@ -263,4 +269,48 @@ fn text_wraps_at_spaces() {
     let lines = wrap("one two three four five six", 10);
 
     assert_eq!(lines, vec!["one two", "three four", "five six"]);
+}
+
+#[test]
+fn readiness_ends_a_sentence_about_the_service() {
+    let sentences: Vec<String> = [Readiness::Ready, Readiness::Failed, Readiness::TimedOut]
+        .iter()
+        .map(|readiness| format!("thor-chat {readiness}"))
+        .collect();
+
+    assert_eq!(
+        sentences,
+        [
+            "thor-chat is ready",
+            "thor-chat failed",
+            "thor-chat did not answer in time"
+        ]
+    );
+}
+
+#[test]
+fn a_program_that_is_not_there_is_named() {
+    let outcome = run("thor-no-such-program", &["--version"]).map(drop);
+
+    assert!(outcome.err().is_some_and(|error| {
+        error
+            .to_string()
+            .starts_with("could not run thor-no-such-program: ")
+    }));
+}
+
+#[test]
+fn vllm_needs_docker_on_the_path() {
+    let settings = Settings::parse(
+        Path::new("/home/thor/env"),
+        Path::new("/home/thor"),
+        "VLLM_IMAGE=vllm:test\n",
+    );
+
+    let installed = Engine::Vllm.installed(&settings, "");
+
+    assert_eq!(
+        installed.to_string(),
+        "not installed: docker not found on the PATH"
+    );
 }

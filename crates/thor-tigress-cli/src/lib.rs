@@ -18,6 +18,7 @@ pub mod hub;
 pub mod machine;
 pub mod memory;
 pub mod plan;
+pub mod prompt;
 pub mod recipes;
 pub mod serve;
 pub mod service;

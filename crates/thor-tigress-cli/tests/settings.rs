@@ -150,3 +150,29 @@ fn spaces_inside_json_are_kept() {
         r#"--speculative-config '{"method": "mtp"}' --max-model-len 4096"#
     );
 }
+
+#[test]
+fn a_folder_in_place_of_the_settings_file_is_named() -> Result<()> {
+    let home = tempfile::tempdir()?;
+
+    let outcome = Settings::load(home.path(), home.path()).map(drop);
+
+    assert!(outcome.err().is_some_and(|error| {
+        error
+            .to_string()
+            .starts_with(&home.path().display().to_string())
+    }));
+
+    Ok(())
+}
+
+#[test]
+fn a_commented_line_sets_nothing() {
+    let settings = Settings::parse(
+        Path::new("/home/thor/env"),
+        Path::new("/home/thor"),
+        "# EDGE_CONTEXT=4096\n",
+    );
+
+    assert_eq!(settings.get("EDGE_CONTEXT"), None);
+}

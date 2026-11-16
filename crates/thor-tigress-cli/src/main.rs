@@ -7,6 +7,7 @@ use thor_tigress_cli::{
     commands,
     error::Outcome,
     machine::Machine,
+    prompt::Terminal,
     serve,
 };
 
@@ -41,8 +42,8 @@ fn run(arguments: &[String]) -> Outcome<()> {
             commands::list(&machine);
             Ok(())
         }
-        Command::Serve(options) => serve::serve(&machine, &options),
-        Command::Stop { name, yes } => commands::stop(&machine, name, yes),
-        Command::Logs { name } => commands::logs(name),
+        Command::Serve(options) => serve::serve(&machine, &options, &mut Terminal),
+        Command::Stop { name, yes } => commands::stop(&machine, name, yes, &mut Terminal),
+        Command::Logs { name } => commands::logs(name, &mut Terminal),
     }
 }
