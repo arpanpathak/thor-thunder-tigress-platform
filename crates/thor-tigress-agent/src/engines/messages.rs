@@ -78,7 +78,7 @@ pub fn forward(client: &mut dyn Client, path: &str, body: &[u8], upstreams: &Ups
 
     engine
         .endpoint()
-        .post(path, &serde_json::to_vec(&fields)?)?
+        .post_for(path, &serde_json::to_vec(&fields)?, client.presence())?
         .relay(client)
 }
 

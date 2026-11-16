@@ -48,7 +48,7 @@ use crate::{
     config::{Engine, Upstreams},
     error::{AgentError, Outcome},
     paths,
-    server::response::{self, Client, DONE, EVENT_PREFIX},
+    server::response::{self, Client, DONE, EVENT_PREFIX, Presence},
     chat::tooltext::Sieve,
 };
 
@@ -265,7 +265,11 @@ pub fn answer(client: &mut dyn Client, body: &[u8], upstreams: &Upstreams) -> Ou
 
     match Mode::of(web_search, streamed, brings_tools(&fields)) {
         Mode::Relay => model
-            .post(paths::CHAT_COMPLETIONS, &serde_json::to_vec(&fields)?)?
+            .post_for(
+                paths::CHAT_COMPLETIONS,
+                &serde_json::to_vec(&fields)?,
+                client.presence(),
+            )?
             .relay(client),
         Mode::Stream => as_events(client, &mut |client| {
             stream_round(client, &fields, model)?;
@@ -298,7 +302,7 @@ fn fit(fields: &mut Fields, engine: &Engine) {
 
 /// Runs `body` inside an event stream: an error becomes an error event, and
 /// the stream always ends with `[DONE]`.
-fn as_events(client: &mut dyn Client, body: &mut dyn FnMut(&mut dyn Write) -> Outcome) -> Outcome {
+fn as_events(client: &mut dyn Client, body: &mut dyn FnMut(&mut dyn Client) -> Outcome) -> Outcome {
     response::start_events(client)?;
 
     if let Err(error) = body(client) {
@@ -329,7 +333,7 @@ fn send_thor(client: &mut dyn Write, event: &ThorEvent) -> Outcome {
 /// the round short would end the answer on a half sentence. Only when no round
 /// writes any text does the note name the sources the ledger found.
 fn search_loop(
-    client: &mut dyn Write,
+    client: &mut dyn Client,
     fields: Fields,
     upstreams: &Upstreams,
     engine: &Engine,
@@ -357,7 +361,7 @@ fn search_loop(
 /// request as it grows round by round, and what the research found.
 struct Search<'a> {
     /// The chat page, which every token and search event is sent to.
-    client: &'a mut dyn Write,
+    client: &'a mut dyn Client,
     /// The request sent for the next round.
     fields: Fields,
     /// The search engine and the web the tools reach.
@@ -919,7 +923,7 @@ fn sources(results: &[SearchResult]) -> Vec<Source<'_>> {
 
 /// Streams one model reply to the client and, when the guard stopped it, tells
 /// the page why. This is the whole answer when web search is off.
-fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome {
+fn stream_round(client: &mut dyn Client, fields: &Fields, model: &Endpoint) -> Outcome {
     let round = stream_tokens(client, fields, model)?;
 
     round
@@ -932,10 +936,17 @@ fn stream_round(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Ou
 /// structured one, and the reader never sees the tags. When the guard stops
 /// the reply, the reason is kept in [`Round::stop`] and nothing about it is
 /// sent: the caller decides whether the page hears of it.
-fn stream_tokens(client: &mut dyn Write, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
+///
+/// The client is checked before each line of the reply, and while the model
+/// server is silent. A request whose client has left ends there, even when
+/// nothing would be written, for example while the sieve holds a call, and
+/// dropping the response closes the connection to the model server.
+fn stream_tokens(client: &mut dyn Client, fields: &Fields, model: &Endpoint) -> Outcome<Round> {
     let request = serde_json::to_vec(fields)?;
-    let response = accepted(model.post(paths::CHAT_COMPLETIONS, &request)?)?;
-    let mut streaming = Streaming::new();
+    let presence = client.presence();
+    let response =
+        accepted(model.post_for(paths::CHAT_COMPLETIONS, &request, presence.clone())?)?;
+    let mut streaming = Streaming::new(presence);
 
     streaming.read(client, response.body)?;
 
@@ -992,15 +1003,18 @@ struct Streaming {
     sieve: Sieve,
     /// Stops a reply that runs too long or repeats itself.
     guard: guard::Guard,
+    /// Whether the client that asked is still there.
+    presence: Presence,
 }
 
 impl Streaming {
-    /// A reply that has produced nothing yet.
-    fn new() -> Streaming {
+    /// A reply that has produced nothing yet, for the client `presence` follows.
+    fn new(presence: Presence) -> Streaming {
         Streaming {
             round: Round::default(),
             sieve: Sieve::new(),
             guard: guard::Guard::default(),
+            presence,
         }
     }
 
@@ -1015,8 +1029,13 @@ impl Streaming {
         last.transpose().map(drop)
     }
 
-    /// Handles one line of the event stream.
+    /// Handles one line of the event stream, once the client is known to be
+    /// still there.
     fn line(&mut self, client: &mut dyn Write, line: &str) -> Outcome<Flow> {
+        if self.presence.is_gone() {
+            return Err(Presence::left().into());
+        }
+
         match Line::of(line) {
             Line::Other => Ok(Flow::More),
             Line::End => Ok(Flow::Over),
