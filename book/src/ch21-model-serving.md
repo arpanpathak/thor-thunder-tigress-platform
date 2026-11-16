@@ -216,7 +216,7 @@ VLLM_ARGS=--speculative-config '{"method":"mtp","model":"google/gemma-4-31B-it-a
 every quote character from both ends of a settings value. With the JSON
 option last, the closing `'` was removed, and Python's `shlex` stopped with
 "No closing quotation". With the JSON option first, the value ends in
-`gemma4`, and nothing is stripped. `thor` writes `--max-model-len` last for
+`gemma4`, and nothing is stripped. `thor-tigress` writes `--max-model-len` last for
 the same reason.
 
 `--gpu-memory-utilization` sets the share of the GPU's memory that vLLM
@@ -246,7 +246,7 @@ vLLM. The service runs `docker run`, and stopping the service ends only that
 client. The container keeps running and holds its memory, about 100 GB on
 the Thor, until `sg docker -c "docker stop thor-vllm"` stops it. `sg` runs
 the command in the `docker` group, which a session started before the user
-joined the group does not have. `thor stop thor-vllm` stops the service,
+joined the group does not have. `thor-tigress stop thor-vllm` stops the service,
 then the container, and reports the memory freed. It is tested with stand-in
 programs, not yet on the Thor.
 

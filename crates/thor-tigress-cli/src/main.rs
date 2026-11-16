@@ -1,4 +1,4 @@
-//! The `thor` command. See [`thor_tigress_cli::cli::USAGE`].
+//! The `thor-tigress` command. See [`thor_tigress_cli::cli::USAGE`].
 
 use std::process::ExitCode;
 
@@ -17,7 +17,7 @@ fn main() -> ExitCode {
     match run(&arguments) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("thor: {error}");
+            eprintln!("thor-tigress: {error}");
             ExitCode::FAILURE
         }
     }

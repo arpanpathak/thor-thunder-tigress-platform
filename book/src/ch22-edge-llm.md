@@ -311,9 +311,9 @@ and we built it with its MTP draft model at `--max-input-len 65536`,
 32,768 × 262,144 × 6 bytes, 48 GiB, larger than either reported capacity,
 and it built and served at about 35 tok/s. We do not know what sets the capacity, so we keep two observed points. A
 workspace of 48 GiB built on this Thor, and one of 96 GiB failed.
-`thor serve` does this arithmetic before an Edge-LLM build with a draft model and
+`thor-tigress serve` does this arithmetic before an Edge-LLM build with a draft model and
 compares it with those two points (chapter "Choosing an engine and a model:
-thor").
+thor-tigress").
 
 NVIDIA/TensorRT-Edge-LLM issue #285 records this failure. PR #229 removes
 the unused prefill scores from the base engine of a speculative build, which

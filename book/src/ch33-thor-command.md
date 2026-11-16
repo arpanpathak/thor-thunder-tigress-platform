@@ -1,6 +1,6 @@
 <img class="cub" src="art/cub.svg" alt="The Thor Tigress Cub">
 
-# Choosing an engine and a model: `thor`
+# Choosing an engine and a model: `thor-tigress`
 
 A served model occupies memory for as long as it runs. On the Thor, the CPU
 and the GPU share one pool of 128 GB, so every model, every engine and every
@@ -11,7 +11,7 @@ model is therefore a question of arithmetic before it is a question of
 commands.
 
 In this chapter, we study that arithmetic and the command that applies it,
-`thor`. The command asks for an engine, a model and a context, checks the
+`thor-tigress`. The command asks for an engine, a model and a context, checks the
 memory, and only then writes the settings and restarts the service. Our
 running example is `nvidia/Gemma-4-31B-IT-NVFP4`, the model the Thor serves.
 It has a vocabulary of 262,144 tokens, a longest context of 262,144 tokens,
@@ -69,7 +69,7 @@ from `~/models/edge-llm/FOLDER` and draft models from
 `~/models/edge-llm/cache`. llama.cpp reads `~/models/gguf/FOLDER`. vLLM's
 container downloads into the Hugging Face cache, `~/.cache/huggingface/hub`.
 The settings `EDGE_ROOT`, `GGUF_ROOT` and `HF_HUB_CACHE` move these folders.
-`thor engines` prints this table for the machine it runs on, with whether
+`thor-tigress engines` prints this table for the machine it runs on, with whether
 each engine is installed.
 
 ## The memory of a served model
@@ -122,15 +122,15 @@ default, and a service's `MemoryMax` caps the result.
 Suppose 4.7 GB is available, `thor-edge-llm` holds 60.0 GB, and
 `MIN_FREE_GB` is 25. The usable memory is 4.7 + 60.0 − 25.0 = 39.7 GB. Our
 model needs 43.8 GB at 262,144 tokens, so it does not fit, while 131,072
-tokens at 38.4 GB does. In this case, `thor serve` changes nothing and states
+tokens at 38.4 GB does. In this case, `thor-tigress serve` changes nothing and states
 both numbers, the largest context that fits, and the services that hold
 memory.
 
 ```text
-thor: Gemma-4-31B-IT-NVFP4 at 262,144 tokens needs about 43.8 GB; 39.7 GB can be used.
+thor-tigress: Gemma-4-31B-IT-NVFP4 at 262,144 tokens needs about 43.8 GB; 39.7 GB can be used.
   4.7 GB available, 60.0 GB held by thor-edge-llm (freed when it restarts), 25.0 GB kept free (MIN_FREE_GB), thor-edge-llm capped at 85.9 GB.
   The largest context that fits is 131,072: --context 131072
-  To make room, stop thor-vllm (105.8 GB): thor stop thor-vllm
+  To make room, stop thor-vllm (105.8 GB): thor-tigress stop thor-vllm
 ```
 
 The same check applies to an engine that is not installed, a context above
@@ -163,7 +163,7 @@ about 35 tokens per second. The capacity TensorRT reports in the failures,
 35.3 GiB without NVIDIA's PR #229 and 32.6 GiB with it, is therefore not a
 fixed limit, and we do not know what sets it.
 
-What we know is two points, so `thor` compares each build with them.
+What we know is two points, so `thor-tigress` compares each build with them.
 `EDGE_WORKSPACE_BUILT_GIB`, 48 by default, is the largest workspace known to
 build here, and `EDGE_WORKSPACE_FAILED_GIB`, 96 by default, is the smallest
 known to fail. Below the first point, the plan says nothing. At or above the
@@ -180,9 +180,9 @@ that the size is untested. A context of 196,608 gives an input of 98,304 and
 a workspace of 72.0 GiB, which falls there. Neither note stops the build,
 and the two settings move as new builds succeed or fail.
 
-## Choosing with `thor serve`
+## Choosing with `thor-tigress serve`
 
-`thor serve` asks four questions in order: the engine, the model, the
+`thor-tigress serve` asks four questions in order: the engine, the model, the
 context, and the plan. Each has a flag, so a script can answer them all.
 
 The model list starts with the models already on disk. Below them comes a
@@ -215,7 +215,7 @@ memory and still be marked as a likely build failure.
 ```
 
 The plan lists every change before it happens: engine and port, download,
-context, memory, settings lines and services to restart. After a yes, `thor` downloads any missing files, copies
+context, memory, settings lines and services to restart. After a yes, `thor-tigress` downloads any missing files, copies
 the settings file to `env.backup-SECONDS`, writes the new lines and restarts
 the service. It then follows the service's log until `/v1/models` lists the
 model, and restarts `thor-tigress-agent` so the chat page lists it too.
@@ -237,17 +237,17 @@ from the end.
 
 `systemctl --user stop thor-vllm` ends the `docker run` client that the
 service started, not the container. The container keeps running and keeps
-its memory, about 100 GB on the Thor. `thor stop thor-vllm` therefore stops
+its memory, about 100 GB on the Thor. `thor-tigress stop thor-vllm` therefore stops
 the service, then the container, and waits until Docker no longer lists it.
 It reports the memory freed from `MemAvailable` before and after. A named
 service stops without a question, so the command works over SSH, where no
-terminal answers. Without a name, `thor stop` offers a menu and asks first.
+terminal answers. Without a name, `thor-tigress stop` offers a menu and asks first.
 
 ## Returning after a failed start
 
 A start fails when systemd reports the service as failed or restarting, or
 when `/v1/models` does not list the model within `--wait`. The useful
-information is then in two places, the log and the backup. `thor` prints
+information is then in two places, the log and the backup. `thor-tigress` prints
 every log line since the restart that reports an error, followed by the
 commands that restore the previous settings.
 
@@ -259,11 +259,11 @@ thor-edge-llm failed. The lines in its log that report errors:
 To go back:
   cp ~/.config/thor-chat/env.backup-1794807482 ~/.config/thor-chat/env
   systemctl --user restart thor-edge-llm
-To stop it from restarting: thor stop thor-edge-llm
+To stop it from restarting: thor-tigress stop thor-edge-llm
 ```
 
 A failed Edge-LLM build restarts every 5 seconds, and each attempt takes
-memory from the other services. `thor stop thor-edge-llm` is therefore the
+memory from the other services. `thor-tigress stop thor-edge-llm` is therefore the
 first command to run, before the restore.
 
 ## Flags
@@ -282,12 +282,12 @@ first command to run, before the restore.
 | `--settings FILE` | the settings file | `~/.config/thor-chat/env` |
 
 ```bash
-thor serve --engine edge-llm --model nvidia/Gemma-4-31B-IT-NVFP4 --context 65536 --yes
-thor serve --engine vllm --model nvidia/Gemma-4-31B-IT-NVFP4 --context max --yes
+thor-tigress serve --engine edge-llm --model nvidia/Gemma-4-31B-IT-NVFP4 --context 65536 --yes
+thor-tigress serve --engine vllm --model nvidia/Gemma-4-31B-IT-NVFP4 --context max --yes
 ```
 
 The Hub token comes from `HF_TOKEN`, `HUGGING_FACE_HUB_TOKEN`, or the file
-that `hf auth login` writes. `thor` sends it only to the Hub. `HF_ENDPOINT`
+that `hf auth login` writes. `thor-tigress` sends it only to the Hub. `HF_ENDPOINT`
 names another Hub, and `HF_HUB_OFFLINE=1` stops every Hub request, as it does
 for Hugging Face's own tools.
 

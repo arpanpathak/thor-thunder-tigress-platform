@@ -1,4 +1,4 @@
-//! What `thor serve` is about to do, worked out before anything changes, so it can be
+//! What `thor-tigress serve` is about to do, worked out before anything changes, so it can be
 //! shown and confirmed.
 
 use std::{
@@ -25,7 +25,7 @@ pub const AGENT_SERVICE: &str = "thor-tigress-agent";
 static MAX_MODEL_LEN: LazyLock<Option<Regex>> =
     LazyLock::new(|| Regex::new(r"--max-model-len(?:=|\s+)\S+\s*").ok());
 
-/// The changes `thor serve` makes.
+/// The changes `thor-tigress serve` makes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Plan {
     /// The engine.

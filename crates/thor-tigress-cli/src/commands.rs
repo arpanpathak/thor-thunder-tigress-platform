@@ -1,4 +1,4 @@
-//! `thor engines`, `thor list`, `thor stop` and `thor logs`.
+//! `thor-tigress engines`, `thor-tigress list`, `thor-tigress stop` and `thor-tigress logs`.
 
 use std::{iter, process::Command};
 
@@ -165,7 +165,7 @@ fn disk_row(machine: &Machine, candidate: &Candidate) -> String {
 
 /// Stops a service and, for vLLM, its Docker container, then reports the memory freed.
 /// A service named on the command line is stopped without a question, so scripts and
-/// `ssh thor thor stop NAME` work without a terminal; a service chosen from the menu is
+/// `ssh thor thor-tigress stop NAME` work without a terminal; a service chosen from the menu is
 /// confirmed first.
 pub fn stop(machine: &Machine, name: Option<String>, yes: bool) -> Outcome<()> {
     let named = name.is_some();

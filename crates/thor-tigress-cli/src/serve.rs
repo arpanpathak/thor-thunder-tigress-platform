@@ -1,4 +1,4 @@
-//! `thor serve`: choose an engine, a model and a context, check that they fit, then
+//! `thor-tigress serve`: choose an engine, a model and a context, check that they fit, then
 //! download, write the settings, restart the service and wait until it answers.
 //!
 //! Every question has a flag, so a script can answer them all and pass `--yes`.
@@ -53,7 +53,7 @@ enum ModelChoice {
     EnterName,
 }
 
-/// What every step of `thor serve` needs once the engine is chosen.
+/// What every step of `thor-tigress serve` needs once the engine is chosen.
 struct Session<'a> {
     /// The machine and its settings.
     machine: &'a Machine,
@@ -69,7 +69,7 @@ struct Session<'a> {
     options: &'a ServeOptions,
 }
 
-/// Runs `thor serve`.
+/// Runs `thor-tigress serve`.
 pub fn serve(machine: &Machine, options: &ServeOptions) -> Outcome<()> {
     let engine = choose_engine(machine, options.engine)?;
     check_installed(machine, engine)?;
@@ -127,7 +127,7 @@ fn check_installed(machine: &Machine, engine: Engine) -> Outcome<()> {
     match engine.installed(&machine.settings, &machine.search_path) {
         Installed::Yes(_found) => Ok(()),
         Installed::No(missing) => Err(ThorError::Condition(format!(
-            "{} is not installed here: {missing}. See thor engines.",
+            "{} is not installed here: {missing}. See thor-tigress engines.",
             engine.title()
         ))),
     }
@@ -552,7 +552,7 @@ pub fn does_not_fit_message(
     );
     lines.extend(running.iter().map(|state| {
         format!(
-            "  To make room, stop {} ({}): thor stop {}",
+            "  To make room, stop {} ({}): thor-tigress stop {}",
             state.name,
             or_unknown(state.held_memory(), gigabytes),
             state.name

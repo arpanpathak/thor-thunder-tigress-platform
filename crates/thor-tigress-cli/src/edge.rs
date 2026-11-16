@@ -8,7 +8,7 @@
 //!
 //! The autotuner's capacity is not a fixed number. Two failed Gemma 4 31B builds on the
 //! Thor reported 35.3 GiB and 32.6 GiB (NVIDIA/TensorRT-Edge-LLM issue #285), and a
-//! Gemma 4 26B-A4B build that needed 48 GiB succeeded. `thor` therefore compares the
+//! Gemma 4 26B-A4B build that needed 48 GiB succeeded. `thor-tigress` therefore compares the
 //! workspace with two recorded points: the largest workspace known to build here
 //! (`EDGE_WORKSPACE_BUILT_GIB`, 48) and the smallest known to fail
 //! (`EDGE_WORKSPACE_FAILED_GIB`, 96).
