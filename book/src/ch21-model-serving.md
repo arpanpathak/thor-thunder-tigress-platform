@@ -200,6 +200,56 @@ To make another model the default, point `MODEL` at its file and restart.
 The aliases `nemotron` and `nemotron-think` follow `MODEL`, so Claude Code
 and OpenCode keep working; they get the new model under the old name.
 
+## Gemma 4 31B on vLLM
+
+The Thor serves `nvidia/Gemma-4-31B-IT-NVFP4` on vLLM. The service is
+`thor-vllm`, its Docker container has the same name, and the server listens
+on port 8000. Edge-LLM cannot build this model's engine for a long prompt with
+its draft model (chapter "TensorRT Edge-LLM"). vLLM reads a long prompt in
+chunks, so it fixes no prompt length in advance. Its settings in `~/.config/thor-chat/env` are these.
+
+```bash
+VLLM_ARGS=--speculative-config '{"method":"mtp","model":"google/gemma-4-31B-it-assistant","num_speculative_tokens":3}' --max-model-len 262144 --gpu-memory-utilization 0.5 --max-num-seqs 2 --enable-prefix-caching --enable-chunked-prefill --reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4
+```
+
+`--speculative-config` comes first for a reason. `thor-tigress-serve` strips
+every quote character from both ends of a settings value. With the JSON
+option last, the closing `'` was removed, and Python's `shlex` stopped with
+"No closing quotation". With the JSON option first, the value ends in
+`gemma4`, and nothing is stripped. `thor` writes `--max-model-len` last for
+the same reason.
+
+`--gpu-memory-utilization` sets the share of the GPU's memory that vLLM
+reserves at start, for the weights and the KV cache together. On the Thor,
+the CPU and GPU share 128 GB, so the reservation is taken from everything
+else. At 0.85, vLLM reserved about 68 GiB of KV cache, room for about 1.45
+million tokens. Each token therefore takes about 68 GiB / 1.45 million ≈ 50 KB. At 0.5,
+the cache still holds two full conversations of 262,144 tokens, which is
+what `--max-num-seqs 2` allows. Two conversations need
+2 × 262,144 × 50 KB ≈ 24.6 GiB.
+
+| Model | Engine | Speed | Conditions |
+|---|---|---|---|
+| Gemma 4 31B NVFP4 | vLLM, no draft model | 7.5 tok/s | a 400-token reply |
+| Gemma 4 31B NVFP4 | vLLM, MTP draft model | 17.0 tok/s | a 400-token reply |
+| Gemma 4 31B NVFP4 | vLLM, MTP draft model | 20 to 30 tok/s | reported during edit steps; not measured under fixed conditions |
+| Qwen3.6-35B-A3B NVFP4 | Edge-LLM, `thor-qwen36-temp` on port 8082 | 76.0 tok/s | one reply |
+
+The draft model more than doubles Gemma's speed, from 7.5 to 17.0 tok/s on
+the same kind of reply. Edit steps reach 20 to 30 tok/s because edits repeat
+text that the draft model guesses well. Qwen3.6-35B-A3B on Edge-LLM is still
+the fastest model on the Thor. It activates about 3B parameters per token,
+against all 31B for Gemma.
+
+Stopping `thor-vllm` with `systemctl --user stop thor-vllm` does not stop
+vLLM. The service runs `docker run`, and stopping the service ends only that
+client. The container keeps running and holds its memory, about 100 GB on
+the Thor, until `sg docker -c "docker stop thor-vllm"` stops it. `sg` runs
+the command in the `docker` group, which a session started before the user
+joined the group does not have. `thor stop thor-vllm` stops the service,
+then the container, and reports the memory freed. It is tested with stand-in
+programs, not yet on the Thor.
+
 ## The other commands
 
 | Command | What it does |

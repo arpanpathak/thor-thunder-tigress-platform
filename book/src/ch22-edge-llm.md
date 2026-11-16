@@ -272,6 +272,69 @@ GB checkpoint plus its context fits, at a context to be measured.
 4. Serve the winner on `:8081`, add the agent's routing, and add it to the
    picker.
 
+## The long-prompt build limit
+
+Consider Gemma 4 31B on Edge-LLM with a long prompt. We built `nvidia/Gemma-4-31B-IT-NVFP4` with its MTP draft model,
+`google/gemma-4-31B-it-assistant`. A *draft model* proposes several tokens
+ahead, and the main model checks them in one pass. MTP, multi-token
+prediction, is the method Gemma 4's draft model uses. We asked for
+`--max-input-len 131072`, `--max-kv-cache-capacity 262144` and a batch of 1.
+`--max-input-len` is the longest prompt the engine accepts, and TensorRT
+fixes it when it builds the engine.
+
+The build failed three times, each after about 27 minutes, and each time
+with the same three errors. The first was
+`AUTOTUNER ERROR: ran out of memory, capacity 37882953728, required 103079215104`.
+TensorRT then logged "Could not find any implementation" for the layer, and
+the builder ended with `build_serialized_network returned None`.
+
+The required size has a simple cause. The draft graph applies the *LM head*,
+the last layer that scores every vocabulary token, to every row of the
+prompt. TensorRT's autotuner sizes a workspace for that layer before it picks
+an implementation. The builder profiles the prompt at half the longest input,
+so 65,536 rows. Each row holds one score per vocabulary token, 262,144 for
+Gemma 4. Each score takes 2 bytes as the FP16 output of the LM head and 4
+bytes as its FP32 copy.
+
+```text
+65,536 × 262,144 × (2 + 4) = 103,079,215,104 bytes = 96 GiB
+```
+
+The reported capacity, 37,882,953,728 bytes, is 35.3 GiB. More free memory
+did not help. The third attempt started with 110 GB free and failed in the
+same place. A fourth attempt with PR #229 applied, described below, reported
+a capacity of 35,030,827,008 bytes, or 32.6 GiB.
+
+The capacity is not a fixed limit. Gemma 4 26B-A4B has the same vocabulary,
+and we built it with its MTP draft model at `--max-input-len 65536`,
+`--max-kv-cache-capacity 131072` and a batch of 1. Its workspace was
+32,768 × 262,144 × 6 bytes, 48 GiB, larger than either reported capacity,
+and it built and served at about 35 tok/s. We do not know what sets the capacity, so we keep two observed points. A
+workspace of 48 GiB built on this Thor, and one of 96 GiB failed.
+`thor serve` does this arithmetic before an Edge-LLM build with a draft model and
+compares it with those two points (chapter "Choosing an engine and a model:
+thor").
+
+NVIDIA/TensorRT-Edge-LLM issue #285 records this failure. PR #229 removes
+the unused prefill scores from the base engine of a speculative build, which
+is the same 65,536 × 262,144 × (2 + 4) allocation. With PR #229 applied, the
+base engine (`spec-base`) builds in 16 minutes, and the draft engine
+(`spec-draft`) fails with the same allocation. The reason is in
+`Gemma4Assistant.forward`. The draft graph applies `lm_head` to all hidden
+states, while the base graph first gathers the rows it needs, so PR #229
+does not cover the draft engine. Issue #222 reports a related limit for
+Qwen3.8-27B. PR #215 adds chunked prefill to the runtime, which would let an
+engine read a long prompt in pieces.
+
+A built engine also limits every request. Edge-LLM answers a longer prompt
+with an error instead of a reply. One agent run on an engine built for
+65,536 stopped with
+`EDGELLM_INPUT_TOO_LONG: prefill length 72057 exceeds engine max_input_len 65536`.
+`openbatrangs` sends the whole conversation again on every step, so the
+prompt grows with each step. For agent runs, the built prompt length is
+therefore the practical context, whatever `--max-kv-cache-capacity` says. We
+serve Gemma 4 31B on vLLM for that reason (chapter "Model serving").
+
 ## Open questions and risks
 
 | Question | Why it matters | How to find out |
@@ -291,4 +354,8 @@ GB checkpoint plus its context fits, at a context to be measured.
 - [Jetson AI Lab: TensorRT Edge-LLM on Jetson](https://www.jetson-ai-lab.com/tutorials/tensorrt-edge-llm/)
 - [NVIDIA blog: Edge-LLM completes the MLPerf Edge Agentic benchmark 6.4× faster on Jetson AGX Thor](https://developer.nvidia.com/blog/tensorrt-edge-llm-completes-the-mlperf-edge-agentic-benchmark-6-4x-faster-on-jetson-agx-thor/)
 - [Issue #233: tensorrt-edgellm-serve on Thor](https://github.com/NVIDIA/TensorRT-Edge-LLM/issues/233)
+- [Issue #285: Gemma-4-31B-IT-NVFP4 build with --max-input-len 131072 fails on the Thor](https://github.com/NVIDIA/TensorRT-Edge-LLM/issues/285)
+- [PR #229: avoid unused prefill memory during speculative engine builds](https://github.com/NVIDIA/TensorRT-Edge-LLM/pull/229)
+- [Issue #222: llm_build fails for long maxInputLen on Qwen3.8-27B](https://github.com/NVIDIA/TensorRT-Edge-LLM/issues/222)
+- [PR #215: continuous batching and chunked prefill](https://github.com/NVIDIA/TensorRT-Edge-LLM/pull/215)
 - [NVIDIA forum: TensorRT-LLM engines on Jetson Thor](https://forums.developer.nvidia.com/t/how-to-serve-tensorrt-llm-engines-with-triton-inference-server-on-jetson-thor-and-compare-inference-speed-with-vllm-container/358802)
