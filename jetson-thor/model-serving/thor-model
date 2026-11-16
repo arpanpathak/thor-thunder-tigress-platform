@@ -93,7 +93,9 @@ up() {
         return
     fi
     wait_for 8079 "llama-server" 2
-    warm "$nano"
+    if grep -q '^MODEL_ON_STARTUP=true' "$env_file"; then
+        warm "$nano"
+    fi
     wait_for 8081 "the Edge-LLM engine" 15
     warm "$bolt"
 }
