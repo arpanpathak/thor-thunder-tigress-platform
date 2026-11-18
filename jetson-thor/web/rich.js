@@ -220,6 +220,68 @@ function drawSvg(figure, source) {
   showDrawing(figure, image);
 }
 
+// ---- a drawing still streaming ----
+// An element's opening or closing tag. Comments, `<?xml … ?>` and `<!DOCTYPE>`
+// don't start with a letter, so they never match.
+const TAG = /<(\/?)([a-zA-Z][\w:.-]*)[^>]*?(\/?)>/g;
+
+// The SVG that has arrived so far, made whole: cut after the last complete tag,
+// with every element still open closed in order. Empty until `<svg …>` is whole.
+export function closeSvg(partial) {
+  const start = partial.search(/<svg\b/i);
+  const end = partial.lastIndexOf(">");
+  if (start < 0 || end < start) return "";
+
+  const text = partial.slice(start, end + 1);
+  const open = [];
+
+  for (const [, closing, name, selfClosing] of text.matchAll(TAG)) {
+    if (closing) open.pop();
+    else if (!selfClosing) open.push(name);
+  }
+
+  return text + open.reverse().map((name) => `</${name}>`).join("");
+}
+
+// One image lives across the re-renders of a streaming reply. Each new frame is
+// loaded off the page first, so the drawing grows without flickering, and a
+// frame that doesn't parse leaves the last good one in place. A source that
+// doesn't continue the last one is a new drawing, and starts a new image.
+let liveImage = null;
+let livePartial = "";
+let liveSource = "";
+
+function liveImageFor(partial) {
+  if (!liveImage || !partial.startsWith(livePartial)) {
+    liveImage = Object.assign(element("img"), { alt: "Drawing from the reply, still arriving" });
+    liveSource = "";
+  }
+
+  livePartial = partial;
+
+  return liveImage;
+}
+
+function nextFrame(image, source) {
+  const frame = svgImage(source, "Drawing from the reply");
+
+  frame.addEventListener("load", () => { image.src = frame.src; }, { once: true });
+}
+
+function drawLiveSvg(figure, partial) {
+  const source = closeSvg(partial);
+
+  const image = liveImageFor(partial);
+
+  figure.querySelector(".view").replaceChildren(image);
+  figure.dataset.svg = source || partial;
+
+  if (!source || source === liveSource) return;
+
+  liveSource = source;
+  nextFrame(image, source);
+}
+
 function drawDiagram(figure, source) {
   const ready = finished.get(diagramKey(source));
 
@@ -238,14 +300,18 @@ function drawDiagram(figure, source) {
     .finally(() => figure.classList.remove("drawing"));
 }
 
-/** Draws every finished ```mermaid and ```svg block under `root`. */
-export function drawFigures(root) {
-  root.querySelectorAll(".figure:not(.drawn):not(.failed):not(.drawing)").forEach((figure) => {
-    const source = figure.querySelector("pre").textContent;
+function drawFigure(figure) {
+  const source = figure.querySelector("pre").textContent;
 
-    if (figure.dataset.kind === "svg") drawSvg(figure, source);
-    else drawDiagram(figure, source);
-  });
+  if (figure.classList.contains("live")) return drawLiveSvg(figure, source);
+  if (figure.dataset.kind === "svg") return drawSvg(figure, source);
+
+  drawDiagram(figure, source);
+}
+
+/** Draws every ```mermaid and ```svg block under `root`, and a drawing still streaming. */
+export function drawFigures(root) {
+  root.querySelectorAll(".figure:not(.drawn):not(.failed):not(.drawing)").forEach(drawFigure);
 }
 
 /** Draws everything rich in a rendered reply. */
