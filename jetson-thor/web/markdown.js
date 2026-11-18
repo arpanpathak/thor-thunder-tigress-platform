@@ -211,15 +211,28 @@ function codeBlock(code, lang) {
   return block;
 }
 
-// Switches a figure between its drawing and its code.
+// Whether a drawing still streaming shows its code. The reply is drawn again on
+// every token, so the choice is kept here instead of on the figure.
+let liveShowsCode = false;
+
+function toggleLabel(showing, kind) {
+  if (!showing) return "code";
+
+  return kind === "svg" ? "drawing" : "diagram";
+}
+
+// Switches a figure between its drawing and its code. A live figure is replaced
+// on every frame, before a click could finish, so it switches on pointerdown.
 function toggleButton(block, kind) {
-  const toggle = element("button", "", "code");
+  const live = block.classList.contains("live");
+  const toggle = element("button", "", toggleLabel(block.classList.contains("show-code"), kind));
   toggle.type = "button";
 
-  toggle.addEventListener("click", () => {
+  toggle.addEventListener(live ? "pointerdown" : "click", () => {
     const showing = block.classList.toggle("show-code");
+    toggle.textContent = toggleLabel(showing, kind);
 
-    toggle.textContent = showing ? (kind === "svg" ? "drawing" : "diagram") : "code";
+    if (live) liveShowsCode = showing;
   });
 
   return toggle;
@@ -246,10 +259,13 @@ function downloadButton(block, code, kind) {
 }
 
 // A ```mermaid diagram or ```svg drawing. rich.js draws it into `.view`; the
-// code stays one click away, and the drawing can be saved as an .svg file.
-function figureBlock(code, kind, lang) {
+// code stays one click away, and the drawing can be saved as an .svg file. A
+// `live` drawing is still streaming, and rich.js draws what has arrived so far.
+function figureBlock(code, kind, lang, live = false) {
   const block = element("div", "code figure");
   block.dataset.kind = kind;
+  block.classList.toggle("live", live);
+  block.classList.toggle("show-code", live && liveShowsCode);
 
   const bar = element("div", "bar");
   bar.append(element("span", "", lang), toggleButton(block, kind), downloadButton(block, code, kind), copyButton(code));
@@ -260,6 +276,12 @@ function figureBlock(code, kind, lang) {
   block.append(bar, element("div", "view"), pre);
 
   return block;
+}
+
+function figureOrCode(code, kind, lang, live) {
+  if (!kind) return codeBlock(code, lang);
+
+  return figureBlock(code, kind, lang, live);
 }
 
 function figureKind(lang, code) {
@@ -373,13 +395,15 @@ function codeFence(parent, lines, index, fence) {
     index += 1;
   }
 
-  // A fence still open is a reply mid-stream: it is shown as code until it closes.
+  // A fence still open is a reply mid-stream. A drawing is drawn as it arrives;
+  // a diagram can't be read until it is whole, so it shows as code until it closes.
   const closed = index < lines.length;
   const code = body.join("\n");
   const lang = fence[2].toLowerCase();
-  const kind = closed ? figureKind(lang, code) : "";
+  const kind = figureKind(lang, code);
+  const live = !closed && kind === "svg";
 
-  parent.append(kind ? figureBlock(code, kind, lang) : codeBlock(code, lang));
+  parent.append(closed || live ? figureOrCode(code, kind, lang, live) : codeBlock(code, lang));
 
   return index + 1;
 }
